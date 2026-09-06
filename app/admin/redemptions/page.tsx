@@ -20,12 +20,35 @@ type RecentRow = {
   id: string;
   status: string;
   code: string;
+  channel: string | null;
   bill_value: string | number | null;
   discount_value: string | number | null;
+  void_reason: string | null;
   listing_name: string;
+  guest_name: string | null;
+  guest_username: string | null;
+  guest_id: string;
+  staff_name: string | null;
+  staff_username: string | null;
+  owner_name: string | null;
+  owner_username: string | null;
   created_at: string;
   validated_at: string | null;
+  voided_at: string | null;
 };
+
+function personLabel(
+  name: string | null,
+  username: string | null,
+  fallback = "—",
+): string {
+  const n = name?.trim();
+  const u = username?.trim();
+  if (n && u) return `${n} (@${u})`;
+  if (n) return n;
+  if (u) return `@${u}`;
+  return fallback;
+}
 
 export default async function AdminRedemptionsPage() {
   const { profile } = await requireSessionUser();
@@ -49,10 +72,21 @@ export default async function AdminRedemptionsPage() {
   try {
     const [recentResult, summaryResult] = await Promise.all([
       query(
-        `SELECT r.id, r.status, r.code, r.bill_value, r.discount_value,
-                r.created_at, r.validated_at, l.name AS listing_name
+        `SELECT r.id, r.status, r.code, r.channel, r.bill_value, r.discount_value,
+                r.void_reason, r.created_at, r.validated_at, r.voided_at,
+                r.user_id AS guest_id,
+                l.name AS listing_name,
+                guest.full_name AS guest_name,
+                guest.username AS guest_username,
+                staff.full_name AS staff_name,
+                staff.username AS staff_username,
+                owner.full_name AS owner_name,
+                owner.username AS owner_username
          FROM public.redemptions r
          INNER JOIN listings l ON l.id = r.listing_id
+         LEFT JOIN profiles guest ON guest.id = r.user_id
+         LEFT JOIN profiles staff ON staff.id = r.staff_id
+         LEFT JOIN profiles owner ON owner.id = COALESCE(r.owner_id, l.owner_id)
          ORDER BY r.created_at DESC
          LIMIT 50`,
       ),
@@ -89,7 +123,7 @@ export default async function AdminRedemptionsPage() {
         <div>
           <h1 className="text-2xl font-bold">Offer redemptions</h1>
           <p className="text-muted-foreground">
-            Platform-wide redemption GMV and staff validation for any listing.
+            Who redeemed, who validated, and platform bill GMV.
           </p>
         </div>
         <Link
@@ -163,13 +197,16 @@ export default async function AdminRedemptionsPage() {
               No redemptions yet (or migration not applied).
             </p>
           ) : (
-            <div className="rounded-xl border border-border/50 overflow-hidden">
+            <div className="rounded-xl border border-border/50 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>When</TableHead>
-                    <TableHead>Code</TableHead>
+                    <TableHead>Guest</TableHead>
+                    <TableHead>Validated by</TableHead>
+                    <TableHead>Merchant</TableHead>
                     <TableHead>Listing</TableHead>
+                    <TableHead>Code</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Bill</TableHead>
                     <TableHead className="text-right">Discount</TableHead>
@@ -178,18 +215,50 @@ export default async function AdminRedemptionsPage() {
                 <TableBody>
                   {recent.map((row) => (
                     <TableRow key={row.id}>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {new Date(row.created_at).toLocaleString("en-US", {
                           month: "short",
                           day: "numeric",
                           hour: "numeric",
                           minute: "2-digit",
                         })}
+                        {row.validated_at ? (
+                          <span className="block text-xs">
+                            ok{" "}
+                            {new Date(row.validated_at).toLocaleString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        ) : null}
                       </TableCell>
+                      <TableCell className="text-sm">
+                        <div className="font-medium">
+                          {personLabel(row.guest_name, row.guest_username, "Unknown guest")}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-mono truncate max-w-[140px]">
+                          {row.guest_id}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {row.status === "validated" || row.staff_name || row.staff_username
+                          ? personLabel(row.staff_name, row.staff_username, "—")
+                          : "—"}
+                        {row.channel ? (
+                          <span className="block text-xs text-muted-foreground">
+                            via {row.channel}
+                          </span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {personLabel(row.owner_name, row.owner_username)}
+                      </TableCell>
+                      <TableCell>{row.listing_name}</TableCell>
                       <TableCell className="font-mono text-xs">
                         {row.code}
                       </TableCell>
-                      <TableCell>{row.listing_name}</TableCell>
                       <TableCell>
                         <Badge
                           variant={
@@ -202,6 +271,11 @@ export default async function AdminRedemptionsPage() {
                         >
                           {row.status}
                         </Badge>
+                        {row.void_reason ? (
+                          <span className="block text-xs text-muted-foreground mt-1 max-w-[160px]">
+                            {row.void_reason}
+                          </span>
+                        ) : null}
                       </TableCell>
                       <TableCell className="text-right">
                         {row.bill_value != null

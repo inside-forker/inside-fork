@@ -138,42 +138,61 @@ export default async function AdminMobileEventsPage() {
                   <TableRow className="border-b border-border/50 bg-muted/30 hover:bg-muted/40">
                     <TableHead className="font-semibold">Time</TableHead>
                     <TableHead className="font-semibold">Event</TableHead>
+                    <TableHead className="font-semibold">User</TableHead>
                     <TableHead className="font-semibold">Source</TableHead>
                     <TableHead className="font-semibold">Screen</TableHead>
                     <TableHead className="font-semibold">Platform</TableHead>
-                    <TableHead className="font-semibold">Actor</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentEvents.map((event) => (
-                    <TableRow
-                      key={event.id}
-                      className="border-b border-border/30 hover:bg-muted/50"
-                    >
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDateTime(event.occurredAt)}
-                      </TableCell>
-                      <TableCell>
-                        <code className="px-2 py-1 rounded-md bg-muted/50 text-xs font-mono border border-border/30">
-                          {event.eventName}
-                        </code>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {event.sourceContext}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {event.screen ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {event.platform ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={event.isAuthenticated ? "secondary" : "outline"}>
-                          {event.isAuthenticated ? "User" : "Anon"}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {recentEvents.map((event) => {
+                    const userLabel = event.isAuthenticated
+                      ? event.actorName && event.actorUsername
+                        ? `${event.actorName} (@${event.actorUsername})`
+                        : event.actorName ||
+                          (event.actorUsername
+                            ? `@${event.actorUsername}`
+                            : event.userId
+                              ? `User ${event.userId.slice(0, 8)}…`
+                              : "User")
+                      : event.anonId
+                        ? `Anon ${event.anonId.slice(0, 8)}…`
+                        : "Anon";
+
+                    return (
+                      <TableRow
+                        key={event.id}
+                        className="border-b border-border/30 hover:bg-muted/50"
+                      >
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDateTime(event.occurredAt)}
+                        </TableCell>
+                        <TableCell>
+                          <code className="px-2 py-1 rounded-md bg-muted/50 text-xs font-mono border border-border/30">
+                            {event.eventName}
+                          </code>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          <div className="font-medium">{userLabel}</div>
+                          <Badge
+                            variant={event.isAuthenticated ? "secondary" : "outline"}
+                            className="mt-1"
+                          >
+                            {event.isAuthenticated ? "Signed in" : "Anonymous"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {event.sourceContext}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {event.screen ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {event.platform ?? "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

@@ -23,6 +23,10 @@ export type RecentMobileEvent = {
   screen: string | null;
   platform: string | null;
   isAuthenticated: boolean;
+  userId: string | null;
+  anonId: string | null;
+  actorName: string | null;
+  actorUsername: string | null;
 };
 
 export type MobileEventsOverview = {
@@ -71,9 +75,13 @@ export async function getMobileEventsOverview(): Promise<MobileEventsOverview> {
       }));
     }),
     query(
-      `SELECT id, event_name, occurred_at, source_context, screen, platform, (user_id IS NOT NULL) AS is_authenticated
-       FROM public.mobile_events
-       ORDER BY occurred_at DESC
+      `SELECT me.id, me.event_name, me.occurred_at, me.source_context, me.screen,
+              me.platform, me.user_id, me.anon_id,
+              (me.user_id IS NOT NULL) AS is_authenticated,
+              p.full_name AS actor_name, p.username AS actor_username
+       FROM public.mobile_events me
+       LEFT JOIN public.profiles p ON p.id = me.user_id
+       ORDER BY me.occurred_at DESC
        LIMIT 100`,
     ),
   ]);
@@ -99,7 +107,11 @@ export async function getMobileEventsOverview(): Promise<MobileEventsOverview> {
       sourceContext: r.source_context,
       screen: r.screen,
       platform: r.platform,
-      isAuthenticated: r.is_authenticated,
+      isAuthenticated: Boolean(r.is_authenticated),
+      userId: r.user_id ? String(r.user_id) : null,
+      anonId: r.anon_id ? String(r.anon_id) : null,
+      actorName: r.actor_name ? String(r.actor_name) : null,
+      actorUsername: r.actor_username ? String(r.actor_username) : null,
     })),
   };
 }
