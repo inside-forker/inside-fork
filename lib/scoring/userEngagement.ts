@@ -4,10 +4,12 @@ import {
   LOGIN_LOOKBACK_DAYS,
   BOOKING_LOOKBACK_DAYS,
   ENGAGEMENT_LOOKBACK_DAYS,
+  REDEMPTION_LOOKBACK_DAYS,
   RECENCY_DECAY_WINDOW_DAYS,
   LOGIN_FREQUENCY_CAP_30D,
   BOOKING_FREQUENCY_CAP_90D,
   ENGAGEMENT_FREQUENCY_CAP_30D,
+  REDEMPTION_FREQUENCY_CAP_90D,
   BOOKING_MONETARY_CAP_PKR,
   SCORE_WEIGHT_LOGIN_RECENCY,
   SCORE_WEIGHT_LOGIN_FREQUENCY,
@@ -16,6 +18,8 @@ import {
   SCORE_WEIGHT_BOOKING_MONETARY,
   SCORE_WEIGHT_ENGAGEMENT_RECENCY,
   SCORE_WEIGHT_ENGAGEMENT_FREQUENCY,
+  SCORE_WEIGHT_REDEMPTION_RECENCY,
+  SCORE_WEIGHT_REDEMPTION_FREQUENCY,
   LIFECYCLE_NEW_ACCOUNT_MAX_AGE_DAYS,
   LIFECYCLE_ACTIVE_MAX_DAYS,
   LIFECYCLE_AT_RISK_MAX_DAYS,
@@ -27,9 +31,9 @@ import {
  * sql/migrations/20260812_user_engagement_scores.sql). Deliberately does
  * NOT follow the lib/analytics/admin.ts pattern of fetching capped rows and
  * reducing in Node - these source tables (audit_logs, bookings,
- * analytics_events, user_listing_events, mobile_events) will grow past what
- * a Node-side reduction can handle, so all aggregation happens in Postgres
- * via CTEs and a single batched upsert.
+ * analytics_events, user_listing_events, mobile_events, redemptions) will
+ * grow past what a Node-side reduction can handle, so all aggregation
+ * happens in Postgres via CTEs and a single batched upsert.
  */
 
 /** Days-since-X as a whole-number-of-days expression, safe for any interval size (no month ambiguity). */
@@ -116,6 +120,17 @@ export async function refreshUserEngagementScores(): Promise<RefreshUserEngageme
       FROM engagement_raw
       GROUP BY user_id
     ),
+    redemption_stats AS (
+      SELECT
+        user_id,
+        MAX(validated_at) AS last_redemption_at,
+        COUNT(*) FILTER (
+          WHERE validated_at >= now() - INTERVAL '${REDEMPTION_LOOKBACK_DAYS} days'
+        ) AS redemption_count_90d
+      FROM public.redemptions
+      WHERE status = 'validated' AND user_id IS NOT NULL
+      GROUP BY user_id
+    ),
     combined AS (
       SELECT
         c.user_id,
@@ -128,11 +143,20 @@ export async function refreshUserEngagementScores(): Promise<RefreshUserEngageme
         COALESCE(b.total_booking_spend, 0) AS total_booking_spend,
         e.last_engagement_at,
         COALESCE(e.engagement_count_30d, 0) AS engagement_count_30d,
-        GREATEST(l.last_login_at, b.last_booking_at, e.last_engagement_at, c.created_at) AS last_activity_at
+        r.last_redemption_at,
+        COALESCE(r.redemption_count_90d, 0) AS redemption_count_90d,
+        GREATEST(
+          l.last_login_at,
+          b.last_booking_at,
+          e.last_engagement_at,
+          r.last_redemption_at,
+          c.created_at
+        ) AS last_activity_at
       FROM consumers c
       LEFT JOIN login_stats l ON l.user_id = c.user_id
       LEFT JOIN booking_stats b ON b.user_id = c.user_id
       LEFT JOIN engagement_stats e ON e.user_id = c.user_id
+      LEFT JOIN redemption_stats r ON r.user_id = c.user_id
     ),
     final AS (
       SELECT
@@ -155,7 +179,9 @@ export async function refreshUserEngagementScores(): Promise<RefreshUserEngageme
           ${frequencySubscoreExpr("booking_count_90d", BOOKING_FREQUENCY_CAP_90D)} * ${SCORE_WEIGHT_BOOKING_FREQUENCY} +
           ${frequencySubscoreExpr("total_booking_spend", BOOKING_MONETARY_CAP_PKR)} * ${SCORE_WEIGHT_BOOKING_MONETARY} +
           ${recencySubscoreExpr("last_engagement_at")} * ${SCORE_WEIGHT_ENGAGEMENT_RECENCY} +
-          ${frequencySubscoreExpr("engagement_count_30d", ENGAGEMENT_FREQUENCY_CAP_30D)} * ${SCORE_WEIGHT_ENGAGEMENT_FREQUENCY}
+          ${frequencySubscoreExpr("engagement_count_30d", ENGAGEMENT_FREQUENCY_CAP_30D)} * ${SCORE_WEIGHT_ENGAGEMENT_FREQUENCY} +
+          ${recencySubscoreExpr("last_redemption_at")} * ${SCORE_WEIGHT_REDEMPTION_RECENCY} +
+          ${frequencySubscoreExpr("redemption_count_90d", REDEMPTION_FREQUENCY_CAP_90D)} * ${SCORE_WEIGHT_REDEMPTION_FREQUENCY}
         ) / 100.0, 2) AS engagement_score
       FROM combined
     )

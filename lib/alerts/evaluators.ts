@@ -11,6 +11,10 @@ import {
   ALERT_RATING_TRAILING_LONG_DAYS,
   ALERT_RATING_DROP_MIN_REVIEWS,
   ALERT_RATING_DROP_MIN_DELTA,
+  ALERT_ZERO_RESULT_SPIKE_MULTIPLIER,
+  ALERT_ZERO_RESULT_MIN_COUNT,
+  ALERT_REDEMPTIONS_DROP_RATIO,
+  ALERT_REDEMPTIONS_DROP_MIN_PRIOR,
 } from "@/lib/scoring/thresholds";
 
 export interface EvaluateAdminAlertsResult {
@@ -292,10 +296,211 @@ async function evaluateVenueRatingDrop(): Promise<EvaluateAdminAlertsResult> {
   };
 }
 
+/** Alert 4: zero-result search volume this week vs prior week (live events). */
+async function evaluateZeroResultSpike(): Promise<EvaluateAdminAlertsResult> {
+  const alertType = "search_zero_result_spike";
+
+  const { rows } = await query(`
+    WITH counts AS (
+      SELECT
+        (
+          SELECT COUNT(*)::int FROM public.mobile_events
+          WHERE event_name IN ('search_performed', 'filters_applied')
+            AND (context->>'hasResults') = 'false'
+            AND occurred_at >= now() - INTERVAL '7 days'
+        ) + (
+          SELECT COUNT(*)::int FROM public.analytics_events
+          WHERE event_type = 'search_performed'
+            AND (
+              (context->>'hasResults') = 'false'
+              OR (context->>'has_results') = 'false'
+              OR COALESCE((context->>'resultCount')::int, (context->>'result_count')::int, -1) = 0
+            )
+            AND occurred_at >= now() - INTERVAL '7 days'
+        ) AS current_7d,
+        (
+          SELECT COUNT(*)::int FROM public.mobile_events
+          WHERE event_name IN ('search_performed', 'filters_applied')
+            AND (context->>'hasResults') = 'false'
+            AND occurred_at >= now() - INTERVAL '14 days'
+            AND occurred_at < now() - INTERVAL '7 days'
+        ) + (
+          SELECT COUNT(*)::int FROM public.analytics_events
+          WHERE event_type = 'search_performed'
+            AND (
+              (context->>'hasResults') = 'false'
+              OR (context->>'has_results') = 'false'
+              OR COALESCE((context->>'resultCount')::int, (context->>'result_count')::int, -1) = 0
+            )
+            AND occurred_at >= now() - INTERVAL '14 days'
+            AND occurred_at < now() - INTERVAL '7 days'
+        ) AS prior_7d
+    )
+    SELECT current_7d, prior_7d FROM counts
+  `);
+
+  const current7d = Number(rows[0]?.current_7d ?? 0);
+  const prior7d = Number(rows[0]?.prior_7d ?? 0);
+  const isSpiking =
+    current7d >= ALERT_ZERO_RESULT_MIN_COUNT &&
+    prior7d > 0 &&
+    current7d >= prior7d * ALERT_ZERO_RESULT_SPIKE_MULTIPLIER;
+
+  const qualifying: QualifyingSubject[] = isSpiking
+    ? [
+        {
+          subjectKey: "global",
+          title: `Search zero-result spike: ${current7d} vs ${prior7d} prior week`,
+          details: {
+            current_7d: current7d,
+            prior_7d: prior7d,
+            multiplier: ALERT_ZERO_RESULT_SPIKE_MULTIPLIER,
+          },
+          severity: "warning",
+        },
+      ]
+    : [];
+
+  const { opened, resolved, stillOpen } = await reconcileAlerts(alertType, qualifying);
+
+  let notified = 0;
+  if (opened.length > 0) {
+    notified = await notifyAdmins(
+      "Search zero-result rate spike",
+      `${current7d} zero-result searches in the last 7 days vs ${prior7d} in the prior week (≥${ALERT_ZERO_RESULT_SPIKE_MULTIPLIER}x).`,
+      {
+        alert_type: alertType,
+        current_7d: current7d,
+        prior_7d: prior7d,
+      },
+    );
+  }
+
+  return {
+    alertType,
+    opened: opened.length,
+    resolved: resolved.length,
+    stillOpen: stillOpen.length,
+    notified,
+  };
+}
+
+/** Alert 5: validated redemptions down >50% week-over-week (min prior volume). */
+async function evaluateRedemptionsWowDrop(): Promise<EvaluateAdminAlertsResult> {
+  const alertType = "redemptions_wow_drop";
+
+  const { rows } = await query(`
+    SELECT
+      COUNT(*) FILTER (
+        WHERE status = 'validated' AND validated_at >= now() - INTERVAL '7 days'
+      )::int AS current_7d,
+      COUNT(*) FILTER (
+        WHERE status = 'validated'
+          AND validated_at >= now() - INTERVAL '14 days'
+          AND validated_at < now() - INTERVAL '7 days'
+      )::int AS prior_7d
+    FROM public.redemptions
+  `);
+
+  const current7d = Number(rows[0]?.current_7d ?? 0);
+  const prior7d = Number(rows[0]?.prior_7d ?? 0);
+  const isDropping =
+    prior7d >= ALERT_REDEMPTIONS_DROP_MIN_PRIOR &&
+    current7d < prior7d * ALERT_REDEMPTIONS_DROP_RATIO;
+
+  const qualifying: QualifyingSubject[] = isDropping
+    ? [
+        {
+          subjectKey: "global",
+          title: `Redemptions WoW drop: ${current7d} vs ${prior7d} prior week`,
+          details: {
+            current_7d: current7d,
+            prior_7d: prior7d,
+            drop_ratio: ALERT_REDEMPTIONS_DROP_RATIO,
+          },
+          severity: "critical",
+        },
+      ]
+    : [];
+
+  const { opened, resolved, stillOpen } = await reconcileAlerts(alertType, qualifying);
+
+  let notified = 0;
+  if (opened.length > 0) {
+    notified = await notifyAdmins(
+      "Platform redemptions down week-over-week",
+      `Validated redemptions fell to ${current7d} from ${prior7d} in the prior 7 days (>${Math.round(
+        (1 - ALERT_REDEMPTIONS_DROP_RATIO) * 100,
+      )}% drop).`,
+      {
+        alert_type: alertType,
+        current_7d: current7d,
+        prior_7d: prior7d,
+      },
+    );
+  }
+
+  return {
+    alertType,
+    opened: opened.length,
+    resolved: resolved.length,
+    stillOpen: stillOpen.length,
+    notified,
+  };
+}
+
+/** Alert 6: reuse lifecycle_churned segment — notify on newly qualified (24h) cohort. */
+async function evaluateLifecycleChurned(): Promise<EvaluateAdminAlertsResult> {
+  const alertType = "lifecycle_churned";
+
+  const { rows } = await query(
+    `SELECT COUNT(*)::int AS newly_qualified
+     FROM public.segment_membership
+     WHERE segment_slug = 'lifecycle_churned'
+       AND first_qualified_at >= now() - INTERVAL '24 hours'`,
+  );
+
+  const newlyQualified = Number(rows[0]?.newly_qualified ?? 0);
+  const dayKey = new Date().toISOString().slice(0, 10);
+
+  const qualifying: QualifyingSubject[] =
+    newlyQualified > 0
+      ? [
+          {
+            subjectKey: dayKey,
+            title: `${newlyQualified} user(s) newly churned (lifecycle)`,
+            details: { newly_qualified: newlyQualified, day: dayKey },
+          },
+        ]
+      : [];
+
+  const { opened, resolved, stillOpen } = await reconcileAlerts(alertType, qualifying);
+
+  let notified = 0;
+  if (opened.length > 0) {
+    notified = await notifyAdmins(
+      `${newlyQualified} user${newlyQualified === 1 ? "" : "s"} entered churned lifecycle`,
+      `${newlyQualified} consumer account(s) newly qualified for lifecycle_churned in the last 24 hours.`,
+      { alert_type: alertType, newly_qualified: newlyQualified, day: dayKey },
+    );
+  }
+
+  return {
+    alertType,
+    opened: opened.length,
+    resolved: resolved.length,
+    stillOpen: stillOpen.length,
+    notified,
+  };
+}
+
 export async function evaluateAdminAlerts(): Promise<EvaluateAdminAlertsResult[]> {
   return [
     await evaluateMerchantDashboardInactive(),
     await evaluatePaymentFailureSpike(),
     await evaluateVenueRatingDrop(),
+    await evaluateZeroResultSpike(),
+    await evaluateRedemptionsWowDrop(),
+    await evaluateLifecycleChurned(),
   ];
 }

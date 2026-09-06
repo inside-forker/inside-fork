@@ -36,6 +36,8 @@ interface BusinessAnalyticsChartsProps {
     visitors: string;
     favorites: string;
     contactClicks: string;
+    billGmv?: string;
+    redemptions?: string;
   };
 }
 
@@ -174,6 +176,73 @@ export function BusinessAnalyticsCharts({
           </Card>
         </motion.div>
       </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.45 }}
+        className="mb-8"
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Redemption GMV Over Time
+            </CardTitle>
+            <CardDescription>
+              Validated offer redemptions and bill value
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-[300px] w-full" />
+            ) : analytics &&
+              analytics.timeseries.some(
+                (row) => (row.redemptions ?? 0) > 0 || (row.billGmv ?? 0) > 0,
+              ) ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={analytics.timeseries}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(date) =>
+                      formatTimeseriesLabel(date, analytics.granularity)
+                    }
+                    className="text-xs"
+                  />
+                  <YAxis className="text-xs" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="billGmv"
+                    stroke={chartColors.billGmv ?? chartColors.views}
+                    strokeWidth={2}
+                    name="Bill GMV"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="redemptions"
+                    stroke={chartColors.redemptions ?? chartColors.visitors}
+                    strokeWidth={2}
+                    name="Redemptions"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                No redemption GMV in this period
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {analytics && analytics.branches.length > 0 && (
         <motion.div

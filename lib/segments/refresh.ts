@@ -52,7 +52,7 @@ async function reconcileSegment(spec: SegmentQuery): Promise<SegmentRefreshResul
   };
 }
 
-/** Refreshes all four segments. Each segment reconciles independently - one failing does not affect the others' results (though a thrown error here surfaces to the caller). */
+/** Refreshes all defined segments. Each segment reconciles independently. */
 export async function refreshSegments(): Promise<SegmentRefreshResult[]> {
   const results: SegmentRefreshResult[] = [];
   for (const spec of ALL_SEGMENT_QUERIES) {

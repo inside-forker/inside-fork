@@ -1,9 +1,11 @@
 import { query } from "@/lib/db";
+import { getLatestMarketplaceHealth } from "@/lib/analytics/marketplace-health";
 import type {
   AdminAnalyticsOverview,
   AdminViewerRole,
   ConversionFunnelSummary,
   ListingsAnalyticsSummary,
+  MarketplaceHealthSummary,
   NotificationsAnalyticsSummary,
   OfferRedemptionsAnalyticsSummary,
   PerformanceAnalyticsSummary,
@@ -660,6 +662,7 @@ export async function getAdminAnalyticsOverview({
     pendingOutboxCount,
     performanceRows,
     offerRedemptions,
+    marketplaceHealthRaw,
   ] = await Promise.all([
     query(
       `SELECT occurred_at, context FROM public.analytics_events
@@ -704,7 +707,21 @@ export async function getAdminAnalyticsOverview({
         ).then((r) => r.rows as PerformanceMetricRow[])
       : Promise.resolve(null),
     fetchOfferRedemptionsSummary(periodStartIso),
+    getLatestMarketplaceHealth(),
   ]);
+
+  const marketplaceHealth: MarketplaceHealthSummary | null = marketplaceHealthRaw
+    ? {
+        day: marketplaceHealthRaw.day,
+        dau: marketplaceHealthRaw.dau,
+        wau: marketplaceHealthRaw.wau,
+        searchZeroResultRate7d: marketplaceHealthRaw.searchZeroResultRate7d,
+        validatedRedemptions7d: marketplaceHealthRaw.validatedRedemptions7d,
+        billGmv7d: marketplaceHealthRaw.billGmv7d,
+        redemptionListingRate30d: marketplaceHealthRaw.redemptionListingRate30d,
+        computedAt: marketplaceHealthRaw.computedAt,
+      }
+    : null;
 
   const searchSummary = normalizeSearchEvents(searchRows, now, lookbackDays);
 
@@ -763,6 +780,7 @@ export async function getAdminAnalyticsOverview({
     traffic: trafficSummary,
     revenue: revenueSummary,
     offerRedemptions,
+    marketplaceHealth,
     notifications: notificationsSummary,
     performance: viewerRole === "super_admin" ? performanceSummary : null,
     generatedAt: now.toISOString(),

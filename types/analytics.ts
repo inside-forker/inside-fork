@@ -200,6 +200,18 @@ export interface OfferRedemptionsAnalyticsSummary {
   voidedCountInPeriod: number;
 }
 
+/** Latest row from marketplace_health_daily (Phase 2). Null when never refreshed. */
+export interface MarketplaceHealthSummary {
+  day: string;
+  dau: number;
+  wau: number;
+  searchZeroResultRate7d: number;
+  validatedRedemptions7d: number;
+  billGmv7d: number;
+  redemptionListingRate30d: number;
+  computedAt: string;
+}
+
 export interface NotificationChannelBreakdown {
   channel: string;
   sent: number;
@@ -256,6 +268,7 @@ export interface AdminAnalyticsOverview {
   traffic: TrafficAnalyticsSummary;
   revenue: RevenueAnalyticsSummary;
   offerRedemptions: OfferRedemptionsAnalyticsSummary;
+  marketplaceHealth: MarketplaceHealthSummary | null;
   notifications: NotificationsAnalyticsSummary;
   performance: PerformanceAnalyticsSummary | null;
   generatedAt: string;

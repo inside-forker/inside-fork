@@ -64,6 +64,8 @@ const chartColors = {
   visitors: "hsl(var(--ring))",
   favorites: "hsl(var(--accent-foreground))",
   contactClicks: "hsl(var(--destructive))",
+  billGmv: "hsl(142 76% 36%)",
+  redemptions: "hsl(221 83% 53%)",
 };
 
 function formatTimeseriesLabel(date: string, granularity: "day" | "week" | "month") {
@@ -148,6 +150,11 @@ export function BusinessAnalyticsPage(_props: BusinessAnalyticsPageProps) {
       ["Redemptions", analytics.summary.redemptionCount],
       ["Bill GMV (PKR)", analytics.summary.billGmv],
       ["Discount GMV (PKR)", analytics.summary.discountGmv],
+      ["Unique redeemers", analytics.summary.uniqueRedeemers ?? 0],
+      [
+        "Repeat redeemer rate",
+        `${(((analytics.summary.repeatRedeemerRate ?? 0) * 100).toFixed(1))}%`,
+      ],
     ];
 
     const timeseriesRows = [
@@ -339,9 +346,63 @@ export function BusinessAnalyticsPage(_props: BusinessAnalyticsPageProps) {
               color="orange"
               delay={0.9}
             />
+            <PremiumStatCard
+              title="Repeat redeemer %"
+              value={`${Math.round((analytics.summary.repeatRedeemerRate ?? 0) * 100)}%`}
+              icon={Users}
+              color="purple"
+              delay={1.0}
+            />
           </>
         ) : null}
       </motion.div>
+
+      {analytics?.categoryBenchmark?.privacyFloorMet ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <Card className={cn(BUSINESS_OWNER_CARD_SURFACE)}>
+            <CardHeader>
+              <CardTitle>Vs category peers</CardTitle>
+              <CardDescription>
+                Median among {analytics.categoryBenchmark.peerListingCount}{" "}
+                peer listings in your categories (min 25 with redemptions).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-sm text-muted-foreground">Your bill GMV</p>
+                <p className="text-2xl font-bold">
+                  Rs{" "}
+                  {Math.round(
+                    analytics.categoryBenchmark.yourBillGmv,
+                  ).toLocaleString()}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Category median: Rs{" "}
+                  {Math.round(
+                    analytics.categoryBenchmark.medianBillGmv ?? 0,
+                  ).toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Your redemptions</p>
+                <p className="text-2xl font-bold">
+                  {analytics.categoryBenchmark.yourRedemptionCount.toLocaleString()}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Category median:{" "}
+                  {Math.round(
+                    analytics.categoryBenchmark.medianRedemptionCount ?? 0,
+                  ).toLocaleString()}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      ) : null}
 
       <BusinessAnalyticsCharts
         analytics={analytics}

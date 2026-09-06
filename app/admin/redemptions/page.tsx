@@ -62,6 +62,13 @@ export default async function AdminRedemptionsPage() {
   }
 
   let recent: RecentRow[] = [];
+  let topMerchants: {
+    owner_id: string;
+    owner_name: string | null;
+    owner_username: string | null;
+    bill_gmv: number;
+    redemption_count: number;
+  }[] = [];
   let summary = {
     validated30d: 0,
     billGmv30d: 0,
@@ -70,7 +77,7 @@ export default async function AdminRedemptionsPage() {
   };
 
   try {
-    const [recentResult, summaryResult] = await Promise.all([
+    const [recentResult, summaryResult, topMerchantsResult] = await Promise.all([
       query(
         `SELECT r.id, r.status, r.code, r.channel, r.bill_value, r.discount_value,
                 r.void_reason, r.created_at, r.validated_at, r.voided_at,
@@ -104,6 +111,22 @@ export default async function AdminRedemptionsPage() {
            COUNT(*) FILTER (WHERE status = 'pending')::int AS pending
          FROM public.redemptions`,
       ),
+      query(
+        `SELECT
+           COALESCE(r.owner_id, l.owner_id)::text AS owner_id,
+           p.full_name AS owner_name,
+           p.username AS owner_username,
+           COALESCE(SUM(r.bill_value), 0)::float AS bill_gmv,
+           COUNT(*)::int AS redemption_count
+         FROM public.redemptions r
+         INNER JOIN listings l ON l.id = r.listing_id
+         LEFT JOIN profiles p ON p.id = COALESCE(r.owner_id, l.owner_id)
+         WHERE r.status = 'validated'
+           AND r.validated_at >= now() - interval '30 days'
+         GROUP BY 1, 2, 3
+         ORDER BY bill_gmv DESC
+         LIMIT 10`,
+      ),
     ]);
     recent = recentResult.rows as RecentRow[];
     const s = summaryResult.rows[0];
@@ -113,6 +136,13 @@ export default async function AdminRedemptionsPage() {
       discountGmv30d: Number(s?.discount_gmv_30d ?? 0),
       pending: Number(s?.pending ?? 0),
     };
+    topMerchants = topMerchantsResult.rows.map((r) => ({
+      owner_id: String(r.owner_id),
+      owner_name: r.owner_name as string | null,
+      owner_username: r.owner_username as string | null,
+      bill_gmv: Number(r.bill_gmv ?? 0),
+      redemption_count: Number(r.redemption_count ?? 0),
+    }));
   } catch (error) {
     console.error("admin redemptions load failed", error);
   }
@@ -186,6 +216,48 @@ export default async function AdminRedemptionsPage() {
       </div>
 
       <BusinessRedemptionsPage compact />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Top merchants by bill GMV (30d)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {topMerchants.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              No validated redemptions in the last 30 days.
+            </p>
+          ) : (
+            <div className="rounded-xl border border-border/50 overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>#</TableHead>
+                    <TableHead>Merchant</TableHead>
+                    <TableHead className="text-right">Redemptions</TableHead>
+                    <TableHead className="text-right">Bill GMV</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {topMerchants.map((row, i) => (
+                    <TableRow key={row.owner_id}>
+                      <TableCell>{i + 1}</TableCell>
+                      <TableCell>
+                        {personLabel(row.owner_name, row.owner_username, row.owner_id)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.redemption_count.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        Rs {Math.round(row.bill_gmv).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -23,6 +23,7 @@ import {
   BarChartBig,
   Download,
   Gauge,
+  HeartPulse,
   LineChart as LineChartIcon,
   RefreshCcw,
   Search,
@@ -600,6 +601,67 @@ export function AdminAnalyticsClient({
           className="rounded-2xl border-2 border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive font-medium shadow-lg"
         >
           {refreshState.error}
+        </motion.div>
+      ) : null}
+
+      {/* Marketplace health strip (Phase 2 nightly snapshot) */}
+      {overview.marketplaceHealth ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-3"
+        >
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <HeartPulse className="h-4 w-4 text-primary" />
+              Marketplace health
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Snapshot {overview.marketplaceHealth.day}
+              {" · "}
+              <Link href="/admin/segments" className="text-primary hover:underline">
+                Segments
+              </Link>
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <div>
+              <p className="text-xs text-muted-foreground">DAU / WAU</p>
+              <p className="text-sm font-semibold">
+                {formatNumber(overview.marketplaceHealth.dau)}
+                <span className="text-muted-foreground font-normal">
+                  {" "}
+                  / {formatNumber(overview.marketplaceHealth.wau)}
+                </span>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Zero-result rate (7d)</p>
+              <p className="text-sm font-semibold">
+                {formatPercent(overview.marketplaceHealth.searchZeroResultRate7d)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Redemptions (7d)</p>
+              <p className="text-sm font-semibold">
+                {formatNumber(overview.marketplaceHealth.validatedRedemptions7d)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Bill GMV (7d)</p>
+              <p className="text-sm font-semibold">
+                {formatCurrency(overview.marketplaceHealth.billGmv7d)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Listings w/ redeem (30d)</p>
+              <p className="text-sm font-semibold">
+                {formatPercent(
+                  overview.marketplaceHealth.redemptionListingRate30d,
+                )}
+              </p>
+            </div>
+          </div>
         </motion.div>
       ) : null}
 
