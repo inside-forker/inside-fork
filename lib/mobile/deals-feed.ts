@@ -40,6 +40,8 @@ export type MobileDealPreviewDTO = {
   terms: string;
   imageUrl?: string;
   listingSlug?: string;
+  /** Listing id for redeem / affinity events. */
+  listingId?: number;
 };
 
 export type CardAssociation = {
@@ -97,6 +99,7 @@ export type DealFeedRow = {
   end_date: Date | string | null;
   merchant: string | null;
   listing_slug: string | null;
+  listing_id?: number | string | null;
   latitude: number | string | null;
   longitude: number | string | null;
   category_name: string | null;
@@ -262,5 +265,10 @@ export function toMobileDealPreview(
   if (subCategory) dto.subCategory = subCategory;
   if (imageUrl) dto.imageUrl = imageUrl;
   if (row.listing_slug) dto.listingSlug = row.listing_slug;
+  const listingIdNum =
+    row.listing_id != null && row.listing_id !== ""
+      ? Number(row.listing_id)
+      : NaN;
+  if (Number.isFinite(listingIdNum)) dto.listingId = listingIdNum;
   return dto;
 }

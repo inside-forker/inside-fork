@@ -211,6 +211,24 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     console.error("Failed to log user signup:", logError);
   }
 
+  try {
+    const { appendConsentLedger } = await import("@/lib/consent/ledger");
+    await appendConsentLedger({
+      userId: newUserId,
+      source: "signup",
+      termsVersion: "current",
+      privacyVersion: "current",
+      marketingEmail: false,
+      marketingPush: false,
+      marketingSms: false,
+      marketingWhatsapp: false,
+      personalisationOptIn: true,
+      meta: { channel: "mobile" },
+    });
+  } catch (consentError) {
+    console.error("[mobile-api] signup consent ledger failed:", consentError);
+  }
+
   await createAndSendSignupOtp({
     userId: newUserId,
     email: sanitizedEmail,

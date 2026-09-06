@@ -84,6 +84,10 @@ export const analyticsEventSchema = z
     entityType: z.string().max(128).optional(),
     entityId: z.string().max(256).optional(),
     sessionId: z.string().max(256).optional(),
+    /** Phase 1 CORE envelope — how the user reached this surface. */
+    sourceContext: z.string().max(128).optional(),
+    deviceId: z.string().max(256).optional(),
+    screen: z.string().max(256).optional(),
     actorId: z.string().uuid().optional(),
     actorRole: userRoleEnum.optional(),
     context: jsonSchema.default({}),

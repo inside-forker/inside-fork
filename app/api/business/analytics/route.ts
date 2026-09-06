@@ -140,6 +140,9 @@ export async function GET(request: NextRequest) {
           totalReviews: 0,
           favorites: 0,
           contactClicks: 0,
+          redemptionCount: 0,
+          billGmv: 0,
+          discountGmv: 0,
         },
         timeseries: [],
         branches: [],
@@ -334,6 +337,36 @@ export async function GET(request: NextRequest) {
           .sort((a, b) => b.views - a.views)
           .slice(0, 5);
 
+    let redemptionCount = 0;
+    let billGmv = 0;
+    let discountGmv = 0;
+    try {
+      const { rows: gmvRows } = await query(
+        `SELECT
+           COUNT(*)::int AS redemption_count,
+           COALESCE(SUM(bill_value), 0)::float AS bill_gmv,
+           COALESCE(SUM(discount_value), 0)::float AS discount_gmv
+         FROM public.redemptions
+         WHERE owner_id = $1
+           AND listing_id = ANY($2::bigint[])
+           AND status = 'validated'
+           AND validated_at >= $3::timestamptz
+           AND validated_at <= $4::timestamptz`,
+        [
+          userId,
+          targetListingIds,
+          `${startDate}T00:00:00.000Z`,
+          `${endDate}T23:59:59.999Z`,
+        ],
+      );
+      const gmv = gmvRows[0];
+      redemptionCount = Number(gmv?.redemption_count ?? 0);
+      billGmv = Number(gmv?.bill_gmv ?? 0);
+      discountGmv = Number(gmv?.discount_gmv ?? 0);
+    } catch (gmvError) {
+      console.error("Failed to fetch redemption GMV:", gmvError);
+    }
+
     const analytics: BusinessOwnerAnalytics = {
       timezone,
       granularity,
@@ -344,6 +377,9 @@ export async function GET(request: NextRequest) {
         totalReviews,
         favorites,
         contactClicks,
+        redemptionCount,
+        billGmv,
+        discountGmv,
       },
       timeseries,
       branches,

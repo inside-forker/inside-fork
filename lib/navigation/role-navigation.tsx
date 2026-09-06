@@ -21,6 +21,7 @@ import {
   PenSquare,
   Smartphone,
   Flag,
+  Ticket,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/types/auth.types";
@@ -64,6 +65,7 @@ export const businessOwnerNavigation: RoleNavItem[] = [
   { name: "Home", href: "/", icon: Home, description: "Back to the homepage" },
   { name: "Dashboard", href: "/dashboard/business", icon: LayoutDashboard, description: "Your business overview" },
   { name: "My Listings", href: "/dashboard/business/listings", icon: Store, description: "Manage your listings" },
+  { name: "Redeem offers", href: "/dashboard/business/redemptions", icon: Ticket, description: "Validate guest offer codes" },
   { name: "Analytics", href: "/dashboard/business/analytics", icon: BarChart3, description: "Track your performance" },
   { name: "Reviews", href: "/dashboard/business/reviews", icon: Star, description: "See customer feedback" },
   { name: "Reports", href: "/dashboard/business/reports", icon: FileText, description: "View business reports" },

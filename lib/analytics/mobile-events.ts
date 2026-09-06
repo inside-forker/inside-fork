@@ -1,4 +1,5 @@
 import { query } from "@/lib/db";
+import { getZeroResultRollup } from "@/lib/analytics/search-zero-results";
 
 export type MobileEventsSummary = {
   totalLast7d: number;
@@ -11,6 +12,7 @@ export type ZeroResultQuery = {
   query: string;
   count: number;
   lastSeen: string;
+  daysActive?: number;
 };
 
 export type RecentMobileEvent = {
@@ -37,7 +39,7 @@ const SEARCH_EVENT_NAMES = ["search_performed", "filters_applied"];
  * enum-typed analytics_events table.
  */
 export async function getMobileEventsOverview(): Promise<MobileEventsOverview> {
-  const [summaryResult, zeroResultResult, recentResult] = await Promise.all([
+  const [summaryResult, rollupRows, recentResult] = await Promise.all([
     query(
       `SELECT
          COUNT(*) FILTER (WHERE occurred_at >= now() - interval '7 days') AS total_last_7d,
@@ -47,18 +49,27 @@ export async function getMobileEventsOverview(): Promise<MobileEventsOverview> {
        FROM public.mobile_events`,
       [SEARCH_EVENT_NAMES],
     ),
-    query(
-      `SELECT context->>'query' AS query, COUNT(*) AS count, MAX(occurred_at) AS last_seen
-       FROM public.mobile_events
-       WHERE event_name = ANY($1)
-         AND (context->>'hasResults') = 'false'
-         AND context->>'query' IS NOT NULL AND context->>'query' != ''
-         AND occurred_at >= now() - interval '30 days'
-       GROUP BY context->>'query'
-       ORDER BY count DESC, last_seen DESC
-       LIMIT 20`,
-      [SEARCH_EVENT_NAMES],
-    ),
+    getZeroResultRollup(30, 30).then(async (rows) => {
+      if (rows.length > 0) return rows;
+      const { rows: live } = await query(
+        `SELECT context->>'query' AS query, COUNT(*) AS count, MAX(occurred_at) AS last_seen
+         FROM public.mobile_events
+         WHERE event_name = ANY($1)
+           AND (context->>'hasResults') = 'false'
+           AND context->>'query' IS NOT NULL AND context->>'query' != ''
+           AND occurred_at >= now() - interval '30 days'
+         GROUP BY context->>'query'
+         ORDER BY count DESC, last_seen DESC
+         LIMIT 20`,
+        [SEARCH_EVENT_NAMES],
+      );
+      return live.map((r) => ({
+        query: String(r.query),
+        zeroCount: Number(r.count),
+        daysActive: 1,
+        lastDay: String(r.last_seen),
+      }));
+    }),
     query(
       `SELECT id, event_name, occurred_at, source_context, screen, platform, (user_id IS NOT NULL) AS is_authenticated
        FROM public.mobile_events
@@ -75,10 +86,11 @@ export async function getMobileEventsOverview(): Promise<MobileEventsOverview> {
       searchesLast7d: Number(s.searches_last_7d),
       zeroResultLast7d: Number(s.zero_result_last_7d),
     },
-    zeroResultQueries: zeroResultResult.rows.map((r) => ({
+    zeroResultQueries: rollupRows.map((r) => ({
       query: r.query,
-      count: Number(r.count),
-      lastSeen: r.last_seen,
+      count: r.zeroCount,
+      lastSeen: r.lastDay,
+      daysActive: r.daysActive,
     })),
     recentEvents: recentResult.rows.map((r) => ({
       id: String(r.id),

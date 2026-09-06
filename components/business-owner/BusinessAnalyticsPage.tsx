@@ -13,6 +13,8 @@ import {
   Star,
   Heart,
   Phone,
+  Ticket,
+  Banknote,
 } from "lucide-react";
 import {
   Card,
@@ -143,6 +145,9 @@ export function BusinessAnalyticsPage(_props: BusinessAnalyticsPageProps) {
       ["Total Reviews", analytics.summary.totalReviews],
       ["Favorites", analytics.summary.favorites],
       ["Contact Clicks", analytics.summary.contactClicks],
+      ["Redemptions", analytics.summary.redemptionCount],
+      ["Bill GMV (PKR)", analytics.summary.billGmv],
+      ["Discount GMV (PKR)", analytics.summary.discountGmv],
     ];
 
     const timeseriesRows = [
@@ -259,11 +264,11 @@ export function BusinessAnalyticsPage(_props: BusinessAnalyticsPageProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 mb-8"
       >
         {loading ? (
           <>
-            {[...Array(6)].map((_, i) => (
+            {[...Array(9)].map((_, i) => (
               <Card key={i} className={cn("p-6", BUSINESS_OWNER_CARD_SURFACE)}>
                 <Skeleton className="h-20 w-full" />
               </Card>
@@ -312,6 +317,27 @@ export function BusinessAnalyticsPage(_props: BusinessAnalyticsPageProps) {
               icon={Phone}
               color="emerald"
               delay={0.6}
+            />
+            <PremiumStatCard
+              title="Redemptions"
+              value={analytics.summary.redemptionCount.toLocaleString()}
+              icon={Ticket}
+              color="blue"
+              delay={0.7}
+            />
+            <PremiumStatCard
+              title="Bill GMV"
+              value={`Rs ${Math.round(analytics.summary.billGmv).toLocaleString()}`}
+              icon={Banknote}
+              color="green"
+              delay={0.8}
+            />
+            <PremiumStatCard
+              title="Discount given"
+              value={`Rs ${Math.round(analytics.summary.discountGmv).toLocaleString()}`}
+              icon={Banknote}
+              color="orange"
+              delay={0.9}
             />
           </>
         ) : null}

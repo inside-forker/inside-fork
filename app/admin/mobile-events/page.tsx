@@ -72,7 +72,7 @@ export default async function AdminMobileEventsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">
-            Zero-result search terms (last 30 days)
+            Zero-result search terms (last 30 days, web + mobile)
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -89,8 +89,11 @@ export default async function AdminMobileEventsPage() {
                     <TableHead className="w-24 text-right font-semibold">
                       Count
                     </TableHead>
+                    <TableHead className="w-24 text-right font-semibold">
+                      Days
+                    </TableHead>
                     <TableHead className="w-40 font-semibold">
-                      Last seen
+                      Last day
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -102,8 +105,13 @@ export default async function AdminMobileEventsPage() {
                     >
                       <TableCell className="font-medium">{row.query}</TableCell>
                       <TableCell className="text-right">{row.count}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {row.daysActive ?? "—"}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {formatDateTime(row.lastSeen)}
+                        {row.lastSeen.includes("T")
+                          ? formatDateTime(row.lastSeen)
+                          : row.lastSeen}
                       </TableCell>
                     </TableRow>
                   ))}

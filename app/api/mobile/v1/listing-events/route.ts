@@ -27,6 +27,9 @@ const MAX_BATCH = 50;
 const eventSchema = z.object({
   listingId: z.number().int().positive(),
   eventType: z.string(),
+  session_id: z.string().min(1).optional(),
+  device_id: z.string().min(1).optional(),
+  source_context: z.string().min(1).optional(),
   context: z.record(z.unknown()).optional(),
 });
 
@@ -37,17 +40,8 @@ const bodySchema = z.object({
 /**
  * POST /api/mobile/v1/listing-events
  *
- * Batched telemetry ingest feeding recommendation affinity
- * (lib/recommendations/affinity.ts, table public.user_listing_events). Named
- * distinctly from GET /api/mobile/v1/events (the public Events/venues
- * listing feed - unrelated) to avoid a route collision.
- *
- * Auth is optional - signed-out actors are identified via the `X-Anon-Id`
- * header, since most browsing is signed-out and was previously invisible to
- * any personalization signal.
- *
- * Unknown event types, malformed rows, and DB failures are all swallowed
- * rather than surfaced as 4xx/5xx: telemetry must never break a screen.
+ * Batched listing-affinity telemetry → public.user_listing_events.
+ * Phase 1 CORE also stores session_id / device_id / source_context when present.
  */
 export const POST = mobileRoute(async (request: NextRequest) => {
   const { user } = await getOptionalMobileUser(request);
@@ -66,9 +60,9 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   const values: unknown[] = [];
   const placeholders: string[] = [];
   rows.forEach((e, i) => {
-    const base = i * 5;
+    const base = i * 8;
     placeholders.push(
-      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}::jsonb)`,
+      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}::jsonb, $${base + 6}, $${base + 7}, $${base + 8})`,
     );
     values.push(
       user?.id ?? null,
@@ -76,12 +70,16 @@ export const POST = mobileRoute(async (request: NextRequest) => {
       e.listingId,
       e.eventType,
       JSON.stringify(e.context ?? {}),
+      e.session_id ?? null,
+      e.source_context ?? null,
+      e.device_id ?? null,
     );
   });
 
   try {
     await query(
-      `INSERT INTO public.user_listing_events (user_id, anon_id, listing_id, event_type, context)
+      `INSERT INTO public.user_listing_events
+         (user_id, anon_id, listing_id, event_type, context, session_id, source_context, device_id)
        VALUES ${placeholders.join(", ")}`,
       values,
     );

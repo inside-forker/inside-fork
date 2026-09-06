@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/evaluate-admin-alerts",
       "schedule": "35 21 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-search-zero-results",
+      "schedule": "45 21 * * *"
     }
   ]
 }

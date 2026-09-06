@@ -99,6 +99,7 @@ export function useSearch({
           eventType: "search_performed",
           entityType: "search",
           source: "web",
+          sourceContext: "search",
           context: {
             query,
             limit,

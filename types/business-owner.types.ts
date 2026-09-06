@@ -101,6 +101,10 @@ export interface BusinessOwnerAnalytics {
     totalReviews: number;
     favorites: number;
     contactClicks: number;
+    /** Phase 1 CORE — validated offer redemptions in range. */
+    redemptionCount: number;
+    billGmv: number;
+    discountGmv: number;
   };
   timeseries: Array<{
     date: string;

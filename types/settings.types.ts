@@ -11,6 +11,17 @@ export interface UserPreferences {
     lng?: number;
     name?: string;
   };
+  /** Phase 1 CORE consent channel flags (also mirrored into consent_ledger). */
+  consent?: {
+    termsVersion?: string;
+    privacyVersion?: string;
+    marketingPush?: boolean;
+    marketingSms?: boolean;
+    marketingWhatsapp?: boolean;
+    marketingEmail?: boolean;
+    locationPermission?: string;
+    personalisationOptIn?: boolean;
+  };
 }
 
 export interface UserSettingsProfile {
