@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import {
   Bar,
   BarChart,
@@ -18,13 +19,16 @@ import {
 } from "recharts";
 import {
   Activity,
+  ArrowRight,
   BarChartBig,
   Download,
   Gauge,
   LineChart as LineChartIcon,
   RefreshCcw,
   Search,
+  Smartphone,
   Target,
+  Ticket,
   UsersRound,
 } from "lucide-react";
 
@@ -61,6 +65,7 @@ interface KeyMetric {
   formatter: (value: number) => string;
   caption?: string;
   icon: React.ComponentType<{ className?: string }>;
+  href?: string;
 }
 
 const AdminAnalyticsCoreCharts = dynamic(
@@ -446,8 +451,16 @@ export function AdminAnalyticsClient({
 
   const performanceMetrics = overview.performance?.metrics ?? [];
 
-  const keyMetrics: KeyMetric[] = useMemo(
-    () => [
+  const keyMetrics: KeyMetric[] = useMemo(() => {
+    const redemptions = overview.offerRedemptions ?? {
+      redemptionCountInPeriod: 0,
+      billGmvInPeriod: 0,
+      discountGmvInPeriod: 0,
+      pendingCount: 0,
+      voidedCountInPeriod: 0,
+    };
+
+    return [
       {
         label: "Daily active users",
         value: overview.traffic.dailyActiveUsers,
@@ -476,6 +489,16 @@ export function AdminAnalyticsClient({
         icon: Search,
       },
       {
+        label: `Offer redemptions${periodLabelSuffix}`,
+        value: redemptions.redemptionCountInPeriod,
+        formatter: formatNumber,
+        caption: `${formatCurrency(
+          redemptions.billGmvInPeriod,
+        )} bill GMV · ${formatNumber(redemptions.pendingCount)} pending`,
+        icon: Ticket,
+        href: "/admin/redemptions",
+      },
+      {
         label: "Conversion rate",
         value: overview.funnels.bookingConversionRate,
         formatter: formatPercent,
@@ -484,9 +507,8 @@ export function AdminAnalyticsClient({
         )} bookings completed`,
         icon: Target,
       },
-    ],
-    [overview, periodLabelSuffix],
-  );
+    ];
+  }, [overview, periodLabelSuffix]);
 
   const lastUpdatedAbsolute = useMemo(
     () =>
@@ -629,6 +651,48 @@ export function AdminAnalyticsClient({
         </div>
       </motion.div>
 
+      {/* Phase 1 CORE deep-dives */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="grid gap-3 sm:grid-cols-2"
+      >
+        <Link
+          href="/admin/mobile-events"
+          className="group flex items-center justify-between rounded-xl border border-border/50 bg-background/70 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Smartphone className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Mobile events</p>
+              <p className="text-xs text-muted-foreground">
+                Screen views, search activity, zero-result queries
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+        </Link>
+        <Link
+          href="/admin/redemptions"
+          className="group flex items-center justify-between rounded-xl border border-border/50 bg-background/70 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Ticket className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Offer redemptions</p>
+              <p className="text-xs text-muted-foreground">
+                Platform bill GMV, recent codes, staff validate
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+        </Link>
+      </motion.div>
+
       {/* Key Metrics Section */}
       <section>
         <motion.div
@@ -640,16 +704,10 @@ export function AdminAnalyticsClient({
             Key Performance{" "}
             <span className="gradient-text-primary">Indicators</span>
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {keyMetrics.map((metric, index) => (
-              <motion.div
-                key={metric.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: index * 0.1 }}
-              >
-                <Card className="group relative overflow-hidden border-2 bg-gradient-to-br from-background via-background to-primary/5 shadow-premium hover:shadow-premium-lg transition-all duration-300 hover:scale-[1.02] hover:border-primary/30">
-                  {/* Subtle shine effect on hover */}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            {keyMetrics.map((metric, index) => {
+              const card = (
+                <Card className="group relative overflow-hidden border-2 bg-gradient-to-br from-background via-background to-primary/5 shadow-premium hover:shadow-premium-lg transition-all duration-300 hover:scale-[1.02] hover:border-primary/30 h-full">
                   <div className="absolute inset-0 bg-gradient-to-br from-transparent via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                   <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-3">
@@ -669,10 +727,32 @@ export function AdminAnalyticsClient({
                         {metric.caption}
                       </p>
                     ) : null}
+                    {metric.href ? (
+                      <p className="pt-1 text-xs font-semibold text-primary inline-flex items-center gap-1">
+                        Open details <ArrowRight className="h-3 w-3" />
+                      </p>
+                    ) : null}
                   </CardContent>
                 </Card>
-              </motion.div>
-            ))}
+              );
+
+              return (
+                <motion.div
+                  key={metric.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: index * 0.1 }}
+                >
+                  {metric.href ? (
+                    <Link href={metric.href} className="block h-full">
+                      {card}
+                    </Link>
+                  ) : (
+                    card
+                  )}
+                </motion.div>
+              );
+            })}
           </div>
         </motion.div>
       </section>

@@ -28,7 +28,12 @@ type LookupResult = {
   expiresAt: string;
 };
 
-export function BusinessRedemptionsPage() {
+export function BusinessRedemptionsPage({
+  compact = false,
+}: {
+  /** When true, skip the business-owner page header (e.g. embedded in admin). */
+  compact?: boolean;
+}) {
   const [code, setCode] = useState("");
   const [billValue, setBillValue] = useState("");
   const [lookup, setLookup] = useState<LookupResult | null>(null);
@@ -108,11 +113,13 @@ export function BusinessRedemptionsPage() {
 
   return (
     <div className="w-full">
-      <BusinessOwnerPageHeader
-        icon={Ticket}
-        title="Redeem offers"
-        description="Enter a customer code and the bill total to record GMV"
-      />
+      {!compact && (
+        <BusinessOwnerPageHeader
+          icon={Ticket}
+          title="Redeem offers"
+          description="Enter a customer code and the bill total to record GMV"
+        />
+      )}
 
       <Card className={cn("max-w-lg", BUSINESS_OWNER_CARD_SURFACE)}>
         <CardHeader>

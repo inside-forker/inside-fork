@@ -191,6 +191,15 @@ export interface RevenueAnalyticsSummary {
   topEvents: RevenueTopEvent[];
 }
 
+/** Phase 1 CORE — platform offer-redemption money loop. */
+export interface OfferRedemptionsAnalyticsSummary {
+  redemptionCountInPeriod: number;
+  billGmvInPeriod: number;
+  discountGmvInPeriod: number;
+  pendingCount: number;
+  voidedCountInPeriod: number;
+}
+
 export interface NotificationChannelBreakdown {
   channel: string;
   sent: number;
@@ -246,6 +255,7 @@ export interface AdminAnalyticsOverview {
   funnels: ConversionFunnelSummary;
   traffic: TrafficAnalyticsSummary;
   revenue: RevenueAnalyticsSummary;
+  offerRedemptions: OfferRedemptionsAnalyticsSummary;
   notifications: NotificationsAnalyticsSummary;
   performance: PerformanceAnalyticsSummary | null;
   generatedAt: string;

@@ -22,13 +22,25 @@ const validateSchema = z.object({
   discountValue: z.coerce.number().nonnegative().max(10_000_000).optional(),
 });
 
+async function isPlatformStaff(userId: string): Promise<boolean> {
+  const { rows } = await query(
+    `SELECT role, active_role FROM profiles WHERE id = $1`,
+    [userId],
+  );
+  const profile = rows[0];
+  if (!profile) return false;
+  const effective = profile.active_role || profile.role;
+  return effective === "admin" || effective === "super_admin";
+}
+
 /**
  * GET /api/business/redemptions?code=RD-...
- * Look up a pending redemption owned by the caller.
+ * Merchants: own listings only. Admin / super_admin: any listing.
  */
 export async function GET(request: NextRequest) {
   try {
     const userId = await verifyBusinessOwner();
+    const staff = await isPlatformStaff(userId);
     const codeRaw = new URL(request.url).searchParams.get("code");
     const parsed = lookupSchema.safeParse({ code: codeRaw });
     if (!parsed.success) {
@@ -37,20 +49,35 @@ export async function GET(request: NextRequest) {
     const code = parsed.data.code.toUpperCase().trim();
 
     const { rows } = await query(
-      `SELECT r.id, r.status, r.code, r.code_expires_at, r.listing_id, r.deal_id,
-              r.bill_value, r.discount_value, r.created_at,
-              l.name AS listing_name, d.discount_value AS deal_discount,
-              p.full_name AS user_name
-       FROM public.redemptions r
-       INNER JOIN listings l ON l.id = r.listing_id
-       LEFT JOIN deals d ON d.id = r.deal_id
-       LEFT JOIN profiles p ON p.id = r.user_id
-       WHERE r.code = $1 AND (r.owner_id = $2 OR l.owner_id = $2)`,
-      [code, userId],
+      staff
+        ? `SELECT r.id, r.status, r.code, r.code_expires_at, r.listing_id, r.deal_id,
+                r.bill_value, r.discount_value, r.created_at,
+                l.name AS listing_name, d.discount_value AS deal_discount,
+                p.full_name AS user_name
+         FROM public.redemptions r
+         INNER JOIN listings l ON l.id = r.listing_id
+         LEFT JOIN deals d ON d.id = r.deal_id
+         LEFT JOIN profiles p ON p.id = r.user_id
+         WHERE r.code = $1`
+        : `SELECT r.id, r.status, r.code, r.code_expires_at, r.listing_id, r.deal_id,
+                r.bill_value, r.discount_value, r.created_at,
+                l.name AS listing_name, d.discount_value AS deal_discount,
+                p.full_name AS user_name
+         FROM public.redemptions r
+         INNER JOIN listings l ON l.id = r.listing_id
+         LEFT JOIN deals d ON d.id = r.deal_id
+         LEFT JOIN profiles p ON p.id = r.user_id
+         WHERE r.code = $1 AND (r.owner_id = $2 OR l.owner_id = $2)`,
+      staff ? [code] : [code, userId],
     );
     const row = rows[0];
     if (!row) {
-      return apiError("Redemption not found for your listings", 404);
+      return apiError(
+        staff
+          ? "Redemption not found"
+          : "Redemption not found for your listings",
+        404,
+      );
     }
 
     if (
@@ -87,11 +114,13 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/business/redemptions
- * Validate by code + required bill_value (merchant web dashboard).
+ * Validate by code + required bill_value.
+ * Admin / super_admin may validate any listing's code.
  */
 export async function POST(request: NextRequest) {
   try {
     const userId = await verifyBusinessOwner();
+    const staff = await isPlatformStaff(userId);
     const body = await request.json().catch(() => null);
     const parsed = validateSchema.safeParse(body);
     if (!parsed.success) {
@@ -111,7 +140,11 @@ export async function POST(request: NextRequest) {
     if (!row) {
       return apiError("Redemption not found", 404);
     }
-    if (row.owner_id !== userId && row.listing_owner_id !== userId) {
+    if (
+      !staff &&
+      row.owner_id !== userId &&
+      row.listing_owner_id !== userId
+    ) {
       return apiError("You do not own this listing", 403);
     }
     if (row.status !== "pending") {
@@ -132,6 +165,10 @@ export async function POST(request: NextRequest) {
     const discountValue =
       parsed.data.discountValue ??
       estimateDiscountValue(billValue, row.deal_discount as string | null);
+    const keepOwnerId =
+      (row.owner_id as string | null) ??
+      (row.listing_owner_id as string | null) ??
+      userId;
 
     const { rows: updated } = await query(
       `UPDATE public.redemptions
@@ -141,11 +178,11 @@ export async function POST(request: NextRequest) {
            staff_id = $4,
            channel = 'staff',
            validated_at = now(),
-           owner_id = COALESCE(owner_id, $4)
+           owner_id = COALESCE(owner_id, $5)
        WHERE id = $1 AND status = 'pending'
        RETURNING id, status, bill_value, discount_value, currency, validated_at,
                  user_id, listing_id, deal_id, session_id, source_context, device_id`,
-      [row.id, billValue, discountValue, userId],
+      [row.id, billValue, discountValue, userId, keepOwnerId],
     );
     const redemption = updated[0];
     if (!redemption) {
@@ -158,7 +195,7 @@ export async function POST(request: NextRequest) {
       sessionId: redemption.session_id as string | null,
       sourceContext: (redemption.source_context as string | null) ?? "redeem",
       deviceId: redemption.device_id as string | null,
-      screen: "business_redeem_validate",
+      screen: staff ? "admin_redeem_validate" : "business_redeem_validate",
       platform: "web",
       context: {
         redemptionId: redemption.id,
@@ -171,6 +208,7 @@ export async function POST(request: NextRequest) {
             : null,
         staffId: userId,
         channel: "staff",
+        platformStaff: staff,
       },
     });
 

@@ -51,6 +51,38 @@ export function exportAnalyticsToCSV(overview: AdminAnalyticsOverview) {
     period,
   ]);
 
+  // Offer redemptions (Phase 1 CORE)
+  rows.push([
+    "Offer Redemptions",
+    "Validated count",
+    (overview.offerRedemptions?.redemptionCountInPeriod ?? 0).toString(),
+    period,
+  ]);
+  rows.push([
+    "Offer Redemptions",
+    "Bill GMV (PKR)",
+    (overview.offerRedemptions?.billGmvInPeriod ?? 0).toString(),
+    period,
+  ]);
+  rows.push([
+    "Offer Redemptions",
+    "Discount GMV (PKR)",
+    (overview.offerRedemptions?.discountGmvInPeriod ?? 0).toString(),
+    period,
+  ]);
+  rows.push([
+    "Offer Redemptions",
+    "Pending now",
+    (overview.offerRedemptions?.pendingCount ?? 0).toString(),
+    "Now",
+  ]);
+  rows.push([
+    "Offer Redemptions",
+    "Voided",
+    (overview.offerRedemptions?.voidedCountInPeriod ?? 0).toString(),
+    period,
+  ]);
+
   // Top Search Queries
   overview.search.topQueries.forEach((query) => {
     rows.push([
