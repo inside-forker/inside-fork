@@ -64,7 +64,10 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   if (location) {
     params.push(`%${location}%`);
-    whereClauses.push(`address ILIKE $${params.length}`);
+    const i = params.length;
+    whereClauses.push(
+      `(address ILIKE $${i} OR location_name ILIKE $${i})`,
+    );
   }
 
   if (date) {

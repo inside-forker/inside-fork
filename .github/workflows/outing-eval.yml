@@ -1,0 +1,25 @@
+name: Outing intent eval
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+    paths:
+      - "lib/outing/**"
+      - "scripts/outing-intent-eval*.ts"
+      - "package.json"
+      - ".github/workflows/outing-eval.yml"
+
+jobs:
+  outing-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Outing golden contracts
+        run: npm run outing:eval

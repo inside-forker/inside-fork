@@ -64,6 +64,12 @@ export type DiscoveryIntentConfig = {
   iconName: string;
   /** Leaf category slugs this intent draws from. Empty array = no restriction (e.g. "Something New" is intentionally city-wide). */
   categorySlugs: string[];
+  /**
+   * Hard exclude: drop any candidate that has ≥1 of these category ids,
+   * even if it also matches an allowed slug (e.g. a burger joint dual-tagged
+   * restaurants-cafes + fast-food must not surface on Date Night).
+   */
+  excludeCategorySlugs?: string[];
   /** Per-slug category-fit multiplier in [0,1]; a matched slug missing from this map uses DEFAULT_CATEGORY_BOOST (see scoring.ts). */
   categoryBoost?: Partial<Record<string, number>>;
   weights: DiscoveryWeights;
@@ -102,22 +108,37 @@ export const DISCOVERY_INTENTS: DiscoveryIntentConfig[] = [
     label: "Date Night",
     subtitle: "Romantic spots for tonight",
     iconName: "heart",
+    // Aligned with outing DATE_CATEGORY_SLUGS — posh/romantic, not casual food arcs.
     categorySlugs: [
       "fine-dining-buffets",
-      "restaurants-cafes",
       "cafes-coworking-spots",
+      "live-music-comedy-venues",
+      "restaurants-cafes",
+    ],
+    excludeCategorySlugs: [
+      "fast-food-street-food",
       "bakeries-desserts",
-      "entertainment-recreation",
+      "pakistani-desi-cuisine",
+      "cinemas-amusement-parks",
+      "gaming-lounges-arcades",
     ],
     categoryBoost: {
       "fine-dining-buffets": 1.0,
-      "entertainment-recreation": 0.85,
-      "restaurants-cafes": 0.7,
-      "cafes-coworking-spots": 0.6,
-      "bakeries-desserts": 0.55,
+      "live-music-comedy-venues": 0.95,
+      "cafes-coworking-spots": 0.85,
+      "restaurants-cafes": 0.45,
     },
-    weights: { categoryFit: 0.3, proximity: 0.15, openNow: 0.3, freshness: 0, rating: 0.25, price: 0 },
-    requireOpenNow: true,
+    // Rating-led: date night should feel dressier than "open now nearby".
+    // Open-now stays a soft signal only — hard-requiring it at 4pm collapses
+    // the pool to lunch/kabab spots and starves fine dining.
+    weights: {
+      categoryFit: 0.35,
+      proximity: 0.1,
+      openNow: 0.15,
+      freshness: 0,
+      rating: 0.4,
+      price: 0,
+    },
     includeEvents: true,
   },
   {
@@ -125,26 +146,29 @@ export const DISCOVERY_INTENTS: DiscoveryIntentConfig[] = [
     label: "Friends Visiting",
     subtitle: "Impress out-of-town guests",
     iconName: "users",
+    // Places to eat + hang — never tour agencies / travel booking shops.
     categorySlugs: [
       "entertainment-recreation",
-      "travel-tourism",
-      "restaurants-cafes",
-      "fine-dining-buffets",
-      "shopping-malls-outlets",
       "cinemas-amusement-parks",
+      "live-music-comedy-venues",
+      "fine-dining-buffets",
+      "restaurants-cafes",
+      "cafes-coworking-spots",
+      "shopping-malls-outlets",
       "bakeries-desserts",
     ],
+    excludeCategorySlugs: ["travel-tourism"],
     categoryBoost: {
-      "travel-tourism": 1.0,
-      "entertainment-recreation": 0.95,
-      "cinemas-amusement-parks": 0.9,
+      "entertainment-recreation": 1.0,
+      "cinemas-amusement-parks": 0.95,
+      "live-music-comedy-venues": 0.9,
+      "fine-dining-buffets": 0.85,
       "shopping-malls-outlets": 0.7,
-      "fine-dining-buffets": 0.7,
-      "restaurants-cafes": 0.6,
-      "bakeries-desserts": 0.5,
+      "cafes-coworking-spots": 0.65,
+      "restaurants-cafes": 0.55,
+      "bakeries-desserts": 0.45,
     },
-    // Rating dominant: this intent is "what would make Karachi look good",
-    // so the best-reviewed spot should outrank the merely-closest one.
+    // Rating dominant: what would make Karachi look good for guests.
     weights: { categoryFit: 0.3, proximity: 0.15, openNow: 0.2, freshness: 0, rating: 0.35, price: 0 },
     includeEvents: true,
   },
@@ -253,15 +277,14 @@ export const DISCOVERY_INTENTS: DiscoveryIntentConfig[] = [
       "parks-outdoor-spaces",
       "cinemas-amusement-parks",
       "entertainment-recreation",
-      "travel-tourism",
       "restaurants-cafes",
       "bakeries-desserts",
     ],
+    excludeCategorySlugs: ["travel-tourism"],
     categoryBoost: {
       "parks-outdoor-spaces": 1.0,
       "cinemas-amusement-parks": 0.95,
       "entertainment-recreation": 0.9,
-      "travel-tourism": 0.7,
       "restaurants-cafes": 0.55,
       "bakeries-desserts": 0.5,
     },

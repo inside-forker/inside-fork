@@ -571,6 +571,62 @@ export function ListingCapacityPage() {
         </Card>
       </div>
 
+      <div className="rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm text-muted-foreground">
+        Outing budget contracts need prices: prioritize{" "}
+        <button
+          type="button"
+          className="font-medium text-foreground underline-offset-2 hover:underline"
+          onClick={() => {
+            const hit = categories.find((c) =>
+              /fine.?dining/i.test(c.label + (c.slug ?? "")),
+            );
+            if (hit) {
+              setCategoryFilter(hit.value);
+              setCompletenessFilter("incomplete");
+              setCurrentPage(1);
+            }
+          }}
+        >
+          Fine dining
+        </button>
+        {", "}
+        <button
+          type="button"
+          className="font-medium text-foreground underline-offset-2 hover:underline"
+          onClick={() => {
+            const hit = categories.find((c) =>
+              /entertainment|recreation/i.test(c.label + (c.slug ?? "")),
+            );
+            if (hit) {
+              setCategoryFilter(hit.value);
+              setCompletenessFilter("incomplete");
+              setCurrentPage(1);
+            }
+          }}
+        >
+          Entertainment
+        </button>
+        {", and "}
+        <button
+          type="button"
+          className="font-medium text-foreground underline-offset-2 hover:underline"
+          onClick={() => {
+            const hit = categories.find((c) =>
+              /gaming|arcade/i.test(c.label + (c.slug ?? "")),
+            );
+            if (hit) {
+              setCategoryFilter(hit.value);
+              setCompletenessFilter("incomplete");
+              setCurrentPage(1);
+            }
+          }}
+        >
+          Gaming / arcades
+        </button>
+        {" "}
+        incomplete rows first.
+      </div>
+
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

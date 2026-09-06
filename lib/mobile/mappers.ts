@@ -35,6 +35,11 @@ export type ListingCardDTO = {
   menu_pdf_url: string | null;
   google_maps_url: string | null;
   images: ListingImageDTO[];
+  /** Outing / capacity enrichment (optional; not on every card endpoint). */
+  min_price_per_person?: number | null;
+  max_price_per_person?: number | null;
+  min_guest_capacity?: number | null;
+  max_guest_capacity?: number | null;
 };
 
 /**
