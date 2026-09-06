@@ -30,6 +30,7 @@ import {
   Smartphone,
   Target,
   Ticket,
+  Layers,
   UsersRound,
 } from "lucide-react";
 
@@ -713,11 +714,11 @@ export function AdminAnalyticsClient({
         </div>
       </motion.div>
 
-      {/* Phase 1 CORE deep-dives */}
+      {/* Analytics deep-dives (Phase 1–2) */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="grid gap-3 sm:grid-cols-2"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
       >
         <Link
           href="/admin/mobile-events"
@@ -747,7 +748,24 @@ export function AdminAnalyticsClient({
             <div>
               <p className="text-sm font-semibold">Offer redemptions</p>
               <p className="text-xs text-muted-foreground">
-                Platform bill GMV, recent codes, staff validate
+                Bill GMV, top merchants (30d), validate codes
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+        </Link>
+        <Link
+          href="/admin/segments"
+          className="group flex items-center justify-between rounded-xl border border-border/50 bg-background/70 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Layers className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Segments</p>
+              <p className="text-xs text-muted-foreground">
+                Membership counts and last refresh
               </p>
             </div>
           </div>

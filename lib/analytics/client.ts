@@ -6,6 +6,10 @@ import {
   analyticsEventSchema,
   type AnalyticsEventInput,
 } from "@/types/analytics";
+import {
+  getOrRotateWebSessionId,
+  getWebDeviceId,
+} from "@/lib/analytics/envelope";
 
 const ANALYTICS_ENDPOINT = "/api/analytics/events";
 const DEFAULT_USE_BEACON = true;
@@ -24,11 +28,21 @@ export interface RecordAnalyticsResult {
   details?: unknown;
 }
 
+/** Ensure every web event carries Phase 1 CORE envelope fields. */
+function withEnvelope(event: AnalyticsEventInput): AnalyticsEventInput {
+  return {
+    ...event,
+    sessionId: event.sessionId ?? getOrRotateWebSessionId(),
+    deviceId: event.deviceId ?? getWebDeviceId(),
+    sourceContext: event.sourceContext ?? "unknown",
+  };
+}
+
 const toSerializableEvents = (events: AnalyticsEventInput[]) => {
   const serialized: AnalyticsEventInput[] = [];
 
   for (const event of events) {
-    const parsed = analyticsEventSchema.safeParse(event);
+    const parsed = analyticsEventSchema.safeParse(withEnvelope(event));
 
     if (!parsed.success) {
       throw parsed.error;
@@ -60,7 +74,7 @@ const sendWithBeacon = (payload: unknown): boolean => {
     const body = JSON.stringify(payload);
     return navigator.sendBeacon(
       ANALYTICS_ENDPOINT,
-      new Blob([body], { type: "application/json" })
+      new Blob([body], { type: "application/json" }),
     );
   } catch (error) {
     console.warn("Analytics beacon failed", error);
@@ -70,7 +84,7 @@ const sendWithBeacon = (payload: unknown): boolean => {
 
 const sendWithFetch = async (
   payload: unknown,
-  options?: RecordAnalyticsOptions
+  options?: RecordAnalyticsOptions,
 ): Promise<RecordAnalyticsResult> => {
   const requestInit: RequestInit = {
     method: "POST",
@@ -115,7 +129,7 @@ const sendWithFetch = async (
 
 export async function recordAnalyticsEvents(
   events: AnalyticsEventInput[],
-  options?: RecordAnalyticsOptions
+  options?: RecordAnalyticsOptions,
 ): Promise<RecordAnalyticsResult> {
   try {
     const serialized = toSerializableEvents(events);
@@ -146,7 +160,7 @@ export async function recordAnalyticsEvents(
 
 export async function recordAnalyticsEvent(
   event: AnalyticsEventInput,
-  options?: RecordAnalyticsOptions
+  options?: RecordAnalyticsOptions,
 ): Promise<RecordAnalyticsResult> {
   return recordAnalyticsEvents([event], options);
 }

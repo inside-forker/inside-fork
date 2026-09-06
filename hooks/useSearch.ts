@@ -100,6 +100,7 @@ export function useSearch({
           entityType: "search",
           source: "web",
           sourceContext: "search",
+          screen: "search",
           context: {
             query,
             limit,

@@ -22,9 +22,11 @@ Owner: platform. Spec must exist before a new client event ships.
 
 | Pipeline | Table | Client |
 |---|---|---|
-| Mobile product | `mobile_events` | `track()` |
-| Web product | `analytics_events` | `recordAnalyticsEvent()` |
+| Mobile product | `mobile_events` | `track()` — always sets `session_id`, `device_id`, `source_context` |
+| Web product | `analytics_events` | `recordAnalyticsEvent()` — auto-injects `sessionId` + `deviceId` (localStorage; 30m session rotation) and defaults `sourceContext` to `unknown` when omitted |
 | Listing affinity | `user_listing_events` | `trackEvent(listingId, …)` |
+
+Callers may still pass explicit `sessionId` / `deviceId` / `sourceContext`; explicit values win.
 
 ## Canonical Phase 1 events
 
