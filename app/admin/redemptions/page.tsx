@@ -2,7 +2,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireSessionUser } from "@/lib/auth/require-session";
 import { query } from "@/lib/db";
-import { BusinessRedemptionsPage } from "@/components/business-owner/BusinessRedemptionsPage";
+import {
+  AdminRedemptionsClient,
+  type AdminRedemptionRow,
+} from "@/components/admin/AdminRedemptionsClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -12,30 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
-
-type RecentRow = {
-  id: string;
-  status: string;
-  code: string;
-  channel: string | null;
-  bill_value: string | number | null;
-  discount_value: string | number | null;
-  void_reason: string | null;
-  listing_name: string;
-  guest_name: string | null;
-  guest_username: string | null;
-  guest_id: string;
-  staff_name: string | null;
-  staff_username: string | null;
-  owner_name: string | null;
-  owner_username: string | null;
-  created_at: string;
-  validated_at: string | null;
-  voided_at: string | null;
-};
 
 function personLabel(
   name: string | null,
@@ -61,7 +42,7 @@ export default async function AdminRedemptionsPage() {
     redirect("/dashboard");
   }
 
-  let recent: RecentRow[] = [];
+  let recent: AdminRedemptionRow[] = [];
   let topMerchants: {
     owner_id: string;
     owner_name: string | null;
@@ -128,7 +109,7 @@ export default async function AdminRedemptionsPage() {
          LIMIT 10`,
       ),
     ]);
-    recent = recentResult.rows as RecentRow[];
+    recent = recentResult.rows as AdminRedemptionRow[];
     const s = summaryResult.rows[0];
     summary = {
       validated30d: Number(s?.validated_30d ?? 0),
@@ -153,7 +134,8 @@ export default async function AdminRedemptionsPage() {
         <div>
           <h1 className="text-2xl font-bold">Offer redemptions</h1>
           <p className="text-muted-foreground">
-            Who redeemed, who validated, and platform bill GMV.
+            Who redeemed, who validated, and platform bill GMV. You can accept
+            pending codes for any merchant.
           </p>
         </div>
         <Link
@@ -215,7 +197,7 @@ export default async function AdminRedemptionsPage() {
         </Card>
       </div>
 
-      <BusinessRedemptionsPage compact />
+      <AdminRedemptionsClient recent={recent} />
 
       <Card>
         <CardHeader>
@@ -249,115 +231,6 @@ export default async function AdminRedemptionsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         Rs {Math.round(row.bill_gmv).toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Recent redemptions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {recent.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-6 text-center">
-              No redemptions yet (or migration not applied).
-            </p>
-          ) : (
-            <div className="rounded-xl border border-border/50 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>When</TableHead>
-                    <TableHead>Guest</TableHead>
-                    <TableHead>Validated by</TableHead>
-                    <TableHead>Merchant</TableHead>
-                    <TableHead>Listing</TableHead>
-                    <TableHead>Code</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Bill</TableHead>
-                    <TableHead className="text-right">Discount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recent.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {new Date(row.created_at).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                        {row.validated_at ? (
-                          <span className="block text-xs">
-                            ok{" "}
-                            {new Date(row.validated_at).toLocaleString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              hour: "numeric",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <div className="font-medium">
-                          {personLabel(row.guest_name, row.guest_username, "Unknown guest")}
-                        </div>
-                        <div className="text-xs text-muted-foreground font-mono truncate max-w-[140px]">
-                          {row.guest_id}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {row.status === "validated" || row.staff_name || row.staff_username
-                          ? personLabel(row.staff_name, row.staff_username, "—")
-                          : "—"}
-                        {row.channel ? (
-                          <span className="block text-xs text-muted-foreground">
-                            via {row.channel}
-                          </span>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {personLabel(row.owner_name, row.owner_username)}
-                      </TableCell>
-                      <TableCell>{row.listing_name}</TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {row.code}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            row.status === "validated"
-                              ? "secondary"
-                              : row.status === "pending"
-                                ? "outline"
-                                : "destructive"
-                          }
-                        >
-                          {row.status}
-                        </Badge>
-                        {row.void_reason ? (
-                          <span className="block text-xs text-muted-foreground mt-1 max-w-[160px]">
-                            {row.void_reason}
-                          </span>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {row.bill_value != null
-                          ? Number(row.bill_value).toLocaleString()
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {row.discount_value != null
-                          ? Number(row.discount_value).toLocaleString()
-                          : "—"}
                       </TableCell>
                     </TableRow>
                   ))}

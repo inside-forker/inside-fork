@@ -29,8 +29,16 @@ async function isPlatformStaff(userId: string): Promise<boolean> {
   );
   const profile = rows[0];
   if (!profile) return false;
-  const effective = profile.active_role || profile.role;
-  return effective === "admin" || effective === "super_admin";
+  const permanent = profile.role as string;
+  const effective = (profile.active_role || profile.role) as string;
+  // Permanent staff always allowed (even if temporarily role-switched);
+  // effective role covers admins acting in their staff seat.
+  return (
+    permanent === "admin" ||
+    permanent === "super_admin" ||
+    effective === "admin" ||
+    effective === "super_admin"
+  );
 }
 
 /**
