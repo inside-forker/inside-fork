@@ -42,6 +42,7 @@ const settingsSchema = z.object({
       marketingEmail: z.boolean().optional(),
       locationPermission: z.string().optional(),
       personalisationOptIn: z.boolean().optional(),
+      researchPanelOptIn: z.boolean().optional(),
     })
     .optional(),
 });
@@ -164,6 +165,7 @@ export const PATCH = mobileRoute(async (request: NextRequest) => {
     patch.consent?.marketingEmail !== undefined ||
     patch.consent?.locationPermission !== undefined ||
     patch.consent?.personalisationOptIn !== undefined ||
+    patch.consent?.researchPanelOptIn !== undefined ||
     patch.consent?.termsVersion !== undefined ||
     patch.consent?.privacyVersion !== undefined;
 
@@ -182,10 +184,17 @@ export const PATCH = mobileRoute(async (request: NextRequest) => {
           c.marketingEmail ?? merged.notifications?.marketing ?? null,
         locationPermission: c.locationPermission ?? null,
         personalisationOptIn: c.personalisationOptIn ?? null,
+        researchPanelOptIn: c.researchPanelOptIn ?? null,
         meta: {
           notificationsMarketing: merged.notifications?.marketing ?? null,
         },
       });
+      if (typeof c.researchPanelOptIn === "boolean") {
+        await query(
+          `UPDATE public.profiles SET research_panel_opt_in = $2 WHERE id = $1`,
+          [user.id, c.researchPanelOptIn],
+        );
+      }
     } catch (ledgerError) {
       console.error(
         "[mobile-api] consent ledger append failed:",

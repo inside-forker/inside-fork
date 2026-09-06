@@ -718,7 +718,7 @@ export function AdminAnalyticsClient({
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
       >
         <Link
           href="/admin/mobile-events"
@@ -766,6 +766,40 @@ export function AdminAnalyticsClient({
               <p className="text-sm font-semibold">Segments</p>
               <p className="text-xs text-muted-foreground">
                 Membership counts and last refresh
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+        </Link>
+        <Link
+          href="/admin/demand-gap"
+          className="group flex items-center justify-between rounded-xl border border-border/50 bg-background/70 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Search className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Demand gap</p>
+              <p className="text-xs text-muted-foreground">
+                Unmet zero-result search demand
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+        </Link>
+        <Link
+          href="/admin/creator-codes"
+          className="group flex items-center justify-between rounded-xl border border-border/50 bg-background/70 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Target className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Creator codes</p>
+              <p className="text-xs text-muted-foreground">
+                Attribution codes and signup counts
               </p>
             </div>
           </div>

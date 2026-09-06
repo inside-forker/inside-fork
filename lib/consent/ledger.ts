@@ -11,6 +11,7 @@ export type ConsentLedgerInput = {
   marketingEmail?: boolean | null;
   locationPermission?: string | null;
   personalisationOptIn?: boolean | null;
+  researchPanelOptIn?: boolean | null;
   meta?: Record<string, unknown>;
 };
 
@@ -20,8 +21,8 @@ export async function appendConsentLedger(input: ConsentLedgerInput): Promise<vo
     `INSERT INTO public.consent_ledger
        (user_id, source, terms_version, privacy_version,
         marketing_push, marketing_sms, marketing_whatsapp, marketing_email,
-        location_permission, personalisation_opt_in, meta)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)`,
+        location_permission, personalisation_opt_in, research_panel_opt_in, meta)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)`,
     [
       input.userId,
       input.source ?? "settings",
@@ -33,6 +34,7 @@ export async function appendConsentLedger(input: ConsentLedgerInput): Promise<vo
       input.marketingEmail ?? null,
       input.locationPermission ?? null,
       input.personalisationOptIn ?? null,
+      input.researchPanelOptIn ?? null,
       JSON.stringify(input.meta ?? {}),
     ],
   );

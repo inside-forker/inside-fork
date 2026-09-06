@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 
 /**
  * Shared auth guard for the Workstream 2 nightly cron routes
- * (app/api/cron/refresh-user-scores, refresh-segments,
+ * (app/api/cron/refresh-user-scores, refresh-intelligence, refresh-segments,
  * evaluate-admin-alerts, refresh-marketplace-health, etc.). Mirrors the token-extraction logic in
  * app/api/notifications/dispatch/route.ts (Authorization: Bearer,
  * x-cron-secret header, or ?token= query param) but checks only

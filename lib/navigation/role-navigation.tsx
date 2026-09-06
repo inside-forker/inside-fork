@@ -23,6 +23,8 @@ import {
   Flag,
   Ticket,
   Layers,
+  Search,
+  Link2,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/types/auth.types";
@@ -124,6 +126,8 @@ export const adminNavigation: RoleNavItem[] = [
   { name: "Mobile Events", href: "/admin/mobile-events", icon: Smartphone, description: "Screen views & search activity" },
   { name: "Offer Redemptions", href: "/admin/redemptions", icon: Ticket, description: "Platform redemption GMV & validate codes" },
   { name: "Segments", href: "/admin/segments", icon: Layers, description: "Segment membership counts" },
+  { name: "Demand Gap", href: "/admin/demand-gap", icon: Search, description: "Unmet zero-result search demand" },
+  { name: "Creator Codes", href: "/admin/creator-codes", icon: Link2, description: "Creator attribution codes" },
   { name: "Listing Scraper", href: "/admin/listing-scraper", icon: Store, description: "Bulk-import listings", requiredRole: "super_admin" },
   { name: "Logs Management", href: "/admin/logs", icon: FileText, description: "View system logs", requiredRole: "super_admin" },
   { name: "Security Center", href: "/admin/security", icon: Shield, description: "Platform security", requiredRole: "super_admin" },

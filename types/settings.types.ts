@@ -21,6 +21,7 @@ export interface UserPreferences {
     marketingEmail?: boolean;
     locationPermission?: string;
     personalisationOptIn?: boolean;
+    researchPanelOptIn?: boolean;
   };
 }
 

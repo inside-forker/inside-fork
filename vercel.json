@@ -5,6 +5,10 @@
       "schedule": "0 21 * * *"
     },
     {
+      "path": "/api/cron/refresh-intelligence",
+      "schedule": "10 21 * * *"
+    },
+    {
       "path": "/api/cron/refresh-segments",
       "schedule": "15 21 * * *"
     },

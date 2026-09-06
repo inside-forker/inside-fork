@@ -103,6 +103,12 @@ export const SEGMENT_MERCHANT_GMV_COMPARE_DAYS = 14;
 /** Require at least this many validated redemptions in the prior window before flagging decline. */
 export const SEGMENT_MERCHANT_GMV_DECLINE_MIN_PRIOR_REDEMPTIONS = 3;
 
+/** Phase 3 — min zero-result searches in 14d for unmet_demand_cohort. */
+export const SEGMENT_UNMET_DEMAND_MIN_ZERO_SEARCHES = 2;
+
+/** Phase 3 — cross-sell propensity floor for segment membership. */
+export const SEGMENT_CROSS_SELL_PROPENSITY_MIN = 0.4;
+
 // ---------------------------------------------------------------------------
 // Engagement score: redemption signal (Phase 2) — weights must still sum to 100
 // ---------------------------------------------------------------------------

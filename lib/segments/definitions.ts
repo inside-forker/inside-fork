@@ -8,6 +8,8 @@ import {
   SEGMENT_HIGH_BILL_REDEEM_CUTOFF_PKR,
   SEGMENT_MERCHANT_GMV_COMPARE_DAYS,
   SEGMENT_MERCHANT_GMV_DECLINE_MIN_PRIOR_REDEMPTIONS,
+  SEGMENT_UNMET_DEMAND_MIN_ZERO_SEARCHES,
+  SEGMENT_CROSS_SELL_PROPENSITY_MIN,
 } from "@/lib/scoring/thresholds";
 
 /**
@@ -227,6 +229,92 @@ export const MERCHANT_GMV_DECLINING: SegmentQuery = {
   params: [],
 };
 
+export const UNMET_DEMAND_COHORT: SegmentQuery = {
+  slug: "unmet_demand_cohort",
+  sql: `
+    SELECT me.user_id
+    FROM public.mobile_events me
+    WHERE me.user_id IS NOT NULL
+      AND me.occurred_at >= now() - INTERVAL '14 days'
+      AND me.event_name IN ('search_performed', 'filters_applied')
+      AND (me.context->>'hasResults') = 'false'
+    GROUP BY me.user_id
+    HAVING COUNT(*) >= ${SEGMENT_UNMET_DEMAND_MIN_ZERO_SEARCHES}
+  `,
+  params: [],
+};
+
+export const EVENT_FIRST: SegmentQuery = {
+  slug: "event_first",
+  sql: `
+    SELECT DISTINCT b.user_id
+    FROM public.bookings b
+    WHERE (b.payment_status = 'paid' OR b.status IN ('confirmed', 'completed'))
+      AND NOT EXISTS (
+        SELECT 1 FROM public.redemptions r
+        WHERE r.user_id = b.user_id AND r.status = 'validated'
+      )
+  `,
+  params: [],
+};
+
+export const VENUE_FIRST: SegmentQuery = {
+  slug: "venue_first",
+  sql: `
+    SELECT DISTINCT r.user_id
+    FROM public.redemptions r
+    WHERE r.status = 'validated' AND r.user_id IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM public.bookings b
+        WHERE b.user_id = r.user_id
+          AND (b.payment_status = 'paid' OR b.status IN ('confirmed', 'completed'))
+      )
+  `,
+  params: [],
+};
+
+export const CROSS_SELL_TO_TICKETS: SegmentQuery = {
+  slug: "cross_sell_to_tickets",
+  sql: `
+    SELECT ups.user_id
+    FROM public.user_propensity_scores ups
+    WHERE ups.cross_sell_to_ticket >= ${SEGMENT_CROSS_SELL_PROPENSITY_MIN}
+  `,
+  params: [],
+};
+
+export const CROSS_SELL_TO_VENUES: SegmentQuery = {
+  slug: "cross_sell_to_venues",
+  sql: `
+    SELECT ups.user_id
+    FROM public.user_propensity_scores ups
+    WHERE ups.cross_sell_to_venue >= ${SEGMENT_CROSS_SELL_PROPENSITY_MIN}
+  `,
+  params: [],
+};
+
+export const RESEARCH_PANEL_OPTED_IN: SegmentQuery = {
+  slug: "research_panel_opted_in",
+  sql: `
+    SELECT p.id AS user_id
+    FROM public.profiles p
+    WHERE p.research_panel_opt_in = true
+      AND p.role::text = ANY($1::text[])
+  `,
+  params: [CONSUMER_ROLES],
+};
+
+export const CREATOR_ATTRIBUTED: SegmentQuery = {
+  slug: "creator_attributed",
+  sql: `
+    SELECT p.id AS user_id
+    FROM public.profiles p
+    WHERE p.attributed_creator_code IS NOT NULL
+      AND p.role::text = ANY($1::text[])
+  `,
+  params: [CONSUMER_ROLES],
+};
+
 export const ALL_SEGMENT_QUERIES: SegmentQuery[] = [
   SIGNED_UP_NO_BOOKING_7D,
   WAS_ACTIVE_NOW_SILENT_21D,
@@ -241,4 +329,11 @@ export const ALL_SEGMENT_QUERIES: SegmentQuery[] = [
   CORE_PROFILE_INCOMPLETE,
   MERCHANT_NO_REDEMPTIONS_30D,
   MERCHANT_GMV_DECLINING,
+  UNMET_DEMAND_COHORT,
+  EVENT_FIRST,
+  VENUE_FIRST,
+  CROSS_SELL_TO_TICKETS,
+  CROSS_SELL_TO_VENUES,
+  RESEARCH_PANEL_OPTED_IN,
+  CREATOR_ATTRIBUTED,
 ];
