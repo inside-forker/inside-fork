@@ -416,6 +416,67 @@ export async function POST(request: NextRequest) {
           notifError,
         );
       }
+
+      // Best-effort: let the organizer know a sale came in. Never let this
+      // affect the webhook's response to PayFast.
+      try {
+        const { notifyOrganizer } = await import("@/lib/organizer/notify");
+        await notifyOrganizer({
+          type: "ticket_sale",
+          eventId: Number(booking.event_id),
+          data: {
+            ticketCount: passesCreated,
+            totalAmount: Number(booking.total_amount ?? 0),
+            buyerName: booking.customer_name || undefined,
+          },
+        });
+      } catch (organizerNotifyError) {
+        console.error(
+          "[PayFast Webhook] Failed to notify organizer of sale:",
+          organizerNotifyError,
+        );
+      }
+
+      // Best-effort: sell-through milestone (25/50/75/100% of capacity).
+      // Only fires when the event has a max_capacity set, and only once
+      // per threshold via notifyOrganizer's dedupeKey.
+      try {
+        const { rows: capacityRows } = await query(
+          `SELECT max_capacity FROM events WHERE id = $1`,
+          [booking.event_id],
+        );
+        const maxCapacity = Number(capacityRows[0]?.max_capacity || 0);
+
+        if (maxCapacity > 0) {
+          const { rows: soldRows } = await query(
+            `SELECT COUNT(*)::int AS sold FROM ticket_passes
+             WHERE event_id = $1 AND status != 'revoked'`,
+            [booking.event_id],
+          );
+          const sold = Number(soldRows[0]?.sold || 0);
+          const prevPercent = Math.floor(
+            ((sold - passesCreated) / maxCapacity) * 100,
+          );
+          const currentPercent = Math.floor((sold / maxCapacity) * 100);
+          const milestone = [25, 50, 75, 100].find(
+            (m) => currentPercent >= m && prevPercent < m,
+          );
+
+          if (milestone) {
+            const { notifyOrganizer } = await import("@/lib/organizer/notify");
+            await notifyOrganizer({
+              type: "milestone",
+              eventId: Number(booking.event_id),
+              data: { milestonePercent: milestone },
+            });
+          }
+        }
+      } catch (milestoneError) {
+        console.error(
+          "[PayFast Webhook] Failed to check sales milestone:",
+          milestoneError,
+        );
+      }
     }
 
     // Send failure notification if payment failed

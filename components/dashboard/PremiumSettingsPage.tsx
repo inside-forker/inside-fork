@@ -20,6 +20,22 @@ import {
   PremiumSettingsPageProps,
 } from "@/types/settings.types";
 
+type NotificationChannel = "bell" | "email" | "push";
+
+interface NotificationCategoryPref {
+  categorySlug: string;
+  label: string;
+  description: string | null;
+  isMandatory: boolean;
+  channels: Record<NotificationChannel, boolean>;
+}
+
+const CHANNEL_LABELS: Record<NotificationChannel, string> = {
+  bell: "In-app",
+  email: "Email",
+  push: "Push",
+};
+
 export function PremiumSettingsPage({ profile }: PremiumSettingsPageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences>({
@@ -37,8 +53,88 @@ export function PremiumSettingsPage({ profile }: PremiumSettingsPageProps) {
     },
   });
 
+  const [categoryPrefs, setCategoryPrefs] = useState<NotificationCategoryPref[]>([]);
+  const [categoryPrefsLoading, setCategoryPrefsLoading] = useState(true);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+
   const { toast } = useToast();
   const router = useRouter();
+
+  // Load per-category notification preferences (the ones that actually
+  // control sending) from the real engine, separate from the legacy
+  // theme/location blob below.
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/notifications/preferences")
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((data) => {
+        if (!cancelled && data?.categories) {
+          setCategoryPrefs(data.categories);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          toast({
+            title: "Couldn't load notification preferences",
+            description: "Please refresh the page to try again.",
+            variant: "destructive",
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCategoryPrefsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const updateCategoryChannel = async (
+    categorySlug: string,
+    channel: NotificationChannel,
+    enabled: boolean
+  ) => {
+    const key = `${categorySlug}:${channel}`;
+    const previous = categoryPrefs;
+
+    setCategoryPrefs((prev) =>
+      prev.map((cat) =>
+        cat.categorySlug === categorySlug
+          ? { ...cat, channels: { ...cat.channels, [channel]: enabled } }
+          : cat
+      )
+    );
+    setSavingKey(key);
+
+    try {
+      const response = await fetch("/api/notifications/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          preferences: [{ categorySlug, channel, enabled }],
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || "Failed to save");
+      }
+    } catch (error) {
+      // Roll back on failure so the toggle reflects what's actually saved.
+      setCategoryPrefs(previous);
+      toast({
+        title: "Couldn't save preference",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingKey(null);
+    }
+  };
 
   // Load user preferences on mount
   useEffect(() => {
@@ -83,20 +179,6 @@ export function PremiumSettingsPage({ profile }: PremiumSettingsPageProps) {
 
     // Save to localStorage
     localStorage.setItem("theme", theme);
-  };
-
-  // Update notification preferences
-  const updateNotification = (
-    key: keyof NonNullable<UserPreferences["notifications"]>,
-    value: boolean
-  ) => {
-    setPreferences((prev) => ({
-      ...prev,
-      notifications: {
-        ...prev.notifications,
-        [key]: value,
-      },
-    }));
   };
 
   // Save preferences to database
@@ -226,64 +308,67 @@ export function PremiumSettingsPage({ profile }: PremiumSettingsPageProps) {
             </div>
           </div>
 
-          <div className="space-y-6">
-            {[
-              {
-                key: "email",
-                label: "Email Notifications",
-                description: "Receive important updates via email",
-              },
-              {
-                key: "bookings",
-                label: "Booking Updates",
-                description:
-                  "Get notified about your bookings and reservations",
-              },
-              {
-                key: "reviews",
-                label: "Review Activity",
-                description: "Notifications about new reviews and responses",
-              },
-              {
-                key: "marketing",
-                label: "Marketing Updates",
-                description: "Receive promotional content and platform news",
-              },
-            ].map(({ key, label, description }) => (
-              <div
-                key={key}
-                className="flex items-center justify-between p-4 rounded-lg border border-border/30 bg-card/30 hover:bg-card/50 transition-colors"
-              >
-                <div className="flex-1">
-                  <h4 className="font-medium text-sm">{label}</h4>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {description}
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer ml-4">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={
-                      preferences.notifications?.[
-                        key as keyof NonNullable<
-                          UserPreferences["notifications"]
-                        >
-                      ] || false
-                    }
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      updateNotification(
-                        key as keyof NonNullable<
-                          UserPreferences["notifications"]
-                        >,
-                        e.target.checked
-                      )
-                    }
-                  />
-                  <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+          <div className="space-y-4">
+            {categoryPrefsLoading ? (
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                <span className="text-sm">Loading preferences...</span>
               </div>
-            ))}
+            ) : (
+              categoryPrefs.map((cat) => (
+                <div
+                  key={cat.categorySlug}
+                  className="p-4 rounded-lg border border-border/30 bg-card/30"
+                >
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm">{cat.label}</h4>
+                      {cat.description && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {cat.description}
+                        </p>
+                      )}
+                      {cat.isMandatory && (
+                        <p className="text-xs text-primary/80 mt-1">
+                          At least one channel required
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    {(Object.keys(CHANNEL_LABELS) as NotificationChannel[]).map(
+                      (channel) => {
+                        const toggleKey = `${cat.categorySlug}:${channel}`;
+                        return (
+                          <label
+                            key={channel}
+                            className="relative inline-flex items-center gap-2 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              className="sr-only peer"
+                              checked={cat.channels[channel]}
+                              disabled={savingKey === toggleKey}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                updateCategoryChannel(
+                                  cat.categorySlug,
+                                  channel,
+                                  e.target.checked
+                                )
+                              }
+                            />
+                            <div className="w-9 h-5 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary" />
+                            <span className="text-xs text-muted-foreground">
+                              {CHANNEL_LABELS[channel]}
+                            </span>
+                          </label>
+                        );
+                      }
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </motion.div>
 

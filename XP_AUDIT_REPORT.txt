@@ -1,0 +1,211 @@
+========================================================================
+XP SYSTEM AUDIT — insidekhi-nextjs
+Live database audit performed 2026-09-07
+========================================================================
+
+METHOD
+------
+Static trace of lib/gamification.ts, every awardXP()/points_log call
+site, and the admin gamification routes, cross-checked against live
+queries against the production Postgres database (actual rank
+thresholds, activity values, trigger definitions, and sampled user
+XP-vs-rank state). No code was changed as part of this audit.
+
+Stats at time of audit: 71 profiles, 57 points_log rows, 5 active
+ranks, 13 XP activities.
+
+
+1. VERDICT SUMMARY
+-------------------
+[PASS] Rank thresholds are seeded and active (5 ranks, 0-3,000 XP).
+[PASS] XP -> profile total sync trigger works correctly, including
+       claw-back: deleting a points_log row on review rejection
+       correctly decrements profiles.points.
+[PASS] Admin manual XP grant tool exists, is role-gated to
+       admin/super_admin, and writes an audit log entry. It does NOT
+       silently bypass activity cooldowns (see Finding 3 for why
+       that's actually a bug in the UI copy, not a feature).
+[FAIL] Daily login -- the highest-frequency XP action -- never
+       triggers rank recalculation. See Finding 1.
+[FAIL] Rank-ups produce zero notification through nearly every
+       server-side award path. See Finding 2.
+
+
+2. RANK LADDER (live values from the `ranks` table)
+-----------------------------------------------------
+Rank         Min XP    Slot cap
+Explorer     0         none
+Local        250       none
+Guide        750       none
+Influencer   1,500     none
+INSIDER      3,000     100
+
+Mechanics: rank is NOT a column on the user profile. It is computed
+fresh every time checkAndProcessRankUp() runs (lib/gamification.ts:133)
+by comparing total XP against the threshold list and flipping a
+current_rank flag in a separate user_ranks table. There is no cron job
+and no database trigger doing this recalculation -- it only runs as
+the tail end of an XP award. This is exactly what makes Finding 1
+possible: skip the award function, skip the rank check.
+
+Crossing a threshold also tries to award a badge named
+"{Rank} Badge" if one exists in the badges table -- not independently
+verified in this audit, same blast radius as Finding 2.
+
+
+3. WHAT EARNS XP TODAY (live values from xp_activities)
+---------------------------------------------------------
+Action                                    Cooldown          XP
+Suggest a new place (admin-approved)      Once/submission   50
+Complete a challenge                      Once/challenge    50
+Scan a location QR code (custom per-QR)   Weekly            20-custom
+Attend an event (ticket scanned)          Once/ticket       30
+Report incorrect info (admin-approved)    Once/report       30
+Complete profile (name+username+phone)    Once, ever        25
+Invite a friend                           Once/invite       25
+7-day login streak bonus                  Weekly            20
+Share a listing link                      Daily             10
+Leave a review (once approved)            Once/listing      10
+Daily login                               Daily             5
+Comment on a review                       10/day cap        2
+React "helpful" to a review               10/day cap        2
+
+Defined in admin config but with NO code path that actually awards
+them: check_in, refer_friend (as distinct from invite). These are
+dead config / unfinished wiring -- flag for cleanup or completion.
+
+
+4. ADMIN / SUPERADMIN XP DASHBOARD
+------------------------------------
+Exists and is a real, audited feature.
+
+- Access: role === "admin" or "super_admin" can manually grant XP.
+  Rank threshold editing (renaming, changing XP requirement, slot
+  caps) is locked further, to super_admin only.
+- Flow: admin searches a user, picks an activity (or custom
+  reason/related-id), submits. Runs through the exact same awardXP()
+  function as an organic action -- same eligibility check, same
+  rank-up check, same badge check.
+- Audit trail: every manual grant writes an audit-log row (admin id,
+  target user, activity, amount, reason).
+- Also admin-configurable: XP value/cooldown of every activity, and
+  the XP reward baked into each location QR code at creation time.
+
+
+5. FINDINGS (ranked by severity)
+-----------------------------------
+
+[HIGH] Daily login never checks for a rank-up
+  Both app/api/gamification/daily-login/route.ts and its mobile
+  counterpart insert straight into points_log instead of calling
+  awardXP(), which skips checkAndProcessRankUp() entirely. A player
+  who only logs in daily and does nothing else stays frozen at
+  Explorer regardless of accumulated XP, until some other action
+  happens to fire and catches the rank-up retroactively.
+  Location: app/api/gamification/daily-login/route.ts:207-218
+            app/api/mobile/v1/gamification/daily-login/route.ts:235
+
+[HIGH] Rank-ups are silent everywhere except one client hook
+  createNotification() (the shared notification/push/email
+  dispatcher) is never called from the gamification engine. The only
+  "you ranked up!" moment in the app is a client-side toast inside
+  useXPAward.ts, which only fires for components calling
+  /api/xp/award directly. A rank-up from a ticket check-in, approved
+  review, admin grant, or QR scan produces no toast, push, email, or
+  in-app notification.
+  Location: lib/gamification.ts (no notification call in
+            checkAndProcessRankUp) / hooks/useXPAward.ts:59-69
+
+[MEDIUM] Manual XP grant UI claims a cooldown bypass it doesn't have
+  Admin panel copy says manual awards "bypass cooldown checks for
+  one-time/special cases." The code doesn't -- it calls the same
+  awardXP() path as organic awards, so re-granting a "once" activity
+  to a user who already claimed it fails with "Activity already
+  claimed," same as a self-serve attempt. Either fix the copy or add
+  the bypass it promises.
+  Location: components/admin/gamification/ManualXPAward.tsx:382-384
+            app/api/admin/gamification/manual-xp/route.ts:83
+
+[MEDIUM] No committed schema for the gamification tables
+  ranks, xp_activities, points_log, user_ranks, and the sync trigger
+  all exist and work correctly live, but none are defined in tracked
+  SQL migrations. If this environment were ever rebuilt from
+  migrations alone, the XP system (including current rank thresholds)
+  would have to be manually reconstructed. Recommend exporting the
+  current schema/trigger definitions into a migration as a backfill.
+  Location: sql/migrations/ (absent)
+
+[LOW] Legacy points_log rows use free-text reasons, not activity slugs
+  A prior version of the ticket check-in route wrote rows like
+  "Attended event: Test Event" and "Daily login reward" instead of
+  canonical slugs (attend_event, daily_login). Already fixed going
+  forward; old rows remain, so historical reporting keyed on
+  reason = activity_slug will undercount those legacy events.
+  Location: points_log.reason (historical rows)
+            app/api/tickets/verify/route.ts:256-262 (comment documents fix)
+
+
+6. SUGGESTED XP WEIGHTING (4-tier scale: micro / small / medium / large)
+----------------------------------------------------------------------
+Keep as-is:
+  - Daily login (micro, 5)
+  - Review reactions/comments (micro, 2, daily-capped)
+  - Attend event / suggest place / report info (small, 30/50)
+
+Raise:
+  - Leave a review: 10 -> 20 (small). Writing a review is more effort
+    than reacting to one; current ratio undervalues it.
+
+New actions to add:
+  - Photo attachments on a review: 5/photo, cap 3 (micro)
+  - First review of a brand-new listing: 40 (medium) -- rewards
+    exploration specifically, reinforces Explorer/Local rank identity
+  - Organizer hosts a sold-out or 4.5+ rated event: 75 (medium) --
+    organizers currently earn zero XP; no supply-side incentive loop
+  - Referral converts (friend completes profile, not just invited):
+    60 (medium) -- current invite_friend pays on send, which is
+    spammable
+  - Monthly (30-day) streak: 150 (large) -- no milestone exists above
+    the 7-day streak currently
+  - "Trail" completion -- visit 5 QR locations in one themed category:
+    100 (large) -- turns independent QR scans into a designed
+    collection mechanic
+  - Verified Local Guide badge (10 approved reviews across distinct
+    listings): 200, one-time (large) -- fills the current gap between
+    ~50 XP actions and the 3,000 XP INSIDER ceiling
+
+
+7. FURTHER FEATURES TO IMPLEMENT
+-----------------------------------
+
+Fix first (prerequisites, not features):
+  - Route daily login through awardXP() so it checks for rank-ups
+  - Wire rank-up / badge-earn events into the shared notification
+    system (push / toast / in-app)
+  - Fix the admin cooldown-bypass UI copy, or implement the bypass
+
+New XP-earning actions: see section 6 above.
+
+System / product features beyond raw XP-earning:
+  - XP decay or activity requirement for INSIDER, since it is
+    slot-capped at 100 -- decide what happens when it fills or a
+    member goes inactive
+  - Leaderboard integration -- confirm/build a real leaderboard view
+    tied to rank + XP (referenced in code as /leaderboard but not
+    fully verified in this audit)
+  - Rank-based perks -- ranks.benefits (JSON column) exists in the
+    schema but was not verified to gate anything real (discounts,
+    early access, profile badges) -- audit whether it's enforced
+    anywhere or purely decorative
+  - XP transaction history UI for users -- let a user see their own
+    points_log breakdown, not just a running total, for transparency
+  - Admin analytics dashboard -- XP awarded by activity type/time
+    period, rank distribution over time, to tune values on real data
+    instead of guesswork
+  - Anti-abuse guardrails -- review "unlimited" cooldown activities
+    (comment/react) and per-QR reward customization for farming risk,
+    since QR XP bypasses the central activity config entirely
+
+========================================================================
+END OF REPORT
+========================================================================
