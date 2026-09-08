@@ -8,6 +8,26 @@ import { MobileApiError } from "@/lib/mobile/errors";
 export const dynamic = "force-dynamic";
 
 /**
+ * Published listings per category, rolled up through the tree so a top-level
+ * category reports everything underneath it rather than only the handful of
+ * listings filed directly against the parent. Depth is not assumed — the
+ * recursive term walks `parent_id` for as many levels as exist.
+ */
+const CATEGORY_COUNTS_CTE = `
+  WITH RECURSIVE tree AS (
+    SELECT id AS root_id, id FROM categories
+    UNION ALL
+    SELECT t.root_id, c.id FROM categories c JOIN tree t ON c.parent_id = t.id
+  ),
+  counts AS (
+    SELECT t.root_id, COUNT(l.id)::int AS listing_count
+    FROM tree t
+    LEFT JOIN listings l ON l.category_id = t.id AND l.status = 'published'
+    GROUP BY t.root_id
+  )
+`;
+
+/**
  * GET /api/mobile/v1/categories
  *
  * Reference data for filter/category pickers. `value` is the stringified integer
@@ -16,6 +36,10 @@ export const dynamic = "force-dynamic";
  * `?type=event|listing|both` filters by `category_type`, matching a row whose
  * `category_type` equals the requested value or is `'both'`. Omitted (default)
  * keeps the original unfiltered behavior so existing callers are unaffected.
+ *
+ * `listingCount` is additive: Home's category index labels each row with how
+ * many places sit under it, which is the whole reason that block can drop the
+ * icons. Clients that only need the picker can ignore it.
  */
 export const GET = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
@@ -31,13 +55,22 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   try {
     const { rows } = type
       ? await query(
-          `SELECT id, name, slug, parent_id, icon_name FROM categories
-           WHERE category_type = $1 OR category_type = 'both'
-           ORDER BY name ASC`,
+          `${CATEGORY_COUNTS_CTE}
+           SELECT c.id, c.name, c.slug, c.parent_id, c.icon_name,
+                  COALESCE(ct.listing_count, 0) AS listing_count
+           FROM categories c
+           LEFT JOIN counts ct ON ct.root_id = c.id
+           WHERE c.category_type = $1 OR c.category_type = 'both'
+           ORDER BY c.name ASC`,
           [type],
         )
       : await query(
-          `SELECT id, name, slug, parent_id, icon_name FROM categories ORDER BY name ASC`,
+          `${CATEGORY_COUNTS_CTE}
+           SELECT c.id, c.name, c.slug, c.parent_id, c.icon_name,
+                  COALESCE(ct.listing_count, 0) AS listing_count
+           FROM categories c
+           LEFT JOIN counts ct ON ct.root_id = c.id
+           ORDER BY c.name ASC`,
         );
     data = rows;
   } catch (error) {
@@ -58,6 +91,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     slug: c.slug,
     parentId: c.parent_id != null ? String(c.parent_id) : null,
     iconName: c.icon_name,
+    listingCount: Number(c.listing_count ?? 0),
   }));
 
   return ok(categories);

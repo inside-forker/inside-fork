@@ -8,6 +8,8 @@ import { MobileApiError } from "@/lib/mobile/errors";
 import { sanitizeSearchTerm } from "@/lib/utils/search-sanitization";
 import { toEventCard, type EventCardRow } from "@/lib/mobile/mappers";
 import { getAttendeesPreviewByEvent } from "@/lib/mobile/attendees";
+import { fetchPrimaryImagesByEventId } from "@/lib/mobile/event-images";
+import { fetchPriceRangeByEventId, type EventPriceRange } from "@/lib/mobile/event-pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -257,6 +259,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     ReturnType<typeof getAttendeesPreviewByEvent>
   > = new Map();
   let primaryImageByEvent = new Map<number, string>();
+  let priceRangeByEvent = new Map<number, EventPriceRange>();
   try {
     // Sequential for the same reason as the count query above - a `max: 1`
     // pool turns concurrent queries into queued ones racing a 10s acquisition
@@ -265,22 +268,20 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     // every card rather than 500ing - the same root cause showing up as
     // "sometimes the events have images, sometimes they don't".
     const attendeesResult = await getAttendeesPreviewByEvent(eventIds);
-    const imagesResult =
-      eventIds.length > 0
-        ? await query(
-            `SELECT DISTINCT ON (event_id) event_id, url
-             FROM event_images
-             WHERE event_id = ANY($1) AND (is_primary = true OR display_order = 1)
-             ORDER BY event_id, is_primary DESC NULLS LAST, display_order ASC`,
-            [eventIds],
-          )
-        : { rows: [] as { event_id: number; url: string }[] };
+    // Shared helper, so "which image is the cover" is decided the same way on
+    // every event list. The old inline query also required `is_primary` or
+    // `display_order = 1`, which left an event whose images are merely ordered
+    // from 0 (or 2 up) with no cover at all.
+    const imagesByEvent = await fetchPrimaryImagesByEventId(eventIds);
+    const pricesByEvent = await fetchPriceRangeByEventId(eventIds);
     attendeesPreviewByEvent = attendeesResult;
-    primaryImageByEvent = new Map(
-      imagesResult.rows.map((r) => [Number(r.event_id), r.url as string]),
-    );
+    primaryImageByEvent = imagesByEvent;
+    priceRangeByEvent = pricesByEvent;
   } catch (error) {
-    console.error("[mobile-api] attendees preview / image query failed:", error);
+    console.error(
+      "[mobile-api] attendees preview / image / price query failed:",
+      error,
+    );
   }
 
   const events = eventCardRows.map((row) =>
@@ -288,6 +289,9 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       row,
       row.event_id != null ? attendeesPreviewByEvent.get(row.event_id) : undefined,
       row.event_id != null ? (primaryImageByEvent.get(row.event_id) ?? null) : null,
+      row.event_id != null
+        ? (priceRangeByEvent.get(row.event_id) ?? { from: null, to: null })
+        : { from: null, to: null },
     ),
   );
 
