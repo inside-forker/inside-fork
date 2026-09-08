@@ -196,6 +196,28 @@ export async function POST(request: NextRequest) {
           method: "POST",
         },
       );
+
+      // create_booking_atomic (sql/migrations/20260901_atomic_booking_add_validation.sql)
+      // wraps every failure as `create_booking_atomic failed: <reason>` via its
+      // `EXCEPTION WHEN OTHERS` handler. Recognized validation failures are the
+      // caller's fault (400, with the real reason) rather than a generic 500 -
+      // this is what previously hid "sold out" / "per-person limit exceeded" /
+      // "sale window closed" behind an unhelpful "Failed to create booking".
+      const rawMessage =
+        bookingError instanceof Error ? bookingError.message : "";
+      const message = rawMessage.replace(
+        /^create_booking_atomic failed: /,
+        "",
+      );
+      const isValidationFailure =
+        /sale window closed|insufficient quantity|per-person limit exceeded|ticket type .* not found|invalid quantity/i.test(
+          message,
+        );
+
+      if (isValidationFailure) {
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
+
       return NextResponse.json(
         { error: "Failed to create booking" },
         { status: 500 },
