@@ -55,6 +55,7 @@ const bodySchema = z.object({
       .transform((value) => value.replace(/\D/g, ""))
       .pipe(z.string().regex(/^\d{13}$/, "CNIC must be 13 digits.")),
   }),
+  coupon_code: z.string().min(1).max(64).optional(),
 });
 
 /**
@@ -69,6 +70,12 @@ const bodySchema = z.object({
  * hashed here in the API layer (hashCnic/cnicLast4) before it ever reaches the
  * RPC or the database - only the hash and last 4 digits are ever persisted or
  * exposed.
+ *
+ * Optional `coupon_code` is passed straight through as `p_coupon_code` - the
+ * RPC validates and redeems it under the same row lock as ticket inventory
+ * (see the coupon migration's header comment). `GET /coupons/validate` is a
+ * separate, non-authoritative preview for the "Apply Offer" UI before this
+ * point.
  */
 export const POST = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
@@ -92,7 +99,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
       path || undefined,
     );
   }
-  const { tickets, customer } = parsed.data;
+  const { tickets, customer, coupon_code: couponCode } = parsed.data;
 
   // Aggregate duplicate ticket types.
   const agg = new Map<number, number>();
@@ -213,7 +220,8 @@ export const POST = mobileRoute(async (request: NextRequest) => {
            p_customer_phone => $5,
            p_cnic_hash => $6,
            p_cnic_last4 => $7,
-           p_basket_id => $8
+           p_basket_id => $8,
+           p_coupon_code => $9
          ) AS result`,
         [
           user.id,
@@ -224,6 +232,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
           hashCnic(customer.cnic),
           cnicLast4(customer.cnic),
           basket,
+          couponCode ?? null,
         ],
       );
       newId = (rpcRows[0]?.result as number | null) ?? null;
@@ -256,6 +265,15 @@ export const POST = mobileRoute(async (request: NextRequest) => {
           "Per-person ticket limit exceeded.",
           400,
         );
+      if (/invalid coupon/i.test(msg))
+        throw new MobileApiError(
+          "coupon_invalid",
+          // The RPC's message already has a friendly, specific reason
+          // ("not found, expired...", "usage limit reached", "already used").
+          msg.replace(/^invalid coupon:\s*/i, "") || "This coupon code is invalid.",
+          400,
+          "coupon_code",
+        );
       console.error("[mobile-api] checkout RPC failed:", msg);
       throw new MobileApiError(
         "internal_error",
@@ -267,7 +285,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   }
 
   const { rows: bookingRows } = await query(
-    `SELECT id, booking_reference, total_amount, payment_status
+    `SELECT id, booking_reference, total_amount, payment_status, coupon_id, discount_amount
      FROM bookings WHERE id = $1`,
     [bookingId],
   );
@@ -330,6 +348,9 @@ export const POST = mobileRoute(async (request: NextRequest) => {
       mock_mode: false,
       reused,
       poll_interval_ms: 4000,
+      // coupon_id is `bigint` - pg returns it as a string, not a number.
+      coupon_id: booking.coupon_id != null ? Number(booking.coupon_id) : null,
+      discount_amount: booking.discount_amount,
     },
     undefined,
     { status: 201 },

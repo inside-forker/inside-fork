@@ -20,7 +20,7 @@ const EVENT_CARD_SQL_COLUMNS =
   "event_id, event_name, event_slug, event_description, event_status, " +
   "to_json(start_time) #>> '{}' AS start_time, " +
   "to_json(end_time) #>> '{}' AS end_time, " +
-  "is_featured, organizer_name, organizer_avatar, location_name, address, latitude, longitude";
+  "is_featured, organizer_name, organizer_avatar, location_name, address, latitude, longitude, category_id";
 
 export async function getUpcomingEventCards(limit: number): Promise<EventCardDTO[]> {
   const { rows } = await query(
@@ -33,6 +33,11 @@ export async function getUpcomingEventCards(limit: number): Promise<EventCardDTO
   );
 
   return (rows as Array<Record<string, unknown>>).map((row) =>
-    toEventCard({ ...row, event_id: Number(row.event_id) } as EventCardRow),
+    toEventCard({
+      ...row,
+      event_id: Number(row.event_id),
+      // category_id is `bigint` - pg returns it as a string, not a number.
+      category_id: row.category_id != null ? Number(row.category_id) : null,
+    } as EventCardRow),
   );
 }

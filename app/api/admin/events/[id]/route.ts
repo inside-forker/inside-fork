@@ -201,6 +201,7 @@ export async function PATCH(
       latitude,
       longitude,
       category_id,
+      venue_id,
       max_capacity,
       is_featured,
       featured_rank,
@@ -237,6 +238,7 @@ export async function PATCH(
     if (latitude !== undefined) pushField("latitude", latitude);
     if (longitude !== undefined) pushField("longitude", longitude);
     if (category_id !== undefined) pushField("category_id", category_id);
+    if (venue_id !== undefined) pushField("venue_id", venue_id);
     if (max_capacity !== undefined) pushField("max_capacity", max_capacity);
     if (is_featured !== undefined) pushField("is_featured", is_featured);
     if (featured_rank !== undefined) pushField("featured_rank", featured_rank);
