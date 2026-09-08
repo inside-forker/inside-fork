@@ -19,11 +19,17 @@ export const dynamic = "force-dynamic";
 
 const MAX_EVENT_IMAGES = 20;
 
+// Same ambiguity concern as the events list route: `events_with_details` and
+// `events` share many column names, and EVENTS_FROM_SQL below joins `events e`
+// to reach venue_id - every shared column must be qualified with
+// `events_with_details.` or Postgres rejects the query as ambiguous.
 const EVENT_CARD_SQL_COLUMNS =
   "events_with_details.event_id, event_name, event_slug, event_description, event_status, " +
-  "to_json(start_time) #>> '{}' AS start_time, " +
-  "to_json(end_time) #>> '{}' AS end_time, " +
-  "is_featured, organizer_id, organizer_name, organizer_avatar, location_name, address, latitude, longitude, " +
+  "to_json(events_with_details.start_time) #>> '{}' AS start_time, " +
+  "to_json(events_with_details.end_time) #>> '{}' AS end_time, " +
+  "events_with_details.is_featured, events_with_details.organizer_id, organizer_name, organizer_avatar, " +
+  "events_with_details.location_name, events_with_details.address, " +
+  "events_with_details.latitude, events_with_details.longitude, " +
   "events_with_details.category_id, c.name AS category_name, c.slug AS category_slug, c.icon_name AS category_icon_name, " +
   "e.venue_id, v.name AS venue_name, v.rating AS venue_rating";
 

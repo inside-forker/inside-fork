@@ -11,11 +11,19 @@ import { getAttendeesPreviewByEvent } from "@/lib/mobile/attendees";
 
 export const dynamic = "force-dynamic";
 
+// `events_with_details` and `events` share many column names (start_time,
+// end_time, address, latitude, longitude, is_featured, category_id, ...) -
+// now that EVENTS_FROM_SQL also joins `events e` (to reach venue_id), every
+// one of those must be qualified with `events_with_details.` or Postgres
+// rejects the query as ambiguous. `event_id`/`event_name`/etc. (the view's
+// renamed columns) don't collide and are left bare.
 const EVENT_CARD_SQL_COLUMNS =
   "events_with_details.event_id, event_name, event_slug, event_description, event_status, " +
-  "to_json(start_time) #>> '{}' AS start_time, " +
-  "to_json(end_time) #>> '{}' AS end_time, " +
-  "is_featured, organizer_name, organizer_avatar, location_name, address, latitude, longitude, " +
+  "to_json(events_with_details.start_time) #>> '{}' AS start_time, " +
+  "to_json(events_with_details.end_time) #>> '{}' AS end_time, " +
+  "events_with_details.is_featured, organizer_name, organizer_avatar, " +
+  "events_with_details.location_name, events_with_details.address, " +
+  "events_with_details.latitude, events_with_details.longitude, " +
   "events_with_details.category_id, c.name AS category_name, c.slug AS category_slug, c.icon_name AS category_icon_name, " +
   "mp.min_price, e.venue_id, v.name AS venue_name, v.rating AS venue_rating";
 
@@ -115,17 +123,17 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   const whereClauses: string[] = [
     "event_status = 'published'",
-    "end_time >= NOW()",
+    "events_with_details.end_time >= NOW()",
   ];
   const params: unknown[] = [];
 
   if (featured) {
-    whereClauses.push("is_featured = true");
+    whereClauses.push("events_with_details.is_featured = true");
   }
 
   if (categoryId != null) {
     params.push(categoryId);
-    whereClauses.push(`category_id = $${params.length}`);
+    whereClauses.push(`events_with_details.category_id = $${params.length}`);
   }
 
   if (search) {
@@ -137,7 +145,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     params.push(`%${location}%`);
     const i = params.length;
     whereClauses.push(
-      `(address ILIKE $${i} OR location_name ILIKE $${i})`,
+      `(events_with_details.address ILIKE $${i} OR events_with_details.location_name ILIKE $${i})`,
     );
   }
 
@@ -192,7 +200,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       params.push(nextDay.toISOString());
       const endIdx = params.length;
       whereClauses.push(
-        `start_time >= $${startIdx} AND start_time < $${endIdx}`,
+        `events_with_details.start_time >= $${startIdx} AND events_with_details.start_time < $${endIdx}`,
       );
     }
   }
@@ -200,8 +208,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const orderBy = nearby
     ? "distance_km ASC, event_id ASC"
     : featured
-      ? "featured_rank DESC NULLS LAST, start_time ASC, event_id ASC"
-      : "start_time ASC, event_id ASC";
+      ? "events_with_details.featured_rank DESC NULLS LAST, events_with_details.start_time ASC, event_id ASC"
+      : "events_with_details.start_time ASC, event_id ASC";
 
   const whereSql = whereClauses.join(" AND ");
 
