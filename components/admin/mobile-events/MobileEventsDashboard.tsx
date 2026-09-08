@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useMemo, useCallback } from "react";
+import { Fragment, useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   Monitor,
@@ -139,7 +139,6 @@ export function MobileEventsDashboard({
   const [data, setData] = useState(initialData);
   const [dateRange, setDateRange] = useState<DateRangeFilter>(initialRange);
   const [isLoading, setIsLoading] = useState(false);
-  const [userFilter, setUserFilter] = useState<string>("");
 
   /* ——— Date range change triggers re-fetch ——— */
   const handleDateRangeChange = useCallback(async (range: DateRangeFilter) => {
@@ -277,8 +276,8 @@ export function MobileEventsDashboard({
         <TabsContent value="screen-time">
           <ScreenTimeTab
             screenTimeRows={data.screenTimeRows}
-            screenUserBreakdowns={data.screenUserBreakdowns}
             totalTime={summary.totalScreenTimeSeconds}
+            dateRange={dateRange}
           />
         </TabsContent>
 
@@ -367,72 +366,87 @@ function KpiCard({
 
 function ScreenTimeTab({
   screenTimeRows,
-  screenUserBreakdowns,
   totalTime,
+  dateRange,
 }: {
   screenTimeRows: ScreenTimeRow[];
-  screenUserBreakdowns: ScreenUserBreakdown[];
   totalTime: number;
+  dateRange: DateRangeFilter;
 }) {
-  const [expandedScreen, setExpandedScreen] = useState<string | null>(null);
+  const [pageSearch, setPageSearch] = useState("");
+  const [selectedRow, setSelectedRow] = useState<ScreenTimeRow | null>(null);
 
-  const usersForScreen = useMemo(() => {
-    if (!expandedScreen) return [];
-    return screenUserBreakdowns
-      .filter((b) => b.screen === expandedScreen)
-      .sort((a, b) => b.totalSeconds - a.totalSeconds);
-  }, [expandedScreen, screenUserBreakdowns]);
+  const filteredRows = useMemo(() => {
+    const q = pageSearch.trim().toLowerCase();
+    if (!q) return screenTimeRows;
+    return screenTimeRows.filter((row) => {
+      const display = screenDisplayName(row.screen).toLowerCase();
+      return (
+        display.includes(q) ||
+        row.screen.toLowerCase().includes(q)
+      );
+    });
+  }, [pageSearch, screenTimeRows]);
 
   return (
-    <Card className="border-2 shadow-sm">
-      <CardHeader className="border-b bg-gradient-to-r from-primary/5 via-background to-background">
-        <CardTitle className="text-lg font-bold flex items-center gap-2">
-          <Timer className="h-5 w-5 text-primary" />
-          Screen Time Analytics
-        </CardTitle>
-        <CardDescription>
-          Exact seconds spent on every page, with user breakdown. Click any row to see which users visited that page.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        {screenTimeRows.length === 0 ? (
-          <EmptyState message="No screen view events recorded for this period." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/30 hover:bg-muted/40">
-                  <TableHead className="font-bold w-8" />
-                  <TableHead className="font-bold">Screen / Page</TableHead>
-                  <TableHead className="font-bold text-right">Total Time</TableHead>
-                  <TableHead className="font-bold text-right">Avg / Visit</TableHead>
-                  <TableHead className="font-bold text-right">Views</TableHead>
-                  <TableHead className="font-bold text-right">Users</TableHead>
-                  <TableHead className="font-bold w-40">Share of Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {screenTimeRows.map((row) => {
-                  const isExpanded = expandedScreen === row.screen;
-                  const sharePercent =
-                    totalTime > 0 ? (row.totalSecondsSpent / totalTime) * 100 : 0;
+    <>
+      <Card className="border-2 shadow-sm">
+        <CardHeader className="border-b bg-gradient-to-r from-primary/5 via-background to-background">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <Timer className="h-5 w-5 text-primary" />
+                Screen Time Analytics
+              </CardTitle>
+              <CardDescription>
+                Exact seconds spent on every page. Click a row to see which users visited that page.
+              </CardDescription>
+            </div>
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="search"
+                value={pageSearch}
+                onChange={(e) => setPageSearch(e.target.value)}
+                placeholder="Search pages…"
+                className="w-full h-9 rounded-lg border border-border/60 bg-background pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {filteredRows.length === 0 ? (
+            <EmptyState
+              message={
+                pageSearch.trim()
+                  ? "No pages match your search."
+                  : "No screen view events recorded for this period."
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/30 hover:bg-muted/40">
+                    <TableHead className="font-bold">Screen / Page</TableHead>
+                    <TableHead className="font-bold text-right">Total Time</TableHead>
+                    <TableHead className="font-bold text-right">Avg / Visit</TableHead>
+                    <TableHead className="font-bold text-right">Views</TableHead>
+                    <TableHead className="font-bold text-right">Users</TableHead>
+                    <TableHead className="font-bold w-40">Share of Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredRows.map((row) => {
+                    const sharePercent =
+                      totalTime > 0 ? (row.totalSecondsSpent / totalTime) * 100 : 0;
 
-                  return (
-                    <Fragment key={row.screen}>
+                    return (
                       <TableRow
                         key={row.screen}
                         className="cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() =>
-                          setExpandedScreen(isExpanded ? null : row.screen)
-                        }
+                        onClick={() => setSelectedRow(row)}
                       >
-                        <TableCell className="w-8 text-center">
-                          {isExpanded ? (
-                            <ChevronUp className="h-4 w-4 text-primary" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <div className="h-2 w-2 rounded-full bg-primary/60" />
@@ -467,61 +481,181 @@ function ScreenTimeTab({
                           </div>
                         </TableCell>
                       </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-                      {/* Expanded user breakdown */}
-                      {isExpanded && usersForScreen.length > 0 && (
-                        <TableRow
-                          key={`${row.screen}-users`}
-                          className="bg-muted/20"
-                        >
-                          <TableCell colSpan={7} className="p-4">
-                            <div className="rounded-lg border bg-card/80 p-3 space-y-2">
-                              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                                Who visited {screenDisplayName(row.screen)}?
-                              </p>
-                              <div className="grid gap-1.5">
-                                {usersForScreen.map((u, idx) => (
-                                  <div
-                                    key={`${u.userId ?? u.anonId}-${idx}`}
-                                    className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/30"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
-                                        <User className="h-3.5 w-3.5 text-primary" />
-                                      </div>
-                                      <div>
-                                        <p className="text-xs font-semibold">{u.userDisplay}</p>
-                                        {u.username && (
-                                          <p className="text-[10px] text-muted-foreground">
-                                            @{u.username}
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-xs">
-                                      <span className="text-muted-foreground">
-                                        {u.visits} visits
-                                      </span>
-                                      <span className="font-bold text-primary">
-                                        {formatDuration(u.totalSeconds)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </TableBody>
-            </Table>
+      <ScreenUsersModal
+        row={selectedRow}
+        open={selectedRow !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedRow(null);
+        }}
+        defaultRange={dateRange}
+      />
+    </>
+  );
+}
+
+function ScreenUsersModal({
+  row,
+  open,
+  onOpenChange,
+  defaultRange,
+}: {
+  row: ScreenTimeRow | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  defaultRange: DateRangeFilter;
+}) {
+  const [modalRange, setModalRange] = useState<DateRangeFilter>(defaultRange);
+  const [users, setUsers] = useState<ScreenUserBreakdown[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+
+  const screenKey = row?.screen ?? null;
+
+  useEffect(() => {
+    if (!open || !screenKey) return;
+    setModalRange(defaultRange);
+    setUserSearch("");
+  }, [open, screenKey, defaultRange]);
+
+  useEffect(() => {
+    if (!open || !screenKey) return;
+
+    let cancelled = false;
+    setIsLoading(true);
+
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/mobile-events/screen-users?screen=${encodeURIComponent(screenKey)}&range=${modalRange}`,
+        );
+        if (cancelled) return;
+        if (res.ok) {
+          const json = await res.json();
+          setUsers(json.data ?? []);
+        } else {
+          setUsers([]);
+        }
+      } catch {
+        if (!cancelled) setUsers([]);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, screenKey, modalRange]);
+
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((u) => {
+      const hay = [u.userDisplay, u.username, u.userId, u.anonId]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [users, userSearch]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Monitor className="h-4 w-4 text-primary" />
+            {row ? screenDisplayName(row.screen) : "Screen users"}
+          </DialogTitle>
+          <DialogDescription>
+            {row
+              ? `${formatDuration(row.totalSecondsSpent)} total · ${row.viewsCount.toLocaleString()} views · ${row.uniqueUsers} users`
+              : "Users who visited this screen"}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-3 min-h-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            {DATE_RANGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setModalRange(opt.value)}
+                disabled={isLoading}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all duration-200 ${
+                  modalRange === opt.value
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                } ${isLoading ? "opacity-50" : ""}`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              type="search"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              placeholder="Search users…"
+              className="w-full h-9 rounded-lg border border-border/60 bg-background pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+
+          <div className="flex-1 overflow-y-auto min-h-[200px] max-h-[50vh] space-y-1.5 pr-1">
+            {isLoading ? (
+              <div className="py-10 text-center text-sm text-muted-foreground animate-pulse">
+                Loading users…
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                {userSearch.trim()
+                  ? "No users match your search."
+                  : "No users for this screen in range."}
+              </div>
+            ) : (
+              filteredUsers.map((u, idx) => (
+                <div
+                  key={`${u.userId ?? u.anonId}-${idx}`}
+                  className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/30"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-7 w-7 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold truncate">{u.userDisplay}</p>
+                      {u.username && (
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          @{u.username}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs shrink-0">
+                    <span className="text-muted-foreground">{u.visits} visits</span>
+                    <span className="font-bold text-primary">
+                      {formatDuration(u.totalSeconds)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -541,6 +675,24 @@ function UserJourneysTab({
   const [selectedUser, setSelectedUser] = useState<ActiveUser | null>(null);
   const [journeyEvents, setJourneyEvents] = useState<RecentMobileEvent[]>([]);
   const [isLoadingJourney, setIsLoadingJourney] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return activeUsers;
+    return activeUsers.filter((user) => {
+      const hay = [
+        user.fullName,
+        user.username,
+        user.userId,
+        user.anonId,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [activeUsers, userSearch]);
 
   const handleSelectUser = useCallback(
     async (user: ActiveUser) => {
@@ -556,7 +708,6 @@ function UserJourneysTab({
           const json = await res.json();
           setJourneyEvents(json.data ?? []);
         } else {
-          // Fall back to filtering recentEvents locally
           const userEvents = recentEvents.filter((e) =>
             user.userId
               ? e.userId === user.userId
@@ -580,21 +731,39 @@ function UserJourneysTab({
     <div className="grid gap-6 lg:grid-cols-5">
       {/* User List */}
       <Card className="lg:col-span-2 border-2 shadow-sm">
-        <CardHeader className="border-b bg-gradient-to-r from-purple-500/5 via-background to-background">
-          <CardTitle className="text-lg font-bold flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            Active Users
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Select a user to view their journey timeline.
-          </CardDescription>
+        <CardHeader className="border-b bg-gradient-to-r from-purple-500/5 via-background to-background space-y-3">
+          <div>
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Active Users
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Select a user to view their journey timeline.
+            </CardDescription>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              type="search"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              placeholder="Search name, @username, id…"
+              className="w-full h-9 rounded-lg border border-border/60 bg-background pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          {activeUsers.length === 0 ? (
-            <EmptyState message="No user activity in this period." />
+          {filteredUsers.length === 0 ? (
+            <EmptyState
+              message={
+                userSearch.trim()
+                  ? "No users match your search."
+                  : "No user activity in this period."
+              }
+            />
           ) : (
             <div className="divide-y max-h-[600px] overflow-y-auto">
-              {activeUsers.map((user) => {
+              {filteredUsers.map((user) => {
                 const isSelected =
                   selectedUser &&
                   ((user.userId && user.userId === selectedUser.userId) ||
@@ -604,6 +773,7 @@ function UserJourneysTab({
                   (user.anonId
                     ? `Anonymous ${user.anonId.slice(0, 8)}`
                     : "Unknown");
+                const platforms = user.platforms ?? [];
 
                 return (
                   <button
@@ -628,7 +798,7 @@ function UserJourneysTab({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold truncate">{displayName}</p>
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-muted-foreground mt-0.5">
                           {user.username && <span>@{user.username}</span>}
                           <Badge
                             variant={user.userId ? "secondary" : "outline"}
@@ -636,7 +806,28 @@ function UserJourneysTab({
                           >
                             {user.userId ? "Signed in" : "Anonymous"}
                           </Badge>
+                          {platforms.map((p) => (
+                            <Badge
+                              key={p}
+                              variant="outline"
+                              className={`text-[9px] px-1 py-0 ${
+                                p === "ios"
+                                  ? "border-sky-500/40 text-sky-400"
+                                  : "border-emerald-500/40 text-emerald-400"
+                              }`}
+                            >
+                              {p === "ios" ? "iOS" : "Android"}
+                            </Badge>
+                          ))}
                         </div>
+                        {user.topScreen && (
+                          <p className="text-[10px] text-muted-foreground mt-1 truncate">
+                            Most viewed:{" "}
+                            <span className="font-semibold text-foreground/80">
+                              {screenDisplayName(user.topScreen)}
+                            </span>
+                          </p>
+                        )}
                       </div>
                       <div className="text-right text-[10px] space-y-0.5">
                         <p className="font-bold text-primary">

@@ -70,6 +70,10 @@ export type ActiveUser = {
   totalSeconds: number;
   firstSeen: string;
   lastSeen: string;
+  /** Distinct native platforms seen for this actor in-range (ios / android). */
+  platforms: string[];
+  /** Screen with the most views for this actor in-range. */
+  topScreen: string | null;
 };
 
 export type UserJourneyEvent = {
@@ -155,6 +159,31 @@ function dateRangeClause(
   return `${alias}.${col} >= now() - interval '${intervals[range]}'`;
 }
 
+/** Native app only — drop Expo web (and any other non-ios/android). */
+function nativePlatformClause(alias: string): string {
+  return `(${alias}.platform IN ('ios', 'android') OR ${alias}.platform IS NULL)`;
+}
+
+function parsePlatforms(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((p) => String(p).toLowerCase())
+      .filter((p) => p === "ios" || p === "android");
+  }
+  if (typeof value === "string" && value.length > 0) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsePlatforms(parsed);
+    } catch {
+      return value
+        .split(",")
+        .map((p) => p.trim().toLowerCase())
+        .filter((p) => p === "ios" || p === "android");
+    }
+  }
+  return [];
+}
+
 /* ===================================================================== */
 /* Main Data Fetcher                                                     */
 /* ===================================================================== */
@@ -214,6 +243,7 @@ export async function getMobileEventsFullOverview(
         FROM public.mobile_events me
         WHERE me.screen IS NOT NULL AND me.screen != ''
           AND ${dateFilter}
+          AND ${nativePlatformClause("me")}
       )
       SELECT
         screen,
@@ -240,9 +270,9 @@ export async function getMobileEventsFullOverview(
             - me.occurred_at
           )) AS raw_duration
         FROM public.mobile_events me
-        LEFT JOIN public.profiles p ON p.id = me.user_id
         WHERE me.screen IS NOT NULL AND me.screen != ''
           AND ${dateFilter}
+          AND ${nativePlatformClause("me")}
       )
       SELECT
         sd.screen,
@@ -259,13 +289,15 @@ export async function getMobileEventsFullOverview(
       LIMIT 200`,
     ),
 
-    /* 4. Active users list */
+    /* 4. Active users list — platforms + most-viewed screen */
     query(
       `WITH user_events AS (
         SELECT
           me.user_id,
           me.anon_id,
           me.screen,
+          me.platform,
+          me.event_name,
           me.occurred_at,
           me.session_id,
           EXTRACT(EPOCH FROM (
@@ -274,6 +306,21 @@ export async function getMobileEventsFullOverview(
           )) AS raw_duration
         FROM public.mobile_events me
         WHERE ${dateFilter}
+          AND ${nativePlatformClause("me")}
+      ),
+      ranked_screens AS (
+        SELECT
+          user_id,
+          anon_id,
+          screen AS top_screen,
+          ROW_NUMBER() OVER (
+            PARTITION BY user_id, anon_id
+            ORDER BY COUNT(*) DESC
+          ) AS rn
+        FROM user_events
+        WHERE screen IS NOT NULL AND screen != ''
+          AND event_name = 'screen_viewed'
+        GROUP BY user_id, anon_id, screen
       )
       SELECT
         ue.user_id::text,
@@ -284,9 +331,15 @@ export async function getMobileEventsFullOverview(
         COUNT(DISTINCT ue.screen)::int AS screens_visited,
         ROUND(SUM(CASE WHEN ue.raw_duration > 0 AND ue.raw_duration < 1800 THEN ue.raw_duration ELSE 5 END)::numeric, 0)::int AS total_seconds,
         MIN(ue.occurred_at)::text AS first_seen,
-        MAX(ue.occurred_at)::text AS last_seen
+        MAX(ue.occurred_at)::text AS last_seen,
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT LOWER(ue.platform)), NULL) AS platforms,
+        MAX(ts.top_screen) AS top_screen
       FROM user_events ue
       LEFT JOIN public.profiles p ON p.id = ue.user_id
+      LEFT JOIN ranked_screens ts
+        ON ts.rn = 1
+        AND ts.user_id IS NOT DISTINCT FROM ue.user_id
+        AND ts.anon_id IS NOT DISTINCT FROM ue.anon_id
       GROUP BY ue.user_id, ue.anon_id, p.full_name, p.username
       ORDER BY events_count DESC
       LIMIT 50`,
@@ -474,6 +527,8 @@ export async function getMobileEventsFullOverview(
       totalSeconds: Number(r.total_seconds),
       firstSeen: r.first_seen,
       lastSeen: r.last_seen,
+      platforms: parsePlatforms(r.platforms),
+      topScreen: r.top_screen ? String(r.top_screen) : null,
     })),
     dealViewership: dealViewResult.rows.map((r) => ({
       dealId: Number(r.deal_id),
@@ -566,6 +621,7 @@ export async function getUserJourney(
       FROM public.mobile_events me
       WHERE ${identityClause}
         AND ${dateFilter}
+        AND ${nativePlatformClause("me")}
     )
     SELECT
       id, event_name, screen, occurred_at, source_context, context,
@@ -587,6 +643,60 @@ export async function getUserJourney(
       typeof r.context === "object" && r.context !== null
         ? (r.context as Record<string, unknown>)
         : {},
+  }));
+}
+
+/* ===================================================================== */
+/* Screen users (modal drill-down for a single screen)                   */
+/* ===================================================================== */
+
+export async function getScreenUsers(
+  screen: string,
+  range: DateRangeFilter = "7d",
+): Promise<ScreenUserBreakdown[]> {
+  const dateFilter = dateRangeClause("me", "occurred_at", range);
+
+  const result = await query(
+    `WITH screen_durations AS (
+      SELECT
+        me.screen,
+        me.user_id,
+        me.anon_id,
+        me.session_id,
+        me.occurred_at,
+        EXTRACT(EPOCH FROM (
+          LEAD(me.occurred_at) OVER (PARTITION BY me.session_id ORDER BY me.occurred_at)
+          - me.occurred_at
+        )) AS raw_duration
+      FROM public.mobile_events me
+      WHERE me.screen = $1
+        AND ${dateFilter}
+        AND ${nativePlatformClause("me")}
+    )
+    SELECT
+      sd.screen,
+      COALESCE(p.full_name, 'Anonymous ' || SUBSTRING(sd.anon_id, 1, 8)) AS user_display,
+      p.username,
+      sd.user_id::text,
+      sd.anon_id,
+      COUNT(*)::int AS visits,
+      ROUND(SUM(CASE WHEN sd.raw_duration > 0 AND sd.raw_duration < 1800 THEN sd.raw_duration ELSE 15 END)::numeric, 0)::int AS total_seconds
+    FROM screen_durations sd
+    LEFT JOIN public.profiles p ON p.id = sd.user_id
+    GROUP BY sd.screen, user_display, p.username, sd.user_id, sd.anon_id
+    ORDER BY total_seconds DESC
+    LIMIT 200`,
+    [screen],
+  );
+
+  return result.rows.map((r) => ({
+    screen: String(r.screen),
+    userDisplay: String(r.user_display),
+    username: r.username ? String(r.username) : null,
+    userId: r.user_id ? String(r.user_id) : null,
+    anonId: r.anon_id ? String(r.anon_id) : null,
+    visits: Number(r.visits),
+    totalSeconds: Number(r.total_seconds),
   }));
 }
 
