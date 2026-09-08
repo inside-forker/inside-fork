@@ -223,6 +223,24 @@ export type EventCardDTO = {
   address: string | null;
   latitude: number | null;
   longitude: number | null;
+  category_id: number | null;
+  /** Joined from `categories` - only present when the caller's query joins
+   * it in (currently the events list and detail routes). Omitted, not null,
+   * on callers that don't join it. */
+  category_name?: string | null;
+  category_slug?: string | null;
+  category_icon_name?: string | null;
+  /** Cheapest ticket type's price, when the caller's query joins it in
+   * (currently the events list route). Omitted, not null, otherwise. */
+  min_price?: number | null;
+  /** Distance from the caller's `?lat`/`?lng`, in km - only present (and
+   * non-null) when that filter is active on the events list route. */
+  distance_km?: number | null;
+  /** Linked venue (events.venue_id, nullable) - only present when the
+   * caller's query joins it in. Omitted, not null, on callers that don't. */
+  venue_id?: number | null;
+  venue_name?: string | null;
+  venue_rating?: number | null;
   image_url?: string | null;
   /** "N people going" preview, based on paid ticket bookings. Omitted (not
    * just empty) when the caller doesn't pass one in, e.g. the detail route. */
@@ -233,6 +251,9 @@ export type EventCardDTO = {
 /**
  * Row subset for an EventCard, derived from the generated view Row so the
  * compiler validates every column name (a phantom column fails to compile).
+ * `category_name`/`category_slug`/`category_icon_name` aren't on the view
+ * itself (they come from a `categories` join some callers add), so they're
+ * intersected in as optional rather than picked.
  */
 export type EventCardRow = Pick<
   Database["public"]["Views"]["events_with_details"]["Row"],
@@ -250,11 +271,21 @@ export type EventCardRow = Pick<
   | "address"
   | "latitude"
   | "longitude"
->;
+  | "category_id"
+> & {
+  category_name?: string | null;
+  category_slug?: string | null;
+  category_icon_name?: string | null;
+  min_price?: number | null;
+  distance_km?: number | null;
+  venue_id?: number | null;
+  venue_name?: string | null;
+  venue_rating?: number | null;
+};
 
 /** Explicit column list for `events_with_details` - never use `*`. */
 export const EVENT_CARD_COLUMNS =
-  "event_id, event_name, event_slug, event_description, event_status, start_time, end_time, is_featured, organizer_name, organizer_avatar, location_name, address, latitude, longitude";
+  "event_id, event_name, event_slug, event_description, event_status, start_time, end_time, is_featured, organizer_name, organizer_avatar, location_name, address, latitude, longitude, category_id";
 
 export function toEventCard(
   row: EventCardRow,
@@ -276,6 +307,17 @@ export function toEventCard(
     address: row.address,
     latitude: row.latitude,
     longitude: row.longitude,
+    category_id: row.category_id,
+    ...(row.category_name !== undefined ? { category_name: row.category_name } : {}),
+    ...(row.category_slug !== undefined ? { category_slug: row.category_slug } : {}),
+    ...(row.category_icon_name !== undefined
+      ? { category_icon_name: row.category_icon_name }
+      : {}),
+    ...(row.min_price !== undefined ? { min_price: row.min_price } : {}),
+    ...(row.distance_km !== undefined ? { distance_km: row.distance_km } : {}),
+    ...(row.venue_id !== undefined ? { venue_id: row.venue_id } : {}),
+    ...(row.venue_name !== undefined ? { venue_name: row.venue_name } : {}),
+    ...(row.venue_rating !== undefined ? { venue_rating: row.venue_rating } : {}),
     ...(imageUrl !== undefined ? { image_url: imageUrl } : {}),
     ...(attendeesPreview
       ? {

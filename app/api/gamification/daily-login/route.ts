@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
+import { checkAndProcessRankUp } from "@/lib/gamification";
 import { captureRouteError } from "@/lib/sentry/captureRouteError";
 import type {
   DailyLoginClaimResult,
@@ -254,6 +255,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { rows: profileRows } = await query(
+      `SELECT points FROM public.profiles WHERE id = $1`,
+      [session.userId],
+    );
+    const newTotalXP = (profileRows[0]?.points as number) ?? 0;
+    const newRank = await checkAndProcessRankUp(session.userId, newTotalXP);
+
     const result: DailyLoginClaimResult = {
       success: true,
       xp_awarded: totalXP,
@@ -264,6 +272,8 @@ export async function POST(request: NextRequest) {
       message: earned7DayBonus
         ? `7-Day Streak Bonus! +${totalXP} XP total`
         : `+${dailyLoginXP} XP! Day ${newStreak} streak`,
+      rank_up: !!newRank,
+      new_rank: newRank,
     };
 
     return NextResponse.json(result);

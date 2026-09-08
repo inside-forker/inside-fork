@@ -13,16 +13,28 @@ import {
   type TicketTypeRow,
 } from "@/lib/mobile/mappers";
 import { getAttendeesPreviewByEvent } from "@/lib/mobile/attendees";
+import { formatDiscount } from "@/lib/mobile/deal-format";
 
 export const dynamic = "force-dynamic";
 
 const MAX_EVENT_IMAGES = 20;
 
 const EVENT_CARD_SQL_COLUMNS =
-  "event_id, event_name, event_slug, event_description, event_status, " +
+  "events_with_details.event_id, event_name, event_slug, event_description, event_status, " +
   "to_json(start_time) #>> '{}' AS start_time, " +
   "to_json(end_time) #>> '{}' AS end_time, " +
-  "is_featured, organizer_id, organizer_name, organizer_avatar, location_name, address, latitude, longitude";
+  "is_featured, organizer_id, organizer_name, organizer_avatar, location_name, address, latitude, longitude, " +
+  "events_with_details.category_id, c.name AS category_name, c.slug AS category_slug, c.icon_name AS category_icon_name, " +
+  "e.venue_id, v.name AS venue_name, v.rating AS venue_rating";
+
+/** `venue_id` isn't on the (untracked) view, so it's reached by joining back
+ * to `events` by id rather than editing the view - same approach as the
+ * events list route. */
+const EVENTS_FROM_SQL =
+  "events_with_details " +
+  "LEFT JOIN categories c ON c.id = events_with_details.category_id " +
+  "LEFT JOIN events e ON e.id = events_with_details.event_id " +
+  "LEFT JOIN venues v ON v.id = e.venue_id";
 
 const EVENT_IMAGE_SQL_COLUMNS = "id, url, alt_text, display_order";
 
@@ -46,7 +58,7 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
   const { slug } = await params;
 
   const { rows: eventRows } = await query(
-    `SELECT ${EVENT_CARD_SQL_COLUMNS} FROM events_with_details
+    `SELECT ${EVENT_CARD_SQL_COLUMNS} FROM ${EVENTS_FROM_SQL}
      WHERE event_slug = $1 AND event_status = 'published'`,
     [slug],
   );
@@ -58,7 +70,7 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
 
   const eventId = Number(eventRow.event_id);
 
-  const [imagesRes, ticketsRes, organizerRes] = await Promise.all([
+  const [imagesRes, ticketsRes, organizerRes, dealsRes] = await Promise.all([
     query(
       `SELECT ${EVENT_IMAGE_SQL_COLUMNS} FROM event_images
        WHERE event_id = $1 ORDER BY display_order ASC LIMIT $2`,
@@ -75,6 +87,18 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
           [eventRow.organizer_id],
         )
       : Promise.resolve({ rows: [] as { username: string | null; is_verified_organizer: boolean | null }[] }),
+    // Mirrors the listing detail route's embedded `deals` query, but for
+    // event_deals - see that file for the same LEFT JOIN banks shape.
+    query(
+      `SELECT d.id, d.title, d.description, d.discount_value, d.deal_type, d.end_date,
+              b.name AS bank_name, b.logo_url AS bank_logo_url
+       FROM event_deals d
+       LEFT JOIN banks b ON b.id = d.bank_id
+       WHERE d.event_id = $1 AND d.is_active = true
+         AND (d.end_date IS NULL OR d.end_date >= NOW())
+       ORDER BY d.created_at DESC LIMIT 20`,
+      [eventId],
+    ),
   ]);
 
   const images = imagesRes.rows.map(
@@ -101,6 +125,39 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
 
   const organizerProfile = organizerRes.rows[0];
 
+  // "Best" = highest formatDiscount() weight (e.g. a bigger % beats a smaller
+  // one), most recent as the tiebreak - same weighting `lib/mobile/deal-format.ts`
+  // already uses to rank the listings deal feed.
+  const dealRows = dealsRes.rows as Array<{
+    id: string | number;
+    title: string;
+    description: string | null;
+    discount_value: string | null;
+    deal_type: string;
+    end_date: string | Date | null;
+    bank_name: string | null;
+    bank_logo_url: string | null;
+  }>;
+  const bestDealRow = dealRows
+    .map((row) => ({ row, weight: formatDiscount(row.discount_value).weight }))
+    .sort((a, b) => b.weight - a.weight)[0]?.row;
+  const bestOffer = bestDealRow
+    ? {
+        id: Number(bestDealRow.id),
+        title: bestDealRow.title,
+        description: bestDealRow.description,
+        discount_value: bestDealRow.discount_value,
+        deal_type: bestDealRow.deal_type,
+        end_date:
+          bestDealRow.end_date instanceof Date
+            ? bestDealRow.end_date.toISOString()
+            : bestDealRow.end_date,
+        bank: bestDealRow.bank_name
+          ? { name: bestDealRow.bank_name, logo_url: bestDealRow.bank_logo_url }
+          : null,
+      }
+    : null;
+
   // "N people going" for the detail screen's attendee strip. Fail-soft and
   // sequential (not folded into the Promise.all above): the production pool is
   // capped at one connection per instance, so a slow "who's going" lookup must
@@ -120,11 +177,17 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
         {
           ...eventRow,
           event_id: eventId,
+          // category_id/venue_id are `bigint`, venue_rating is `numeric(2,1)` -
+          // pg returns all three as strings, not numbers.
+          category_id: eventRow.category_id != null ? Number(eventRow.category_id) : null,
+          venue_id: eventRow.venue_id != null ? Number(eventRow.venue_id) : null,
+          venue_rating: eventRow.venue_rating != null ? Number(eventRow.venue_rating) : null,
         } as unknown as EventCardRow,
         attendeesPreview.get(eventId),
       ),
       organizer_username: organizerProfile?.username ?? null,
       organizer_is_verified: organizerProfile?.is_verified_organizer ?? false,
+      best_offer: bestOffer,
     },
     images: images.map(toEventImage),
     ticket_types: tickets.map(toTicketType),
