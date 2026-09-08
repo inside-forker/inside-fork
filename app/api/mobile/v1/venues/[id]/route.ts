@@ -13,12 +13,18 @@ const VENUE_SQL_COLUMNS =
   "id, name, slug, description, address, latitude, longitude, phone, website, rating, facilities, cover_image_url";
 
 /** Same base columns as the events list route's card, minus category/price/
- * distance (not needed here) - just enough for `EventListCard` on the client. */
+ * distance (not needed here) - just enough for `EventListCard` on the client.
+ * This route joins `events e` (below) to filter by venue_id, and
+ * `events_with_details`/`events` share many column names - every shared
+ * column must be qualified with `events_with_details.` or Postgres rejects
+ * the query as ambiguous. Same concern as the events list/detail routes. */
 const EVENT_CARD_SQL_COLUMNS =
   "events_with_details.event_id, event_name, event_slug, event_description, event_status, " +
-  "to_json(start_time) #>> '{}' AS start_time, " +
-  "to_json(end_time) #>> '{}' AS end_time, " +
-  "is_featured, organizer_name, organizer_avatar, location_name, address, latitude, longitude, " +
+  "to_json(events_with_details.start_time) #>> '{}' AS start_time, " +
+  "to_json(events_with_details.end_time) #>> '{}' AS end_time, " +
+  "events_with_details.is_featured, organizer_name, organizer_avatar, " +
+  "events_with_details.location_name, events_with_details.address, " +
+  "events_with_details.latitude, events_with_details.longitude, " +
   "events_with_details.category_id";
 
 /**
@@ -51,8 +57,8 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
     `SELECT ${EVENT_CARD_SQL_COLUMNS}
      FROM events_with_details
      JOIN events e ON e.id = events_with_details.event_id
-     WHERE e.venue_id = $1 AND event_status = 'published' AND end_time >= NOW()
-     ORDER BY start_time ASC, event_id ASC
+     WHERE e.venue_id = $1 AND event_status = 'published' AND events_with_details.end_time >= NOW()
+     ORDER BY events_with_details.start_time ASC, event_id ASC
      LIMIT 20`,
     [venueId],
   );

@@ -4,6 +4,7 @@
  * other users' auth UUIDs are never exposed (only `is_own` + display fields).
  */
 import type { Database, Json } from "@/types/database";
+import type { ListingDeals, ListingDealSummaryDTO } from "@/lib/mobile/listing-deals";
 import type {
   NotificationFeedItem,
   NotificationChannel,
@@ -40,6 +41,16 @@ export type ListingCardDTO = {
   max_price_per_person?: number | null;
   min_guest_capacity?: number | null;
   max_guest_capacity?: number | null;
+  /**
+   * The listing's strongest active offer, for the badge on a browse row.
+   * Only present on endpoints that opt in by passing `deals` to
+   * {@link toListingCard} - absent means "not loaded", `null` means "loaded,
+   * and this listing has no active deal". Clients must treat the two the same
+   * way (no badge) rather than rendering an empty slot.
+   */
+  best_deal?: ListingDealSummaryDTO | null;
+  /** Active deals on the listing, so a row can say "+2 more". */
+  deal_count?: number;
 };
 
 /**
@@ -104,9 +115,16 @@ export function toNumericListingRow(row: Record<string, unknown>): ListingRowLik
   } as unknown as ListingRowLike;
 }
 
+/**
+ * `deals` is opt-in: pass the entry from {@link fetchBestDealsByListing} to
+ * emit `best_deal`/`deal_count` on the card, or omit it entirely on endpoints
+ * that don't load deals. Passing `undefined` leaves both keys off the payload
+ * rather than sending a misleading `deal_count: 0`.
+ */
 export function toListingCard(
   row: ListingRowLike,
   images: ListingImageDTO[],
+  deals?: ListingDeals | null,
 ): ListingCardDTO {
   return {
     id: row.id as number,
@@ -125,6 +143,9 @@ export function toListingCard(
     menu_pdf_url: row.menu_pdf_url,
     google_maps_url: row.google_maps_url,
     images,
+    ...(deals !== undefined
+      ? { best_deal: deals?.best ?? null, deal_count: deals?.count ?? 0 }
+      : {}),
   };
 }
 
@@ -242,6 +263,12 @@ export type EventCardDTO = {
   venue_name?: string | null;
   venue_rating?: number | null;
   image_url?: string | null;
+  /** Cheapest / dearest ticket price across the event's ticket types, so a
+   * list card can show "From PKR X" without pulling the full ticket list.
+   * `0` is a real value (a free tier); `null` means the event has no ticket
+   * types. Both omitted when the caller doesn't pass a price range in. */
+  from_price?: number | null;
+  to_price?: number | null;
   /** "N people going" preview, based on paid ticket bookings. Omitted (not
    * just empty) when the caller doesn't pass one in, e.g. the detail route. */
   attendees_preview?: AttendeePreviewDTO[];
@@ -291,6 +318,7 @@ export function toEventCard(
   row: EventCardRow,
   attendeesPreview?: { users: AttendeePreviewDTO[]; total_count: number },
   imageUrl?: string | null,
+  priceRange?: { from: number | null; to: number | null },
 ): EventCardDTO {
   return {
     event_id: row.event_id,
@@ -319,6 +347,9 @@ export function toEventCard(
     ...(row.venue_name !== undefined ? { venue_name: row.venue_name } : {}),
     ...(row.venue_rating !== undefined ? { venue_rating: row.venue_rating } : {}),
     ...(imageUrl !== undefined ? { image_url: imageUrl } : {}),
+    ...(priceRange !== undefined
+      ? { from_price: priceRange.from, to_price: priceRange.to }
+      : {}),
     ...(attendeesPreview
       ? {
           attendees_preview: attendeesPreview.users,
