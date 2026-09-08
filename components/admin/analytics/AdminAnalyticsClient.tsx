@@ -47,6 +47,10 @@ import { Progress } from "@/components/ui/progress";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { DateRangeQuickSelect } from "@/components/admin/analytics/DateRangeQuickSelect";
 import { exportAnalyticsToCSV } from "@/lib/utils/analytics-export";
+import {
+  KeyMetricDetailModal,
+  type MetricType,
+} from "@/components/admin/analytics/KeyMetricDetailModal";
 import type {
   AdminAnalyticsOverview,
   DateRangePreset,
@@ -62,6 +66,7 @@ interface RefreshState {
 }
 
 interface KeyMetric {
+  id: MetricType;
   label: string;
   value: number;
   formatter: (value: number) => string;
@@ -243,6 +248,9 @@ export function AdminAnalyticsClient({
   });
   const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>(
     initialOverview.dateRange?.preset ?? "7d",
+  );
+  const [selectedMetricId, setSelectedMetricId] = useState<MetricType | null>(
+    null,
   );
 
   const refreshInterval = useMemo(
@@ -464,6 +472,7 @@ export function AdminAnalyticsClient({
 
     return [
       {
+        id: "dau",
         label: "Daily active users",
         value: overview.traffic.dailyActiveUsers,
         formatter: formatNumber,
@@ -473,6 +482,7 @@ export function AdminAnalyticsClient({
         icon: UsersRound,
       },
       {
+        id: "revenue",
         label: `Gross revenue${periodLabelSuffix}`,
         value: overview.revenue.grossRevenueInPeriod,
         formatter: formatCurrency,
@@ -482,6 +492,7 @@ export function AdminAnalyticsClient({
         icon: LineChartIcon,
       },
       {
+        id: "searches",
         label: `Searches${periodLabelSuffix}`,
         value: overview.search.totalInPeriod,
         formatter: formatNumber,
@@ -491,6 +502,7 @@ export function AdminAnalyticsClient({
         icon: Search,
       },
       {
+        id: "redemptions",
         label: `Offer redemptions${periodLabelSuffix}`,
         value: redemptions.redemptionCountInPeriod,
         formatter: formatNumber,
@@ -501,6 +513,7 @@ export function AdminAnalyticsClient({
         href: "/admin/redemptions",
       },
       {
+        id: "conversion",
         label: "Conversion rate",
         value: overview.funnels.bookingConversionRate,
         formatter: formatPercent,
@@ -821,8 +834,8 @@ export function AdminAnalyticsClient({
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             {keyMetrics.map((metric, index) => {
               const card = (
-                <Card className="group relative overflow-hidden border-2 bg-gradient-to-br from-background via-background to-primary/5 shadow-premium hover:shadow-premium-lg transition-all duration-300 hover:scale-[1.02] hover:border-primary/30 h-full">
-                  <div className="absolute inset-0 bg-gradient-to-br from-transparent via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <Card className="group relative overflow-hidden border-2 bg-gradient-to-br from-background via-background to-primary/5 shadow-premium hover:shadow-premium-lg transition-all duration-300 hover:scale-[1.02] hover:border-primary/30 h-full cursor-pointer select-none">
+                  <div className="absolute inset-0 bg-gradient-to-br from-transparent via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
                   <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-3">
                     <CardTitle className="text-sm font-semibold text-muted-foreground">
@@ -841,11 +854,9 @@ export function AdminAnalyticsClient({
                         {metric.caption}
                       </p>
                     ) : null}
-                    {metric.href ? (
-                      <p className="pt-1 text-xs font-semibold text-primary inline-flex items-center gap-1">
-                        Open details <ArrowRight className="h-3 w-3" />
-                      </p>
-                    ) : null}
+                    <p className="pt-1.5 text-xs font-semibold text-primary inline-flex items-center gap-1 group-hover:underline">
+                      Open details <ArrowRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
+                    </p>
                   </CardContent>
                 </Card>
               );
@@ -856,14 +867,18 @@ export function AdminAnalyticsClient({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: index * 0.1 }}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedMetricId(metric.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedMetricId(metric.id);
+                    }
+                  }}
+                  className="h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl"
                 >
-                  {metric.href ? (
-                    <Link href={metric.href} className="block h-full">
-                      {card}
-                    </Link>
-                  ) : (
-                    card
-                  )}
+                  {card}
                 </motion.div>
               );
             })}
@@ -1308,6 +1323,20 @@ export function AdminAnalyticsClient({
           </div>
         </section>
       ) : null}
+      {/* KPI Detail Modal */}
+      <KeyMetricDetailModal
+        isOpen={selectedMetricId !== null}
+        onClose={() => setSelectedMetricId(null)}
+        initialMetricId={selectedMetricId}
+        overview={overview}
+        periodLabelSuffix={periodLabelSuffix}
+        formatNumber={formatNumber}
+        formatPercent={formatPercent}
+        formatCurrency={formatCurrency}
+        searchTrendData={searchTrendData}
+        trafficTrendData={trafficTrendData}
+        revenueTrendData={revenueTrendData}
+      />
     </div>
   );
 }
