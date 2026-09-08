@@ -5,6 +5,7 @@ import { requireMobileUser } from "@/lib/mobile/auth";
 import { enforceMobileRateLimit } from "@/lib/mobile/rate-limit";
 import { MobileApiError } from "@/lib/mobile/errors";
 import { query } from "@/lib/db";
+import { checkAndProcessRankUp } from "@/lib/gamification";
 
 export const dynamic = "force-dynamic";
 
@@ -278,11 +279,20 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     );
   }
 
+  const { rows: profileRows } = await query(
+    `SELECT points FROM public.profiles WHERE id = $1`,
+    [user.id],
+  );
+  const newTotalXP = (profileRows[0]?.points as number) ?? 0;
+  const newRank = await checkAndProcessRankUp(user.id, newTotalXP);
+
   return ok({
     xp_awarded: dailyXp + bonusXp,
     new_streak: newStreak,
     streak_bonus: earnedBonus
       ? { earned: true, xp_bonus: bonusXp, days_in_streak: 7 }
       : null,
+    rank_up: !!newRank,
+    new_rank: newRank ?? null,
   });
 });

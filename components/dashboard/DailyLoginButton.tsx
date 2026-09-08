@@ -77,6 +77,14 @@ export function DailyLoginButton({
           variant: "default",
         });
 
+        if (claimResult.rank_up && claimResult.new_rank) {
+          toast({
+            title: "Rank up! 🎉",
+            description: `You're now a ${claimResult.new_rank.name}!`,
+            variant: "default",
+          });
+        }
+
         await fetchStatus();
         onSuccess?.(claimResult);
 

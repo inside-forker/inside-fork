@@ -1,137 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
-import { createNotification } from "@/lib/notifications/service";
+import { notifyOrganizer, type NotifyOrganizerInput } from "@/lib/organizer/notify";
 
 export const dynamic = "force-dynamic";
 
-type NotificationType =
-  | "ticket_sale"
-  | "check_in"
-  | "milestone"
-  | "event_reminder";
+// Internal/cron-only endpoint - this fires system-triggered notifications
+// (ticket sales, check-ins, milestones) to an event's organizer. It is not
+// meant to be called by end users, so it's gated the same way as
+// /api/notifications/dispatch rather than by a user session.
+const NOTIFY_SECRET =
+  process.env.ORGANIZER_NOTIFY_TOKEN ?? process.env.CRON_SECRET ?? null;
 
-interface NotifyOrganizerRequest {
-  type: NotificationType;
-  eventId: number;
-  data?: {
-    ticketCount?: number;
-    totalAmount?: number;
-    buyerName?: string;
-    attendeeName?: string;
-    milestonePercent?: number;
-    hoursUntil?: number;
-  };
+function extractToken(request: NextRequest): string | null {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.slice(7).trim();
+  }
+
+  const cronHeader = request.headers.get("x-cron-secret");
+  if (cronHeader?.length) {
+    return cronHeader.trim();
+  }
+
+  return null;
+}
+
+function isAuthorized(request: NextRequest): boolean {
+  if (!NOTIFY_SECRET) {
+    console.warn(
+      "POST /api/organizer/notify: no ORGANIZER_NOTIFY_TOKEN or CRON_SECRET configured - denying request"
+    );
+    return false;
+  }
+
+  return extractToken(request) === NOTIFY_SECRET;
 }
 
 export async function POST(request: NextRequest) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    const body: NotifyOrganizerRequest = await request.json();
+    const body: NotifyOrganizerInput = await request.json();
 
-    const { type, eventId, data } = body;
-
-    if (!type || !eventId) {
+    if (!body.type || !body.eventId) {
       return NextResponse.json(
         { error: "type and eventId required" },
         { status: 400 }
       );
     }
 
-    // Get event with organizer info
-    const { rows: eventRows } = await query(
-      `SELECT id, name, organizer_id FROM events WHERE id = $1`,
-      [eventId]
-    );
-    const event = eventRows[0];
-
-    if (!event) {
-      return NextResponse.json({ error: "Event not found" }, { status: 404 });
-    }
-
-    // Get organizer profile
-    const { rows: organizerRows } = await query(
-      `SELECT role FROM profiles WHERE id = $1`,
-      [event.organizer_id]
-    );
-    const role = organizerRows[0]?.role || "public_user";
-
-    // Build notification based on type
-    let title = "";
-    let body_text = "";
-    let categorySlug = "";
-    let ctaUrl = `/dashboard/organizer`;
-
-    switch (type) {
-      case "ticket_sale":
-        categorySlug = "organizer_ticket_sale";
-        title = `🎫 New Ticket Sale for ${event.name}`;
-        body_text = data?.buyerName
-          ? `${data.buyerName} purchased ${
-              data.ticketCount || 1
-            } ticket(s) for PKR ${(data.totalAmount || 0).toLocaleString()}`
-          : `${data?.ticketCount || 1} ticket(s) sold for PKR ${(
-              data?.totalAmount || 0
-            ).toLocaleString()}`;
-        break;
-
-      case "check_in":
-        categorySlug = "organizer_check_in";
-        title = `✓ Check-in at ${event.name}`;
-        body_text = data?.attendeeName
-          ? `${data.attendeeName} has checked in`
-          : "An attendee has checked in to your event";
-        break;
-
-      case "milestone":
-        categorySlug = "organizer_milestone";
-        const percent = data?.milestonePercent || 0;
-        if (percent >= 100) {
-          title = `🎉 ${event.name} is SOLD OUT!`;
-          body_text = "Congratulations! Your event has sold out.";
-        } else {
-          title = `📈 ${event.name} is ${percent}% sold`;
-          body_text = `Your event has reached ${percent}% capacity. Great progress!`;
-        }
-        break;
-
-      case "event_reminder":
-        categorySlug = "organizer_event_reminder";
-        const hours = data?.hoursUntil || 24;
-        title = `⏰ ${event.name} starts in ${hours} hours`;
-        body_text = `Your event is coming up soon. Make sure everything is ready!`;
-        ctaUrl = `/events/${eventId}`;
-        break;
-
-      default:
-        return NextResponse.json(
-          { error: "Invalid notification type" },
-          { status: 400 }
-        );
-    }
-
-    // Create the notification
-    const result = await createNotification({
-      recipientId: event.organizer_id,
-      roleScope: role as "admin" | "super_admin" | "lister" | "public_user",
-      categorySlug,
-      title,
-      body: body_text,
-      metadata: {
-        eventId,
-        eventName: event.name,
-        type,
-        ...data,
-      },
-      priority:
-        type === "milestone" && (data?.milestonePercent || 0) >= 100
-          ? "high"
-          : "normal",
-      ctaLabel: "View Dashboard",
-      ctaUrl,
-      dedupeKey:
-        type === "milestone"
-          ? `organizer_milestone_${eventId}_${data?.milestonePercent}`
-          : undefined,
-    });
+    const result = await notifyOrganizer(body);
 
     return NextResponse.json({
       success: true,
@@ -139,6 +58,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Organizer notification error:", error);
+    const status =
+      error instanceof Error && error.message.includes("not found")
+        ? 404
+        : 500;
     return NextResponse.json(
       {
         error:
@@ -146,7 +69,7 @@ export async function POST(request: NextRequest) {
             ? error.message
             : "Failed to send notification",
       },
-      { status: 500 }
+      { status }
     );
   }
 }

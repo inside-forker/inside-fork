@@ -276,6 +276,44 @@ export async function POST(
         console.error("Failed to award XP:", xpError);
         // Don't fail the check-in, just log the error
       }
+
+      // Best-effort: notify the organizer only when this check-in crosses a
+      // 25/50/75/100% threshold, not on every single scan - a busy event
+      // could see hundreds of check-ins and per-scan notifications would
+      // just be noise.
+      try {
+        const { rows: countRows } = await query(
+          `SELECT
+             COUNT(*) FILTER (WHERE status != 'revoked') AS total,
+             COUNT(*) FILTER (WHERE status != 'revoked' AND checked_in_at IS NOT NULL) AS checked_in
+           FROM ticket_passes WHERE event_id = $1`,
+          [event.id],
+        );
+        const total = Number(countRows[0]?.total || 0);
+        const checkedIn = Number(countRows[0]?.checked_in || 0);
+
+        if (total > 0) {
+          const prevPercent = Math.floor(((checkedIn - 1) / total) * 100);
+          const currentPercent = Math.floor((checkedIn / total) * 100);
+          const milestone = [25, 50, 75, 100].find(
+            (m) => currentPercent >= m && prevPercent < m,
+          );
+
+          if (milestone) {
+            const { notifyOrganizer } = await import("@/lib/organizer/notify");
+            await notifyOrganizer({
+              type: "check_in",
+              eventId: event.id,
+              data: { milestonePercent: milestone },
+            });
+          }
+        }
+      } catch (organizerNotifyError) {
+        console.error(
+          "Failed to notify organizer of check-in milestone:",
+          organizerNotifyError,
+        );
+      }
     }
 
     return NextResponse.json({

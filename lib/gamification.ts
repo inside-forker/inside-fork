@@ -1,4 +1,5 @@
 import { query } from "@/lib/db";
+import { createNotification } from "@/lib/notifications/service";
 import {
   type ActivityCheckResponse,
   type XPAwardResult,
@@ -213,6 +214,26 @@ export async function checkAndProcessRankUp(
           // Already has badge - that's okay
           console.log("User already has this badge");
         }
+      }
+
+      try {
+        await createNotification({
+          recipientId: userId,
+          roleScope: "public_user",
+          categorySlug: "public_rank_up",
+          title: `🎉 You've reached ${newRank.name}!`,
+          body: `Your new rank unlocks fresh perks — check them out.`,
+          priority: "high",
+          ctaLabel: "View leaderboard",
+          ctaUrl: "/leaderboard",
+          metadata: {
+            rank_id: newRank.id,
+            rank_slug: newRank.slug,
+            xp_total: newTotalXP,
+          },
+        });
+      } catch (notifyError) {
+        console.error("Failed to send rank-up notification:", notifyError);
       }
 
       return {
