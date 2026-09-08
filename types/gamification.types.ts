@@ -203,6 +203,14 @@ export interface DailyLoginClaimResult {
     days_in_streak: number;
   };
   message: string;
+  rank_up: boolean;
+  new_rank?: {
+    id: number;
+    name: string;
+    slug: string;
+    color: string;
+    benefits: string[];
+  };
 }
 
 // ============================================================================
