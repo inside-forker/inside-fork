@@ -39,6 +39,8 @@ const CAT = {
   entertainmentRecreation: { id: 99, parent: 79, slug: "entertainment-recreation" },
   travelTourism: { id: 97, parent: 79, slug: "travel-tourism" },
   cinemasAmusementParks: { id: 135, parent: 99, slug: "cinemas-amusement-parks" },
+  liveMusicComedyVenues: { id: 137, parent: 79, slug: "live-music-comedy-venues" },
+  gamingLoungesArcades: { id: 138, parent: 79, slug: "gaming-lounges-arcades" },
   // Off-taxonomy control group: real categories no intent references, used
   // below to prove the category filter actually excludes something.
   clinicsHospitals: { id: 93, parent: 77, slug: "clinics-hospitals" },
@@ -144,6 +146,16 @@ function main() {
         (c) => c.distanceMeters != null && c.distanceMeters > config.maxDistanceMeters!,
       );
       assert(tooFar.length === 0, `${config.slug}: maxDistanceMeters left ${tooFar.length} out-of-range candidates in`);
+    }
+
+    if (config.excludeCategorySlugs?.length) {
+      const leaked = eligible.filter((c) =>
+        c.categoryIds.some((id) => filter.excludedCategoryIds.has(id)),
+      );
+      assert(
+        leaked.length === 0,
+        `${config.slug}: excludeCategorySlugs left ${leaked.length} forbidden-category candidates in`,
+      );
     }
 
     const scored = scoreDiscoveryCandidates(eligible, config, filter, {

@@ -3,218 +3,265 @@ import { mobileRoute } from "@/lib/mobile/handler";
 import { ok } from "@/lib/mobile/response";
 import { query } from "@/lib/db";
 import { enforceMobileRateLimit } from "@/lib/mobile/rate-limit";
+import { parsePagination, buildPaginationMeta } from "@/lib/mobile/pagination";
 import { MobileApiError } from "@/lib/mobile/errors";
-import { formatDiscount, daysUntil, normalizeCardName } from "@/lib/mobile/deal-format";
+import { toListingImage } from "@/lib/mobile/mappers";
+import { sanitizeSearchTerm } from "@/lib/utils/search-sanitization";
+import {
+  normalizeCardName,
+  toMobileDealPreview,
+  type CardVariantLookup,
+  type DealFeedRow,
+  type MobileDealPreviewDTO,
+} from "@/lib/mobile/deals-feed";
+import type { MobileDealCategory } from "@/lib/mobile/deal-category";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Explicit column list - never use `*`. `l.category_id`/`category_name` are
- * the listing's own (sub)category - e.g. "Jewelry & Watches" - which is one
- * level too specific for the Deals tab's category tabs (that UI mirrors the
- * Home screen's 7-parent grid). `top_category` resolves each listing's
- * top-level ancestor: taxonomy depth is capped at parent -> child (enforced
- * in the admin API), so a single self-join on `parent_id` is enough - no
- * recursion needed.
- */
-const DEAL_SQL_COLUMNS = `
-  d.id, d.title, d.description, d.deal_type, d.bank_id, d.discount_value, d.end_date,
-  d.valid_card_variants, d.metadata,
-  l.id AS listing_id, l.slug AS listing_slug, l.name AS listing_name,
-  l.category_id, l.category_name, l.latitude, l.longitude,
-  top_category.id AS top_category_id, top_category.name AS top_category_name
-`;
-const DEAL_SQL_JOINS = `
-  JOIN listings_with_details l ON l.id = d.listing_id
-  LEFT JOIN categories cat ON cat.id = l.category_id
-  LEFT JOIN categories top_category ON top_category.id = COALESCE(cat.parent_id, cat.id)
-`;
+const DEAL_CATEGORIES = new Set<MobileDealCategory>([
+  "dining",
+  "shopping",
+  "beauty",
+  "hotels",
+  "entertainment",
+  "travel",
+]);
 
-type DealRow = {
-  id: string | number;
-  title: string;
-  description: string | null;
-  deal_type: "general" | "bank_discount";
-  discount_value: string | null;
-  end_date: string | null;
-  /** `bigint[]` in Postgres - `pg` parses each element as a string, same as
-   * a scalar bigint column. Always run through `Number()` before use. */
-  valid_card_variants: (string | number)[] | null;
-  bank_id: string | number | null;
-  /** Scraper-sourced deals carry `card_associations` here - see the
-   * name-matching fallback below for why this is needed. */
-  metadata: { card_associations?: { typeId: number; name: string }[] } | null;
-  listing_id: string | number;
-  listing_slug: string;
-  listing_name: string;
-  category_id: string | number | null;
-  category_name: string | null;
-  top_category_id: string | number | null;
-  top_category_name: string | null;
-  latitude: string | number | null;
-  longitude: string | number | null;
-};
-
-type CardMatchDTO = { cardVariantId: number; bankId: number; label: string };
+type DealSqlRow = DealFeedRow & { listing_id: number | string };
 
 /**
  * GET /api/mobile/v1/deals
  *
- * Public, deal-first catalog: every active, non-expired deal on a published
- * listing, with the listing's own display info (name/slug/image/location/category)
- * and the specific bank cards it applies to. Small unpaginated catalog, same
- * shape as GET /banks and GET /cards - not a paginated feed.
+ * Deal-first catalog for the mobile Discounts tab. Active deals on published
+ * listings, shaped as `DealPreview` (merchant, cardMatches, coords, image).
+ *
+ * Query params:
+ * - `search` — ILIKE across merchant, deal title/description/discount, bank, category
+ * - `bankId`, `cardVariantId`, `category` — optional filters
+ * - `page` / `limit` — pagination
  */
 export const GET = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
 
-  let rows: DealRow[];
+  const { searchParams } = new URL(request.url);
+  const { page, limit, offset } = parsePagination(searchParams, {
+    defaultLimit: 100,
+    maxLimit: 200,
+  });
+
+  const bankIdRaw = searchParams.get("bankId");
+  const cardVariantIdRaw = searchParams.get("cardVariantId");
+  const categoryRaw = searchParams.get("category");
+  const rawSearch = searchParams.get("search");
+  const sanitizedSearch =
+    rawSearch && rawSearch.trim() ? sanitizeSearchTerm(rawSearch) : "";
+
+  const bankId =
+    bankIdRaw && /^\d+$/.test(bankIdRaw) ? parseInt(bankIdRaw, 10) : null;
+  const cardVariantId =
+    cardVariantIdRaw && /^\d+$/.test(cardVariantIdRaw)
+      ? parseInt(cardVariantIdRaw, 10)
+      : null;
+  const categoryFilter =
+    categoryRaw && DEAL_CATEGORIES.has(categoryRaw as MobileDealCategory)
+      ? (categoryRaw as MobileDealCategory)
+      : null;
+
+  const where: string[] = [
+    "d.is_active = true",
+    "l.status = 'published'",
+    "(d.start_date IS NULL OR d.start_date <= NOW())",
+    "(d.end_date IS NULL OR d.end_date >= NOW())",
+  ];
+  const params: unknown[] = [];
+
+  if (sanitizedSearch) {
+    params.push(`%${sanitizedSearch}%`);
+    const i = params.length;
+    where.push(`(
+      l.name ILIKE $${i}
+      OR COALESCE(d.title, '') ILIKE $${i}
+      OR COALESCE(d.description, '') ILIKE $${i}
+      OR COALESCE(d.discount_value, '') ILIKE $${i}
+      OR COALESCE(b.name, '') ILIKE $${i}
+      OR COALESCE(l.category_name, '') ILIKE $${i}
+      OR COALESCE(c.name, '') ILIKE $${i}
+      OR COALESCE(l.address, '') ILIKE $${i}
+    )`);
+  }
+
+  let dealRows: DealSqlRow[];
   try {
-    const result = await query(
-      `SELECT ${DEAL_SQL_COLUMNS}
+    const { rows } = await query(
+      `SELECT
+         d.id,
+         d.listing_id,
+         d.title,
+         d.description,
+         d.discount_value,
+         d.bank_id,
+         d.valid_card_variants,
+         d.metadata,
+         d.end_date,
+         b.name AS bank_name,
+         l.name AS merchant,
+         l.slug AS listing_slug,
+         l.latitude,
+         l.longitude,
+         l.category_name,
+         c.slug AS category_slug
        FROM deals d
-       ${DEAL_SQL_JOINS}
-       WHERE d.is_active = true
-         AND (d.end_date IS NULL OR d.end_date >= NOW())
-         AND l.status = 'published'
+       INNER JOIN listings_with_details l ON l.id = d.listing_id
+       LEFT JOIN banks b ON b.id = d.bank_id
+       LEFT JOIN categories c ON c.id = l.category_id
+       WHERE ${where.join(" AND ")}
        ORDER BY d.created_at DESC
-       LIMIT 300`,
+       LIMIT 2000`,
+      params,
     );
-    rows = result.rows as DealRow[];
+    dealRows = rows as DealSqlRow[];
   } catch (error) {
     console.error(
-      "[mobile-api] deals query failed:",
+      "[mobile-api] deals feed query failed:",
       error instanceof Error ? error.message : error,
     );
     throw new MobileApiError("internal_error", "Failed to load deals.", 500);
   }
 
-  const listingIds = [...new Set(rows.map((r) => Number(r.listing_id)))];
-  const imageByListing = new Map<number, string>();
-  if (listingIds.length > 0) {
-    const { rows: images } = await query(
-      `SELECT id, listing_id, url, display_order, is_primary
-       FROM listing_images
-       WHERE listing_id = ANY($1::int[])
-       ORDER BY display_order ASC`,
-      [listingIds],
-    );
-    for (const img of images as {
-      listing_id: number;
-      url: string;
-      is_primary: boolean | null;
-    }[]) {
-      if (img.url.includes("/menu/")) continue;
-      const existing = imageByListing.get(img.listing_id);
-      if (!existing || img.is_primary) {
-        imageByListing.set(img.listing_id, img.url);
+  const variantIdSet = new Set<number>();
+  const bankIdSet = new Set<number>();
+  const listingIds: number[] = [];
+
+  for (const row of dealRows) {
+    listingIds.push(Number(row.listing_id));
+    if (row.bank_id != null) {
+      const bid = Number(row.bank_id);
+      if (Number.isFinite(bid)) bankIdSet.add(bid);
+    }
+    if (Array.isArray(row.valid_card_variants)) {
+      for (const v of row.valid_card_variants) {
+        const n = Number(v);
+        if (Number.isFinite(n)) variantIdSet.add(n);
       }
     }
   }
 
-  const cardVariantIds = [
-    ...new Set(rows.flatMap((r) => (r.valid_card_variants ?? []).map(Number))),
-  ];
-  const bankIds = [
-    ...new Set(
-      rows.map((r) => (r.bank_id !== null ? Number(r.bank_id) : null)).filter((id): id is number => id !== null),
-    ),
-  ];
+  const uniqueListingIds = [...new Set(listingIds.filter(Number.isFinite))];
 
-  type CardVariantRow = { id: number; cardName: string; bankId: number; label: string };
-  const cardById = new Map<number, CardVariantRow>();
-  /** Same rows as `cardById`, indexed by bank + normalized card name - the
-   * fallback path below (see `cardMatches`). */
-  const cardByBankAndName = new Map<number, Map<string, CardVariantRow>>();
+  const cardById = new Map<number, CardVariantLookup>();
+  const cardsByBankName = new Map<string, CardVariantLookup>();
 
-  if (cardVariantIds.length > 0 || bankIds.length > 0) {
-    const { rows: cards } = await query(
-      `SELECT cv.id, cv.card_name, cv.bank_id, b.name AS bank_name
-       FROM card_variants cv
-       JOIN banks b ON b.id = cv.bank_id
-       WHERE cv.id = ANY($1::int[]) OR cv.bank_id = ANY($2::int[])`,
-      [cardVariantIds, bankIds],
-    );
-    for (const c of cards as {
-      id: string | number;
-      card_name: string;
-      bank_id: string | number;
-      bank_name: string;
-    }[]) {
-      const bankId = Number(c.bank_id);
-      const row: CardVariantRow = {
-        id: Number(c.id),
-        cardName: c.card_name,
-        bankId,
-        label: `${c.bank_name} ${c.card_name}`.trim(),
-      };
-      cardById.set(row.id, row);
-      if (!cardByBankAndName.has(bankId)) cardByBankAndName.set(bankId, new Map());
-      cardByBankAndName.get(bankId)!.set(normalizeCardName(c.card_name), row);
+  // Load every active card for banks in this feed so we can name-match
+  // Peekaboo associations (typeIds rarely equal our card_variants.id).
+  const bankIds = [...bankIdSet];
+  if (bankIds.length > 0 || variantIdSet.size > 0) {
+    try {
+      const { rows: cardRows } = await query(
+        `SELECT id, bank_id, card_name
+         FROM card_variants
+         WHERE is_active = true
+           AND (
+             bank_id = ANY($1::bigint[])
+             OR id = ANY($2::bigint[])
+           )`,
+        [bankIds.length ? bankIds : [0], [...variantIdSet].length ? [...variantIdSet] : [0]],
+      );
+      for (const c of cardRows) {
+        const id = Number(c.id);
+        const lookup: CardVariantLookup = {
+          id,
+          bankId: Number(c.bank_id),
+          label: String(c.card_name ?? "Card"),
+        };
+        cardById.set(id, lookup);
+        cardsByBankName.set(
+          `${lookup.bankId}::${normalizeCardName(lookup.label)}`,
+          lookup,
+        );
+      }
+    } catch (error) {
+      console.error(
+        "[mobile-api] deals card_variants lookup failed:",
+        error instanceof Error ? error.message : error,
+      );
     }
   }
 
-  const deals = rows.map((row) => {
-    const { label: discountLabel, weight: discountWeight } = formatDiscount(
-      row.discount_value,
-    );
-
-    // Primary path: `valid_card_variants` ids that resolve directly against
-    // `card_variants.id` (true for admin-entered deals).
-    let cardMatches: CardMatchDTO[] = (row.valid_card_variants ?? [])
-      .map((rawId): CardMatchDTO | null => {
-        const id = Number(rawId);
-        const card = cardById.get(id);
-        if (!card) return null;
-        return { cardVariantId: id, bankId: card.bankId, label: card.label };
-      })
-      .filter((m): m is CardMatchDTO => m !== null);
-
-    // Fallback: scraper-sourced deals write Peekaboo's own `typeId` into
-    // `valid_card_variants`, which never matches `card_variants.id` (see
-    // `entity-scraper.ts`'s `validCards: deal.associations.map(assoc =>
-    // assoc.typeId)`). Those same associations carry a human-readable card
-    // name in `metadata.card_associations`, in the same "Visa Gold Debit
-    // Card" style `card_variants.card_name` already uses - match on that,
-    // scoped to the deal's own bank so two banks' same-named tier can't cross-match.
-    if (cardMatches.length === 0 && row.bank_id !== null) {
-      const bankId = Number(row.bank_id);
-      const byName = cardByBankAndName.get(bankId);
-      const associations = row.metadata?.card_associations ?? [];
-      if (byName && associations.length > 0) {
-        const seen = new Set<number>();
-        cardMatches = associations
-          .map((assoc): CardMatchDTO | null => {
-            const card = byName.get(normalizeCardName(assoc.name));
-            if (!card || seen.has(card.id)) return null;
-            seen.add(card.id);
-            return { cardVariantId: card.id, bankId: card.bankId, label: card.label };
-          })
-          .filter((m): m is CardMatchDTO => m !== null);
+  const imageByListingId = new Map<number, string>();
+  if (uniqueListingIds.length > 0) {
+    try {
+      const { rows: imgRows } = await query(
+        `SELECT DISTINCT ON (listing_id)
+           listing_id, id, url, alt_text, display_order, is_primary
+         FROM listing_images
+         WHERE listing_id = ANY($1::bigint[])
+           AND url NOT LIKE '%/menu/%'
+         ORDER BY listing_id,
+           CASE WHEN is_primary THEN 0 ELSE 1 END,
+           display_order ASC NULLS LAST,
+           id ASC`,
+        [uniqueListingIds],
+      );
+      for (const img of imgRows) {
+        const dto = toListingImage({
+          id: Number(img.id),
+          url: String(img.url),
+          alt_text: (img.alt_text as string | null) ?? null,
+          display_order:
+            img.display_order !== null ? Number(img.display_order) : null,
+          is_primary: Boolean(img.is_primary),
+        });
+        imageByListingId.set(Number(img.listing_id), dto.url);
       }
+    } catch (error) {
+      console.error(
+        "[mobile-api] deals images lookup failed:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  const now = new Date();
+  const mapped: MobileDealPreviewDTO[] = [];
+  for (const row of dealRows) {
+    const listingId = Number(row.listing_id);
+    const imageUrl = Number.isFinite(listingId)
+      ? imageByListingId.get(listingId)
+      : undefined;
+    const dto = toMobileDealPreview(
+      row,
+      cardById,
+      cardsByBankName,
+      imageUrl,
+      now,
+    );
+    if (!dto) continue;
+
+    if (categoryFilter && dto.category !== categoryFilter) continue;
+
+    if (cardVariantId != null) {
+      const okVariant =
+        dto.cardMatches.some((m) => m.cardVariantId === cardVariantId) ||
+        (dto.matchByBank &&
+          dto.bankId != null &&
+          cardById.get(cardVariantId)?.bankId === dto.bankId);
+      if (!okVariant) continue;
     }
 
-    return {
-      id: Number(row.id),
-      title: row.title,
-      description: row.description,
-      dealType: row.deal_type,
-      discountLabel,
-      discountWeight,
-      endDate: row.end_date,
-      expiryDaysLeft: daysUntil(row.end_date),
-      merchant: row.listing_name,
-      listingSlug: row.listing_slug,
-      imageUrl: imageByListing.get(Number(row.listing_id)) ?? null,
-      categoryId: row.category_id !== null ? Number(row.category_id) : null,
-      categoryName: row.category_name,
-      topCategoryId: row.top_category_id !== null ? Number(row.top_category_id) : null,
-      topCategoryName: row.top_category_name,
-      latitude: row.latitude !== null ? Number(row.latitude) : null,
-      longitude: row.longitude !== null ? Number(row.longitude) : null,
-      cardMatches,
-    };
+    if (bankId != null) {
+      const bankMatch =
+        dto.bankId === bankId ||
+        dto.cardMatches.some((m) => m.bankId === bankId);
+      if (!bankMatch) continue;
+    }
+
+    mapped.push(dto);
+  }
+
+  const totalItems = mapped.length;
+  const pageSlice = mapped.slice(offset, offset + limit);
+
+  return ok(pageSlice, {
+    pagination: buildPaginationMeta(page, limit, totalItems),
   });
-
-  return ok(deals);
 });

@@ -33,6 +33,75 @@ export type OutingTemplate = {
  */
 export const OUTING_TEMPLATES: OutingTemplate[] = [
   {
+    vibeKey: "hangout",
+    title: "Hangout",
+    arcBlurb: "ranked hangout spots",
+    phrases: [
+      "hangout",
+      "hang out",
+      "chill with",
+      "chill spot",
+      "something fun",
+      "fun place",
+      "fun activity",
+      "team outing",
+      "khana nahi",
+      "not a restaurant",
+    ],
+    slots: [
+      {
+        role: "place",
+        label: "Hangout",
+        categorySlug: "entertainment-recreation",
+        fallbackSlugs: [
+          "gaming-lounges-arcades",
+          "live-music-comedy-venues",
+          "parks-outdoor-spaces",
+        ],
+      },
+    ],
+  },
+  {
+    vibeKey: "date-night",
+    title: "Date night",
+    arcBlurb: "posh romantic picks",
+    phrases: [
+      "date night",
+      "romantic",
+      "anniversary",
+      "first date",
+      "girlfriend",
+      "boyfriend",
+      "for a couple",
+    ],
+    slots: [
+      {
+        role: "place",
+        label: "Date spot",
+        categorySlug: "fine-dining-buffets",
+        fallbackSlugs: [
+          "cafes-coworking-spots",
+          "live-music-comedy-venues",
+          "restaurants-cafes",
+        ],
+      },
+    ],
+  },
+  {
+    vibeKey: "bowling",
+    title: "Bowling",
+    arcBlurb: "bowling venues",
+    phrases: ["bowling", "bowling alley"],
+    slots: [
+      {
+        role: "place",
+        label: "Bowling",
+        categorySlug: "gaming-lounges-arcades",
+        fallbackSlugs: ["entertainment-recreation"],
+      },
+    ],
+  },
+  {
     vibeKey: "night-out",
     title: "Night out",
     arcBlurb: "dinner, something to do, dessert",
@@ -44,7 +113,7 @@ export const OUTING_TEMPLATES: OutingTemplate[] = [
       "club",
       "party",
       "bar hop",
-      "night",
+      "plan my night",
     ],
     slots: [
       {

@@ -110,6 +110,7 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
       : Promise.resolve({ rows: [] as Array<Record<string, unknown>> }),
     query(
       `SELECT d.id, d.title, d.description, d.discount_value, d.deal_type, d.end_date,
+              d.bank_id, d.valid_card_variants,
               b.name AS bank_name, b.logo_url AS bank_logo_url
        FROM deals d
        LEFT JOIN banks b ON b.id = d.bank_id
@@ -222,18 +223,20 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
   }));
 
   const dealsRows = dealsRes.rows as Array<{
-    id: number;
+    id: number | string;
     title: string;
     description: string | null;
     discount_value: string | null;
     deal_type: string;
     end_date: Date | string | null;
+    bank_id: number | string | null;
+    valid_card_variants: number[] | null;
     bank_name: string | null;
     bank_logo_url: string | null;
   }>;
 
   const deals = dealsRows.map((deal) => ({
-    id: deal.id,
+    id: Number(deal.id),
     title: deal.title,
     description: deal.description,
     discount_value: deal.discount_value,
@@ -242,6 +245,10 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
       deal.end_date instanceof Date
         ? deal.end_date.toISOString()
         : deal.end_date,
+    bank_id: deal.bank_id != null ? Number(deal.bank_id) : null,
+    valid_card_variants: Array.isArray(deal.valid_card_variants)
+      ? deal.valid_card_variants.map(Number).filter((n) => Number.isFinite(n))
+      : [],
     bank: deal.bank_name
       ? { name: deal.bank_name, logo_url: deal.bank_logo_url }
       : null,

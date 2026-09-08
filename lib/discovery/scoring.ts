@@ -45,6 +45,8 @@ export type ScoredDiscoveryCandidate = DiscoveryCandidateInput & {
 export type ResolvedIntentFilter = {
   /** null = no restriction (e.g. Something New draws from the whole city). */
   allowedCategoryIds: Set<number> | null;
+  /** Empty when the intent has no excludeCategorySlugs. */
+  excludedCategoryIds: Set<number>;
   boostByCategoryId: Map<number, number>;
 };
 
@@ -61,9 +63,6 @@ const DEFAULT_CATEGORY_BOOST = 0.6;
 export async function resolveIntentCategoryFilter(
   config: DiscoveryIntentConfig,
 ): Promise<ResolvedIntentFilter> {
-  if (config.categorySlugs.length === 0) {
-    return { allowedCategoryIds: null, boostByCategoryId: new Map() };
-  }
   const slugToId = await getCategorySlugIdMap();
   return buildIntentCategoryFilter(config, slugToId);
 }
@@ -80,7 +79,11 @@ export function buildIntentCategoryFilter(
   slugToId: Map<string, number>,
 ): ResolvedIntentFilter {
   if (config.categorySlugs.length === 0) {
-    return { allowedCategoryIds: null, boostByCategoryId: new Map() };
+    return {
+      allowedCategoryIds: null,
+      excludedCategoryIds: resolveExcludedIds(config, slugToId),
+      boostByCategoryId: new Map(),
+    };
   }
 
   const allowedCategoryIds = new Set<number>();
@@ -94,11 +97,32 @@ export function buildIntentCategoryFilter(
     allowedCategoryIds.add(id);
     boostByCategoryId.set(id, config.categoryBoost?.[slug] ?? DEFAULT_CATEGORY_BOOST);
   }
-  return { allowedCategoryIds, boostByCategoryId };
+  return {
+    allowedCategoryIds,
+    excludedCategoryIds: resolveExcludedIds(config, slugToId),
+    boostByCategoryId,
+  };
+}
+
+function resolveExcludedIds(
+  config: DiscoveryIntentConfig,
+  slugToId: Map<string, number>,
+): Set<number> {
+  const excluded = new Set<number>();
+  for (const slug of config.excludeCategorySlugs ?? []) {
+    const id = slugToId.get(slug);
+    if (id != null) excluded.add(id);
+  }
+  return excluded;
 }
 
 /** True when the intent has no category restriction, or the candidate has >=1 allowed category. */
 export function matchesIntentCategory(candidate: CandidateInput, filter: ResolvedIntentFilter): boolean {
+  if (filter.excludedCategoryIds.size > 0) {
+    if (candidate.categoryIds.some((id) => filter.excludedCategoryIds.has(id))) {
+      return false;
+    }
+  }
   if (filter.allowedCategoryIds === null) return true;
   return candidate.categoryIds.some((id) => filter.allowedCategoryIds!.has(id));
 }
