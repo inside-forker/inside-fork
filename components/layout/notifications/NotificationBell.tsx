@@ -47,6 +47,8 @@ function NotificationBellDesktop({
         eventType: "page_view",
         entityType: "notifications_panel",
         source: "web",
+        sourceContext: "notification",
+        screen: "notifications_panel",
         context: {
           variant: "desktop",
           unreadBefore: feed.unreadCount,
@@ -151,6 +153,8 @@ function NotificationBellMobile({
         eventType: "page_view",
         entityType: "notifications_panel",
         source: "web",
+        sourceContext: "notification",
+        screen: "notifications_panel",
         context: {
           variant: "mobile",
           unreadBefore: feed.unreadCount,

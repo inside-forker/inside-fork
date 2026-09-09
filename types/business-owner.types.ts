@@ -101,6 +101,14 @@ export interface BusinessOwnerAnalytics {
     totalReviews: number;
     favorites: number;
     contactClicks: number;
+    /** Phase 1 CORE — validated offer redemptions in range. */
+    redemptionCount: number;
+    billGmv: number;
+    discountGmv: number;
+    /** Phase 2 — unique guests who redeemed ≥1 time in range. */
+    uniqueRedeemers: number;
+    /** Phase 2 — fraction of redeemers with ≥2 redemptions (0–1). */
+    repeatRedeemerRate: number;
   };
   timeseries: Array<{
     date: string;
@@ -108,7 +116,19 @@ export interface BusinessOwnerAnalytics {
     visitors: number;
     favorites: number;
     contactClicks: number;
+    redemptions: number;
+    billGmv: number;
+    discountGmv: number;
   }>;
+  /** Phase 2 — category peer compare; null when privacy floor not met. */
+  categoryBenchmark: {
+    peerListingCount: number;
+    privacyFloorMet: boolean;
+    medianBillGmv: number | null;
+    medianRedemptionCount: number | null;
+    yourBillGmv: number;
+    yourRedemptionCount: number;
+  } | null;
   branches: Array<{
     branchId: number;
     branchName: string;

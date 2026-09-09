@@ -84,6 +84,10 @@ export const analyticsEventSchema = z
     entityType: z.string().max(128).optional(),
     entityId: z.string().max(256).optional(),
     sessionId: z.string().max(256).optional(),
+    /** Phase 1 CORE envelope — how the user reached this surface. */
+    sourceContext: z.string().max(128).optional(),
+    deviceId: z.string().max(256).optional(),
+    screen: z.string().max(256).optional(),
     actorId: z.string().uuid().optional(),
     actorRole: userRoleEnum.optional(),
     context: jsonSchema.default({}),
@@ -187,6 +191,27 @@ export interface RevenueAnalyticsSummary {
   topEvents: RevenueTopEvent[];
 }
 
+/** Phase 1 CORE — platform offer-redemption money loop. */
+export interface OfferRedemptionsAnalyticsSummary {
+  redemptionCountInPeriod: number;
+  billGmvInPeriod: number;
+  discountGmvInPeriod: number;
+  pendingCount: number;
+  voidedCountInPeriod: number;
+}
+
+/** Latest row from marketplace_health_daily (Phase 2). Null when never refreshed. */
+export interface MarketplaceHealthSummary {
+  day: string;
+  dau: number;
+  wau: number;
+  searchZeroResultRate7d: number;
+  validatedRedemptions7d: number;
+  billGmv7d: number;
+  redemptionListingRate30d: number;
+  computedAt: string;
+}
+
 export interface NotificationChannelBreakdown {
   channel: string;
   sent: number;
@@ -242,6 +267,8 @@ export interface AdminAnalyticsOverview {
   funnels: ConversionFunnelSummary;
   traffic: TrafficAnalyticsSummary;
   revenue: RevenueAnalyticsSummary;
+  offerRedemptions: OfferRedemptionsAnalyticsSummary;
+  marketplaceHealth: MarketplaceHealthSummary | null;
   notifications: NotificationsAnalyticsSummary;
   performance: PerformanceAnalyticsSummary | null;
   generatedAt: string;

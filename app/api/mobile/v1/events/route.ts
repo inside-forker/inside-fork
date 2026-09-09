@@ -8,14 +8,24 @@ import { MobileApiError } from "@/lib/mobile/errors";
 import { sanitizeSearchTerm } from "@/lib/utils/search-sanitization";
 import { toEventCard, type EventCardRow } from "@/lib/mobile/mappers";
 import { getAttendeesPreviewByEvent } from "@/lib/mobile/attendees";
+import { fetchPrimaryImagesByEventId } from "@/lib/mobile/event-images";
+import { fetchPriceRangeByEventId, type EventPriceRange } from "@/lib/mobile/event-pricing";
 
 export const dynamic = "force-dynamic";
 
+// `events_with_details` and `events` share many column names (start_time,
+// end_time, address, latitude, longitude, is_featured, category_id, ...) -
+// now that EVENTS_FROM_SQL also joins `events e` (to reach venue_id), every
+// one of those must be qualified with `events_with_details.` or Postgres
+// rejects the query as ambiguous. `event_id`/`event_name`/etc. (the view's
+// renamed columns) don't collide and are left bare.
 const EVENT_CARD_SQL_COLUMNS =
   "events_with_details.event_id, event_name, event_slug, event_description, event_status, " +
-  "to_json(start_time) #>> '{}' AS start_time, " +
-  "to_json(end_time) #>> '{}' AS end_time, " +
-  "is_featured, organizer_name, organizer_avatar, location_name, address, latitude, longitude, " +
+  "to_json(events_with_details.start_time) #>> '{}' AS start_time, " +
+  "to_json(events_with_details.end_time) #>> '{}' AS end_time, " +
+  "events_with_details.is_featured, organizer_name, organizer_avatar, " +
+  "events_with_details.location_name, events_with_details.address, " +
+  "events_with_details.latitude, events_with_details.longitude, " +
   "events_with_details.category_id, c.name AS category_name, c.slug AS category_slug, c.icon_name AS category_icon_name, " +
   "mp.min_price, e.venue_id, v.name AS venue_name, v.rating AS venue_rating";
 
@@ -115,17 +125,17 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   const whereClauses: string[] = [
     "event_status = 'published'",
-    "end_time >= NOW()",
+    "events_with_details.end_time >= NOW()",
   ];
   const params: unknown[] = [];
 
   if (featured) {
-    whereClauses.push("is_featured = true");
+    whereClauses.push("events_with_details.is_featured = true");
   }
 
   if (categoryId != null) {
     params.push(categoryId);
-    whereClauses.push(`category_id = $${params.length}`);
+    whereClauses.push(`events_with_details.category_id = $${params.length}`);
   }
 
   if (search) {
@@ -137,7 +147,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     params.push(`%${location}%`);
     const i = params.length;
     whereClauses.push(
-      `(address ILIKE $${i} OR location_name ILIKE $${i})`,
+      `(events_with_details.address ILIKE $${i} OR events_with_details.location_name ILIKE $${i})`,
     );
   }
 
@@ -192,7 +202,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       params.push(nextDay.toISOString());
       const endIdx = params.length;
       whereClauses.push(
-        `start_time >= $${startIdx} AND start_time < $${endIdx}`,
+        `events_with_details.start_time >= $${startIdx} AND events_with_details.start_time < $${endIdx}`,
       );
     }
   }
@@ -200,8 +210,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const orderBy = nearby
     ? "distance_km ASC, event_id ASC"
     : featured
-      ? "featured_rank DESC NULLS LAST, start_time ASC, event_id ASC"
-      : "start_time ASC, event_id ASC";
+      ? "events_with_details.featured_rank DESC NULLS LAST, events_with_details.start_time ASC, event_id ASC"
+      : "events_with_details.start_time ASC, event_id ASC";
 
   const whereSql = whereClauses.join(" AND ");
 
@@ -249,6 +259,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     ReturnType<typeof getAttendeesPreviewByEvent>
   > = new Map();
   let primaryImageByEvent = new Map<number, string>();
+  let priceRangeByEvent = new Map<number, EventPriceRange>();
   try {
     // Sequential for the same reason as the count query above - a `max: 1`
     // pool turns concurrent queries into queued ones racing a 10s acquisition
@@ -257,22 +268,20 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     // every card rather than 500ing - the same root cause showing up as
     // "sometimes the events have images, sometimes they don't".
     const attendeesResult = await getAttendeesPreviewByEvent(eventIds);
-    const imagesResult =
-      eventIds.length > 0
-        ? await query(
-            `SELECT DISTINCT ON (event_id) event_id, url
-             FROM event_images
-             WHERE event_id = ANY($1) AND (is_primary = true OR display_order = 1)
-             ORDER BY event_id, is_primary DESC NULLS LAST, display_order ASC`,
-            [eventIds],
-          )
-        : { rows: [] as { event_id: number; url: string }[] };
+    // Shared helper, so "which image is the cover" is decided the same way on
+    // every event list. The old inline query also required `is_primary` or
+    // `display_order = 1`, which left an event whose images are merely ordered
+    // from 0 (or 2 up) with no cover at all.
+    const imagesByEvent = await fetchPrimaryImagesByEventId(eventIds);
+    const pricesByEvent = await fetchPriceRangeByEventId(eventIds);
     attendeesPreviewByEvent = attendeesResult;
-    primaryImageByEvent = new Map(
-      imagesResult.rows.map((r) => [Number(r.event_id), r.url as string]),
-    );
+    primaryImageByEvent = imagesByEvent;
+    priceRangeByEvent = pricesByEvent;
   } catch (error) {
-    console.error("[mobile-api] attendees preview / image query failed:", error);
+    console.error(
+      "[mobile-api] attendees preview / image / price query failed:",
+      error,
+    );
   }
 
   const events = eventCardRows.map((row) =>
@@ -280,6 +289,9 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       row,
       row.event_id != null ? attendeesPreviewByEvent.get(row.event_id) : undefined,
       row.event_id != null ? (primaryImageByEvent.get(row.event_id) ?? null) : null,
+      row.event_id != null
+        ? (priceRangeByEvent.get(row.event_id) ?? { from: null, to: null })
+        : { from: null, to: null },
     ),
   );
 

@@ -379,6 +379,8 @@ export function useNotificationsFeed(
           entityType: "notification",
           entityId: id,
           source: "web",
+          sourceContext: "notification",
+          screen: "notifications_feed",
           context: {
             action: archive ? "mark_read_and_archive" : "mark_read",
             unreadBefore: previousUnreadCount,
@@ -462,6 +464,8 @@ export function useNotificationsFeed(
         eventType: "admin_action",
         entityType: "notifications_feed",
         source: "web",
+        sourceContext: "notification",
+        screen: "notifications_feed",
         context: {
           action: "mark_all_read",
           updated: data.updated,

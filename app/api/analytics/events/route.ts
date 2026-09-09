@@ -20,6 +20,9 @@ type AnalyticsEventInsert = {
   entity_type: string | null;
   entity_id: string | null;
   session_id: string | null;
+  source_context: string | null;
+  device_id: string | null;
+  screen: string | null;
   actor_id: string | null;
   actor_role: string | null;
   context: unknown;
@@ -163,6 +166,9 @@ const normalizeEvents = async (
       entity_type: event.entityType ?? null,
       entity_id: event.entityId ?? null,
       session_id: event.sessionId ?? null,
+      source_context: event.sourceContext ?? null,
+      device_id: event.deviceId ?? null,
+      screen: event.screen ?? null,
       actor_id: eventActorId ?? null,
       actor_role: eventActorRole ?? null,
       context: mergedContext,
@@ -234,7 +240,7 @@ export async function POST(request: NextRequest) {
   try {
     const placeholders = normalized.map(
       (_, i) =>
-        `($${i * 10 + 1}, $${i * 10 + 2}, $${i * 10 + 3}, $${i * 10 + 4}, $${i * 10 + 5}, $${i * 10 + 6}, $${i * 10 + 7}, $${i * 10 + 8}, $${i * 10 + 9}, $${i * 10 + 10})`
+        `($${i * 13 + 1}, $${i * 13 + 2}, $${i * 13 + 3}, $${i * 13 + 4}, $${i * 13 + 5}, $${i * 13 + 6}, $${i * 13 + 7}, $${i * 13 + 8}, $${i * 13 + 9}, $${i * 13 + 10}, $${i * 13 + 11}, $${i * 13 + 12}, $${i * 13 + 13})`
     ).join(", ");
     const values = normalized.flatMap((e) => [
       e.event_type,
@@ -244,13 +250,16 @@ export async function POST(request: NextRequest) {
       e.entity_type,
       e.entity_id,
       e.session_id,
+      e.source_context,
+      e.device_id,
+      e.screen,
       e.actor_id,
       e.actor_role,
       JSON.stringify(e.context ?? {}),
     ]);
     await query(
       `INSERT INTO public.analytics_events
-       (event_type, source, occurred_at, ingested_at, entity_type, entity_id, session_id, actor_id, actor_role, context)
+       (event_type, source, occurred_at, ingested_at, entity_type, entity_id, session_id, source_context, device_id, screen, actor_id, actor_role, context)
        VALUES ${placeholders}`,
       values
     );

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import {
   Bar,
   BarChart,
@@ -18,13 +19,18 @@ import {
 } from "recharts";
 import {
   Activity,
+  ArrowRight,
   BarChartBig,
   Download,
   Gauge,
+  HeartPulse,
   LineChart as LineChartIcon,
   RefreshCcw,
   Search,
+  Smartphone,
   Target,
+  Ticket,
+  Layers,
   UsersRound,
 } from "lucide-react";
 
@@ -41,6 +47,10 @@ import { Progress } from "@/components/ui/progress";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { DateRangeQuickSelect } from "@/components/admin/analytics/DateRangeQuickSelect";
 import { exportAnalyticsToCSV } from "@/lib/utils/analytics-export";
+import {
+  KeyMetricDetailModal,
+  type MetricType,
+} from "@/components/admin/analytics/KeyMetricDetailModal";
 import type {
   AdminAnalyticsOverview,
   DateRangePreset,
@@ -56,11 +66,13 @@ interface RefreshState {
 }
 
 interface KeyMetric {
+  id: MetricType;
   label: string;
   value: number;
   formatter: (value: number) => string;
   caption?: string;
   icon: React.ComponentType<{ className?: string }>;
+  href?: string;
 }
 
 const AdminAnalyticsCoreCharts = dynamic(
@@ -236,6 +248,9 @@ export function AdminAnalyticsClient({
   });
   const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>(
     initialOverview.dateRange?.preset ?? "7d",
+  );
+  const [selectedMetricId, setSelectedMetricId] = useState<MetricType | null>(
+    null,
   );
 
   const refreshInterval = useMemo(
@@ -446,9 +461,18 @@ export function AdminAnalyticsClient({
 
   const performanceMetrics = overview.performance?.metrics ?? [];
 
-  const keyMetrics: KeyMetric[] = useMemo(
-    () => [
+  const keyMetrics: KeyMetric[] = useMemo(() => {
+    const redemptions = overview.offerRedemptions ?? {
+      redemptionCountInPeriod: 0,
+      billGmvInPeriod: 0,
+      discountGmvInPeriod: 0,
+      pendingCount: 0,
+      voidedCountInPeriod: 0,
+    };
+
+    return [
       {
+        id: "dau",
         label: "Daily active users",
         value: overview.traffic.dailyActiveUsers,
         formatter: formatNumber,
@@ -458,6 +482,7 @@ export function AdminAnalyticsClient({
         icon: UsersRound,
       },
       {
+        id: "revenue",
         label: `Gross revenue${periodLabelSuffix}`,
         value: overview.revenue.grossRevenueInPeriod,
         formatter: formatCurrency,
@@ -467,6 +492,7 @@ export function AdminAnalyticsClient({
         icon: LineChartIcon,
       },
       {
+        id: "searches",
         label: `Searches${periodLabelSuffix}`,
         value: overview.search.totalInPeriod,
         formatter: formatNumber,
@@ -476,6 +502,18 @@ export function AdminAnalyticsClient({
         icon: Search,
       },
       {
+        id: "redemptions",
+        label: `Offer redemptions${periodLabelSuffix}`,
+        value: redemptions.redemptionCountInPeriod,
+        formatter: formatNumber,
+        caption: `${formatCurrency(
+          redemptions.billGmvInPeriod,
+        )} bill GMV · ${formatNumber(redemptions.pendingCount)} pending`,
+        icon: Ticket,
+        href: "/admin/redemptions",
+      },
+      {
+        id: "conversion",
         label: "Conversion rate",
         value: overview.funnels.bookingConversionRate,
         formatter: formatPercent,
@@ -484,9 +522,8 @@ export function AdminAnalyticsClient({
         )} bookings completed`,
         icon: Target,
       },
-    ],
-    [overview, periodLabelSuffix],
-  );
+    ];
+  }, [overview, periodLabelSuffix]);
 
   const lastUpdatedAbsolute = useMemo(
     () =>
@@ -581,6 +618,67 @@ export function AdminAnalyticsClient({
         </motion.div>
       ) : null}
 
+      {/* Marketplace health strip (Phase 2 nightly snapshot) */}
+      {overview.marketplaceHealth ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-3"
+        >
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <HeartPulse className="h-4 w-4 text-primary" />
+              Marketplace health
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Snapshot {overview.marketplaceHealth.day}
+              {" · "}
+              <Link href="/admin/segments" className="text-primary hover:underline">
+                Segments
+              </Link>
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <div>
+              <p className="text-xs text-muted-foreground">DAU / WAU</p>
+              <p className="text-sm font-semibold">
+                {formatNumber(overview.marketplaceHealth.dau)}
+                <span className="text-muted-foreground font-normal">
+                  {" "}
+                  / {formatNumber(overview.marketplaceHealth.wau)}
+                </span>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Zero-result rate (7d)</p>
+              <p className="text-sm font-semibold">
+                {formatPercent(overview.marketplaceHealth.searchZeroResultRate7d)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Redemptions (7d)</p>
+              <p className="text-sm font-semibold">
+                {formatNumber(overview.marketplaceHealth.validatedRedemptions7d)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Bill GMV (7d)</p>
+              <p className="text-sm font-semibold">
+                {formatCurrency(overview.marketplaceHealth.billGmv7d)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Listings w/ redeem (30d)</p>
+              <p className="text-sm font-semibold">
+                {formatPercent(
+                  overview.marketplaceHealth.redemptionListingRate30d,
+                )}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      ) : null}
+
       {/* Filters and Actions - Consistent with other admin pages */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -629,6 +727,99 @@ export function AdminAnalyticsClient({
         </div>
       </motion.div>
 
+      {/* Analytics deep-dives (Phase 1–2) */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+      >
+        <Link
+          href="/admin/mobile-events"
+          className="group flex items-center justify-between rounded-xl border border-border/50 bg-background/70 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Smartphone className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Mobile events</p>
+              <p className="text-xs text-muted-foreground">
+                Screen views, search activity, zero-result queries
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+        </Link>
+        <Link
+          href="/admin/redemptions"
+          className="group flex items-center justify-between rounded-xl border border-border/50 bg-background/70 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Ticket className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Offer redemptions</p>
+              <p className="text-xs text-muted-foreground">
+                Bill GMV, top merchants (30d), validate codes
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+        </Link>
+        <Link
+          href="/admin/segments"
+          className="group flex items-center justify-between rounded-xl border border-border/50 bg-background/70 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Layers className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Segments</p>
+              <p className="text-xs text-muted-foreground">
+                Membership counts and last refresh
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+        </Link>
+        <Link
+          href="/admin/demand-gap"
+          className="group flex items-center justify-between rounded-xl border border-border/50 bg-background/70 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Search className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Demand gap</p>
+              <p className="text-xs text-muted-foreground">
+                Unmet zero-result search demand
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+        </Link>
+        <Link
+          href="/admin/creator-codes"
+          className="group flex items-center justify-between rounded-xl border border-border/50 bg-background/70 px-4 py-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Target className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Creator codes</p>
+              <p className="text-xs text-muted-foreground">
+                Attribution codes and signup counts
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+        </Link>
+      </motion.div>
+
       {/* Key Metrics Section */}
       <section>
         <motion.div
@@ -640,17 +831,11 @@ export function AdminAnalyticsClient({
             Key Performance{" "}
             <span className="gradient-text-primary">Indicators</span>
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {keyMetrics.map((metric, index) => (
-              <motion.div
-                key={metric.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: index * 0.1 }}
-              >
-                <Card className="group relative overflow-hidden border-2 bg-gradient-to-br from-background via-background to-primary/5 shadow-premium hover:shadow-premium-lg transition-all duration-300 hover:scale-[1.02] hover:border-primary/30">
-                  {/* Subtle shine effect on hover */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-transparent via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            {keyMetrics.map((metric, index) => {
+              const card = (
+                <Card className="group relative overflow-hidden border-2 bg-gradient-to-br from-background via-background to-primary/5 shadow-premium hover:shadow-premium-lg transition-all duration-300 hover:scale-[1.02] hover:border-primary/30 h-full cursor-pointer select-none">
+                  <div className="absolute inset-0 bg-gradient-to-br from-transparent via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
                   <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-3">
                     <CardTitle className="text-sm font-semibold text-muted-foreground">
@@ -669,10 +854,34 @@ export function AdminAnalyticsClient({
                         {metric.caption}
                       </p>
                     ) : null}
+                    <p className="pt-1.5 text-xs font-semibold text-primary inline-flex items-center gap-1 group-hover:underline">
+                      Open details <ArrowRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
+                    </p>
                   </CardContent>
                 </Card>
-              </motion.div>
-            ))}
+              );
+
+              return (
+                <motion.div
+                  key={metric.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: index * 0.1 }}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedMetricId(metric.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedMetricId(metric.id);
+                    }
+                  }}
+                  className="h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl"
+                >
+                  {card}
+                </motion.div>
+              );
+            })}
           </div>
         </motion.div>
       </section>
@@ -1114,6 +1323,20 @@ export function AdminAnalyticsClient({
           </div>
         </section>
       ) : null}
+      {/* KPI Detail Modal */}
+      <KeyMetricDetailModal
+        isOpen={selectedMetricId !== null}
+        onClose={() => setSelectedMetricId(null)}
+        initialMetricId={selectedMetricId}
+        overview={overview}
+        periodLabelSuffix={periodLabelSuffix}
+        formatNumber={formatNumber}
+        formatPercent={formatPercent}
+        formatCurrency={formatCurrency}
+        searchTrendData={searchTrendData}
+        trafficTrendData={trafficTrendData}
+        revenueTrendData={revenueTrendData}
+      />
     </div>
   );
 }

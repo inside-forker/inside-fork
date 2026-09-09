@@ -5,6 +5,10 @@
       "schedule": "0 21 * * *"
     },
     {
+      "path": "/api/cron/refresh-intelligence",
+      "schedule": "10 21 * * *"
+    },
+    {
       "path": "/api/cron/refresh-segments",
       "schedule": "15 21 * * *"
     },
@@ -13,8 +17,17 @@
       "schedule": "35 21 * * *"
     },
     {
+      "path": "/api/cron/refresh-search-zero-results",
+      "schedule": "45 21 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-marketplace-health",
+      "schedule": "50 21 * * *"
+    },
+    {
       "path": "/api/cron/event-reminders",
       "schedule": "0 * * * *"
     }
   ]
 }
+

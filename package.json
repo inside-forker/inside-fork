@@ -15,7 +15,8 @@
     "scraper:worker": "npx tsx apps/scraper-worker/src/index.ts",
     "outing:eval": "npx tsx scripts/outing-intent-eval.ts",
     "outing:eval:core": "npx tsx scripts/outing-intent-eval.ts --core",
-    "outing:eval:live": "npx tsx scripts/outing-intent-eval-live.ts"
+    "outing:eval:live": "npx tsx scripts/outing-intent-eval-live.ts",
+    "db:migrate": "npx tsx scripts/run-migration.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1081.0",

@@ -6,12 +6,14 @@ import { requireMobileUser } from "@/lib/mobile/auth";
 import { enforceMobileRateLimit } from "@/lib/mobile/rate-limit";
 import { MobileApiError } from "@/lib/mobile/errors";
 import { query } from "@/lib/db";
+import { appendConsentLedger } from "@/lib/consent/ledger";
 
 export const dynamic = "force-dynamic";
 
 /**
  * User settings = the `profiles.user_preferences` JSON blob. Shape mirrors the
- * website's `app/api/user/settings` schema (theme / notifications / location).
+ * website's `app/api/user/settings` schema (theme / notifications / location),
+ * plus Phase 1 CORE consent channel flags under `consent`.
  */
 const settingsSchema = z.object({
   theme: z.enum(["light", "dark", "system"]).optional(),
@@ -30,14 +32,25 @@ const settingsSchema = z.object({
       name: z.string().optional(),
     })
     .optional(),
+  consent: z
+    .object({
+      termsVersion: z.string().optional(),
+      privacyVersion: z.string().optional(),
+      marketingPush: z.boolean().optional(),
+      marketingSms: z.boolean().optional(),
+      marketingWhatsapp: z.boolean().optional(),
+      marketingEmail: z.boolean().optional(),
+      locationPermission: z.string().optional(),
+      personalisationOptIn: z.boolean().optional(),
+      researchPanelOptIn: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 type Settings = z.infer<typeof settingsSchema>;
 
 /**
  * GET /api/mobile/v1/settings
- *
- * The caller's preferences. Returns `{}` when none are set yet.
  */
 export const GET = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
@@ -65,11 +78,7 @@ const updateSchema = z.object({ userPreferences: settingsSchema });
 
 /**
  * PATCH /api/mobile/v1/settings
- *
- * Body `{ userPreferences: <partial Settings> }`. The partial is deep-merged
- * into the stored preferences (top-level keys plus the nested `notifications` /
- * `location` objects) so updating one field never wipes the others - unlike the
- * website route, which replaces the whole blob.
+ * Deep-merges preferences. Consent / marketing changes append to consent_ledger.
  */
 export const PATCH = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
@@ -121,6 +130,9 @@ export const PATCH = mobileRoute(async (request: NextRequest) => {
     ...(existing.location || patch.location
       ? { location: { ...existing.location, ...patch.location } }
       : {}),
+    ...(existing.consent || patch.consent
+      ? { consent: { ...existing.consent, ...patch.consent } }
+      : {}),
   };
 
   let data;
@@ -143,6 +155,52 @@ export const PATCH = mobileRoute(async (request: NextRequest) => {
       "Failed to update settings.",
       500,
     );
+  }
+
+  const marketingTouched =
+    patch.notifications?.marketing !== undefined ||
+    patch.consent?.marketingPush !== undefined ||
+    patch.consent?.marketingSms !== undefined ||
+    patch.consent?.marketingWhatsapp !== undefined ||
+    patch.consent?.marketingEmail !== undefined ||
+    patch.consent?.locationPermission !== undefined ||
+    patch.consent?.personalisationOptIn !== undefined ||
+    patch.consent?.researchPanelOptIn !== undefined ||
+    patch.consent?.termsVersion !== undefined ||
+    patch.consent?.privacyVersion !== undefined;
+
+  if (marketingTouched) {
+    try {
+      const c = merged.consent ?? {};
+      await appendConsentLedger({
+        userId: user.id,
+        source: "settings",
+        termsVersion: c.termsVersion ?? null,
+        privacyVersion: c.privacyVersion ?? null,
+        marketingPush: c.marketingPush ?? null,
+        marketingSms: c.marketingSms ?? null,
+        marketingWhatsapp: c.marketingWhatsapp ?? null,
+        marketingEmail:
+          c.marketingEmail ?? merged.notifications?.marketing ?? null,
+        locationPermission: c.locationPermission ?? null,
+        personalisationOptIn: c.personalisationOptIn ?? null,
+        researchPanelOptIn: c.researchPanelOptIn ?? null,
+        meta: {
+          notificationsMarketing: merged.notifications?.marketing ?? null,
+        },
+      });
+      if (typeof c.researchPanelOptIn === "boolean") {
+        await query(
+          `UPDATE public.profiles SET research_panel_opt_in = $2 WHERE id = $1`,
+          [user.id, c.researchPanelOptIn],
+        );
+      }
+    } catch (ledgerError) {
+      console.error(
+        "[mobile-api] consent ledger append failed:",
+        ledgerError instanceof Error ? ledgerError.message : ledgerError,
+      );
+    }
   }
 
   return ok((data?.user_preferences as Settings | null) ?? merged);

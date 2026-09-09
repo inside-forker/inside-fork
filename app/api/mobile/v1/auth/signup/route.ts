@@ -25,6 +25,8 @@ const bodySchema = z.object({
   confirmPassword: z.string(),
   username: z.string(),
   full_name: z.string().nullable().optional(),
+  /** Phase 3 creator attribution code (optional). */
+  creatorCode: z.string().min(3).max(32).optional(),
 });
 
 function validateUsername(username: string): boolean {
@@ -55,7 +57,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
       400,
     );
   }
-  const { email, password, confirmPassword, username, full_name } =
+  const { email, password, confirmPassword, username, full_name, creatorCode } =
     parsed.data;
 
   const ip =
@@ -209,6 +211,43 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     );
   } catch (logError) {
     console.error("Failed to log user signup:", logError);
+  }
+
+  try {
+    const { appendConsentLedger } = await import("@/lib/consent/ledger");
+    await appendConsentLedger({
+      userId: newUserId,
+      source: "signup",
+      termsVersion: "current",
+      privacyVersion: "current",
+      marketingEmail: false,
+      marketingPush: false,
+      marketingSms: false,
+      marketingWhatsapp: false,
+      personalisationOptIn: true,
+      meta: { channel: "mobile" },
+    });
+  } catch (consentError) {
+    console.error("[mobile-api] signup consent ledger failed:", consentError);
+  }
+
+  if (creatorCode) {
+    try {
+      const normalized = creatorCode.trim().toUpperCase();
+      const { rows: codeRows } = await query(
+        `SELECT code FROM public.creator_attribution_codes
+         WHERE code = $1 AND is_active = true`,
+        [normalized],
+      );
+      if (codeRows[0]) {
+        await query(
+          `UPDATE public.profiles SET attributed_creator_code = $2 WHERE id = $1`,
+          [newUserId, normalized],
+        );
+      }
+    } catch (attrError) {
+      console.error("[mobile-api] signup creator attribution failed:", attrError);
+    }
   }
 
   await createAndSendSignupOtp({

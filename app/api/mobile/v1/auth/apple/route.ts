@@ -35,7 +35,9 @@ const bodySchema = z.object({
  *
  * Verifies an Apple ID token obtained natively on-device
  * (expo-apple-authentication) and reuses the same findOrCreateOAuthUser as
- * the web Apple login. Mirrors `app/api/mobile/v1/auth/google`.
+ * the web Apple login. Mirrors `app/api/mobile/v1/auth/google`, except the
+ * field names match what expo-apple-authentication actually returns
+ * (identityToken, and fullName present only on the very first authorization).
  */
 export const POST = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
@@ -44,7 +46,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   if (!parsed.success) {
     throw new MobileApiError(
       "validation_error",
-      "An Apple ID token is required.",
+      "An Apple identity token is required.",
       400,
     );
   }

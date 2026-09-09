@@ -1,10 +1,13 @@
 import { query } from "@/lib/db";
+import { getLatestMarketplaceHealth } from "@/lib/analytics/marketplace-health";
 import type {
   AdminAnalyticsOverview,
   AdminViewerRole,
   ConversionFunnelSummary,
   ListingsAnalyticsSummary,
+  MarketplaceHealthSummary,
   NotificationsAnalyticsSummary,
+  OfferRedemptionsAnalyticsSummary,
   PerformanceAnalyticsSummary,
   PerformanceMetricSummary,
   PerformanceMetricType,
@@ -658,6 +661,8 @@ export async function getAdminAnalyticsOverview({
     notificationRows,
     pendingOutboxCount,
     performanceRows,
+    offerRedemptions,
+    marketplaceHealthRaw,
   ] = await Promise.all([
     query(
       `SELECT occurred_at, context FROM public.analytics_events
@@ -701,7 +706,22 @@ export async function getAdminAnalyticsOverview({
           ]
         ).then((r) => r.rows as PerformanceMetricRow[])
       : Promise.resolve(null),
+    fetchOfferRedemptionsSummary(periodStartIso),
+    getLatestMarketplaceHealth(),
   ]);
+
+  const marketplaceHealth: MarketplaceHealthSummary | null = marketplaceHealthRaw
+    ? {
+        day: marketplaceHealthRaw.day,
+        dau: marketplaceHealthRaw.dau,
+        wau: marketplaceHealthRaw.wau,
+        searchZeroResultRate7d: marketplaceHealthRaw.searchZeroResultRate7d,
+        validatedRedemptions7d: marketplaceHealthRaw.validatedRedemptions7d,
+        billGmv7d: marketplaceHealthRaw.billGmv7d,
+        redemptionListingRate30d: marketplaceHealthRaw.redemptionListingRate30d,
+        computedAt: marketplaceHealthRaw.computedAt,
+      }
+    : null;
 
   const searchSummary = normalizeSearchEvents(searchRows, now, lookbackDays);
 
@@ -759,10 +779,56 @@ export async function getAdminAnalyticsOverview({
     funnels,
     traffic: trafficSummary,
     revenue: revenueSummary,
+    offerRedemptions,
+    marketplaceHealth,
     notifications: notificationsSummary,
     performance: viewerRole === "super_admin" ? performanceSummary : null,
     generatedAt: now.toISOString(),
   };
 
   return overview;
+}
+
+async function fetchOfferRedemptionsSummary(
+  periodStartIso: string,
+): Promise<OfferRedemptionsAnalyticsSummary> {
+  const empty: OfferRedemptionsAnalyticsSummary = {
+    redemptionCountInPeriod: 0,
+    billGmvInPeriod: 0,
+    discountGmvInPeriod: 0,
+    pendingCount: 0,
+    voidedCountInPeriod: 0,
+  };
+
+  try {
+    const { rows } = await query(
+      `SELECT
+         COUNT(*) FILTER (
+           WHERE status = 'validated' AND validated_at >= $1
+         )::int AS redemption_count,
+         COALESCE(SUM(bill_value) FILTER (
+           WHERE status = 'validated' AND validated_at >= $1
+         ), 0)::float AS bill_gmv,
+         COALESCE(SUM(discount_value) FILTER (
+           WHERE status = 'validated' AND validated_at >= $1
+         ), 0)::float AS discount_gmv,
+         COUNT(*) FILTER (WHERE status = 'pending')::int AS pending_count,
+         COUNT(*) FILTER (
+           WHERE status = 'voided' AND voided_at >= $1
+         )::int AS voided_count
+       FROM public.redemptions`,
+      [periodStartIso],
+    );
+    const row = rows[0];
+    return {
+      redemptionCountInPeriod: Number(row?.redemption_count ?? 0),
+      billGmvInPeriod: Number(row?.bill_gmv ?? 0),
+      discountGmvInPeriod: Number(row?.discount_gmv ?? 0),
+      pendingCount: Number(row?.pending_count ?? 0),
+      voidedCountInPeriod: Number(row?.voided_count ?? 0),
+    };
+  } catch (error) {
+    console.error("Failed to fetch offer redemption analytics", error);
+    return empty;
+  }
 }

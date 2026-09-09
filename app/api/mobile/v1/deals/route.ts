@@ -148,77 +148,77 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   const uniqueListingIds = [...new Set(listingIds.filter(Number.isFinite))];
 
+  const bankIds = [...bankIdSet];
   const cardById = new Map<number, CardVariantLookup>();
   const cardsByBankName = new Map<string, CardVariantLookup>();
+  const imageByListingId = new Map<number, string>();
 
-  // Load every active card for banks in this feed so we can name-match
-  // Peekaboo associations (typeIds rarely equal our card_variants.id).
-  const bankIds = [...bankIdSet];
-  if (bankIds.length > 0 || variantIdSet.size > 0) {
-    try {
-      const { rows: cardRows } = await query(
-        `SELECT id, bank_id, card_name
-         FROM card_variants
-         WHERE is_active = true
-           AND (
-             bank_id = ANY($1::bigint[])
-             OR id = ANY($2::bigint[])
-           )`,
-        [bankIds.length ? bankIds : [0], [...variantIdSet].length ? [...variantIdSet] : [0]],
-      );
-      for (const c of cardRows) {
-        const id = Number(c.id);
-        const lookup: CardVariantLookup = {
-          id,
-          bankId: Number(c.bank_id),
-          label: String(c.card_name ?? "Card"),
-        };
-        cardById.set(id, lookup);
-        cardsByBankName.set(
-          `${lookup.bankId}::${normalizeCardName(lookup.label)}`,
-          lookup,
-        );
-      }
-    } catch (error) {
-      console.error(
-        "[mobile-api] deals card_variants lookup failed:",
-        error instanceof Error ? error.message : error,
-      );
-    }
+  // Fetch card variants and listing images in parallel
+  const [cardsResult, imagesResult] = await Promise.all([
+    bankIds.length > 0 || variantIdSet.size > 0
+      ? query(
+          `SELECT id, bank_id, card_name
+           FROM card_variants
+           WHERE is_active = true
+             AND (
+               bank_id = ANY($1::bigint[])
+               OR id = ANY($2::bigint[])
+             )`,
+          [bankIds.length ? bankIds : [0], [...variantIdSet].length ? [...variantIdSet] : [0]],
+        ).catch((error) => {
+          console.error(
+            "[mobile-api] deals card_variants lookup failed:",
+            error instanceof Error ? error.message : error,
+          );
+          return { rows: [] };
+        })
+      : Promise.resolve({ rows: [] }),
+    uniqueListingIds.length > 0
+      ? query(
+          `SELECT DISTINCT ON (listing_id)
+             listing_id, id, url, alt_text, display_order, is_primary
+           FROM listing_images
+           WHERE listing_id = ANY($1::bigint[])
+             AND url NOT LIKE '%/menu/%'
+           ORDER BY listing_id,
+             CASE WHEN is_primary THEN 0 ELSE 1 END,
+             display_order ASC NULLS LAST,
+             id ASC`,
+          [uniqueListingIds],
+        ).catch((error) => {
+          console.error(
+            "[mobile-api] deals images lookup failed:",
+            error instanceof Error ? error.message : error,
+          );
+          return { rows: [] };
+        })
+      : Promise.resolve({ rows: [] }),
+  ]);
+
+  for (const c of cardsResult.rows) {
+    const id = Number(c.id);
+    const lookup: CardVariantLookup = {
+      id,
+      bankId: Number(c.bank_id),
+      label: String(c.card_name ?? "Card"),
+    };
+    cardById.set(id, lookup);
+    cardsByBankName.set(
+      `${lookup.bankId}::${normalizeCardName(lookup.label)}`,
+      lookup,
+    );
   }
 
-  const imageByListingId = new Map<number, string>();
-  if (uniqueListingIds.length > 0) {
-    try {
-      const { rows: imgRows } = await query(
-        `SELECT DISTINCT ON (listing_id)
-           listing_id, id, url, alt_text, display_order, is_primary
-         FROM listing_images
-         WHERE listing_id = ANY($1::bigint[])
-           AND url NOT LIKE '%/menu/%'
-         ORDER BY listing_id,
-           CASE WHEN is_primary THEN 0 ELSE 1 END,
-           display_order ASC NULLS LAST,
-           id ASC`,
-        [uniqueListingIds],
-      );
-      for (const img of imgRows) {
-        const dto = toListingImage({
-          id: Number(img.id),
-          url: String(img.url),
-          alt_text: (img.alt_text as string | null) ?? null,
-          display_order:
-            img.display_order !== null ? Number(img.display_order) : null,
-          is_primary: Boolean(img.is_primary),
-        });
-        imageByListingId.set(Number(img.listing_id), dto.url);
-      }
-    } catch (error) {
-      console.error(
-        "[mobile-api] deals images lookup failed:",
-        error instanceof Error ? error.message : error,
-      );
-    }
+  for (const img of imagesResult.rows) {
+    const dto = toListingImage({
+      id: Number(img.id),
+      url: String(img.url),
+      alt_text: (img.alt_text as string | null) ?? null,
+      display_order:
+        img.display_order !== null ? Number(img.display_order) : null,
+      is_primary: Boolean(img.is_primary),
+    });
+    imageByListingId.set(Number(img.listing_id), dto.url);
   }
 
   const now = new Date();
@@ -258,10 +258,43 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     mapped.push(dto);
   }
 
-  const totalItems = mapped.length;
-  const pageSlice = mapped.slice(offset, offset + limit);
+  // Group deals by listing (or merchant if listing_id is missing) so a single
+  // merchant with multiple deals produces one primary card with the best offer,
+  // and remaining offers attached in `otherDeals`.
+  const dealsByListing = new Map<string, MobileDealPreviewDTO[]>();
+  for (const dto of mapped) {
+    const key = dto.listingId != null ? `listing:${dto.listingId}` : `merchant:${dto.merchant}`;
+    const group = dealsByListing.get(key);
+    if (group) {
+      group.push(dto);
+    } else {
+      dealsByListing.set(key, [dto]);
+    }
+  }
 
-  return ok(pageSlice, {
-    pagination: buildPaginationMeta(page, limit, totalItems),
-  });
+  const groupedDeals: MobileDealPreviewDTO[] = [];
+  for (const list of dealsByListing.values()) {
+    // Sort descending by discount weight so best deal is first
+    list.sort((a, b) => b.discountWeight - a.discountWeight);
+    const primary = { ...list[0] };
+    if (list.length > 1) {
+      primary.otherDeals = list.slice(1);
+    }
+    groupedDeals.push(primary);
+  }
+
+  const totalItems = groupedDeals.length;
+  const pageSlice = groupedDeals.slice(offset, offset + limit);
+
+  return ok(
+    pageSlice,
+    {
+      pagination: buildPaginationMeta(page, limit, totalItems),
+    },
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+      },
+    },
+  );
 });

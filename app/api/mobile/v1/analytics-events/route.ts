@@ -15,6 +15,7 @@ const eventSchema = z.object({
   occurred_at: z.coerce.date().optional(),
   source_context: z.string().min(1),
   session_id: z.string().min(1),
+  device_id: z.string().min(1).optional(),
   screen: z.string().optional(),
   platform: z.string().optional(),
   app_version: z.string().optional(),
@@ -29,16 +30,9 @@ const bodySchema = z.object({
 /**
  * POST /api/mobile/v1/analytics-events
  *
- * General mobile product-analytics ingest (screen views, search behavior),
- * table public.mobile_events. Named distinctly from GET /api/mobile/v1/events
- * (the public Events/venues listing feed - unrelated) to avoid a route
- * collision, matching the listing-events naming convention.
- *
- * Auth is optional - signed-out actors are identified via the `X-Anon-Id`
- * header.
- *
- * Malformed rows and DB failures are swallowed, never surfaced as 4xx/5xx:
- * telemetry must never break the app.
+ * General mobile product-analytics ingest → public.mobile_events.
+ * Auth optional; signed-out actors use `X-Anon-Id`.
+ * Malformed rows / DB failures are swallowed (telemetry must never break the app).
  */
 export const POST = mobileRoute(async (request: NextRequest) => {
   const { user } = await getOptionalMobileUser(request);
@@ -56,9 +50,9 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   const values: unknown[] = [];
   const placeholders: string[] = [];
   rows.forEach((e, i) => {
-    const base = i * 11;
+    const base = i * 12;
     placeholders.push(
-      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}::jsonb)`,
+      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}::jsonb, $${base + 12})`,
     );
     values.push(
       e.event_name,
@@ -72,13 +66,14 @@ export const POST = mobileRoute(async (request: NextRequest) => {
       e.app_version ?? null,
       e.os_version ?? null,
       JSON.stringify(e.context ?? {}),
+      e.device_id ?? null,
     );
   });
 
   try {
     await query(
       `INSERT INTO public.mobile_events
-         (event_name, occurred_at, user_id, anon_id, session_id, source_context, screen, platform, app_version, os_version, context)
+         (event_name, occurred_at, user_id, anon_id, session_id, source_context, screen, platform, app_version, os_version, context, device_id)
        VALUES ${placeholders.join(", ")}`,
       values,
     );

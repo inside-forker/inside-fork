@@ -140,8 +140,14 @@ export async function GET(request: NextRequest) {
           totalReviews: 0,
           favorites: 0,
           contactClicks: 0,
+          redemptionCount: 0,
+          billGmv: 0,
+          discountGmv: 0,
+          uniqueRedeemers: 0,
+          repeatRedeemerRate: 0,
         },
         timeseries: [],
+        categoryBenchmark: null,
         branches: [],
         topListings: [],
       });
@@ -186,6 +192,9 @@ export async function GET(request: NextRequest) {
         visitors: number;
         favorites: number;
         contactClicks: number;
+        redemptions: number;
+        billGmv: number;
+        discountGmv: number;
       }
     >();
 
@@ -219,6 +228,9 @@ export async function GET(request: NextRequest) {
         visitors: 0,
         favorites: 0,
         contactClicks: 0,
+        redemptions: 0,
+        billGmv: 0,
+        discountGmv: 0,
       };
       existingTimeseries.views += rowViews;
       existingTimeseries.visitors += rowVisitors;
@@ -237,6 +249,94 @@ export async function GET(request: NextRequest) {
       listingAggregateMap.set(row.listing_id, existingListingAggregate);
     }
 
+    let redemptionCount = 0;
+    let billGmv = 0;
+    let discountGmv = 0;
+    let uniqueRedeemers = 0;
+    let repeatRedeemerRate = 0;
+    try {
+      const { rows: gmvRows } = await query(
+        `SELECT
+           COUNT(*)::int AS redemption_count,
+           COALESCE(SUM(bill_value), 0)::float AS bill_gmv,
+           COALESCE(SUM(discount_value), 0)::float AS discount_gmv,
+           COUNT(DISTINCT user_id)::int AS unique_redeemers,
+           COUNT(DISTINCT user_id) FILTER (
+             WHERE user_id IN (
+               SELECT user_id FROM public.redemptions
+               WHERE owner_id = $1
+                 AND listing_id = ANY($2::bigint[])
+                 AND status = 'validated'
+                 AND validated_at >= $3::timestamptz
+                 AND validated_at <= $4::timestamptz
+               GROUP BY user_id
+               HAVING COUNT(*) >= 2
+             )
+           )::int AS repeat_redeemers
+         FROM public.redemptions
+         WHERE owner_id = $1
+           AND listing_id = ANY($2::bigint[])
+           AND status = 'validated'
+           AND validated_at >= $3::timestamptz
+           AND validated_at <= $4::timestamptz`,
+        [
+          userId,
+          targetListingIds,
+          `${startDate}T00:00:00.000Z`,
+          `${endDate}T23:59:59.999Z`,
+        ],
+      );
+      const gmv = gmvRows[0];
+      redemptionCount = Number(gmv?.redemption_count ?? 0);
+      billGmv = Number(gmv?.bill_gmv ?? 0);
+      discountGmv = Number(gmv?.discount_gmv ?? 0);
+      uniqueRedeemers = Number(gmv?.unique_redeemers ?? 0);
+      const repeatRedeemers = Number(gmv?.repeat_redeemers ?? 0);
+      repeatRedeemerRate =
+        uniqueRedeemers > 0 ? repeatRedeemers / uniqueRedeemers : 0;
+
+      const { rows: dailyGmv } = await query(
+        `SELECT
+           (validated_at AT TIME ZONE $5)::date::text AS metric_date,
+           COUNT(*)::int AS redemptions,
+           COALESCE(SUM(bill_value), 0)::float AS bill_gmv,
+           COALESCE(SUM(discount_value), 0)::float AS discount_gmv
+         FROM public.redemptions
+         WHERE owner_id = $1
+           AND listing_id = ANY($2::bigint[])
+           AND status = 'validated'
+           AND validated_at >= $3::timestamptz
+           AND validated_at <= $4::timestamptz
+         GROUP BY 1
+         ORDER BY 1`,
+        [
+          userId,
+          targetListingIds,
+          `${startDate}T00:00:00.000Z`,
+          `${endDate}T23:59:59.999Z`,
+          timezone,
+        ],
+      );
+      for (const row of dailyGmv) {
+        const bucket = getBucketDate(String(row.metric_date), granularity);
+        const existing = timeseriesMap.get(bucket) ?? {
+          views: 0,
+          visitors: 0,
+          favorites: 0,
+          contactClicks: 0,
+          redemptions: 0,
+          billGmv: 0,
+          discountGmv: 0,
+        };
+        existing.redemptions += Number(row.redemptions ?? 0);
+        existing.billGmv += Number(row.bill_gmv ?? 0);
+        existing.discountGmv += Number(row.discount_gmv ?? 0);
+        timeseriesMap.set(bucket, existing);
+      }
+    } catch (gmvError) {
+      console.error("Failed to fetch redemption GMV:", gmvError);
+    }
+
     const timeseries = Array.from(timeseriesMap.entries())
       .map(([date, values]) => ({
         date,
@@ -244,8 +344,68 @@ export async function GET(request: NextRequest) {
         visitors: values.visitors,
         favorites: values.favorites,
         contactClicks: values.contactClicks,
+        redemptions: values.redemptions,
+        billGmv: values.billGmv,
+        discountGmv: values.discountGmv,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
+
+    const CATEGORY_BENCHMARK_MIN_PEERS = 25;
+    let categoryBenchmark: BusinessOwnerAnalytics["categoryBenchmark"] = null;
+    try {
+      const { rows: peerRows } = await query(
+        `WITH my_categories AS (
+           SELECT DISTINCT category_id
+           FROM listings
+           WHERE id = ANY($1::bigint[]) AND category_id IS NOT NULL
+         ),
+         peer_listings AS (
+           SELECT l.id
+           FROM listings l
+           WHERE l.status = 'published'
+             AND l.category_id IN (SELECT category_id FROM my_categories)
+             AND NOT (l.id = ANY($1::bigint[]))
+         ),
+         peer_gmv AS (
+           SELECT
+             r.listing_id,
+             COUNT(*)::int AS redemption_count,
+             COALESCE(SUM(r.bill_value), 0)::float AS bill_gmv
+           FROM public.redemptions r
+           INNER JOIN peer_listings pl ON pl.id = r.listing_id
+           WHERE r.status = 'validated'
+             AND r.validated_at >= $2::timestamptz
+             AND r.validated_at <= $3::timestamptz
+           GROUP BY r.listing_id
+         )
+         SELECT
+           COUNT(*)::int AS peer_count,
+           PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY bill_gmv) AS median_bill_gmv,
+           PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY redemption_count) AS median_redemptions
+         FROM peer_gmv`,
+        [
+          targetListingIds,
+          `${startDate}T00:00:00.000Z`,
+          `${endDate}T23:59:59.999Z`,
+        ],
+      );
+      const peerCount = Number(peerRows[0]?.peer_count ?? 0);
+      const floorMet = peerCount >= CATEGORY_BENCHMARK_MIN_PEERS;
+      categoryBenchmark = {
+        peerListingCount: peerCount,
+        privacyFloorMet: floorMet,
+        medianBillGmv: floorMet
+          ? Number(peerRows[0]?.median_bill_gmv ?? 0)
+          : null,
+        medianRedemptionCount: floorMet
+          ? Number(peerRows[0]?.median_redemptions ?? 0)
+          : null,
+        yourBillGmv: billGmv,
+        yourRedemptionCount: redemptionCount,
+      };
+    } catch (benchError) {
+      console.error("Failed to fetch category benchmark:", benchError);
+    }
 
     let branches: BusinessOwnerAnalytics["branches"] = [];
     if (targetListingIds.length > 0) {
@@ -344,8 +504,14 @@ export async function GET(request: NextRequest) {
         totalReviews,
         favorites,
         contactClicks,
+        redemptionCount,
+        billGmv,
+        discountGmv,
+        uniqueRedeemers,
+        repeatRedeemerRate,
       },
       timeseries,
+      categoryBenchmark,
       branches,
       topListings,
     };

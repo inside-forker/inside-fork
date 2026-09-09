@@ -32,6 +32,9 @@ export const PROFILE_COLUMN_KEYS = [
   "organizer_company",
   "organizer_website",
   "is_verified_organizer",
+  "home_area_label",
+  "age_band",
+  "declared_interests",
   "created_at",
   "updated_at",
 ] as const;
@@ -41,10 +44,30 @@ export const PROFILE_COLUMNS = PROFILE_COLUMN_KEYS.join(", ");
 /** Same columns, `p.`-prefixed for GET /profile's join against `auth.users`. */
 export const PROFILE_COLUMNS_JOINED = PROFILE_COLUMN_KEYS.map((k) => `p.${k}`).join(", ");
 
-export type ProfileRow = Pick<
+type ProfileBase = Pick<
   Database["public"]["Tables"]["profiles"]["Row"],
-  (typeof PROFILE_COLUMN_KEYS)[number]
+  | "id"
+  | "full_name"
+  | "username"
+  | "avatar_url"
+  | "phone"
+  | "role"
+  | "active_role"
+  | "points"
+  | "membership_plan"
+  | "organizer_bio"
+  | "organizer_company"
+  | "organizer_website"
+  | "is_verified_organizer"
+  | "created_at"
+  | "updated_at"
 >;
+
+export type ProfileRow = ProfileBase & {
+  home_area_label: string | null;
+  age_band: string | null;
+  declared_interests: string[] | null;
+};
 
 export const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 const MEMBERSHIP_PLANS = ["basic", "premium", "enterprise"];
@@ -83,23 +106,26 @@ export const profilePatchSchema = z.object({
   organizer_company: z.string().nullable().optional(),
   organizer_website: z.string().nullable().optional(),
   membership_plan: z.string().nullable().optional(),
+  home_area_label: z.string().nullable().optional(),
+  age_band: z.string().nullable().optional(),
+  declared_interests: z.array(z.string()).nullable().optional(),
 });
 
 export type ProfilePatchInput = z.infer<typeof profilePatchSchema>;
 
-export type ProfileUpdate = Partial<
-  Pick<
-    Database["public"]["Tables"]["profiles"]["Row"],
-    | "full_name"
-    | "username"
-    | "phone"
-    | "avatar_url"
-    | "organizer_bio"
-    | "organizer_company"
-    | "organizer_website"
-    | "membership_plan"
-  >
->;
+export type ProfileUpdate = Partial<{
+  full_name: string | null;
+  username: string | null;
+  phone: string | null;
+  avatar_url: string | null;
+  organizer_bio: string | null;
+  organizer_company: string | null;
+  organizer_website: string | null;
+  membership_plan: string | null;
+  home_area_label: string | null;
+  age_band: string | null;
+  declared_interests: string[] | null;
+}>;
 
 function invalid(message: string, field: string): MobileApiError {
   return new MobileApiError("validation_error", message, 400, field);
@@ -191,6 +217,34 @@ export function buildProfileUpdate(
       }
       update.membership_plan = v || null;
     }
+  }
+
+  if (input.home_area_label !== undefined) {
+    const v = input.home_area_label?.trim() ?? "";
+    if (v.length > 120) {
+      throw invalid("Home area must be 120 characters or fewer.", "home_area_label");
+    }
+    update.home_area_label = v || null;
+  }
+
+  if (input.age_band !== undefined) {
+    const v = input.age_band?.trim() ?? "";
+    const allowed = new Set(["", "under_18", "18-24", "25-34", "35-44", "45-54", "55+"]);
+    if (!allowed.has(v)) {
+      throw invalid(
+        "Invalid age band. Use under_18, 18-24, 25-34, 35-44, 45-54, or 55+.",
+        "age_band",
+      );
+    }
+    update.age_band = v || null;
+  }
+
+  if (input.declared_interests !== undefined) {
+    const interests = (input.declared_interests ?? [])
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean)
+      .slice(0, 20);
+    update.declared_interests = interests;
   }
 
   return update;

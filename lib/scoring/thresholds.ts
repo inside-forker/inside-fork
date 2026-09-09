@@ -55,13 +55,14 @@ export const BOOKING_MONETARY_CAP_PKR = 50_000;
 // Engagement score: composite weights (0-100, must sum to 100)
 // ---------------------------------------------------------------------------
 
-export const SCORE_WEIGHT_LOGIN_RECENCY = 15;
+// Phase 2: redemption recency/frequency take 15pts; booking/engagement trimmed to keep sum=100.
+export const SCORE_WEIGHT_LOGIN_RECENCY = 13;
 export const SCORE_WEIGHT_LOGIN_FREQUENCY = 10;
-export const SCORE_WEIGHT_BOOKING_RECENCY = 20;
+export const SCORE_WEIGHT_BOOKING_RECENCY = 15;
 export const SCORE_WEIGHT_BOOKING_FREQUENCY = 15;
-export const SCORE_WEIGHT_BOOKING_MONETARY = 15;
-export const SCORE_WEIGHT_ENGAGEMENT_RECENCY = 15;
-export const SCORE_WEIGHT_ENGAGEMENT_FREQUENCY = 10;
+export const SCORE_WEIGHT_BOOKING_MONETARY = 12;
+export const SCORE_WEIGHT_ENGAGEMENT_RECENCY = 12;
+export const SCORE_WEIGHT_ENGAGEMENT_FREQUENCY = 8;
 
 // ---------------------------------------------------------------------------
 // Lifecycle stage day-cutoffs (days since last_activity_at, unless noted)
@@ -94,6 +95,29 @@ export const SEGMENT_HIGH_SPENDER_CUTOFF_PKR = 50_000;
 /** Same 21-day window as the admin alert of the same name (alert reuses this segment directly). */
 export const SEGMENT_MERCHANT_DASHBOARD_INACTIVE_MIN_DAYS = 21;
 
+/** Phase 2 — bill GMV (validated redemptions) over 90d for "high bill redeemers". */
+export const SEGMENT_HIGH_BILL_REDEEM_CUTOFF_PKR = 25_000;
+
+/** Phase 2 — merchant GMV decline: last N days vs prior N days. */
+export const SEGMENT_MERCHANT_GMV_COMPARE_DAYS = 14;
+/** Require at least this many validated redemptions in the prior window before flagging decline. */
+export const SEGMENT_MERCHANT_GMV_DECLINE_MIN_PRIOR_REDEMPTIONS = 3;
+
+/** Phase 3 — min zero-result searches in 14d for unmet_demand_cohort. */
+export const SEGMENT_UNMET_DEMAND_MIN_ZERO_SEARCHES = 2;
+
+/** Phase 3 — cross-sell propensity floor for segment membership. */
+export const SEGMENT_CROSS_SELL_PROPENSITY_MIN = 0.4;
+
+// ---------------------------------------------------------------------------
+// Engagement score: redemption signal (Phase 2) — weights must still sum to 100
+// ---------------------------------------------------------------------------
+
+export const REDEMPTION_LOOKBACK_DAYS = 90;
+export const REDEMPTION_FREQUENCY_CAP_90D = 8;
+export const SCORE_WEIGHT_REDEMPTION_RECENCY = 8;
+export const SCORE_WEIGHT_REDEMPTION_FREQUENCY = 7;
+
 // ---------------------------------------------------------------------------
 // Admin alert thresholds
 // ---------------------------------------------------------------------------
@@ -112,3 +136,13 @@ export const ALERT_RATING_TRAILING_LONG_DAYS = 30;
 export const ALERT_RATING_DROP_MIN_REVIEWS = 5;
 /** Minimum point drop (out of 5) between the short-window and long-window average to flag. */
 export const ALERT_RATING_DROP_MIN_DELTA = 0.5;
+
+/** Phase 2 — zero-result rate must rise by this relative factor WoW to alert. */
+export const ALERT_ZERO_RESULT_SPIKE_MULTIPLIER = 1.5;
+/** Absolute floor on current-week zero-result events before alerting. */
+export const ALERT_ZERO_RESULT_MIN_COUNT = 20;
+
+/** Phase 2 — platform redemptions WoW drop threshold. */
+export const ALERT_REDEMPTIONS_DROP_RATIO = 0.5;
+/** Min prior-week validated redemptions before WoW drop alerts. */
+export const ALERT_REDEMPTIONS_DROP_MIN_PRIOR = 10;

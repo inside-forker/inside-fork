@@ -263,6 +263,24 @@ export async function POST(request: Request) {
       console.error("Failed to log user signup:", logError);
     }
 
+    try {
+      const { appendConsentLedger } = await import("@/lib/consent/ledger");
+      await appendConsentLedger({
+        userId: newUserId,
+        source: "signup",
+        termsVersion: "current",
+        privacyVersion: "current",
+        marketingEmail: false,
+        marketingPush: false,
+        marketingSms: false,
+        marketingWhatsapp: false,
+        personalisationOptIn: true,
+        meta: { channel: "web" },
+      });
+    } catch (consentError) {
+      console.error("signup consent ledger failed:", consentError);
+    }
+
     // Handle invitation if a token was provided. The signup page reads this
     // from the `?invite=` URL param, which carries the invite's `invite_token`
     // (see the invite_url built in app/api/mobile/v1/invitations/route.ts) -
