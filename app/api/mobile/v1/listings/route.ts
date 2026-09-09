@@ -11,6 +11,7 @@ import {
   type ListingImageDTO,
   type ListingRowLike,
 } from "@/lib/mobile/mappers";
+import { fetchBestDealsByListing, type ListingDeals } from "@/lib/mobile/listing-deals";
 import { sanitizeSearchTerm } from "@/lib/utils/search-sanitization";
 import { sortFetchedListingsBySearchRelevance } from "@/lib/listings/search-relevance";
 import {
@@ -229,14 +230,21 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     .filter((id): id is number => typeof id === "number");
 
   const imagesByListing: Record<number, ListingImageDTO[]> = {};
+  // Browse rows lead with a discount badge, so the page's deals are fetched
+  // alongside its images rather than left to a per-card follow-up request.
+  let dealsByListing: Record<number, ListingDeals> = {};
   if (listingIds.length > 0) {
-    const { rows: images } = await query(
-      `SELECT id, listing_id, url, alt_text, display_order, is_primary
+    const [{ rows: images }, deals] = await Promise.all([
+      query(
+        `SELECT id, listing_id, url, alt_text, display_order, is_primary
        FROM listing_images
        WHERE listing_id = ANY($1::int[])
        ORDER BY display_order ASC`,
-      [listingIds],
-    );
+        [listingIds],
+      ),
+      fetchBestDealsByListing(listingIds),
+    ]);
+    dealsByListing = deals;
 
     for (const img of images) {
       (imagesByListing[img.listing_id] ??= []).push(toListingImage(img));
@@ -245,7 +253,16 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   const listings = rows
     .filter((r) => typeof r.id === "number")
-    .map((r) => toListingCard(r, imagesByListing[r.id as number] ?? []));
+    .map((r) =>
+      toListingCard(
+        r,
+        imagesByListing[r.id as number] ?? [],
+        // `?? null` (not `undefined`) so a listing with no active deal still
+        // reports `best_deal: null` — the client can tell "no offer" apart
+        // from an endpoint that never loaded deals at all.
+        dealsByListing[r.id as number] ?? null,
+      ),
+    );
 
   return ok(listings, {
     pagination: buildPaginationMeta(page, limit, count ?? 0),

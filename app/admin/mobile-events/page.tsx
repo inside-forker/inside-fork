@@ -24,9 +24,5 @@ export default async function AdminMobileEventsPage() {
   const defaultRange = "7d" as const;
   const data = await getMobileEventsFullOverview(defaultRange);
 
-  return (
-    <div className="p-6">
-      <MobileEventsDashboard initialData={data} initialRange={defaultRange} />
-    </div>
-  );
+  return <MobileEventsDashboard initialData={data} initialRange={defaultRange} />;
 }

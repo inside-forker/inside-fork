@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useMemo, useCallback } from "react";
+import { Fragment, useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   Monitor,
@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   ExternalLink,
   Timer,
   BarChartBig,
@@ -28,6 +29,17 @@ import {
   Target,
   Filter,
   X,
+  House,
+  Tag,
+  ShoppingCart,
+  Building2,
+  Trophy,
+  Sparkles,
+  LayoutGrid,
+  List,
+  SlidersHorizontal,
+  ArrowUpDown,
+  Compass,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -109,8 +121,26 @@ function formatDateShort(value: string) {
 }
 
 function screenDisplayName(screen: string): string {
-  if (screen === "/") return "Home";
-  return screen.startsWith("/") ? screen.slice(1) : screen;
+  if (!screen || screen === "/") return "Home";
+  const raw = screen.startsWith("/") ? screen.slice(1) : screen;
+  return raw
+    .split("/")
+    .map((part) => {
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(part)) {
+        return `[id:${part.slice(0, 8)}]`;
+      }
+      return part
+        .replace(/[-_]/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+    })
+    .join(" / ");
+}
+
+function formatPreviewSlug(slug: string): string {
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)) {
+    return `[${slug.slice(0, 8)}]`;
+  }
+  return slug.replace(/[-_]/g, " ");
 }
 
 const SURFACE_LABELS: Record<SearchEvent["surface"], { label: string; color: string }> = {
@@ -139,7 +169,26 @@ export function MobileEventsDashboard({
   const [data, setData] = useState(initialData);
   const [dateRange, setDateRange] = useState<DateRangeFilter>(initialRange);
   const [isLoading, setIsLoading] = useState(false);
-  const [userFilter, setUserFilter] = useState<string>("");
+  const [activeTab, setActiveTab] = useState("screen-time");
+  const [journeyTarget, setJourneyTarget] = useState<{
+    id: string;
+    type: "user" | "anon";
+    displayName: string;
+  } | null>(null);
+
+  const handleJumpToUserJourney = useCallback(
+    (u: { userId: string | null; anonId: string | null; displayName: string }) => {
+      const id = u.userId ?? u.anonId;
+      if (!id) return;
+      setJourneyTarget({
+        id,
+        type: u.userId ? "user" : "anon",
+        displayName: u.displayName,
+      });
+      setActiveTab("users");
+    },
+    [],
+  );
 
   /* ——— Date range change triggers re-fetch ——— */
   const handleDateRangeChange = useCallback(async (range: DateRangeFilter) => {
@@ -254,7 +303,7 @@ export function MobileEventsDashboard({
       </div>
 
       {/* ——— Main Tabbed Dashboard ——— */}
-      <Tabs defaultValue="screen-time" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="bg-muted/50 p-1 h-auto flex-wrap">
           <TabsTrigger value="screen-time" className="gap-1.5 text-xs">
             <Timer className="h-3.5 w-3.5" /> Screen Time
@@ -277,8 +326,9 @@ export function MobileEventsDashboard({
         <TabsContent value="screen-time">
           <ScreenTimeTab
             screenTimeRows={data.screenTimeRows}
-            screenUserBreakdowns={data.screenUserBreakdowns}
             totalTime={summary.totalScreenTimeSeconds}
+            dateRange={dateRange}
+            onJumpToUserJourney={handleJumpToUserJourney}
           />
         </TabsContent>
 
@@ -288,6 +338,7 @@ export function MobileEventsDashboard({
             activeUsers={data.activeUsers}
             recentEvents={data.recentEvents}
             dateRange={dateRange}
+            externalTarget={journeyTarget}
           />
         </TabsContent>
 
@@ -362,166 +413,1508 @@ function KpiCard({
 }
 
 /* ===================================================================== */
-/* Tab 1: Screen Time Analytics                                          */
+/* App Domain Taxonomy & Classification                                  */
+/* ===================================================================== */
+
+type AppDomainKey =
+  | "core"
+  | "deals"
+  | "events"
+  | "places"
+  | "discovery"
+  | "account";
+
+interface AppDomainConfig {
+  key: AppDomainKey;
+  name: string;
+  shortLabel: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: {
+    text: string;
+    bg: string;
+    border: string;
+    barBg: string;
+    badge: string;
+    dot: string;
+  };
+}
+
+const APP_DOMAINS: Record<AppDomainKey, AppDomainConfig> = {
+  core: {
+    key: "core",
+    name: "Home & Core Feed",
+    shortLabel: "Core Hub",
+    description: "Main feed, home landing & core navigation",
+    icon: House,
+    accent: {
+      text: "text-indigo-400",
+      bg: "bg-indigo-500/10",
+      border: "border-indigo-500/30",
+      barBg: "bg-indigo-500",
+      badge: "bg-indigo-500/15 text-indigo-400 border-indigo-500/30",
+      dot: "bg-indigo-400",
+    },
+  },
+  deals: {
+    key: "deals",
+    name: "Deals & Commerce",
+    shortLabel: "Deals",
+    description: "Discounts, category filters, deal terms & redemptions",
+    icon: Tag,
+    accent: {
+      text: "text-amber-400",
+      bg: "bg-amber-500/10",
+      border: "border-amber-500/30",
+      barBg: "bg-amber-500",
+      badge: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+      dot: "bg-amber-400",
+    },
+  },
+  events: {
+    key: "events",
+    name: "Events & Ticketing",
+    shortLabel: "Events",
+    description: "Festivals, concerts, event listings & organizer profiles",
+    icon: Ticket,
+    accent: {
+      text: "text-violet-400",
+      bg: "bg-violet-500/10",
+      border: "border-violet-500/30",
+      barBg: "bg-violet-500",
+      badge: "bg-violet-500/15 text-violet-400 border-violet-500/30",
+      dot: "bg-violet-400",
+    },
+  },
+  places: {
+    key: "places",
+    name: "Places & Venues",
+    shortLabel: "Places",
+    description: "Directory listings, venue profiles & outlet locations",
+    icon: MapPin,
+    accent: {
+      text: "text-emerald-400",
+      bg: "bg-emerald-500/10",
+      border: "border-emerald-500/30",
+      barBg: "bg-emerald-500",
+      badge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+      dot: "bg-emerald-400",
+    },
+  },
+  discovery: {
+    key: "discovery",
+    name: "Discovery & AI Search",
+    shortLabel: "Discovery",
+    description: "Search queries, explore recommendations & city discover",
+    icon: Globe,
+    accent: {
+      text: "text-cyan-400",
+      bg: "bg-cyan-500/10",
+      border: "border-cyan-500/30",
+      barBg: "bg-cyan-500",
+      badge: "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
+      dot: "bg-cyan-400",
+    },
+  },
+  account: {
+    key: "account",
+    name: "Account & System",
+    shortLabel: "Account",
+    description: "User authentication, profile, onboarding & dashboard",
+    icon: User,
+    accent: {
+      text: "text-rose-400",
+      bg: "bg-rose-500/10",
+      border: "border-rose-500/30",
+      barBg: "bg-rose-500",
+      badge: "bg-rose-500/15 text-rose-400 border-rose-500/30",
+      dot: "bg-rose-400",
+    },
+  },
+};
+
+function getScreenDomain(screen: string): AppDomainKey {
+  const s = screen.toLowerCase().trim();
+  const normalized = s.startsWith("/") ? s.slice(1) : s;
+
+  if (!normalized || normalized === "home") return "core";
+
+  if (
+    normalized.startsWith("deal") ||
+    normalized.startsWith("checkout") ||
+    normalized.startsWith("redeem") ||
+    normalized.includes("deal_term")
+  ) {
+    return "deals";
+  }
+
+  if (normalized.startsWith("event") || normalized.startsWith("organizer")) {
+    return "events";
+  }
+
+  if (
+    normalized.startsWith("listing") ||
+    normalized.startsWith("venue") ||
+    normalized.startsWith("place")
+  ) {
+    return "places";
+  }
+
+  if (
+    normalized.startsWith("search") ||
+    normalized.startsWith("explore") ||
+    normalized.startsWith("discover")
+  ) {
+    return "discovery";
+  }
+
+  if (
+    normalized.startsWith("profile") ||
+    normalized.startsWith("sign-in") ||
+    normalized.startsWith("signin") ||
+    normalized.startsWith("auth") ||
+    normalized.startsWith("onboarding") ||
+    normalized.startsWith("dashboard") ||
+    normalized.startsWith("contact")
+  ) {
+    return "account";
+  }
+
+  return "core";
+}
+
+function formatCleanScreenTitle(screen: string): string {
+  if (!screen || screen === "/" || screen.toLowerCase() === "home") {
+    return "Home Feed";
+  }
+  const s = screen.startsWith("/") ? screen.slice(1) : screen;
+
+  if (s === "deals") return "Deals Directory";
+  if (s === "deals-category") return "Deals Category View";
+  if (s === "deals-filter") return "Deals Filter & Search";
+  if (s === "deals-bank") return "Deals Bank Partners";
+  if (s === "listing_deal_terms") return "Deal Terms & Redemption";
+  if (s === "sign-in" || s === "signin") return "Sign In / Authentication";
+  if (s === "checkout") return "Checkout Flow";
+  if (s === "events") return "Events Directory";
+  if (s === "explore") return "Explore AI City Guide";
+  if (s === "listings") return "Listings Directory";
+  if (s === "search") return "Global Search";
+  if (s === "profile") return "User Profile";
+  if (s === "contact") return "Contact Support";
+  if (s === "onboarding") return "User Onboarding";
+
+  const parts = s.split("/").filter(Boolean);
+  return parts
+    .map((part) => {
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(part)) {
+        return `[id:${part.slice(0, 8)}]`;
+      }
+      return part
+        .replace(/[-_]/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+    })
+    .join(" › ");
+}
+
+type SelectedScreenTarget = {
+  screen: string;
+  displayTitle: string;
+  routeSlug: string;
+  totalSeconds: number;
+  viewsCount: number;
+  uniqueUsers: number;
+  isPrefix: boolean;
+  domain: AppDomainKey;
+};
+
+/* ===================================================================== */
+/* Tab 1: Screen Time — Executive Intelligence Architecture               */
 /* ===================================================================== */
 
 function ScreenTimeTab({
   screenTimeRows,
-  screenUserBreakdowns,
   totalTime,
+  dateRange,
+  onJumpToUserJourney,
 }: {
   screenTimeRows: ScreenTimeRow[];
-  screenUserBreakdowns: ScreenUserBreakdown[];
   totalTime: number;
+  dateRange: DateRangeFilter;
+  onJumpToUserJourney?: (user: {
+    userId: string | null;
+    anonId: string | null;
+    displayName: string;
+  }) => void;
 }) {
-  const [expandedScreen, setExpandedScreen] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"modules" | "leaderboard">("modules");
+  const [selectedDomain, setSelectedDomain] = useState<AppDomainKey | "all">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [leaderboardSort, setLeaderboardSort] = useState<"time" | "views" | "users">("time");
+  const [expandedModules, setExpandedModules] = useState<Set<AppDomainKey>>(
+    new Set(["core", "deals", "events", "places", "discovery", "account"]),
+  );
+  const [selectedTarget, setSelectedTarget] = useState<SelectedScreenTarget | null>(null);
 
-  const usersForScreen = useMemo(() => {
-    if (!expandedScreen) return [];
-    return screenUserBreakdowns
-      .filter((b) => b.screen === expandedScreen)
+  // Group rows by app domain
+  const domainGroups = useMemo(() => {
+    const groups: Record<
+      AppDomainKey,
+      {
+        domain: AppDomainConfig;
+        totalSeconds: number;
+        totalViews: number;
+        uniqueUsers: number;
+        screens: ScreenTimeRow[];
+        sharePercent: number;
+      }
+    > = {
+      core: { domain: APP_DOMAINS.core, totalSeconds: 0, totalViews: 0, uniqueUsers: 0, screens: [], sharePercent: 0 },
+      deals: { domain: APP_DOMAINS.deals, totalSeconds: 0, totalViews: 0, uniqueUsers: 0, screens: [], sharePercent: 0 },
+      events: { domain: APP_DOMAINS.events, totalSeconds: 0, totalViews: 0, uniqueUsers: 0, screens: [], sharePercent: 0 },
+      places: { domain: APP_DOMAINS.places, totalSeconds: 0, totalViews: 0, uniqueUsers: 0, screens: [], sharePercent: 0 },
+      discovery: { domain: APP_DOMAINS.discovery, totalSeconds: 0, totalViews: 0, uniqueUsers: 0, screens: [], sharePercent: 0 },
+      account: { domain: APP_DOMAINS.account, totalSeconds: 0, totalViews: 0, uniqueUsers: 0, screens: [], sharePercent: 0 },
+    };
+
+    for (const row of screenTimeRows) {
+      const dKey = getScreenDomain(row.screen);
+      const grp = groups[dKey];
+      grp.totalSeconds += row.totalSecondsSpent;
+      grp.totalViews += row.viewsCount;
+      grp.uniqueUsers += row.uniqueUsers;
+      grp.screens.push(row);
+    }
+
+    for (const dKey of Object.keys(groups) as AppDomainKey[]) {
+      groups[dKey].screens.sort((a, b) => b.totalSecondsSpent - a.totalSecondsSpent);
+      groups[dKey].sharePercent = totalTime > 0 ? (groups[dKey].totalSeconds / totalTime) * 100 : 0;
+    }
+
+    return groups;
+  }, [screenTimeRows, totalTime]);
+
+  // Executive Spotlight Metrics
+  const highlights = useMemo(() => {
+    if (screenTimeRows.length === 0) return null;
+
+    const mostEngaged = [...screenTimeRows].sort((a, b) => b.totalSecondsSpent - a.totalSecondsSpent)[0];
+    const mostViewed = [...screenTimeRows].sort((a, b) => b.viewsCount - a.viewsCount)[0];
+    const broadestReach = [...screenTimeRows].sort((a, b) => b.uniqueUsers - a.uniqueUsers)[0];
+    const totalViews = screenTimeRows.reduce((acc, r) => acc + r.viewsCount, 0);
+    const avgDwell = totalViews > 0 ? Math.round(totalTime / totalViews) : 0;
+
+    return {
+      mostEngaged: {
+        title: formatCleanScreenTitle(mostEngaged.screen),
+        seconds: mostEngaged.totalSecondsSpent,
+        share: totalTime > 0 ? ((mostEngaged.totalSecondsSpent / totalTime) * 100).toFixed(1) : "0",
+        raw: mostEngaged,
+      },
+      mostViewed: {
+        title: formatCleanScreenTitle(mostViewed.screen),
+        views: mostViewed.viewsCount,
+        raw: mostViewed,
+      },
+      broadestReach: {
+        title: formatCleanScreenTitle(broadestReach.screen),
+        users: broadestReach.uniqueUsers,
+        raw: broadestReach,
+      },
+      avgDwell: {
+        seconds: avgDwell,
+        totalViews,
+      },
+    };
+  }, [screenTimeRows, totalTime]);
+
+  // Filtered rows for Leaderboard
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return screenTimeRows.filter((r) => {
+      const d = getScreenDomain(r.screen);
+      if (selectedDomain !== "all" && d !== selectedDomain) return false;
+      if (!q) return true;
+      const clean = formatCleanScreenTitle(r.screen).toLowerCase();
+      const raw = r.screen.toLowerCase();
+      const domainName = APP_DOMAINS[d].name.toLowerCase();
+      return clean.includes(q) || raw.includes(q) || domainName.includes(q);
+    });
+  }, [screenTimeRows, selectedDomain, searchQuery]);
+
+  const sortedLeaderboardRows = useMemo(() => {
+    return [...filteredRows].sort((a, b) => {
+      if (leaderboardSort === "views") return b.viewsCount - a.viewsCount;
+      if (leaderboardSort === "users") return b.uniqueUsers - a.uniqueUsers;
+      return b.totalSecondsSpent - a.totalSecondsSpent;
+    });
+  }, [filteredRows, leaderboardSort]);
+
+  const toggleModuleExpand = useCallback((dKey: AppDomainKey) => {
+    setExpandedModules((prev) => {
+      const next = new Set(prev);
+      if (next.has(dKey)) next.delete(dKey);
+      else next.add(dKey);
+      return next;
+    });
+  }, []);
+
+  const domainsList = useMemo(() => {
+    return (Object.keys(domainGroups) as AppDomainKey[])
+      .map((k) => domainGroups[k])
+      .filter((g) => g.screens.length > 0)
       .sort((a, b) => b.totalSeconds - a.totalSeconds);
-  }, [expandedScreen, screenUserBreakdowns]);
+  }, [domainGroups]);
 
   return (
-    <Card className="border-2 shadow-sm">
-      <CardHeader className="border-b bg-gradient-to-r from-primary/5 via-background to-background">
-        <CardTitle className="text-lg font-bold flex items-center gap-2">
-          <Timer className="h-5 w-5 text-primary" />
-          Screen Time Analytics
-        </CardTitle>
-        <CardDescription>
-          Exact seconds spent on every page, with user breakdown. Click any row to see which users visited that page.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        {screenTimeRows.length === 0 ? (
-          <EmptyState message="No screen view events recorded for this period." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/30 hover:bg-muted/40">
-                  <TableHead className="font-bold w-8" />
-                  <TableHead className="font-bold">Screen / Page</TableHead>
-                  <TableHead className="font-bold text-right">Total Time</TableHead>
-                  <TableHead className="font-bold text-right">Avg / Visit</TableHead>
-                  <TableHead className="font-bold text-right">Views</TableHead>
-                  <TableHead className="font-bold text-right">Users</TableHead>
-                  <TableHead className="font-bold w-40">Share of Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {screenTimeRows.map((row) => {
-                  const isExpanded = expandedScreen === row.screen;
-                  const sharePercent =
-                    totalTime > 0 ? (row.totalSecondsSpent / totalTime) * 100 : 0;
+    <div className="space-y-6">
+      {/* ——— Section 1: Executive Share of Attention Strip ——— */}
+      <Card className="border-2 shadow-sm bg-gradient-to-br from-background via-background to-muted/20">
+        <CardHeader className="pb-3 border-b border-border/40">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Layers className="h-4 w-4 text-primary" />
+                Share of User Attention by App Domain
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Proportional breakdown of total active screen time across mobile app features
+              </CardDescription>
+            </div>
+            <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 w-fit">
+              {formatDuration(totalTime)} Total Dwell
+            </span>
+          </div>
+        </CardHeader>
 
-                  return (
-                    <Fragment key={row.screen}>
-                      <TableRow
-                        key={row.screen}
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() =>
-                          setExpandedScreen(isExpanded ? null : row.screen)
-                        }
-                      >
-                        <TableCell className="w-8 text-center">
-                          {isExpanded ? (
-                            <ChevronUp className="h-4 w-4 text-primary" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="h-2 w-2 rounded-full bg-primary/60" />
-                            <code className="text-xs font-mono bg-muted/50 px-2 py-0.5 rounded border border-border/30">
-                              {screenDisplayName(row.screen)}
-                            </code>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-bold">
-                          {formatDuration(row.totalSecondsSpent)}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold text-muted-foreground">
-                          {row.avgSecondsPerVisit}s
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {row.viewsCount.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                            {row.uniqueUsers}
+        <CardContent className="pt-4 space-y-4">
+          {/* Multi-segment stacked distribution bar */}
+          <div className="relative h-4 w-full rounded-full bg-muted/60 overflow-hidden flex border border-border/40 shadow-inner">
+            {domainsList.map((grp) => {
+              if (grp.sharePercent <= 0) return null;
+              return (
+                <div
+                  key={grp.domain.key}
+                  style={{ width: `${grp.sharePercent}%` }}
+                  className={`h-full ${grp.domain.accent.barBg} transition-all duration-300 relative group cursor-pointer`}
+                  onClick={() =>
+                    setSelectedDomain((prev) => (prev === grp.domain.key ? "all" : grp.domain.key))
+                  }
+                  title={`${grp.domain.name}: ${formatDuration(grp.totalSeconds)} (${grp.sharePercent.toFixed(1)}%)`}
+                />
+              );
+            })}
+          </div>
+
+          {/* Interactive domain pills */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {domainsList.map((grp) => {
+              const isSelected = selectedDomain === grp.domain.key;
+              const Icon = grp.domain.icon;
+              return (
+                <button
+                  key={grp.domain.key}
+                  type="button"
+                  onClick={() =>
+                    setSelectedDomain((prev) => (prev === grp.domain.key ? "all" : grp.domain.key))
+                  }
+                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-2 transition-all ${
+                    isSelected
+                      ? `${grp.domain.accent.bg} ${grp.domain.accent.border} ${grp.domain.accent.text} ring-2 ring-primary/20 shadow-sm`
+                      : "border-border/60 bg-muted/30 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${grp.domain.accent.dot}`} />
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{grp.domain.shortLabel}</span>
+                  <span className="text-[11px] font-mono opacity-80">
+                    {grp.sharePercent.toFixed(1)}%
+                  </span>
+                  <span className="text-[10px] text-muted-foreground tabular-nums">
+                    ({formatDuration(grp.totalSeconds)})
+                  </span>
+                </button>
+              );
+            })}
+            {selectedDomain !== "all" && (
+              <button
+                type="button"
+                onClick={() => setSelectedDomain("all")}
+                className="px-2 py-1 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground underline underline-offset-4"
+              >
+                Reset filter
+              </button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ——— Section 2: Executive Metric Highlights ——— */}
+      {highlights && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Card 1: Most Engaged */}
+          <Card
+            onClick={() =>
+              setSelectedTarget({
+                screen: highlights.mostEngaged.raw.screen,
+                displayTitle: highlights.mostEngaged.title,
+                routeSlug: highlights.mostEngaged.raw.screen,
+                totalSeconds: highlights.mostEngaged.raw.totalSecondsSpent,
+                viewsCount: highlights.mostEngaged.raw.viewsCount,
+                uniqueUsers: highlights.mostEngaged.raw.uniqueUsers,
+                isPrefix: false,
+                domain: getScreenDomain(highlights.mostEngaged.raw.screen),
+              })
+            }
+            className="border border-border/70 bg-gradient-to-br from-amber-500/10 via-background to-background p-4 rounded-xl cursor-pointer hover:border-amber-500/50 hover:shadow-md transition-all group"
+          >
+            <div className="flex items-center justify-between pb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Trophy className="h-3.5 w-3.5 text-amber-500" />
+                Top Screen Engagement
+              </span>
+              <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-500 bg-amber-500/10">
+                {highlights.mostEngaged.share}% share
+              </Badge>
+            </div>
+            <p className="text-base font-bold truncate group-hover:text-primary transition-colors">
+              {highlights.mostEngaged.title}
+            </p>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-xl font-black tabular-nums">
+                {formatDuration(highlights.mostEngaged.seconds)}
+              </span>
+              <span className="text-xs text-muted-foreground">total spent</span>
+            </div>
+          </Card>
+
+          {/* Card 2: Most Viewed */}
+          <Card
+            onClick={() =>
+              setSelectedTarget({
+                screen: highlights.mostViewed.raw.screen,
+                displayTitle: highlights.mostViewed.title,
+                routeSlug: highlights.mostViewed.raw.screen,
+                totalSeconds: highlights.mostViewed.raw.totalSecondsSpent,
+                viewsCount: highlights.mostViewed.raw.viewsCount,
+                uniqueUsers: highlights.mostViewed.raw.uniqueUsers,
+                isPrefix: false,
+                domain: getScreenDomain(highlights.mostViewed.raw.screen),
+              })
+            }
+            className="border border-border/70 bg-gradient-to-br from-violet-500/10 via-background to-background p-4 rounded-xl cursor-pointer hover:border-violet-500/50 hover:shadow-md transition-all group"
+          >
+            <div className="flex items-center justify-between pb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Eye className="h-3.5 w-3.5 text-violet-400" />
+                Most Visited Screen
+              </span>
+              <Badge variant="outline" className="text-[10px] border-violet-500/30 text-violet-400 bg-violet-500/10">
+                Footfall
+              </Badge>
+            </div>
+            <p className="text-base font-bold truncate group-hover:text-primary transition-colors">
+              {highlights.mostViewed.title}
+            </p>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-xl font-black tabular-nums">
+                {highlights.mostViewed.views.toLocaleString()}
+              </span>
+              <span className="text-xs text-muted-foreground">views recorded</span>
+            </div>
+          </Card>
+
+          {/* Card 3: Broadest Reach */}
+          <Card
+            onClick={() =>
+              setSelectedTarget({
+                screen: highlights.broadestReach.raw.screen,
+                displayTitle: highlights.broadestReach.title,
+                routeSlug: highlights.broadestReach.raw.screen,
+                totalSeconds: highlights.broadestReach.raw.totalSecondsSpent,
+                viewsCount: highlights.broadestReach.raw.viewsCount,
+                uniqueUsers: highlights.broadestReach.raw.uniqueUsers,
+                isPrefix: false,
+                domain: getScreenDomain(highlights.broadestReach.raw.screen),
+              })
+            }
+            className="border border-border/70 bg-gradient-to-br from-indigo-500/10 via-background to-background p-4 rounded-xl cursor-pointer hover:border-indigo-500/50 hover:shadow-md transition-all group"
+          >
+            <div className="flex items-center justify-between pb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5 text-indigo-400" />
+                Broadest Reach
+              </span>
+              <Badge variant="outline" className="text-[10px] border-indigo-500/30 text-indigo-400 bg-indigo-500/10">
+                Audience
+              </Badge>
+            </div>
+            <p className="text-base font-bold truncate group-hover:text-primary transition-colors">
+              {highlights.broadestReach.title}
+            </p>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-xl font-black tabular-nums">
+                {highlights.broadestReach.users}
+              </span>
+              <span className="text-xs text-muted-foreground">unique viewers</span>
+            </div>
+          </Card>
+
+          {/* Card 4: Avg Dwell Time */}
+          <Card className="border border-border/70 bg-gradient-to-br from-emerald-500/10 via-background to-background p-4 rounded-xl">
+            <div className="flex items-center justify-between pb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-emerald-400" />
+                Avg Screen Dwell
+              </span>
+              <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
+                Global
+              </Badge>
+            </div>
+            <p className="text-base font-bold text-muted-foreground">
+              App-Wide Pace
+            </p>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-xl font-black tabular-nums">
+                {formatDuration(highlights.avgDwell.seconds)}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                per view across {highlights.avgDwell.totalViews} views
+              </span>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ——— Section 3: Navigation Toolbar & View Switcher ——— */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2">
+        {/* View mode toggle */}
+        <div className="flex items-center p-1 bg-muted/60 rounded-xl border border-border/50 self-start">
+          <button
+            type="button"
+            onClick={() => setViewMode("modules")}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              viewMode === "modules"
+                ? "bg-background text-foreground shadow-sm font-bold border border-border/40"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <LayoutGrid className="h-3.5 w-3.5 text-primary" />
+            <span>Feature Modules</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("leaderboard")}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              viewMode === "leaderboard"
+                ? "bg-background text-foreground shadow-sm font-bold border border-border/40"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <List className="h-3.5 w-3.5 text-primary" />
+            <span>Ranked Leaderboard</span>
+          </button>
+        </div>
+
+        {/* Search and Sort controls */}
+        <div className="flex items-center gap-2 flex-1 md:justify-end">
+          {viewMode === "leaderboard" && (
+            <div className="flex items-center gap-1.5 bg-muted/40 px-2.5 py-1 rounded-lg border border-border/60 shrink-0">
+              <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Sort:</span>
+              <select
+                value={leaderboardSort}
+                onChange={(e) => setLeaderboardSort(e.target.value as "time" | "views" | "users")}
+                className="bg-transparent text-xs font-semibold text-foreground focus:outline-none cursor-pointer"
+              >
+                <option value="time" className="bg-background text-foreground">Total Time</option>
+                <option value="views" className="bg-background text-foreground">Views Count</option>
+                <option value="users" className="bg-background text-foreground">Unique Users</option>
+              </select>
+            </div>
+          )}
+
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search screen, route, or category…"
+              className="w-full h-9 rounded-xl border border-border/60 bg-muted/20 pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ——— Section 4: Main Content (Modules or Leaderboard) ——— */}
+      {viewMode === "modules" ? (
+        <div className="space-y-4">
+          {domainsList
+            .filter((grp) => selectedDomain === "all" || grp.domain.key === selectedDomain)
+            .map((grp) => {
+              const isExpanded = expandedModules.has(grp.domain.key);
+              const Icon = grp.domain.icon;
+              const q = searchQuery.trim().toLowerCase();
+              const matchingScreens = q
+                ? grp.screens.filter((s) => {
+                    const clean = formatCleanScreenTitle(s.screen).toLowerCase();
+                    return clean.includes(q) || s.screen.toLowerCase().includes(q);
+                  })
+                : grp.screens;
+
+              if (matchingScreens.length === 0 && q) return null;
+
+              return (
+                <Card
+                  key={grp.domain.key}
+                  className="border-2 shadow-sm overflow-hidden transition-all duration-200"
+                >
+                  {/* Module Header Strip */}
+                  <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b bg-muted/10">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`h-10 w-10 rounded-xl ${grp.domain.accent.bg} border ${grp.domain.accent.border} flex items-center justify-center shrink-0`}>
+                        <Icon className={`h-5 w-5 ${grp.domain.accent.text}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-bold text-base text-foreground truncate">
+                            {grp.domain.name}
+                          </h3>
+                          <Badge variant="outline" className={`text-[10px] px-2 py-0.5 font-normal ${grp.domain.accent.badge}`}>
+                            {grp.screens.length} {grp.screens.length === 1 ? "screen" : "screens"}
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress
-                              value={Math.min(sharePercent, 100)}
-                              className="h-2 flex-1"
-                            />
-                            <span className="text-xs font-semibold text-muted-foreground w-10 text-right">
-                              {sharePercent.toFixed(1)}%
-                            </span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                          <span className="text-xs font-mono font-semibold text-muted-foreground">
+                            {grp.sharePercent.toFixed(1)}% of app time
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {grp.domain.description}
+                        </p>
+                      </div>
+                    </div>
 
-                      {/* Expanded user breakdown */}
-                      {isExpanded && usersForScreen.length > 0 && (
+                    {/* Aggregate module stats & toggle */}
+                    <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
+                      <div className="text-right">
+                        <p className="text-base font-black tabular-nums">
+                          {formatDuration(grp.totalSeconds)}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {grp.totalViews.toLocaleString()} views · {grp.uniqueUsers} users
+                        </p>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setSelectedTarget({
+                            screen: grp.domain.key === "core" ? "" : grp.domain.key,
+                            displayTitle: `${grp.domain.name} (Module Aggregate)`,
+                            routeSlug: grp.domain.key,
+                            totalSeconds: grp.totalSeconds,
+                            viewsCount: grp.totalViews,
+                            uniqueUsers: grp.uniqueUsers,
+                            isPrefix: grp.domain.key !== "core",
+                            domain: grp.domain.key,
+                          })
+                        }
+                        className="h-8 text-xs font-semibold gap-1.5 bg-background hover:bg-muted"
+                      >
+                        <span>Inspect Module</span>
+                        <ArrowRight className="h-3 w-3" />
+                      </Button>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleModuleExpand(grp.domain.key)}
+                        className="h-8 w-8 rounded-lg border border-border/60 bg-background flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        title={isExpanded ? "Collapse screens" : "Expand screens"}
+                      >
+                        {isExpanded ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Module Screens List */}
+                  {isExpanded && (
+                    <div className="divide-y divide-border/30 bg-background/50">
+                      {matchingScreens.map((row) => {
+                        const cleanTitle = formatCleanScreenTitle(row.screen);
+                        const rowShare =
+                          grp.totalSeconds > 0
+                            ? (row.totalSecondsSpent / grp.totalSeconds) * 100
+                            : 0;
+                        const avgDwell =
+                          row.viewsCount > 0
+                            ? Math.round(row.totalSecondsSpent / row.viewsCount)
+                            : 0;
+
+                        return (
+                          <div
+                            key={row.screen}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() =>
+                              setSelectedTarget({
+                                screen: row.screen,
+                                displayTitle: cleanTitle,
+                                routeSlug: row.screen,
+                                totalSeconds: row.totalSecondsSpent,
+                                viewsCount: row.viewsCount,
+                                uniqueUsers: row.uniqueUsers,
+                                isPrefix: false,
+                                domain: grp.domain.key,
+                              })
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                setSelectedTarget({
+                                  screen: row.screen,
+                                  displayTitle: cleanTitle,
+                                  routeSlug: row.screen,
+                                  totalSeconds: row.totalSecondsSpent,
+                                  viewsCount: row.viewsCount,
+                                  uniqueUsers: row.uniqueUsers,
+                                  isPrefix: false,
+                                  domain: grp.domain.key,
+                                });
+                              }
+                            }}
+                            className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3 hover:bg-muted/40 transition-colors cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="h-2 w-2 rounded-full bg-border group-hover:bg-primary transition-colors shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
+                                  {cleanTitle}
+                                </p>
+                                <p className="text-[11px] font-mono text-muted-foreground truncate">
+                                  {row.screen || "/"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-4 text-xs shrink-0 self-end sm:self-center">
+                              <div className="w-24 text-right">
+                                <span className="font-bold text-sm tabular-nums">
+                                  {formatDuration(row.totalSecondsSpent)}
+                                </span>
+                                <div className="flex items-center gap-1 justify-end mt-0.5">
+                                  <Progress value={Math.min(rowShare, 100)} className="h-1 w-12" />
+                                  <span className="text-[10px] text-muted-foreground tabular-nums">
+                                    {rowShare.toFixed(0)}%
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="w-16 text-right tabular-nums text-muted-foreground">
+                                <span className="font-medium text-foreground">{row.viewsCount}</span>
+                                <span className="text-[10px] block text-muted-foreground">views</span>
+                              </div>
+
+                              <div className="w-16 text-right tabular-nums">
+                                <span className="font-semibold text-foreground px-1.5 py-0.5 rounded bg-muted text-[11px]">
+                                  {row.uniqueUsers} users
+                                </span>
+                              </div>
+
+                              <div className="w-20 text-right tabular-nums text-muted-foreground hidden md:block">
+                                <span className="text-[11px]">~{formatDuration(avgDwell)}</span>
+                                <span className="text-[10px] block text-muted-foreground/70">avg dwell</span>
+                              </div>
+
+                              <span className="text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 pl-2">
+                                Inspect <ArrowRight className="h-3 w-3" />
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+        </div>
+      ) : (
+        /* ——— View Mode 2: Ranked Leaderboard View ——— */
+        <Card className="border-2 shadow-sm overflow-hidden">
+          <CardHeader className="border-b bg-muted/20 py-3 px-5">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-bold">
+                All Screens Ranked ({sortedLeaderboardRows.length})
+              </CardTitle>
+              <span className="text-xs text-muted-foreground">
+                Click any row to open the full user analytics modal
+              </span>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow className="text-[11px] uppercase tracking-wider font-semibold hover:bg-transparent">
+                    <TableHead className="w-16 text-center">Rank</TableHead>
+                    <TableHead className="min-w-[220px]">Screen & App Domain</TableHead>
+                    <TableHead className="text-right w-28">Total Time</TableHead>
+                    <TableHead className="text-right w-20">Views</TableHead>
+                    <TableHead className="text-right w-20">Users</TableHead>
+                    <TableHead className="text-right w-24 hidden md:table-cell">Avg Dwell</TableHead>
+                    <TableHead className="w-32 hidden sm:table-cell">Share</TableHead>
+                    <TableHead className="text-right w-20">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border/30">
+                  {sortedLeaderboardRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">
+                        No screens match your search query or domain filter.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    sortedLeaderboardRows.map((row, idx) => {
+                      const cleanTitle = formatCleanScreenTitle(row.screen);
+                      const dKey = getScreenDomain(row.screen);
+                      const domainCfg = APP_DOMAINS[dKey];
+                      const sharePercent = totalTime > 0 ? (row.totalSecondsSpent / totalTime) * 100 : 0;
+                      const avgDwell = row.viewsCount > 0 ? Math.round(row.totalSecondsSpent / row.viewsCount) : 0;
+                      const rank = idx + 1;
+
+                      return (
                         <TableRow
-                          key={`${row.screen}-users`}
-                          className="bg-muted/20"
+                          key={row.screen}
+                          onClick={() =>
+                            setSelectedTarget({
+                              screen: row.screen,
+                              displayTitle: cleanTitle,
+                              routeSlug: row.screen,
+                              totalSeconds: row.totalSecondsSpent,
+                              viewsCount: row.viewsCount,
+                              uniqueUsers: row.uniqueUsers,
+                              isPrefix: false,
+                              domain: dKey,
+                            })
+                          }
+                          className="cursor-pointer hover:bg-muted/50 transition-colors group"
                         >
-                          <TableCell colSpan={7} className="p-4">
-                            <div className="rounded-lg border bg-card/80 p-3 space-y-2">
-                              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                                Who visited {screenDisplayName(row.screen)}?
-                              </p>
-                              <div className="grid gap-1.5">
-                                {usersForScreen.map((u, idx) => (
-                                  <div
-                                    key={`${u.userId ?? u.anonId}-${idx}`}
-                                    className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/30"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
-                                        <User className="h-3.5 w-3.5 text-primary" />
-                                      </div>
-                                      <div>
-                                        <p className="text-xs font-semibold">{u.userDisplay}</p>
-                                        {u.username && (
-                                          <p className="text-[10px] text-muted-foreground">
-                                            @{u.username}
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-xs">
-                                      <span className="text-muted-foreground">
-                                        {u.visits} visits
-                                      </span>
-                                      <span className="font-bold text-primary">
-                                        {formatDuration(u.totalSeconds)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
+                          {/* Rank */}
+                          <TableCell className="text-center font-mono font-bold">
+                            {rank === 1 ? (
+                              <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/40 text-xs">
+                                #1
+                              </span>
+                            ) : rank === 2 ? (
+                              <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-slate-400/20 text-slate-300 border border-slate-400/40 text-xs">
+                                #2
+                              </span>
+                            ) : rank === 3 ? (
+                              <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-amber-700/20 text-amber-600 border border-amber-700/40 text-xs">
+                                #3
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">#{rank}</span>
+                            )}
+                          </TableCell>
+
+                          {/* Screen Title & Domain */}
+                          <TableCell>
+                            <div className="flex items-center gap-2.5">
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] px-1.5 py-0 font-normal shrink-0 ${domainCfg.accent.badge}`}
+                              >
+                                {domainCfg.shortLabel}
+                              </Badge>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+                                  {cleanTitle}
+                                </p>
+                                <p className="text-[11px] font-mono text-muted-foreground truncate">
+                                  {row.screen || "/"}
+                                </p>
                               </div>
                             </div>
                           </TableCell>
+
+                          {/* Total Time */}
+                          <TableCell className="text-right font-bold text-sm tabular-nums">
+                            {formatDuration(row.totalSecondsSpent)}
+                          </TableCell>
+
+                          {/* Views */}
+                          <TableCell className="text-right text-xs tabular-nums text-muted-foreground">
+                            {row.viewsCount.toLocaleString()}
+                          </TableCell>
+
+                          {/* Users */}
+                          <TableCell className="text-right">
+                            <span className="text-xs px-2 py-0.5 rounded bg-muted font-medium">
+                              {row.uniqueUsers}
+                            </span>
+                          </TableCell>
+
+                          {/* Avg Dwell */}
+                          <TableCell className="text-right text-xs tabular-nums text-muted-foreground hidden md:table-cell">
+                            ~{formatDuration(avgDwell)}
+                          </TableCell>
+
+                          {/* Share Progress */}
+                          <TableCell className="hidden sm:table-cell">
+                            <div className="flex items-center gap-2">
+                              <Progress value={Math.min(sharePercent, 100)} className="h-1.5 flex-1" />
+                              <span className="text-[10px] text-muted-foreground font-mono w-10 text-right tabular-nums">
+                                {sharePercent.toFixed(1)}%
+                              </span>
+                            </div>
+                          </TableCell>
+
+                          {/* Action Button */}
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-[11px] font-semibold text-primary hover:text-primary hover:bg-primary/10 gap-1 px-2"
+                            >
+                              <span>Inspect</span>
+                              <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ——— Section 5: Centered Stats Popup Modal ——— */}
+      {selectedTarget && (
+        <ScreenUserModal
+          target={selectedTarget}
+          defaultRange={dateRange}
+          onClose={() => setSelectedTarget(null)}
+          onJumpToUserJourney={onJumpToUserJourney}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ===================================================================== */
+/* Centered Stats Popup Modal (`ScreenUserModal`)                        */
+/* ===================================================================== */
+
+function ScreenUserModal({
+  target,
+  defaultRange,
+  onClose,
+  onJumpToUserJourney,
+}: {
+  target: SelectedScreenTarget;
+  defaultRange: DateRangeFilter;
+  onClose: () => void;
+  onJumpToUserJourney?: (user: {
+    userId: string | null;
+    anonId: string | null;
+    displayName: string;
+  }) => void;
+}) {
+  const [modalRange, setModalRange] = useState<DateRangeFilter>(defaultRange);
+  const [users, setUsers] = useState<ScreenUserBreakdown[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [userSearch, setUserSearch] = useState("");
+  const [mobileTab, setMobileTab] = useState<"viewers" | "kpis">("viewers");
+
+  const domainCfg = APP_DOMAINS[target.domain];
+  const Icon = domainCfg.icon;
+
+  useEffect(() => {
+    setModalRange(defaultRange);
+    setUserSearch("");
+    setIsLoading(true);
+  }, [target.screen, target.isPrefix, defaultRange]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+
+    void (async () => {
+      try {
+        const prefixParam = target.isPrefix ? "&prefix=true" : "";
+        const res = await fetch(
+          `/api/admin/mobile-events/screen-users?screen=${encodeURIComponent(
+            target.screen,
+          )}&range=${modalRange}${prefixParam}`,
+        );
+        if (cancelled) return;
+        if (res.ok) {
+          const json = await res.json();
+          setUsers(json.data ?? []);
+        } else {
+          setUsers([]);
+        }
+      } catch {
+        if (!cancelled) setUsers([]);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [target.screen, target.isPrefix, modalRange]);
+
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((u) => {
+      const hay = [u.userDisplay, u.username, u.userId, u.anonId]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [users, userSearch]);
+
+  const avgDwell =
+    target.viewsCount > 0
+      ? Math.round(target.totalSeconds / target.viewsCount)
+      : 0;
+
+  const [showAnonDetails, setShowAnonDetails] = useState(false);
+
+  // Split viewers into registered named users vs anonymous guests
+  const { registeredUsers, anonymousUsers } = useMemo(() => {
+    const reg: ScreenUserBreakdown[] = [];
+    const anon: ScreenUserBreakdown[] = [];
+
+    for (const u of filteredUsers) {
+      const isNamed = Boolean(
+        u.userId ||
+          u.username ||
+          (u.userDisplay && !u.userDisplay.startsWith("Anonymous ")),
+      );
+      if (isNamed) {
+        reg.push(u);
+      } else {
+        anon.push(u);
+      }
+    }
+
+    return { registeredUsers: reg, anonymousUsers: anon };
+  }, [filteredUsers]);
+
+  // Aggregate stats for anonymous guests
+  const anonSummary = useMemo(() => {
+    const count = anonymousUsers.length;
+    const totalVisits = anonymousUsers.reduce((acc, u) => acc + u.visits, 0);
+    const totalSeconds = anonymousUsers.reduce(
+      (acc, u) => acc + u.totalSeconds,
+      0,
+    );
+    return { count, totalVisits, totalSeconds };
+  }, [anonymousUsers]);
+
+  const isSearchingAnon = Boolean(
+    userSearch.trim() &&
+      anonymousUsers.some((u) => {
+        const hay = [u.userDisplay, u.anonId].filter(Boolean).join(" ").toLowerCase();
+        return hay.includes(userSearch.trim().toLowerCase());
+      }),
+  );
+
+  const shouldShowAnonBreakdown = showAnonDetails || isSearchingAnon;
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        className="w-[96vw] max-w-5xl h-[88vh] sm:h-[min(85vh,640px)] p-0 gap-0 overflow-hidden border-2 shadow-2xl bg-background rounded-2xl flex flex-col"
+      >
+        {/* Mobile Tab Switcher (< 640px only) */}
+        <div className="flex sm:hidden border-b border-border/50 p-2 bg-muted/40 shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={() => setMobileTab("viewers")}
+            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+              mobileTab === "viewers"
+                ? "bg-primary text-primary-foreground shadow-xs font-bold"
+                : "text-muted-foreground hover:text-foreground bg-background/50"
+            }`}
+          >
+            <Users className="h-3.5 w-3.5" />
+            <span>Viewers ({isLoading ? "…" : users.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab("kpis")}
+            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+              mobileTab === "kpis"
+                ? "bg-primary text-primary-foreground shadow-xs font-bold"
+                : "text-muted-foreground hover:text-foreground bg-background/50"
+            }`}
+          >
+            <BarChartBig className="h-3.5 w-3.5" />
+            <span>Screen Stats</span>
+          </button>
+        </div>
+
+        {/* 2-Column Desktop & Tablet Container */}
+        <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
+          {/* Left Column: Screen Intelligence, Telemetry & Time Controls */}
+          <div
+            className={`w-full sm:w-[320px] md:w-[360px] lg:w-[390px] shrink-0 sm:border-r border-border/60 bg-muted/20 p-4 sm:p-5 flex-col justify-between overflow-y-auto ${
+              mobileTab === "kpis" ? "flex" : "hidden sm:flex"
+            }`}
+          >
+            <div className="space-y-4">
+              <DialogHeader className="space-y-2 text-left">
+                <div className="flex items-center gap-2">
+                  <div className={`h-8 w-8 rounded-lg ${domainCfg.accent.bg} border ${domainCfg.accent.border} flex items-center justify-center shrink-0`}>
+                    <Icon className={`h-4 w-4 ${domainCfg.accent.text}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${domainCfg.accent.badge}`}>
+                        {domainCfg.name}
+                      </Badge>
+                      <span className="text-[11px] font-mono text-muted-foreground truncate">
+                        {target.routeSlug || "/"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <DialogTitle className="text-lg sm:text-xl font-bold tracking-tight text-foreground leading-snug">
+                    {target.displayTitle}
+                  </DialogTitle>
+                  {isLoading && (
+                    <div className="h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin shrink-0" />
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Screen engagement telemetry, dwell distribution, and viewer identity breakdown.
+                </p>
+              </DialogHeader>
+
+              {/* 4 Quick KPI Summary Cards */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="p-3 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Time</p>
+                  <p className="text-base font-black tabular-nums mt-0.5 text-foreground">{formatDuration(target.totalSeconds)}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Views</p>
+                  <p className="text-base font-black tabular-nums mt-0.5 text-foreground">{target.viewsCount.toLocaleString()}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Unique Viewers</p>
+                  <p className="text-base font-black tabular-nums mt-0.5 text-foreground">{target.uniqueUsers}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Avg Dwell</p>
+                  <p className="text-base font-black tabular-nums mt-0.5 text-foreground">~{formatDuration(avgDwell)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom section of left column: Time Window Selector */}
+            <div className="pt-3 mt-3 border-t border-border/40 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                  Time Window
+                </span>
+                {isLoading && (
+                  <span className="text-[10px] text-primary font-medium animate-pulse">
+                    Refreshing…
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-background/60 rounded-xl border border-border/60">
+                {DATE_RANGE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setModalRange(opt.value)}
+                    disabled={isLoading}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold text-center transition-all ${
+                      modalRange === opt.value
+                        ? "bg-primary text-primary-foreground shadow-xs font-bold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    } ${isLoading ? "opacity-60" : ""}`}
+                  >
+                    {opt.value === "24h"
+                      ? "24 Hours"
+                      : opt.value === "7d"
+                        ? "7 Days"
+                        : opt.value === "30d"
+                          ? "30 Days"
+                          : "All Time"}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground/80 leading-normal pt-1">
+                Select any viewer on the right to trace their full app journey timeline.
+              </p>
+            </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          {/* Right Column: Viewers Intel and Activity Stream */}
+          <div
+            className={`flex-1 min-w-0 flex-col h-full overflow-hidden bg-background ${
+              mobileTab === "viewers" ? "flex" : "hidden sm:flex"
+            }`}
+          >
+            {/* Header of right pane with Title and Search Input */}
+            <div className="p-4 sm:p-5 border-b border-border/50 shrink-0 pr-12 space-y-3 bg-gradient-to-b from-muted/20 to-transparent">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <span>Viewer Intelligence</span>
+                    <Badge variant="secondary" className="text-[11px] font-medium px-2 py-0">
+                      {isLoading ? "Fetching…" : `${users.length} ${users.length === 1 ? "viewer" : "viewers"}`}
+                    </Badge>
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Identified registered accounts and aggregated guest audience
+                  </p>
+                </div>
+              </div>
+
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  type="search"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  placeholder="Search viewers by name, username, or ID…"
+                  disabled={isLoading}
+                  className="w-full h-9 rounded-xl border border-border/60 bg-muted/20 pl-8 pr-8 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+                />
+                {userSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setUserSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Scrollable List Container */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-2.5">
+              {isLoading ? (
+                /* Prominent Loader State */
+                <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center p-6 space-y-4">
+                  <div className="relative flex items-center justify-center">
+                    <div className="h-12 w-12 rounded-full border-3 border-primary/20 border-t-primary animate-spin" />
+                    <Users className="h-5 w-5 text-primary absolute" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-foreground">Loading Audience Intelligence</p>
+                    <p className="text-xs text-muted-foreground max-w-xs">
+                      Analyzing viewers, sessions, and dwell telemetry for {target.displayTitle}…
+                    </p>
+                  </div>
+                  {/* 3 shimmer skeleton cards */}
+                  <div className="w-full max-w-md space-y-2.5 pt-2">
+                    {[1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/40 animate-pulse"
+                      >
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="h-9 w-9 rounded-full bg-muted-foreground/15" />
+                          <div className="space-y-1.5 flex-1">
+                            <div className="h-3.5 w-28 rounded-md bg-muted-foreground/20" />
+                            <div className="h-2.5 w-16 rounded-md bg-muted-foreground/10" />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="h-5 w-14 rounded-md bg-muted-foreground/15" />
+                          <div className="h-5 w-16 rounded-md bg-muted-foreground/20" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : registeredUsers.length === 0 && anonymousUsers.length === 0 ? (
+                <div className="h-full min-h-[220px] flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
+                  <p className="font-semibold text-foreground/80">No Viewers Found</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                    {userSearch.trim()
+                      ? `No viewers match "${userSearch.trim()}".`
+                      : "No viewers recorded for this screen within the selected time window."}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Registered Users */}
+                  {registeredUsers.map((u, idx) => (
+                    <div
+                      key={`${u.userId ?? u.username}-${idx}`}
+                      onClick={() => {
+                        onClose();
+                        if (onJumpToUserJourney) {
+                          onJumpToUserJourney({
+                            userId: u.userId,
+                            anonId: u.anonId,
+                            displayName: u.userDisplay,
+                          });
+                        }
+                      }}
+                      className="group flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/40 hover:border-primary/40 hover:bg-primary/[0.04] transition-all cursor-pointer shadow-2xs"
+                      title="Click to view full user journey timeline"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
+                        <div className="h-9 w-9 shrink-0 rounded-full flex items-center justify-center font-bold text-xs bg-primary/15 text-primary border border-primary/30">
+                          {u.userDisplay.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
+                            {u.userDisplay}
+                          </p>
+                          {u.username ? (
+                            <p className="text-xs text-muted-foreground truncate">
+                              @{u.username}
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">
+                              Registered User
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-xs shrink-0">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground border border-border/40">
+                          {u.visits} {u.visits === 1 ? "visit" : "visits"}
+                        </span>
+                        <span className="font-bold text-xs font-mono text-primary bg-primary/10 border border-primary/25 px-2.5 py-0.5 rounded-md">
+                          {formatDuration(u.totalSeconds)}
+                        </span>
+                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Grouped Anonymous Guests */}
+                  {anonymousUsers.length > 0 && (
+                    <div className="rounded-xl border border-border/60 bg-muted/25 overflow-hidden transition-all shadow-2xs">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setShowAnonDetails((prev) => !prev)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") setShowAnonDetails((prev) => !prev);
+                        }}
+                        className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/40 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-9 w-9 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 text-muted-foreground">
+                            <Users className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-semibold text-foreground">
+                                Anonymous Guests
+                              </p>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                {anonSummary.count} {anonSummary.count === 1 ? "guest" : "guests"}
+                              </Badge>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              {anonSummary.totalVisits} total visits · Grouped guest traffic
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <span className="font-mono text-xs font-bold text-foreground bg-background/80 border border-border/60 px-2 py-0.5 rounded-md">
+                            {formatDuration(anonSummary.totalSeconds)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowAnonDetails((prev) => !prev);
+                            }}
+                            className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 pl-1"
+                          >
+                            <span>{shouldShowAnonBreakdown ? "Hide" : "Breakdown"}</span>
+                            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${shouldShowAnonBreakdown ? "rotate-180" : ""}`} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Collapsible breakdown for anonymous guests */}
+                      {shouldShowAnonBreakdown && (
+                        <div className="divide-y divide-border/20 border-t border-border/40 bg-background/60 max-h-56 overflow-y-auto">
+                          {anonymousUsers.map((u, idx) => (
+                            <div
+                              key={`${u.anonId}-${idx}`}
+                              onClick={() => {
+                                onClose();
+                                if (onJumpToUserJourney) {
+                                  onJumpToUserJourney({
+                                    userId: u.userId,
+                                    anonId: u.anonId,
+                                    displayName: u.userDisplay,
+                                  });
+                                }
+                              }}
+                              className="group flex items-center justify-between py-2 px-4 hover:bg-muted/40 transition-colors cursor-pointer text-xs"
+                              title="Click to view anonymous timeline"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
+                                <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 group-hover:bg-primary transition-colors shrink-0" />
+                                <span className="font-mono text-[11px] text-muted-foreground group-hover:text-foreground truncate">
+                                  {u.userDisplay}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-[10px] text-muted-foreground">
+                                  {u.visits} {u.visits === 1 ? "visit" : "visits"}
+                                </span>
+                                <span className="font-mono text-[11px] font-semibold text-foreground/80 group-hover:text-primary">
+                                  {formatDuration(u.totalSeconds)}
+                                </span>
+                                <ArrowRight className="h-3 w-3 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -533,14 +1926,38 @@ function UserJourneysTab({
   activeUsers,
   recentEvents,
   dateRange,
+  externalTarget,
 }: {
   activeUsers: ActiveUser[];
   recentEvents: RecentMobileEvent[];
   dateRange: DateRangeFilter;
+  externalTarget?: {
+    id: string;
+    type: "user" | "anon";
+    displayName: string;
+  } | null;
 }) {
   const [selectedUser, setSelectedUser] = useState<ActiveUser | null>(null);
   const [journeyEvents, setJourneyEvents] = useState<RecentMobileEvent[]>([]);
   const [isLoadingJourney, setIsLoadingJourney] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return activeUsers;
+    return activeUsers.filter((user) => {
+      const hay = [
+        user.fullName,
+        user.username,
+        user.userId,
+        user.anonId,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [activeUsers, userSearch]);
 
   const handleSelectUser = useCallback(
     async (user: ActiveUser) => {
@@ -556,7 +1973,6 @@ function UserJourneysTab({
           const json = await res.json();
           setJourneyEvents(json.data ?? []);
         } else {
-          // Fall back to filtering recentEvents locally
           const userEvents = recentEvents.filter((e) =>
             user.userId
               ? e.userId === user.userId
@@ -576,25 +1992,71 @@ function UserJourneysTab({
     [dateRange, recentEvents],
   );
 
+  // Jump to external user target if provided
+  useEffect(() => {
+    if (!externalTarget) return;
+    const found = activeUsers.find(
+      (u) =>
+        (externalTarget.type === "user" && u.userId === externalTarget.id) ||
+        (externalTarget.type === "anon" && u.anonId === externalTarget.id),
+    );
+    if (found) {
+      void handleSelectUser(found);
+    } else {
+      const syntheticUser: ActiveUser = {
+        userId: externalTarget.type === "user" ? externalTarget.id : null,
+        anonId: externalTarget.type === "anon" ? externalTarget.id : null,
+        fullName: externalTarget.displayName,
+        username: null,
+        eventsCount: 0,
+        screensVisited: 0,
+        totalSeconds: 0,
+        firstSeen: new Date().toISOString(),
+        lastSeen: new Date().toISOString(),
+        platforms: [],
+        topScreen: null,
+      };
+      void handleSelectUser(syntheticUser);
+    }
+  }, [externalTarget, activeUsers, handleSelectUser]);
+
   return (
     <div className="grid gap-6 lg:grid-cols-5">
       {/* User List */}
       <Card className="lg:col-span-2 border-2 shadow-sm">
-        <CardHeader className="border-b bg-gradient-to-r from-purple-500/5 via-background to-background">
-          <CardTitle className="text-lg font-bold flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            Active Users
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Select a user to view their journey timeline.
-          </CardDescription>
+        <CardHeader className="border-b bg-gradient-to-r from-purple-500/5 via-background to-background space-y-3">
+          <div>
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Active Users
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Select a user to view their journey timeline.
+            </CardDescription>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              type="search"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              placeholder="Search name, @username, id…"
+              className="w-full h-9 rounded-lg border border-border/60 bg-background pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          {activeUsers.length === 0 ? (
-            <EmptyState message="No user activity in this period." />
+          {filteredUsers.length === 0 ? (
+            <EmptyState
+              message={
+                userSearch.trim()
+                  ? "No users match your search."
+                  : "No user activity in this period."
+              }
+            />
           ) : (
             <div className="divide-y max-h-[600px] overflow-y-auto">
-              {activeUsers.map((user) => {
+              {filteredUsers.map((user) => {
                 const isSelected =
                   selectedUser &&
                   ((user.userId && user.userId === selectedUser.userId) ||
@@ -604,6 +2066,7 @@ function UserJourneysTab({
                   (user.anonId
                     ? `Anonymous ${user.anonId.slice(0, 8)}`
                     : "Unknown");
+                const platforms = user.platforms ?? [];
 
                 return (
                   <button
@@ -628,7 +2091,7 @@ function UserJourneysTab({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold truncate">{displayName}</p>
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-muted-foreground mt-0.5">
                           {user.username && <span>@{user.username}</span>}
                           <Badge
                             variant={user.userId ? "secondary" : "outline"}
@@ -636,7 +2099,28 @@ function UserJourneysTab({
                           >
                             {user.userId ? "Signed in" : "Anonymous"}
                           </Badge>
+                          {platforms.map((p) => (
+                            <Badge
+                              key={p}
+                              variant="outline"
+                              className={`text-[9px] px-1 py-0 ${
+                                p === "ios"
+                                  ? "border-sky-500/40 text-sky-400"
+                                  : "border-emerald-500/40 text-emerald-400"
+                              }`}
+                            >
+                              {p === "ios" ? "iOS" : "Android"}
+                            </Badge>
+                          ))}
                         </div>
+                        {user.topScreen && (
+                          <p className="text-[10px] text-muted-foreground mt-1 truncate">
+                            Most viewed:{" "}
+                            <span className="font-semibold text-foreground/80">
+                              {screenDisplayName(user.topScreen)}
+                            </span>
+                          </p>
+                        )}
                       </div>
                       <div className="text-right text-[10px] space-y-0.5">
                         <p className="font-bold text-primary">
