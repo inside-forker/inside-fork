@@ -1440,8 +1440,9 @@ function ScreenUserModal({
 }) {
   const [modalRange, setModalRange] = useState<DateRangeFilter>(defaultRange);
   const [users, setUsers] = useState<ScreenUserBreakdown[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [userSearch, setUserSearch] = useState("");
+  const [mobileTab, setMobileTab] = useState<"viewers" | "kpis">("viewers");
 
   const domainCfg = APP_DOMAINS[target.domain];
   const Icon = domainCfg.icon;
@@ -1449,6 +1450,7 @@ function ScreenUserModal({
   useEffect(() => {
     setModalRange(defaultRange);
     setUserSearch("");
+    setIsLoading(true);
   }, [target.screen, target.isPrefix, defaultRange]);
 
   useEffect(() => {
@@ -1499,185 +1501,418 @@ function ScreenUserModal({
       ? Math.round(target.totalSeconds / target.viewsCount)
       : 0;
 
+  const [showAnonDetails, setShowAnonDetails] = useState(false);
+
+  // Split viewers into registered named users vs anonymous guests
+  const { registeredUsers, anonymousUsers } = useMemo(() => {
+    const reg: ScreenUserBreakdown[] = [];
+    const anon: ScreenUserBreakdown[] = [];
+
+    for (const u of filteredUsers) {
+      const isNamed = Boolean(
+        u.userId ||
+          u.username ||
+          (u.userDisplay && !u.userDisplay.startsWith("Anonymous ")),
+      );
+      if (isNamed) {
+        reg.push(u);
+      } else {
+        anon.push(u);
+      }
+    }
+
+    return { registeredUsers: reg, anonymousUsers: anon };
+  }, [filteredUsers]);
+
+  // Aggregate stats for anonymous guests
+  const anonSummary = useMemo(() => {
+    const count = anonymousUsers.length;
+    const totalVisits = anonymousUsers.reduce((acc, u) => acc + u.visits, 0);
+    const totalSeconds = anonymousUsers.reduce(
+      (acc, u) => acc + u.totalSeconds,
+      0,
+    );
+    return { count, totalVisits, totalSeconds };
+  }, [anonymousUsers]);
+
+  const isSearchingAnon = Boolean(
+    userSearch.trim() &&
+      anonymousUsers.some((u) => {
+        const hay = [u.userDisplay, u.anonId].filter(Boolean).join(" ").toLowerCase();
+        return hay.includes(userSearch.trim().toLowerCase());
+      }),
+  );
+
+  const shouldShowAnonBreakdown = showAnonDetails || isSearchingAnon;
+
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
-        className="max-w-2xl w-[95vw] p-0 gap-0 overflow-hidden border-2 shadow-2xl bg-background rounded-2xl flex flex-col"
-        style={{
-          top: "clamp(1.25rem, 4vh, 2.5rem)",
-          transform: "translateX(-50%)",
-          maxHeight: "calc(100vh - 4rem)",
-          height: "min(80vh, 640px)",
-        }}
+        className="w-[96vw] max-w-5xl h-[88vh] sm:h-[min(85vh,640px)] p-0 gap-0 overflow-hidden border-2 shadow-2xl bg-background rounded-2xl flex flex-col"
       >
-        {/* Modal Header (Fixed height, shrink-0) */}
-        <DialogHeader className="p-4 sm:p-5 border-b bg-gradient-to-r from-muted/40 via-background to-transparent pr-12 space-y-3 text-left shrink-0">
-          <div className="flex items-center gap-3">
-            <div className={`h-10 w-10 rounded-xl ${domainCfg.accent.bg} border ${domainCfg.accent.border} flex items-center justify-center shrink-0`}>
-              <Icon className={`h-5 w-5 ${domainCfg.accent.text}`} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${domainCfg.accent.badge}`}>
-                  {domainCfg.name}
-                </Badge>
-                <span className="text-[11px] font-mono text-muted-foreground truncate">
-                  {target.routeSlug || "/"}
-                </span>
-              </div>
-              <DialogTitle className="text-lg font-bold truncate mt-0.5">
-                {target.displayTitle}
-              </DialogTitle>
-            </div>
-          </div>
-
-          {/* 4 Quick KPI Summary Cards */}
-          <div className="grid grid-cols-4 gap-2 pt-0.5">
-            <div className="px-3 py-1.5 rounded-lg bg-muted/40 border border-border/50">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Time</p>
-              <p className="text-sm font-black tabular-nums mt-0.5">{formatDuration(target.totalSeconds)}</p>
-            </div>
-            <div className="px-3 py-1.5 rounded-lg bg-muted/40 border border-border/50">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Views</p>
-              <p className="text-sm font-black tabular-nums mt-0.5">{target.viewsCount.toLocaleString()}</p>
-            </div>
-            <div className="px-3 py-1.5 rounded-lg bg-muted/40 border border-border/50">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Unique</p>
-              <p className="text-sm font-black tabular-nums mt-0.5">{target.uniqueUsers}</p>
-            </div>
-            <div className="px-3 py-1.5 rounded-lg bg-muted/40 border border-border/50">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Avg Dwell</p>
-              <p className="text-sm font-black tabular-nums mt-0.5">~{formatDuration(avgDwell)}</p>
-            </div>
-          </div>
-
-          {/* Date Range Selector Pills */}
-          <div className="grid grid-cols-4 gap-1 p-0.5 bg-muted/60 rounded-lg border border-border/50">
-            {DATE_RANGE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setModalRange(opt.value)}
-                disabled={isLoading}
-                className={`py-1 px-2 rounded-md text-xs font-semibold text-center transition-all ${
-                  modalRange === opt.value
-                    ? "bg-primary text-primary-foreground shadow-xs font-bold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-background/60"
-                } ${isLoading ? "opacity-50" : ""}`}
-              >
-                {opt.value === "24h"
-                  ? "24 Hours"
-                  : opt.value === "7d"
-                    ? "7 Days"
-                    : opt.value === "30d"
-                      ? "30 Days"
-                      : "All Time"}
-              </button>
-            ))}
-          </div>
-        </DialogHeader>
-
-        {/* Viewer search bar (Pinned, shrink-0) */}
-        <div className="px-4 pt-3 pb-2 shrink-0">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <input
-              type="search"
-              value={userSearch}
-              onChange={(e) => setUserSearch(e.target.value)}
-              placeholder="Search viewers by name, username, or ID…"
-              className="w-full h-9 rounded-xl border border-border/60 bg-muted/20 pl-8 pr-8 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-            {userSearch && (
-              <button
-                type="button"
-                onClick={() => setUserSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
+        {/* Mobile Tab Switcher (< 640px only) */}
+        <div className="flex sm:hidden border-b border-border/50 p-2 bg-muted/40 shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={() => setMobileTab("viewers")}
+            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+              mobileTab === "viewers"
+                ? "bg-primary text-primary-foreground shadow-xs font-bold"
+                : "text-muted-foreground hover:text-foreground bg-background/50"
+            }`}
+          >
+            <Users className="h-3.5 w-3.5" />
+            <span>Viewers ({isLoading ? "…" : users.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab("kpis")}
+            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+              mobileTab === "kpis"
+                ? "bg-primary text-primary-foreground shadow-xs font-bold"
+                : "text-muted-foreground hover:text-foreground bg-background/50"
+            }`}
+          >
+            <BarChartBig className="h-3.5 w-3.5" />
+            <span>Screen Stats</span>
+          </button>
         </div>
 
-        {/* Direct Scrollable Viewers List */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 space-y-2">
-            {isLoading ? (
-              <div className="py-16 text-center text-sm text-muted-foreground animate-pulse flex flex-col items-center gap-2">
-                <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                <span>Loading viewers breakdown…</span>
-              </div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">
-                {userSearch.trim()
-                  ? "No viewers match your search query."
-                  : "No screen view events recorded for this period."}
-              </div>
-            ) : (
-              filteredUsers.map((u, idx) => {
-                const isNamed = Boolean(
-                  u.username ||
-                    (u.userDisplay && !u.userDisplay.startsWith("Anonymous ")),
-                );
-                return (
-                  <div
-                    key={`${u.userId ?? u.anonId}-${idx}`}
-                    onClick={() => {
-                      onClose();
-                      if (onJumpToUserJourney) {
-                        onJumpToUserJourney({
-                          userId: u.userId,
-                          anonId: u.anonId,
-                          displayName: u.userDisplay,
-                        });
-                      }
-                    }}
-                    className="group flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/40 hover:border-primary/40 hover:bg-primary/[0.04] transition-all cursor-pointer shadow-xs"
-                    title="Click to view full user journey timeline"
-                  >
-                    <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
-                      <div
-                        className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center font-bold text-xs ${
-                          isNamed
-                            ? "bg-primary/15 text-primary border border-primary/30"
-                            : "bg-muted text-muted-foreground border border-border/60"
-                        }`}
-                      >
-                        {isNamed ? (
-                          u.userDisplay.charAt(0).toUpperCase()
-                        ) : (
-                          <User className="h-4 w-4" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
-                          {u.userDisplay}
-                        </p>
-                        {u.username ? (
-                          <p className="text-xs text-muted-foreground truncate">
-                            @{u.username}
-                          </p>
-                        ) : (
-                          <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">
-                            {u.userId ? "Registered User" : "Anonymous Guest"}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2.5 text-xs shrink-0">
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground border border-border/40">
-                        {u.visits} {u.visits === 1 ? "visit" : "visits"}
+        {/* 2-Column Desktop & Tablet Container */}
+        <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
+          {/* Left Column: Screen Intelligence, Telemetry & Time Controls */}
+          <div
+            className={`w-full sm:w-[320px] md:w-[360px] lg:w-[390px] shrink-0 sm:border-r border-border/60 bg-muted/20 p-4 sm:p-5 flex-col justify-between overflow-y-auto ${
+              mobileTab === "kpis" ? "flex" : "hidden sm:flex"
+            }`}
+          >
+            <div className="space-y-4">
+              <DialogHeader className="space-y-2 text-left">
+                <div className="flex items-center gap-2">
+                  <div className={`h-8 w-8 rounded-lg ${domainCfg.accent.bg} border ${domainCfg.accent.border} flex items-center justify-center shrink-0`}>
+                    <Icon className={`h-4 w-4 ${domainCfg.accent.text}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${domainCfg.accent.badge}`}>
+                        {domainCfg.name}
+                      </Badge>
+                      <span className="text-[11px] font-mono text-muted-foreground truncate">
+                        {target.routeSlug || "/"}
                       </span>
-                      <span className="font-bold text-xs font-mono text-primary bg-primary/10 border border-primary/25 px-2.5 py-0.5 rounded-md">
-                        {formatDuration(u.totalSeconds)}
-                      </span>
-                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                     </div>
                   </div>
-                );
-              })
-            )}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <DialogTitle className="text-lg sm:text-xl font-bold tracking-tight text-foreground leading-snug">
+                    {target.displayTitle}
+                  </DialogTitle>
+                  {isLoading && (
+                    <div className="h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin shrink-0" />
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Screen engagement telemetry, dwell distribution, and viewer identity breakdown.
+                </p>
+              </DialogHeader>
+
+              {/* 4 Quick KPI Summary Cards */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="p-3 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Time</p>
+                  <p className="text-base font-black tabular-nums mt-0.5 text-foreground">{formatDuration(target.totalSeconds)}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Views</p>
+                  <p className="text-base font-black tabular-nums mt-0.5 text-foreground">{target.viewsCount.toLocaleString()}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Unique Viewers</p>
+                  <p className="text-base font-black tabular-nums mt-0.5 text-foreground">{target.uniqueUsers}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Avg Dwell</p>
+                  <p className="text-base font-black tabular-nums mt-0.5 text-foreground">~{formatDuration(avgDwell)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom section of left column: Time Window Selector */}
+            <div className="pt-3 mt-3 border-t border-border/40 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                  Time Window
+                </span>
+                {isLoading && (
+                  <span className="text-[10px] text-primary font-medium animate-pulse">
+                    Refreshing…
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-background/60 rounded-xl border border-border/60">
+                {DATE_RANGE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setModalRange(opt.value)}
+                    disabled={isLoading}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold text-center transition-all ${
+                      modalRange === opt.value
+                        ? "bg-primary text-primary-foreground shadow-xs font-bold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    } ${isLoading ? "opacity-60" : ""}`}
+                  >
+                    {opt.value === "24h"
+                      ? "24 Hours"
+                      : opt.value === "7d"
+                        ? "7 Days"
+                        : opt.value === "30d"
+                          ? "30 Days"
+                          : "All Time"}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground/80 leading-normal pt-1">
+                Select any viewer on the right to trace their full app journey timeline.
+              </p>
+            </div>
           </div>
+
+          {/* Right Column: Viewers Intel and Activity Stream */}
+          <div
+            className={`flex-1 min-w-0 flex-col h-full overflow-hidden bg-background ${
+              mobileTab === "viewers" ? "flex" : "hidden sm:flex"
+            }`}
+          >
+            {/* Header of right pane with Title and Search Input */}
+            <div className="p-4 sm:p-5 border-b border-border/50 shrink-0 pr-12 space-y-3 bg-gradient-to-b from-muted/20 to-transparent">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <span>Viewer Intelligence</span>
+                    <Badge variant="secondary" className="text-[11px] font-medium px-2 py-0">
+                      {isLoading ? "Fetching…" : `${users.length} ${users.length === 1 ? "viewer" : "viewers"}`}
+                    </Badge>
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Identified registered accounts and aggregated guest audience
+                  </p>
+                </div>
+              </div>
+
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  type="search"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  placeholder="Search viewers by name, username, or ID…"
+                  disabled={isLoading}
+                  className="w-full h-9 rounded-xl border border-border/60 bg-muted/20 pl-8 pr-8 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+                />
+                {userSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setUserSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Scrollable List Container */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-2.5">
+              {isLoading ? (
+                /* Prominent Loader State */
+                <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center p-6 space-y-4">
+                  <div className="relative flex items-center justify-center">
+                    <div className="h-12 w-12 rounded-full border-3 border-primary/20 border-t-primary animate-spin" />
+                    <Users className="h-5 w-5 text-primary absolute" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-foreground">Loading Audience Intelligence</p>
+                    <p className="text-xs text-muted-foreground max-w-xs">
+                      Analyzing viewers, sessions, and dwell telemetry for {target.displayTitle}…
+                    </p>
+                  </div>
+                  {/* 3 shimmer skeleton cards */}
+                  <div className="w-full max-w-md space-y-2.5 pt-2">
+                    {[1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/40 animate-pulse"
+                      >
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="h-9 w-9 rounded-full bg-muted-foreground/15" />
+                          <div className="space-y-1.5 flex-1">
+                            <div className="h-3.5 w-28 rounded-md bg-muted-foreground/20" />
+                            <div className="h-2.5 w-16 rounded-md bg-muted-foreground/10" />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="h-5 w-14 rounded-md bg-muted-foreground/15" />
+                          <div className="h-5 w-16 rounded-md bg-muted-foreground/20" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : registeredUsers.length === 0 && anonymousUsers.length === 0 ? (
+                <div className="h-full min-h-[220px] flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
+                  <p className="font-semibold text-foreground/80">No Viewers Found</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                    {userSearch.trim()
+                      ? `No viewers match "${userSearch.trim()}".`
+                      : "No viewers recorded for this screen within the selected time window."}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Registered Users */}
+                  {registeredUsers.map((u, idx) => (
+                    <div
+                      key={`${u.userId ?? u.username}-${idx}`}
+                      onClick={() => {
+                        onClose();
+                        if (onJumpToUserJourney) {
+                          onJumpToUserJourney({
+                            userId: u.userId,
+                            anonId: u.anonId,
+                            displayName: u.userDisplay,
+                          });
+                        }
+                      }}
+                      className="group flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/40 hover:border-primary/40 hover:bg-primary/[0.04] transition-all cursor-pointer shadow-2xs"
+                      title="Click to view full user journey timeline"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
+                        <div className="h-9 w-9 shrink-0 rounded-full flex items-center justify-center font-bold text-xs bg-primary/15 text-primary border border-primary/30">
+                          {u.userDisplay.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
+                            {u.userDisplay}
+                          </p>
+                          {u.username ? (
+                            <p className="text-xs text-muted-foreground truncate">
+                              @{u.username}
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">
+                              Registered User
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-xs shrink-0">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground border border-border/40">
+                          {u.visits} {u.visits === 1 ? "visit" : "visits"}
+                        </span>
+                        <span className="font-bold text-xs font-mono text-primary bg-primary/10 border border-primary/25 px-2.5 py-0.5 rounded-md">
+                          {formatDuration(u.totalSeconds)}
+                        </span>
+                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Grouped Anonymous Guests */}
+                  {anonymousUsers.length > 0 && (
+                    <div className="rounded-xl border border-border/60 bg-muted/25 overflow-hidden transition-all shadow-2xs">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setShowAnonDetails((prev) => !prev)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") setShowAnonDetails((prev) => !prev);
+                        }}
+                        className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/40 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-9 w-9 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 text-muted-foreground">
+                            <Users className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-semibold text-foreground">
+                                Anonymous Guests
+                              </p>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                {anonSummary.count} {anonSummary.count === 1 ? "guest" : "guests"}
+                              </Badge>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              {anonSummary.totalVisits} total visits · Grouped guest traffic
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <span className="font-mono text-xs font-bold text-foreground bg-background/80 border border-border/60 px-2 py-0.5 rounded-md">
+                            {formatDuration(anonSummary.totalSeconds)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowAnonDetails((prev) => !prev);
+                            }}
+                            className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 pl-1"
+                          >
+                            <span>{shouldShowAnonBreakdown ? "Hide" : "Breakdown"}</span>
+                            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${shouldShowAnonBreakdown ? "rotate-180" : ""}`} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Collapsible breakdown for anonymous guests */}
+                      {shouldShowAnonBreakdown && (
+                        <div className="divide-y divide-border/20 border-t border-border/40 bg-background/60 max-h-56 overflow-y-auto">
+                          {anonymousUsers.map((u, idx) => (
+                            <div
+                              key={`${u.anonId}-${idx}`}
+                              onClick={() => {
+                                onClose();
+                                if (onJumpToUserJourney) {
+                                  onJumpToUserJourney({
+                                    userId: u.userId,
+                                    anonId: u.anonId,
+                                    displayName: u.userDisplay,
+                                  });
+                                }
+                              }}
+                              className="group flex items-center justify-between py-2 px-4 hover:bg-muted/40 transition-colors cursor-pointer text-xs"
+                              title="Click to view anonymous timeline"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
+                                <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 group-hover:bg-primary transition-colors shrink-0" />
+                                <span className="font-mono text-[11px] text-muted-foreground group-hover:text-foreground truncate">
+                                  {u.userDisplay}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-[10px] text-muted-foreground">
+                                  {u.visits} {u.visits === 1 ? "visit" : "visits"}
+                                </span>
+                                <span className="font-mono text-[11px] font-semibold text-foreground/80 group-hover:text-primary">
+                                  {formatDuration(u.totalSeconds)}
+                                </span>
+                                <ArrowRight className="h-3 w-3 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
