@@ -16,13 +16,18 @@ export const dynamic = "force-dynamic";
 // .dev/.preview suffixes) - a native Sign in with Apple token is audienced
 // to whichever one built the app, not to the web APPLE_CLIENT_ID.
 const IOS_BUNDLE_IDS = [
-  "com.insidekarachi.app",
-  "com.insidekarachi.app.dev",
-  "com.insidekarachi.app.preview",
+  "com.inside.cityguide",
+  "com.inside.cityguide.dev",
+  "com.inside.cityguide.preview",
 ];
 
+// The RN client (src/utils/appleSignIn.ts) posts the token as `identityToken`
+// (that's expo-apple-authentication's field name) plus `fullName`, which Apple
+// only returns on the *first* authorization - forwarded so the new profile
+// gets a name.
 const bodySchema = z.object({
-  idToken: z.string().min(1),
+  identityToken: z.string().min(1),
+  fullName: z.string().trim().min(1).optional(),
 });
 
 /**
@@ -46,7 +51,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
 
   let profile: AppleIdTokenPayload;
   try {
-    profile = await verifyAppleIdToken(parsed.data.idToken, IOS_BUNDLE_IDS);
+    profile = await verifyAppleIdToken(parsed.data.identityToken, IOS_BUNDLE_IDS);
   } catch {
     throw new MobileApiError(
       "invalid_apple_token",
@@ -63,7 +68,12 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     );
   }
 
-  const user = await findOrCreateOAuthUser("apple", profile);
+  const user = await findOrCreateOAuthUser("apple", {
+    ...profile,
+    // Apple only sends the name in the token on first auth; the client passes
+    // it explicitly so a first-time signup still gets a full_name.
+    ...(parsed.data.fullName ? { name: parsed.data.fullName } : {}),
+  });
 
   const { rows } = await query(
     `SELECT username, full_name FROM public.profiles WHERE id = $1 LIMIT 1`,
