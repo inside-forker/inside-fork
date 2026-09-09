@@ -66,9 +66,9 @@ export async function findOrCreateOAuthUser(
   inviteCode?: string
 ): Promise<{ id: string; email: string; role: string }> {
   const { rows } = await query(
-    `SELECT p.id, p.role, u.email, u.raw_app_meta_data
+    `SELECT u.id, COALESCE(p.role, 'public_user') as role, u.email, u.raw_app_meta_data, p.id as profile_id
      FROM auth.users u
-     JOIN public.profiles p ON p.id = u.id
+     LEFT JOIN public.profiles p ON p.id = u.id
      WHERE LOWER(u.email) = LOWER($1) LIMIT 1`,
     [profile.email]
   );
@@ -100,6 +100,24 @@ export async function findOrCreateOAuthUser(
         now,
       ]
     );
+
+    if (!existing.profile_id) {
+      const username = await generateUniqueUsername(profile.email);
+      try {
+        await query(`SELECT public.create_user_profile($1, $2, $3)`, [
+          existing.id,
+          username,
+          profile.name ?? null,
+        ]);
+      } catch {
+        await query(
+          `INSERT INTO public.profiles (id, username, full_name, role, points, active_role)
+           VALUES ($1, $2, $3, 'public_user', 0, 'public_user')
+           ON CONFLICT (id) DO NOTHING`,
+          [existing.id, username, profile.name ?? null]
+        );
+      }
+    }
 
     if (profile.picture) {
       await query(
