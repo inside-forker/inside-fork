@@ -38,5 +38,10 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     logoUrl: b.logo_url,
   }));
 
-  return ok(banks);
+  return ok(banks, undefined, {
+    headers: {
+      "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+    },
+  });
 });
+

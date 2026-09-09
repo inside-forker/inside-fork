@@ -42,6 +42,8 @@ export type MobileDealPreviewDTO = {
   listingSlug?: string;
   /** Listing id for redeem / affinity events. */
   listingId?: number;
+  /** Other deals for the same merchant listing. */
+  otherDeals?: MobileDealPreviewDTO[];
 };
 
 export type CardAssociation = {
