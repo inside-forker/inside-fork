@@ -613,17 +613,9 @@ function ScreenTimeTab({
   const hasPanel = selectedTarget !== null;
 
   return (
-    <div
-      className={`grid gap-6 items-start ${
-        hasPanel ? "grid-cols-1 lg:grid-cols-12" : "grid-cols-1"
-      }`}
-    >
-      {/* ——— Tree Panel ——— */}
-      <Card
-        className={`border-2 shadow-sm transition-all duration-300 min-w-0 ${
-          hasPanel ? "lg:col-span-7 xl:col-span-8" : "w-full"
-        }`}
-      >
+    <div className="space-y-6">
+      {/* ——— Tree Panel (Full Width) ——— */}
+      <Card className="w-full border-2 shadow-sm transition-all duration-300">
         <CardHeader className="border-b bg-gradient-to-r from-primary/5 via-background to-background">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
@@ -632,7 +624,7 @@ function ScreenTimeTab({
                 Screen Time Explorer
               </CardTitle>
               <CardDescription>
-                Drill into sections or click any row to inspect viewer analytics →
+                Drill into sections or click any screen row to inspect viewer analytics in a popup modal →
               </CardDescription>
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -672,12 +664,13 @@ function ScreenTimeTab({
 
         <CardContent className="p-0">
           {/* Column header strip */}
-          <div className="flex items-center gap-3 px-4 py-2 border-b bg-muted/20 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground select-none">
-            <span className="flex-1 min-w-0">Screen / Page</span>
-            <span className="w-20 text-right shrink-0">Total Time</span>
-            <span className="w-14 text-right shrink-0">Views</span>
-            <span className="w-12 text-right shrink-0">Users</span>
-            <span className="w-24 pl-1 shrink-0">Share</span>
+          <div className="flex items-center gap-4 px-5 py-2.5 border-b bg-muted/20 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground select-none">
+            <span className="flex-1 min-w-[160px]">Screen / Page</span>
+            <span className="w-24 text-right shrink-0">Total Time</span>
+            <span className="w-16 text-right shrink-0">Views</span>
+            <span className="w-16 text-right shrink-0">Users</span>
+            <span className="w-28 pl-1 shrink-0">Share</span>
+            <span className="w-20 text-right shrink-0 text-muted-foreground/60 hidden sm:inline">Action</span>
           </div>
 
           {filteredNodes.length === 0 ? (
@@ -694,10 +687,6 @@ function ScreenTimeTab({
                 const isExpanded = expandedKeys.has(node.key);
                 const hasChildren = node.children.length > 0;
                 const totalScreens = node.children.length + (node.ownRow ? 1 : 0);
-
-                const isSelected = hasChildren
-                  ? selectedTarget?.screen === node.key && selectedTarget?.isPrefix
-                  : selectedTarget?.screen === (node.ownRow?.screen ?? node.key) && !selectedTarget?.isPrefix;
 
                 const sharePercent =
                   totalTime > 0
@@ -738,15 +727,11 @@ function ScreenTimeTab({
                           handleSelectNode();
                         }
                       }}
-                      className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all duration-150 ${
-                        isSelected
-                          ? "bg-primary/10 border-l-[3px] border-l-primary shadow-xs"
-                          : "border-l-[3px] border-l-transparent hover:bg-muted/40"
-                      }`}
+                      className="group flex items-center gap-4 px-5 py-3.5 cursor-pointer transition-all duration-150 hover:bg-muted/40"
                       onClick={handleSelectNode}
                     >
                       {/* Label + expand */}
-                      <div className="flex-1 min-w-0 flex items-center gap-2.5">
+                      <div className="flex-1 min-w-[160px] flex items-center gap-3">
                         {/* Expand toggle button or leaf icon */}
                         {hasChildren ? (
                           <button
@@ -771,13 +756,13 @@ function ScreenTimeTab({
                         )}
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
                             {hasChildren && (
                               <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center shrink-0">
                                 <Icon className="h-3 w-3 text-primary" />
                               </div>
                             )}
-                            <span className="text-sm font-semibold truncate">
+                            <span className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
                               {node.label}
                             </span>
                             {hasChildren && (
@@ -791,7 +776,7 @@ function ScreenTimeTab({
                           </div>
                           {/* Collapsed preview */}
                           {hasChildren && !isExpanded && (
-                            <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
                               {[
                                 node.ownRow
                                   ? screenDisplayName(node.ownRow.screen)
@@ -812,17 +797,17 @@ function ScreenTimeTab({
                       </div>
 
                       {/* Aggregated stats */}
-                      <span className="w-20 text-right shrink-0 text-sm font-bold tabular-nums">
+                      <span className="w-24 text-right shrink-0 text-sm font-bold tabular-nums">
                         {formatDuration(node.aggregatedSeconds)}
                       </span>
-                      <span className="w-14 text-right shrink-0 text-xs text-muted-foreground tabular-nums">
+                      <span className="w-16 text-right shrink-0 text-xs text-muted-foreground tabular-nums">
                         {node.aggregatedViews.toLocaleString()}
                       </span>
-                      <span className="w-12 text-right shrink-0">
+                      <span className="w-16 text-right shrink-0">
                         {node.ownRow ? (
                           <Badge
                             variant="secondary"
-                            className="text-xs px-1.5 py-0"
+                            className="text-xs px-2 py-0.5"
                           >
                             {node.ownRow.uniqueUsers}
                           </Badge>
@@ -832,13 +817,18 @@ function ScreenTimeTab({
                           </span>
                         )}
                       </span>
-                      <div className="w-24 shrink-0 flex items-center gap-1.5">
+                      <div className="w-28 shrink-0 flex items-center gap-1.5">
                         <Progress
                           value={Math.min(sharePercent, 100)}
                           className="h-1.5 flex-1"
                         />
-                        <span className="text-[10px] font-semibold text-muted-foreground w-9 text-right tabular-nums shrink-0">
+                        <span className="text-[10px] font-semibold text-muted-foreground w-10 text-right tabular-nums shrink-0">
                           {sharePercent.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="w-20 text-right shrink-0 hidden sm:flex items-center justify-end">
+                        <span className="text-[11px] font-medium text-primary/80 group-hover:text-primary flex items-center gap-1">
+                          View stats <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
                         </span>
                       </div>
                     </div>
@@ -851,10 +841,6 @@ function ScreenTimeTab({
                           <ScreenChildRow
                             row={node.ownRow}
                             totalTime={totalTime}
-                            isSelected={
-                              selectedTarget?.screen === node.ownRow.screen &&
-                              !selectedTarget?.isPrefix
-                            }
                             onSelect={() =>
                               setSelectedTarget({
                                 screen: node.ownRow!.screen,
@@ -879,10 +865,6 @@ function ScreenTimeTab({
                               key={child.screen}
                               row={child}
                               totalTime={totalTime}
-                              isSelected={
-                                selectedTarget?.screen === child.screen &&
-                                !selectedTarget?.isPrefix
-                              }
                               onSelect={() =>
                                 setSelectedTarget({
                                   screen: child.screen,
@@ -905,16 +887,14 @@ function ScreenTimeTab({
         </CardContent>
       </Card>
 
-      {/* ——— User breakdown side panel ——— */}
+      {/* ——— Screen User Breakdown Modal ——— */}
       {selectedTarget && (
-        <div className="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-6 min-w-0">
-          <ScreenUserPanel
-            target={selectedTarget}
-            defaultRange={dateRange}
-            onClose={() => setSelectedTarget(null)}
-            onJumpToUserJourney={onJumpToUserJourney}
-          />
-        </div>
+        <ScreenUserModal
+          target={selectedTarget}
+          defaultRange={dateRange}
+          onClose={() => setSelectedTarget(null)}
+          onJumpToUserJourney={onJumpToUserJourney}
+        />
       )}
     </div>
   );
@@ -925,13 +905,11 @@ function ScreenTimeTab({
 function ScreenChildRow({
   row,
   totalTime,
-  isSelected,
   onSelect,
   label,
 }: {
   row: ScreenTimeRow;
   totalTime: number;
-  isSelected: boolean;
   onSelect: () => void;
   label?: string;
 }) {
@@ -946,54 +924,55 @@ function ScreenChildRow({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") onSelect();
       }}
-      className={`flex items-center gap-3 py-2.5 pr-4 cursor-pointer transition-all duration-150 border-t border-border/20 ${
-        isSelected
-          ? "bg-primary/15 border-l-[3px] border-l-primary pl-9 shadow-xs"
-          : "border-l-[3px] border-l-transparent hover:bg-muted/50 pl-9"
-      }`}
+      className="group flex items-center gap-4 py-2.5 pr-5 pl-12 cursor-pointer transition-all duration-150 border-t border-border/20 hover:bg-muted/50"
       onClick={onSelect}
     >
       {/* Label with tree indicator */}
-      <div className="flex-1 min-w-0 flex items-center gap-2">
+      <div className="flex-1 min-w-[160px] flex items-center gap-2">
         <div className="flex items-center gap-1 shrink-0 text-border">
           <div className="w-3 h-px bg-border/60" />
           <div className="h-1.5 w-1.5 rounded-full bg-primary/40" />
         </div>
         <span
-          className="text-xs font-mono text-muted-foreground truncate hover:text-foreground transition-colors"
+          className="text-xs font-mono text-muted-foreground truncate group-hover:text-foreground transition-colors"
           title={screenDisplayName(row.screen)}
         >
           {displayLabel}
         </span>
       </div>
       {/* Stats */}
-      <span className="w-20 text-right shrink-0 text-xs font-semibold tabular-nums">
+      <span className="w-24 text-right shrink-0 text-xs font-semibold tabular-nums">
         {formatDuration(row.totalSecondsSpent)}
       </span>
-      <span className="w-14 text-right shrink-0 text-xs text-muted-foreground tabular-nums">
+      <span className="w-16 text-right shrink-0 text-xs text-muted-foreground tabular-nums">
         {row.viewsCount}
       </span>
-      <span className="w-12 text-right shrink-0">
-        <Badge variant="outline" className="text-[9px] px-1 py-0">
+      <span className="w-16 text-right shrink-0">
+        <Badge variant="outline" className="text-[9px] px-1.5 py-0.2">
           {row.uniqueUsers}
         </Badge>
       </span>
-      <div className="w-24 shrink-0 flex items-center gap-1">
+      <div className="w-28 shrink-0 flex items-center gap-1">
         <Progress
           value={Math.min(sharePercent, 100)}
           className="h-1 flex-1"
         />
-        <span className="text-[9px] text-muted-foreground w-9 text-right tabular-nums shrink-0">
+        <span className="text-[10px] text-muted-foreground w-10 text-right tabular-nums shrink-0">
           {sharePercent.toFixed(1)}%
+        </span>
+      </div>
+      <div className="w-20 text-right shrink-0 hidden sm:flex items-center justify-end">
+        <span className="text-[10px] font-medium text-primary/70 group-hover:text-primary flex items-center gap-1">
+          View <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
         </span>
       </div>
     </div>
   );
 }
 
-/* ——— User breakdown side panel ——— */
+/* ——— Screen User Modal (Centered Dialog Popup) ——— */
 
-function ScreenUserPanel({
+function ScreenUserModal({
   target,
   defaultRange,
   onClose,
@@ -1064,173 +1043,166 @@ function ScreenUserPanel({
   }, [users, userSearch]);
 
   return (
-    <Card className="border-2 shadow-sm overflow-hidden">
-      <CardHeader className="border-b bg-gradient-to-r from-primary/5 via-background to-background pb-3 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
-                <Monitor className="h-4 w-4 text-primary" />
-              </div>
-              <CardTitle
-                className="text-base font-bold truncate leading-tight"
-                title={target.displayTitle}
-              >
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden border-2 shadow-2xl bg-background rounded-2xl max-h-[85vh] flex flex-col">
+        {/* Modal Header */}
+        <DialogHeader className="p-5 border-b bg-gradient-to-r from-primary/10 via-primary/5 to-transparent pr-12 space-y-3 text-left">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+              <Monitor className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-xl font-bold truncate">
                 {target.displayTitle}
-              </CardTitle>
+              </DialogTitle>
+              <DialogDescription className="text-xs mt-1 flex items-center gap-2 flex-wrap text-muted-foreground">
+                <span className="font-semibold text-foreground">
+                  {formatDuration(target.totalSeconds)}
+                </span>
+                <span>·</span>
+                <span>{target.viewsCount.toLocaleString()} views</span>
+                {target.uniqueUsers > 0 && (
+                  <>
+                    <span>·</span>
+                    <span className="px-1.5 py-0.5 rounded bg-muted text-[11px] font-medium text-foreground">
+                      {target.uniqueUsers} users
+                    </span>
+                  </>
+                )}
+              </DialogDescription>
             </div>
-            <CardDescription className="text-xs mt-1.5 flex items-center gap-2 flex-wrap text-muted-foreground">
-              <span className="font-semibold text-foreground">
-                {formatDuration(target.totalSeconds)}
-              </span>
-              <span>·</span>
-              <span>{target.viewsCount.toLocaleString()} views</span>
-              {target.uniqueUsers > 0 && (
-                <>
-                  <span>·</span>
-                  <span className="px-1.5 py-0.5 rounded bg-muted/80 text-[11px] font-medium text-foreground">
-                    {target.uniqueUsers} users
-                  </span>
-                </>
-              )}
-            </CardDescription>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close panel"
-            className="shrink-0 p-1.5 rounded-lg border border-border/40 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
 
-        {/* Date range segmented buttons */}
-        <div className="grid grid-cols-4 gap-1 p-1 bg-muted/60 rounded-lg border border-border/40">
-          {DATE_RANGE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setModalRange(opt.value)}
-              disabled={isLoading}
-              className={`py-1 px-1 rounded-md text-[11px] font-semibold text-center transition-all ${
-                modalRange === opt.value
-                  ? "bg-primary text-primary-foreground shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-background/60"
-              } ${isLoading ? "opacity-50" : ""}`}
-            >
-              {opt.value === "24h"
-                ? "24h"
-                : opt.value === "7d"
-                  ? "7d"
-                  : opt.value === "30d"
-                    ? "30d"
-                    : "All"}
-            </button>
-          ))}
-        </div>
-      </CardHeader>
+          {/* Date range segmented buttons */}
+          <div className="grid grid-cols-4 gap-1 p-1 bg-muted/70 rounded-xl border border-border/40">
+            {DATE_RANGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setModalRange(opt.value)}
+                disabled={isLoading}
+                className={`py-1.5 px-2 rounded-lg text-xs font-semibold text-center transition-all ${
+                  modalRange === opt.value
+                    ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-background/60"
+                } ${isLoading ? "opacity-50" : ""}`}
+              >
+                {opt.value === "24h"
+                  ? "24 Hours"
+                  : opt.value === "7d"
+                    ? "7 Days"
+                    : opt.value === "30d"
+                      ? "30 Days"
+                      : "All Time"}
+              </button>
+            ))}
+          </div>
+        </DialogHeader>
 
-      <CardContent className="p-3 space-y-2.5">
-        {/* User search */}
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <input
-            type="search"
-            value={userSearch}
-            onChange={(e) => setUserSearch(e.target.value)}
-            placeholder="Search users…"
-            className="w-full h-9 rounded-lg border border-border/60 bg-background pl-8 pr-8 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-          {userSearch && (
-            <button
-              type="button"
-              onClick={() => setUserSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
+        {/* Modal Body */}
+        <div className="p-5 space-y-3 flex-1 overflow-hidden flex flex-col min-h-0">
+          {/* User search */}
+          <div className="relative shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="search"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              placeholder="Search viewers by name, username, or ID…"
+              className="w-full h-10 rounded-xl border border-border/60 bg-muted/20 pl-9 pr-9 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            {userSearch && (
+              <button
+                type="button"
+                onClick={() => setUserSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
 
-        {/* User list */}
-        <div className="space-y-1.5 max-h-[520px] overflow-y-auto pr-1">
-          {isLoading ? (
-            <div className="py-10 text-center text-sm text-muted-foreground animate-pulse">
-              Loading screen viewers…
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">
-              {userSearch.trim()
-                ? "No users match your search."
-                : "No users for this screen in range."}
-            </div>
-          ) : (
-            filteredUsers.map((u, idx) => {
-              const isNamed = Boolean(
-                u.username ||
-                  (u.userDisplay && !u.userDisplay.startsWith("Anonymous ")),
-              );
-              return (
-                <div
-                  key={`${u.userId ?? u.anonId}-${idx}`}
-                  onClick={() => {
-                    if (onJumpToUserJourney) {
-                      onJumpToUserJourney({
-                        userId: u.userId,
-                        anonId: u.anonId,
-                        displayName: u.userDisplay,
-                      });
-                    }
-                  }}
-                  className="group flex items-center justify-between p-2.5 rounded-xl bg-card border border-border/40 hover:border-primary/40 hover:bg-primary/[0.04] transition-all cursor-pointer shadow-xs"
-                  title="Click to view full user journey timeline"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
-                    <div
-                      className={`h-8 w-8 shrink-0 rounded-full flex items-center justify-center font-bold text-xs ${
-                        isNamed
-                          ? "bg-primary/15 text-primary border border-primary/30"
-                          : "bg-muted text-muted-foreground border border-border/60"
-                      }`}
-                    >
-                      {isNamed ? (
-                        u.userDisplay.charAt(0).toUpperCase()
-                      ) : (
-                        <User className="h-3.5 w-3.5" />
-                      )}
+          {/* User list */}
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[220px]">
+            {isLoading ? (
+              <div className="py-16 text-center text-sm text-muted-foreground animate-pulse flex flex-col items-center gap-2">
+                <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                <span>Loading screen viewers…</span>
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="py-16 text-center text-sm text-muted-foreground">
+                {userSearch.trim()
+                  ? "No viewers match your search."
+                  : "No screen view events recorded for this period."}
+              </div>
+            ) : (
+              filteredUsers.map((u, idx) => {
+                const isNamed = Boolean(
+                  u.username ||
+                    (u.userDisplay && !u.userDisplay.startsWith("Anonymous ")),
+                );
+                return (
+                  <div
+                    key={`${u.userId ?? u.anonId}-${idx}`}
+                    onClick={() => {
+                      onClose();
+                      if (onJumpToUserJourney) {
+                        onJumpToUserJourney({
+                          userId: u.userId,
+                          anonId: u.anonId,
+                          displayName: u.userDisplay,
+                        });
+                      }
+                    }}
+                    className="group flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/40 hover:border-primary/40 hover:bg-primary/[0.04] transition-all cursor-pointer shadow-xs"
+                    title="Click to view full user journey timeline"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
+                      <div
+                        className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center font-bold text-xs ${
+                          isNamed
+                            ? "bg-primary/15 text-primary border border-primary/30"
+                            : "bg-muted text-muted-foreground border border-border/60"
+                        }`}
+                      >
+                        {isNamed ? (
+                          u.userDisplay.charAt(0).toUpperCase()
+                        ) : (
+                          <User className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
+                          {u.userDisplay}
+                        </p>
+                        {u.username ? (
+                          <p className="text-xs text-muted-foreground truncate">
+                            @{u.username}
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">
+                            {u.userId ? "Registered" : "Guest"}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold truncate group-hover:text-primary transition-colors">
-                        {u.userDisplay}
-                      </p>
-                      {u.username ? (
-                        <p className="text-[10px] text-muted-foreground truncate">
-                          @{u.username}
-                        </p>
-                      ) : (
-                        <p className="text-[9px] text-muted-foreground/70 uppercase tracking-wider">
-                          {u.userId ? "Registered" : "Guest"}
-                        </p>
-                      )}
+                    <div className="flex items-center gap-2.5 text-xs shrink-0">
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground border border-border/40">
+                        {u.visits} {u.visits === 1 ? "visit" : "visits"}
+                      </span>
+                      <span className="font-bold text-xs font-mono text-primary bg-primary/10 border border-primary/25 px-2.5 py-0.5 rounded-md">
+                        {formatDuration(u.totalSeconds)}
+                      </span>
+                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 text-xs shrink-0">
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-muted/60 text-muted-foreground border border-border/30">
-                      {u.visits} {u.visits === 1 ? "visit" : "visits"}
-                    </span>
-                    <span className="font-bold text-xs font-mono text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-md">
-                      {formatDuration(u.totalSeconds)}
-                    </span>
-                    <ArrowRight className="h-3 w-3 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
-                  </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 }
 

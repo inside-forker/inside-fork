@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     const prefix = searchParams.get("prefix") === "true";
 
-    if (!screen) {
+    if (screen === null || screen === undefined) {
       return NextResponse.json(
         { error: "Missing screen parameter" },
         { status: 400 },
