@@ -653,8 +653,25 @@ export async function getUserJourney(
 export async function getScreenUsers(
   screen: string,
   range: DateRangeFilter = "7d",
+  isPrefix: boolean = false,
 ): Promise<ScreenUserBreakdown[]> {
   const dateFilter = dateRangeClause("me", "occurred_at", range);
+  const normalized = screen.startsWith("/") ? screen.slice(1) : screen;
+  const isHome = !normalized || normalized.toLowerCase() === "home";
+
+  let screenCondition: string;
+  let params: string[];
+
+  if (isHome) {
+    screenCondition = `(me.screen = '' OR me.screen = '/' OR LOWER(me.screen) = 'home')`;
+    params = [];
+  } else if (isPrefix) {
+    screenCondition = `(me.screen = $1 OR me.screen = $2 OR me.screen LIKE $1 || '/%' OR me.screen LIKE $2 || '/%')`;
+    params = [normalized, `/${normalized}`];
+  } else {
+    screenCondition = `(me.screen = $1 OR me.screen = $2)`;
+    params = [normalized, `/${normalized}`];
+  }
 
   const result = await query(
     `WITH screen_durations AS (
@@ -669,12 +686,12 @@ export async function getScreenUsers(
           - me.occurred_at
         )) AS raw_duration
       FROM public.mobile_events me
-      WHERE me.screen = $1
+      WHERE ${screenCondition}
         AND ${dateFilter}
         AND ${nativePlatformClause("me")}
     )
     SELECT
-      sd.screen,
+      ${isHome ? "'Home'" : "$1"} AS screen,
       COALESCE(p.full_name, 'Anonymous ' || SUBSTRING(sd.anon_id, 1, 8)) AS user_display,
       p.username,
       sd.user_id::text,
@@ -683,10 +700,10 @@ export async function getScreenUsers(
       ROUND(SUM(CASE WHEN sd.raw_duration > 0 AND sd.raw_duration < 1800 THEN sd.raw_duration ELSE 15 END)::numeric, 0)::int AS total_seconds
     FROM screen_durations sd
     LEFT JOIN public.profiles p ON p.id = sd.user_id
-    GROUP BY sd.screen, user_display, p.username, sd.user_id, sd.anon_id
+    GROUP BY user_display, p.username, sd.user_id, sd.anon_id
     ORDER BY total_seconds DESC
     LIMIT 200`,
-    [screen],
+    params,
   );
 
   return result.rows.map((r) => ({

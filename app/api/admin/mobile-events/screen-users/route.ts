@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
         : "7d"
     ) as DateRangeFilter;
 
+    const prefix = searchParams.get("prefix") === "true";
+
     if (!screen) {
       return NextResponse.json(
         { error: "Missing screen parameter" },
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data = await getScreenUsers(screen, range);
+    const data = await getScreenUsers(screen, range, prefix);
 
     return NextResponse.json(
       { data },

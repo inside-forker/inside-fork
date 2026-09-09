@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   ExternalLink,
   Timer,
   BarChartBig,
@@ -28,6 +29,10 @@ import {
   Target,
   Filter,
   X,
+  House,
+  Tag,
+  ShoppingCart,
+  Building2,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -109,8 +114,26 @@ function formatDateShort(value: string) {
 }
 
 function screenDisplayName(screen: string): string {
-  if (screen === "/") return "Home";
-  return screen.startsWith("/") ? screen.slice(1) : screen;
+  if (!screen || screen === "/") return "Home";
+  const raw = screen.startsWith("/") ? screen.slice(1) : screen;
+  return raw
+    .split("/")
+    .map((part) => {
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(part)) {
+        return `[id:${part.slice(0, 8)}]`;
+      }
+      return part
+        .replace(/[-_]/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+    })
+    .join(" / ");
+}
+
+function formatPreviewSlug(slug: string): string {
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)) {
+    return `[${slug.slice(0, 8)}]`;
+  }
+  return slug.replace(/[-_]/g, " ");
 }
 
 const SURFACE_LABELS: Record<SearchEvent["surface"], { label: string; color: string }> = {
@@ -139,6 +162,26 @@ export function MobileEventsDashboard({
   const [data, setData] = useState(initialData);
   const [dateRange, setDateRange] = useState<DateRangeFilter>(initialRange);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("screen-time");
+  const [journeyTarget, setJourneyTarget] = useState<{
+    id: string;
+    type: "user" | "anon";
+    displayName: string;
+  } | null>(null);
+
+  const handleJumpToUserJourney = useCallback(
+    (u: { userId: string | null; anonId: string | null; displayName: string }) => {
+      const id = u.userId ?? u.anonId;
+      if (!id) return;
+      setJourneyTarget({
+        id,
+        type: u.userId ? "user" : "anon",
+        displayName: u.displayName,
+      });
+      setActiveTab("users");
+    },
+    [],
+  );
 
   /* ——— Date range change triggers re-fetch ——— */
   const handleDateRangeChange = useCallback(async (range: DateRangeFilter) => {
@@ -253,7 +296,7 @@ export function MobileEventsDashboard({
       </div>
 
       {/* ——— Main Tabbed Dashboard ——— */}
-      <Tabs defaultValue="screen-time" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="bg-muted/50 p-1 h-auto flex-wrap">
           <TabsTrigger value="screen-time" className="gap-1.5 text-xs">
             <Timer className="h-3.5 w-3.5" /> Screen Time
@@ -278,6 +321,7 @@ export function MobileEventsDashboard({
             screenTimeRows={data.screenTimeRows}
             totalTime={summary.totalScreenTimeSeconds}
             dateRange={dateRange}
+            onJumpToUserJourney={handleJumpToUserJourney}
           />
         </TabsContent>
 
@@ -287,6 +331,7 @@ export function MobileEventsDashboard({
             activeUsers={data.activeUsers}
             recentEvents={data.recentEvents}
             dateRange={dateRange}
+            externalTarget={journeyTarget}
           />
         </TabsContent>
 
@@ -361,181 +406,631 @@ function KpiCard({
 }
 
 /* ===================================================================== */
-/* Tab 1: Screen Time Analytics                                          */
+/* Screen Tree Types & Builder                                            */
+/* ===================================================================== */
+
+type ScreenNode = {
+  key: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  ownRow: ScreenTimeRow | null;
+  children: ScreenTimeRow[];
+  aggregatedSeconds: number;
+  aggregatedViews: number;
+};
+
+type SelectedScreenTarget = {
+  screen: string;
+  displayTitle: string;
+  totalSeconds: number;
+  viewsCount: number;
+  uniqueUsers: number;
+  isPrefix: boolean;
+};
+
+function getScreenIcon(
+  base: string,
+): React.ComponentType<{ className?: string }> {
+  switch (base.toLowerCase()) {
+    case "":
+    case "home":
+      return House;
+    case "events":
+      return Ticket;
+    case "deals":
+    case "deals-category":
+    case "deals-filter":
+    case "deals-bank":
+      return Tag;
+    case "listing":
+    case "listings":
+    case "listing_deal_terms":
+      return MapPin;
+    case "explore":
+    case "discovery":
+    case "discover":
+      return Globe;
+    case "search":
+      return Search;
+    case "checkout":
+      return ShoppingCart;
+    case "organizer":
+    case "organizers":
+    case "venue":
+      return Building2;
+    default:
+      return Monitor;
+  }
+}
+
+function buildScreenTree(rows: ScreenTimeRow[]): ScreenNode[] {
+  const nodeMap = new Map<string, ScreenNode>();
+
+  for (const row of rows) {
+    const normalized = row.screen.startsWith("/")
+      ? row.screen.slice(1)
+      : row.screen;
+    const parts = normalized.split("/").filter(Boolean);
+    const base = parts.length === 0 ? "" : parts[0];
+    const isChild = parts.length > 1;
+
+    if (!nodeMap.has(base)) {
+      const formattedLabel =
+        base === ""
+          ? "Home"
+          : base
+              .replace(/[-_]/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase());
+      nodeMap.set(base, {
+        key: base,
+        label: formattedLabel,
+        icon: getScreenIcon(base),
+        ownRow: null,
+        children: [],
+        aggregatedSeconds: 0,
+        aggregatedViews: 0,
+      });
+    }
+    const node = nodeMap.get(base)!;
+    node.aggregatedSeconds += row.totalSecondsSpent;
+    node.aggregatedViews += row.viewsCount;
+
+    if (isChild) {
+      node.children.push(row);
+    } else {
+      node.ownRow = row;
+    }
+  }
+
+  return Array.from(nodeMap.values()).sort(
+    (a, b) => b.aggregatedSeconds - a.aggregatedSeconds,
+  );
+}
+
+/* ===================================================================== */
+/* Tab 1: Screen Time — Hierarchical Drill-Down                          */
 /* ===================================================================== */
 
 function ScreenTimeTab({
   screenTimeRows,
   totalTime,
   dateRange,
+  onJumpToUserJourney,
 }: {
   screenTimeRows: ScreenTimeRow[];
   totalTime: number;
   dateRange: DateRangeFilter;
+  onJumpToUserJourney?: (user: {
+    userId: string | null;
+    anonId: string | null;
+    displayName: string;
+  }) => void;
 }) {
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const [selectedTarget, setSelectedTarget] =
+    useState<SelectedScreenTarget | null>(null);
   const [pageSearch, setPageSearch] = useState("");
-  const [selectedRow, setSelectedRow] = useState<ScreenTimeRow | null>(null);
 
-  const filteredRows = useMemo(() => {
+  const nodes = useMemo(
+    () => buildScreenTree(screenTimeRows),
+    [screenTimeRows],
+  );
+
+  // Auto-expand nodes that match search query
+  useEffect(() => {
     const q = pageSearch.trim().toLowerCase();
-    if (!q) return screenTimeRows;
-    return screenTimeRows.filter((row) => {
-      const display = screenDisplayName(row.screen).toLowerCase();
-      return (
-        display.includes(q) ||
-        row.screen.toLowerCase().includes(q)
+    if (!q) return;
+    const matchingKeys = new Set<string>();
+    for (const node of nodes) {
+      const parentMatch =
+        node.key.toLowerCase().includes(q) ||
+        node.label.toLowerCase().includes(q);
+      const childMatch = node.children.some((c) =>
+        c.screen.toLowerCase().includes(q),
       );
+      if (parentMatch || childMatch) {
+        matchingKeys.add(node.key);
+      }
+    }
+    setExpandedKeys((prev) => new Set([...prev, ...matchingKeys]));
+  }, [pageSearch, nodes]);
+
+  const filteredNodes = useMemo(() => {
+    const q = pageSearch.trim().toLowerCase();
+    if (!q) return nodes;
+    return nodes
+      .map((node) => {
+        const parentMatch =
+          node.key.toLowerCase().includes(q) ||
+          node.label.toLowerCase().includes(q);
+        const matchedChildren = node.children.filter((c) =>
+          c.screen.toLowerCase().includes(q),
+        );
+        if (
+          parentMatch ||
+          matchedChildren.length > 0 ||
+          node.ownRow?.screen.toLowerCase().includes(q)
+        ) {
+          return {
+            ...node,
+            children: parentMatch ? node.children : matchedChildren,
+          };
+        }
+        return null;
+      })
+      .filter((n): n is ScreenNode => n !== null);
+  }, [nodes, pageSearch]);
+
+  const toggleExpand = useCallback((key: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
-  }, [pageSearch, screenTimeRows]);
+  }, []);
+
+  const expandableKeys = useMemo(
+    () => nodes.filter((n) => n.children.length > 0).map((n) => n.key),
+    [nodes],
+  );
+
+  const allExpanded = useMemo(
+    () =>
+      expandableKeys.length > 0 &&
+      expandableKeys.every((k) => expandedKeys.has(k)),
+    [expandableKeys, expandedKeys],
+  );
+
+  const toggleExpandAll = useCallback(() => {
+    if (allExpanded) {
+      setExpandedKeys(new Set());
+    } else {
+      setExpandedKeys(new Set(expandableKeys));
+    }
+  }, [allExpanded, expandableKeys]);
+
+  const hasPanel = selectedTarget !== null;
 
   return (
-    <>
-      <Card className="border-2 shadow-sm">
+    <div
+      className={`grid gap-6 items-start ${
+        hasPanel ? "grid-cols-1 lg:grid-cols-12" : "grid-cols-1"
+      }`}
+    >
+      {/* ——— Tree Panel ——— */}
+      <Card
+        className={`border-2 shadow-sm transition-all duration-300 min-w-0 ${
+          hasPanel ? "lg:col-span-7 xl:col-span-8" : "w-full"
+        }`}
+      >
         <CardHeader className="border-b bg-gradient-to-r from-primary/5 via-background to-background">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <Timer className="h-5 w-5 text-primary" />
-                Screen Time Analytics
+                <Layers className="h-5 w-5 text-primary" />
+                Screen Time Explorer
               </CardTitle>
               <CardDescription>
-                Exact seconds spent on every page. Click a row to see which users visited that page.
+                Drill into sections or click any row to inspect viewer analytics →
               </CardDescription>
             </div>
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <input
-                type="search"
-                value={pageSearch}
-                onChange={(e) => setPageSearch(e.target.value)}
-                placeholder="Search pages…"
-                className="w-full h-9 rounded-lg border border-border/60 bg-background pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {expandableKeys.length > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleExpandAll}
+                  className="px-2.5 py-1.5 h-9 rounded-lg border border-border/60 bg-background text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0 flex items-center gap-1.5"
+                  title={allExpanded ? "Collapse all sections" : "Expand all sections"}
+                >
+                  {allExpanded ? (
+                    <>
+                      <ChevronUp className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Collapse All</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Expand All</span>
+                    </>
+                  )}
+                </button>
+              )}
+              <div className="relative w-full sm:w-64 shrink-0">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  type="search"
+                  value={pageSearch}
+                  onChange={(e) => setPageSearch(e.target.value)}
+                  placeholder="Search screens…"
+                  className="w-full h-9 rounded-lg border border-border/60 bg-background pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
             </div>
           </div>
         </CardHeader>
+
         <CardContent className="p-0">
-          {filteredRows.length === 0 ? (
+          {/* Column header strip */}
+          <div className="flex items-center gap-3 px-4 py-2 border-b bg-muted/20 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground select-none">
+            <span className="flex-1 min-w-0">Screen / Page</span>
+            <span className="w-20 text-right shrink-0">Total Time</span>
+            <span className="w-14 text-right shrink-0">Views</span>
+            <span className="w-12 text-right shrink-0">Users</span>
+            <span className="w-24 pl-1 shrink-0">Share</span>
+          </div>
+
+          {filteredNodes.length === 0 ? (
             <EmptyState
               message={
                 pageSearch.trim()
-                  ? "No pages match your search."
+                  ? "No screens match your search."
                   : "No screen view events recorded for this period."
               }
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30 hover:bg-muted/40">
-                    <TableHead className="font-bold">Screen / Page</TableHead>
-                    <TableHead className="font-bold text-right">Total Time</TableHead>
-                    <TableHead className="font-bold text-right">Avg / Visit</TableHead>
-                    <TableHead className="font-bold text-right">Views</TableHead>
-                    <TableHead className="font-bold text-right">Users</TableHead>
-                    <TableHead className="font-bold w-40">Share of Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRows.map((row) => {
-                    const sharePercent =
-                      totalTime > 0 ? (row.totalSecondsSpent / totalTime) * 100 : 0;
+            <div className="divide-y divide-border/40">
+              {filteredNodes.map((node) => {
+                const isExpanded = expandedKeys.has(node.key);
+                const hasChildren = node.children.length > 0;
+                const totalScreens = node.children.length + (node.ownRow ? 1 : 0);
 
-                    return (
-                      <TableRow
-                        key={row.screen}
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => setSelectedRow(row)}
-                      >
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="h-2 w-2 rounded-full bg-primary/60" />
-                            <code className="text-xs font-mono bg-muted/50 px-2 py-0.5 rounded border border-border/30">
-                              {screenDisplayName(row.screen)}
-                            </code>
+                const isSelected = hasChildren
+                  ? selectedTarget?.screen === node.key && selectedTarget?.isPrefix
+                  : selectedTarget?.screen === (node.ownRow?.screen ?? node.key) && !selectedTarget?.isPrefix;
+
+                const sharePercent =
+                  totalTime > 0
+                    ? (node.aggregatedSeconds / totalTime) * 100
+                    : 0;
+                const Icon = node.icon;
+
+                const handleSelectNode = () => {
+                  if (hasChildren) {
+                    setSelectedTarget({
+                      screen: node.key,
+                      displayTitle: `${node.label} (${totalScreens} ${totalScreens === 1 ? "screen" : "screens"})`,
+                      totalSeconds: node.aggregatedSeconds,
+                      viewsCount: node.aggregatedViews,
+                      uniqueUsers: node.ownRow?.uniqueUsers ?? node.children.reduce((acc, c) => acc + c.uniqueUsers, 0),
+                      isPrefix: true,
+                    });
+                  } else if (node.ownRow) {
+                    setSelectedTarget({
+                      screen: node.ownRow.screen,
+                      displayTitle: node.label,
+                      totalSeconds: node.ownRow.totalSecondsSpent,
+                      viewsCount: node.ownRow.viewsCount,
+                      uniqueUsers: node.ownRow.uniqueUsers,
+                      isPrefix: false,
+                    });
+                  }
+                };
+
+                return (
+                  <div key={node.key}>
+                    {/* ── Root / parent row ── */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          handleSelectNode();
+                        }
+                      }}
+                      className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all duration-150 ${
+                        isSelected
+                          ? "bg-primary/10 border-l-[3px] border-l-primary shadow-xs"
+                          : "border-l-[3px] border-l-transparent hover:bg-muted/40"
+                      }`}
+                      onClick={handleSelectNode}
+                    >
+                      {/* Label + expand */}
+                      <div className="flex-1 min-w-0 flex items-center gap-2.5">
+                        {/* Expand toggle button or leaf icon */}
+                        {hasChildren ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpand(node.key);
+                            }}
+                            className="h-7 w-7 rounded-lg bg-muted/80 hover:bg-muted flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground transition-colors border border-border/40"
+                            title={isExpanded ? "Collapse section" : "Expand section"}
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </button>
+                        ) : (
+                          <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                            <Icon className="h-3.5 w-3.5 text-primary" />
                           </div>
-                        </TableCell>
-                        <TableCell className="text-right font-bold">
-                          {formatDuration(row.totalSecondsSpent)}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold text-muted-foreground">
-                          {row.avgSecondsPerVisit}s
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {row.viewsCount.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                            {row.uniqueUsers}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress
-                              value={Math.min(sharePercent, 100)}
-                              className="h-2 flex-1"
-                            />
-                            <span className="text-xs font-semibold text-muted-foreground w-10 text-right">
-                              {sharePercent.toFixed(1)}%
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {hasChildren && (
+                              <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center shrink-0">
+                                <Icon className="h-3 w-3 text-primary" />
+                              </div>
+                            )}
+                            <span className="text-sm font-semibold truncate">
+                              {node.label}
                             </span>
+                            {hasChildren && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] px-1.5 py-0 h-4 font-normal shrink-0"
+                              >
+                                {totalScreens} {totalScreens === 1 ? "screen" : "screens"}
+                              </Badge>
+                            )}
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                          {/* Collapsed preview */}
+                          {hasChildren && !isExpanded && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                              {[
+                                node.ownRow
+                                  ? screenDisplayName(node.ownRow.screen)
+                                  : null,
+                                ...node.children
+                                  .slice(0, 2)
+                                  .map((c) => formatPreviewSlug(screenDisplayName(c.screen))),
+                              ]
+                                .filter(Boolean)
+                                .slice(0, 2)
+                                .join(" · ")}
+                              {node.children.length > 2
+                                ? ` +${node.children.length - 1} more`
+                                : ""}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Aggregated stats */}
+                      <span className="w-20 text-right shrink-0 text-sm font-bold tabular-nums">
+                        {formatDuration(node.aggregatedSeconds)}
+                      </span>
+                      <span className="w-14 text-right shrink-0 text-xs text-muted-foreground tabular-nums">
+                        {node.aggregatedViews.toLocaleString()}
+                      </span>
+                      <span className="w-12 text-right shrink-0">
+                        {node.ownRow ? (
+                          <Badge
+                            variant="secondary"
+                            className="text-xs px-1.5 py-0"
+                          >
+                            {node.ownRow.uniqueUsers}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground font-mono">
+                            —
+                          </span>
+                        )}
+                      </span>
+                      <div className="w-24 shrink-0 flex items-center gap-1.5">
+                        <Progress
+                          value={Math.min(sharePercent, 100)}
+                          className="h-1.5 flex-1"
+                        />
+                        <span className="text-[10px] font-semibold text-muted-foreground w-9 text-right tabular-nums shrink-0">
+                          {sharePercent.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* ── Expanded children ── */}
+                    {isExpanded && hasChildren && (
+                      <div className="bg-muted/10">
+                        {/* Parent's own-screen row (if it exists) */}
+                        {node.ownRow && (
+                          <ScreenChildRow
+                            row={node.ownRow}
+                            totalTime={totalTime}
+                            isSelected={
+                              selectedTarget?.screen === node.ownRow.screen &&
+                              !selectedTarget?.isPrefix
+                            }
+                            onSelect={() =>
+                              setSelectedTarget({
+                                screen: node.ownRow!.screen,
+                                displayTitle: `${node.label} (Main Screen)`,
+                                totalSeconds: node.ownRow!.totalSecondsSpent,
+                                viewsCount: node.ownRow!.viewsCount,
+                                uniqueUsers: node.ownRow!.uniqueUsers,
+                                isPrefix: false,
+                              })
+                            }
+                            label={`${node.label} (main screen)`}
+                          />
+                        )}
+                        {/* Child screens, sorted by time desc */}
+                        {[...node.children]
+                          .sort(
+                            (a, b) =>
+                              b.totalSecondsSpent - a.totalSecondsSpent,
+                          )
+                          .map((child) => (
+                            <ScreenChildRow
+                              key={child.screen}
+                              row={child}
+                              totalTime={totalTime}
+                              isSelected={
+                                selectedTarget?.screen === child.screen &&
+                                !selectedTarget?.isPrefix
+                              }
+                              onSelect={() =>
+                                setSelectedTarget({
+                                  screen: child.screen,
+                                  displayTitle: screenDisplayName(child.screen),
+                                  totalSeconds: child.totalSecondsSpent,
+                                  viewsCount: child.viewsCount,
+                                  uniqueUsers: child.uniqueUsers,
+                                  isPrefix: false,
+                                })
+                              }
+                            />
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
       </Card>
 
-      <ScreenUsersModal
-        row={selectedRow}
-        open={selectedRow !== null}
-        onOpenChange={(open) => {
-          if (!open) setSelectedRow(null);
-        }}
-        defaultRange={dateRange}
-      />
-    </>
+      {/* ——— User breakdown side panel ——— */}
+      {selectedTarget && (
+        <div className="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-6 min-w-0">
+          <ScreenUserPanel
+            target={selectedTarget}
+            defaultRange={dateRange}
+            onClose={() => setSelectedTarget(null)}
+            onJumpToUserJourney={onJumpToUserJourney}
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
-function ScreenUsersModal({
+/* ——— Child row (appears when parent is expanded) ——— */
+
+function ScreenChildRow({
   row,
-  open,
-  onOpenChange,
-  defaultRange,
+  totalTime,
+  isSelected,
+  onSelect,
+  label,
 }: {
-  row: ScreenTimeRow | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  row: ScreenTimeRow;
+  totalTime: number;
+  isSelected: boolean;
+  onSelect: () => void;
+  label?: string;
+}) {
+  const sharePercent =
+    totalTime > 0 ? (row.totalSecondsSpent / totalTime) * 100 : 0;
+  const displayLabel = label ?? screenDisplayName(row.screen);
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onSelect();
+      }}
+      className={`flex items-center gap-3 py-2.5 pr-4 cursor-pointer transition-all duration-150 border-t border-border/20 ${
+        isSelected
+          ? "bg-primary/15 border-l-[3px] border-l-primary pl-9 shadow-xs"
+          : "border-l-[3px] border-l-transparent hover:bg-muted/50 pl-9"
+      }`}
+      onClick={onSelect}
+    >
+      {/* Label with tree indicator */}
+      <div className="flex-1 min-w-0 flex items-center gap-2">
+        <div className="flex items-center gap-1 shrink-0 text-border">
+          <div className="w-3 h-px bg-border/60" />
+          <div className="h-1.5 w-1.5 rounded-full bg-primary/40" />
+        </div>
+        <span
+          className="text-xs font-mono text-muted-foreground truncate hover:text-foreground transition-colors"
+          title={screenDisplayName(row.screen)}
+        >
+          {displayLabel}
+        </span>
+      </div>
+      {/* Stats */}
+      <span className="w-20 text-right shrink-0 text-xs font-semibold tabular-nums">
+        {formatDuration(row.totalSecondsSpent)}
+      </span>
+      <span className="w-14 text-right shrink-0 text-xs text-muted-foreground tabular-nums">
+        {row.viewsCount}
+      </span>
+      <span className="w-12 text-right shrink-0">
+        <Badge variant="outline" className="text-[9px] px-1 py-0">
+          {row.uniqueUsers}
+        </Badge>
+      </span>
+      <div className="w-24 shrink-0 flex items-center gap-1">
+        <Progress
+          value={Math.min(sharePercent, 100)}
+          className="h-1 flex-1"
+        />
+        <span className="text-[9px] text-muted-foreground w-9 text-right tabular-nums shrink-0">
+          {sharePercent.toFixed(1)}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ——— User breakdown side panel ——— */
+
+function ScreenUserPanel({
+  target,
+  defaultRange,
+  onClose,
+  onJumpToUserJourney,
+}: {
+  target: SelectedScreenTarget;
   defaultRange: DateRangeFilter;
+  onClose: () => void;
+  onJumpToUserJourney?: (user: {
+    userId: string | null;
+    anonId: string | null;
+    displayName: string;
+  }) => void;
 }) {
   const [modalRange, setModalRange] = useState<DateRangeFilter>(defaultRange);
   const [users, setUsers] = useState<ScreenUserBreakdown[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [userSearch, setUserSearch] = useState("");
 
-  const screenKey = row?.screen ?? null;
-
+  // Reset when selected target changes
   useEffect(() => {
-    if (!open || !screenKey) return;
     setModalRange(defaultRange);
     setUserSearch("");
-  }, [open, screenKey, defaultRange]);
+  }, [target.screen, target.isPrefix, defaultRange]);
 
+  // Fetch users whenever target screen or range changes
   useEffect(() => {
-    if (!open || !screenKey) return;
-
     let cancelled = false;
     setIsLoading(true);
 
     void (async () => {
       try {
+        const prefixParam = target.isPrefix ? "&prefix=true" : "";
         const res = await fetch(
-          `/api/admin/mobile-events/screen-users?screen=${encodeURIComponent(screenKey)}&range=${modalRange}`,
+          `/api/admin/mobile-events/screen-users?screen=${encodeURIComponent(
+            target.screen,
+          )}&range=${modalRange}${prefixParam}`,
         );
         if (cancelled) return;
         if (res.ok) {
@@ -554,7 +1049,7 @@ function ScreenUsersModal({
     return () => {
       cancelled = true;
     };
-  }, [open, screenKey, modalRange]);
+  }, [target.screen, target.isPrefix, modalRange]);
 
   const filteredUsers = useMemo(() => {
     const q = userSearch.trim().toLowerCase();
@@ -569,93 +1064,173 @@ function ScreenUsersModal({
   }, [users, userSearch]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Monitor className="h-4 w-4 text-primary" />
-            {row ? screenDisplayName(row.screen) : "Screen users"}
-          </DialogTitle>
-          <DialogDescription>
-            {row
-              ? `${formatDuration(row.totalSecondsSpent)} total · ${row.viewsCount.toLocaleString()} views · ${row.uniqueUsers} users`
-              : "Users who visited this screen"}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex flex-col gap-3 min-h-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            {DATE_RANGE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setModalRange(opt.value)}
-                disabled={isLoading}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all duration-200 ${
-                  modalRange === opt.value
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                } ${isLoading ? "opacity-50" : ""}`}
+    <Card className="border-2 shadow-sm overflow-hidden">
+      <CardHeader className="border-b bg-gradient-to-r from-primary/5 via-background to-background pb-3 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                <Monitor className="h-4 w-4 text-primary" />
+              </div>
+              <CardTitle
+                className="text-base font-bold truncate leading-tight"
+                title={target.displayTitle}
               >
-                {opt.label}
-              </button>
-            ))}
+                {target.displayTitle}
+              </CardTitle>
+            </div>
+            <CardDescription className="text-xs mt-1.5 flex items-center gap-2 flex-wrap text-muted-foreground">
+              <span className="font-semibold text-foreground">
+                {formatDuration(target.totalSeconds)}
+              </span>
+              <span>·</span>
+              <span>{target.viewsCount.toLocaleString()} views</span>
+              {target.uniqueUsers > 0 && (
+                <>
+                  <span>·</span>
+                  <span className="px-1.5 py-0.5 rounded bg-muted/80 text-[11px] font-medium text-foreground">
+                    {target.uniqueUsers} users
+                  </span>
+                </>
+              )}
+            </CardDescription>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close panel"
+            className="shrink-0 p-1.5 rounded-lg border border-border/40 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <input
-              type="search"
-              value={userSearch}
-              onChange={(e) => setUserSearch(e.target.value)}
-              placeholder="Search users…"
-              className="w-full h-9 rounded-lg border border-border/60 bg-background pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </div>
+        {/* Date range segmented buttons */}
+        <div className="grid grid-cols-4 gap-1 p-1 bg-muted/60 rounded-lg border border-border/40">
+          {DATE_RANGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setModalRange(opt.value)}
+              disabled={isLoading}
+              className={`py-1 px-1 rounded-md text-[11px] font-semibold text-center transition-all ${
+                modalRange === opt.value
+                  ? "bg-primary text-primary-foreground shadow-xs font-bold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/60"
+              } ${isLoading ? "opacity-50" : ""}`}
+            >
+              {opt.value === "24h"
+                ? "24h"
+                : opt.value === "7d"
+                  ? "7d"
+                  : opt.value === "30d"
+                    ? "30d"
+                    : "All"}
+            </button>
+          ))}
+        </div>
+      </CardHeader>
 
-          <div className="flex-1 overflow-y-auto min-h-[200px] max-h-[50vh] space-y-1.5 pr-1">
-            {isLoading ? (
-              <div className="py-10 text-center text-sm text-muted-foreground animate-pulse">
-                Loading users…
-              </div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">
-                {userSearch.trim()
-                  ? "No users match your search."
-                  : "No users for this screen in range."}
-              </div>
-            ) : (
-              filteredUsers.map((u, idx) => (
+      <CardContent className="p-3 space-y-2.5">
+        {/* User search */}
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="search"
+            value={userSearch}
+            onChange={(e) => setUserSearch(e.target.value)}
+            placeholder="Search users…"
+            className="w-full h-9 rounded-lg border border-border/60 bg-background pl-8 pr-8 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          {userSearch && (
+            <button
+              type="button"
+              onClick={() => setUserSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+
+        {/* User list */}
+        <div className="space-y-1.5 max-h-[520px] overflow-y-auto pr-1">
+          {isLoading ? (
+            <div className="py-10 text-center text-sm text-muted-foreground animate-pulse">
+              Loading screen viewers…
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              {userSearch.trim()
+                ? "No users match your search."
+                : "No users for this screen in range."}
+            </div>
+          ) : (
+            filteredUsers.map((u, idx) => {
+              const isNamed = Boolean(
+                u.username ||
+                  (u.userDisplay && !u.userDisplay.startsWith("Anonymous ")),
+              );
+              return (
                 <div
                   key={`${u.userId ?? u.anonId}-${idx}`}
-                  className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/30"
+                  onClick={() => {
+                    if (onJumpToUserJourney) {
+                      onJumpToUserJourney({
+                        userId: u.userId,
+                        anonId: u.anonId,
+                        displayName: u.userDisplay,
+                      });
+                    }
+                  }}
+                  className="group flex items-center justify-between p-2.5 rounded-xl bg-card border border-border/40 hover:border-primary/40 hover:bg-primary/[0.04] transition-all cursor-pointer shadow-xs"
+                  title="Click to view full user journey timeline"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="h-7 w-7 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
-                      <User className="h-3.5 w-3.5 text-primary" />
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
+                    <div
+                      className={`h-8 w-8 shrink-0 rounded-full flex items-center justify-center font-bold text-xs ${
+                        isNamed
+                          ? "bg-primary/15 text-primary border border-primary/30"
+                          : "bg-muted text-muted-foreground border border-border/60"
+                      }`}
+                    >
+                      {isNamed ? (
+                        u.userDisplay.charAt(0).toUpperCase()
+                      ) : (
+                        <User className="h-3.5 w-3.5" />
+                      )}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold truncate">{u.userDisplay}</p>
-                      {u.username && (
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold truncate group-hover:text-primary transition-colors">
+                        {u.userDisplay}
+                      </p>
+                      {u.username ? (
                         <p className="text-[10px] text-muted-foreground truncate">
                           @{u.username}
+                        </p>
+                      ) : (
+                        <p className="text-[9px] text-muted-foreground/70 uppercase tracking-wider">
+                          {u.userId ? "Registered" : "Guest"}
                         </p>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 text-xs shrink-0">
-                    <span className="text-muted-foreground">{u.visits} visits</span>
-                    <span className="font-bold text-primary">
+                  <div className="flex items-center gap-2 text-xs shrink-0">
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-muted/60 text-muted-foreground border border-border/30">
+                      {u.visits} {u.visits === 1 ? "visit" : "visits"}
+                    </span>
+                    <span className="font-bold text-xs font-mono text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-md">
                       {formatDuration(u.totalSeconds)}
                     </span>
+                    <ArrowRight className="h-3 w-3 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+              );
+            })
+          )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -667,10 +1242,16 @@ function UserJourneysTab({
   activeUsers,
   recentEvents,
   dateRange,
+  externalTarget,
 }: {
   activeUsers: ActiveUser[];
   recentEvents: RecentMobileEvent[];
   dateRange: DateRangeFilter;
+  externalTarget?: {
+    id: string;
+    type: "user" | "anon";
+    displayName: string;
+  } | null;
 }) {
   const [selectedUser, setSelectedUser] = useState<ActiveUser | null>(null);
   const [journeyEvents, setJourneyEvents] = useState<RecentMobileEvent[]>([]);
@@ -726,6 +1307,34 @@ function UserJourneysTab({
     },
     [dateRange, recentEvents],
   );
+
+  // Jump to external user target if provided
+  useEffect(() => {
+    if (!externalTarget) return;
+    const found = activeUsers.find(
+      (u) =>
+        (externalTarget.type === "user" && u.userId === externalTarget.id) ||
+        (externalTarget.type === "anon" && u.anonId === externalTarget.id),
+    );
+    if (found) {
+      void handleSelectUser(found);
+    } else {
+      const syntheticUser: ActiveUser = {
+        userId: externalTarget.type === "user" ? externalTarget.id : null,
+        anonId: externalTarget.type === "anon" ? externalTarget.id : null,
+        fullName: externalTarget.displayName,
+        username: null,
+        eventsCount: 0,
+        screensVisited: 0,
+        totalSeconds: 0,
+        firstSeen: new Date().toISOString(),
+        lastSeen: new Date().toISOString(),
+        platforms: [],
+        topScreen: null,
+      };
+      void handleSelectUser(syntheticUser);
+    }
+  }, [externalTarget, activeUsers, handleSelectUser]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-5">
