@@ -235,9 +235,15 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     // Floor the reported total at what's actually being returned.
     const totalItems = Math.max(pinnedRows.length + organicTotal, listings.length);
 
-    return ok(listings, {
-      pagination: buildPaginationMeta(page, limit, totalItems),
-    });
+    return ok(
+      listings,
+      { pagination: buildPaginationMeta(page, limit, totalItems) },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+        },
+      },
+    );
   } catch (error) {
     console.error(
       "[mobile-api] trending listings query failed:",
