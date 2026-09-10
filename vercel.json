@@ -1,4 +1,5 @@
 {
+  "regions": ["sgp1"],
   "crons": [
     {
       "path": "/api/cron/refresh-user-scores",

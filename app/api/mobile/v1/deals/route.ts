@@ -210,15 +210,27 @@ async function compileFullCatalog(): Promise<CompiledCatalog> {
     list.sort((a, b) => b.discountWeight - a.discountWeight);
     const primary = { ...list[0] };
     if (list.length > 1) {
-      primary.otherDeals = list.slice(1);
+      const siblings = list.slice(1);
+      primary.otherDealsCount = siblings.length;
+      primary.otherDeals = siblings.map((d) => ({
+        id: d.id,
+        merchant: d.merchant,
+      }));
     }
     groupedDeals.push(primary);
   }
 
-  const hashContent = groupedDeals
-    .slice(0, 50)
-    .map((d) => `${d.id}:${d.discountLabel}`)
-    .join("|") + `:${groupedDeals.length}`;
+  // Bump when the serialized shape changes, not just the data: the hash below
+  // only covers ids/labels, so without this a client holding a body from an
+  // older shape would revalidate into a 304 and keep it.
+  const PAYLOAD_SHAPE_VERSION = "v2-stub-siblings";
+
+  const hashContent =
+    `${PAYLOAD_SHAPE_VERSION}|` +
+    groupedDeals
+      .slice(0, 50)
+      .map((d) => `${d.id}:${d.discountLabel}`)
+      .join("|") + `:${groupedDeals.length}`;
   const etag = `W/"deals-${createHash("md5").update(hashContent).digest("hex")}"`;
 
   const result: CompiledCatalog = {
