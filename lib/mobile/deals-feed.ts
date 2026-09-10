@@ -42,8 +42,24 @@ export type MobileDealPreviewDTO = {
   listingSlug?: string;
   /** Listing id for redeem / affinity events. */
   listingId?: number;
-  /** Other deals for the same merchant listing. */
-  otherDeals?: MobileDealPreviewDTO[];
+  /**
+   * Other deals for the same merchant listing, as id/merchant stubs only.
+   *
+   * These were full `MobileDealPreviewDTO`s until they were measured at 81% of
+   * a 5.5MB catalog response — and the only thing any client reads off them is
+   * `.length`, for a "+N more" badge. Stubs keep that working (the client
+   * normalizer needs `id` + `merchant` to count a row) without shipping the
+   * nested blurb/terms/cardMatches payload. Prefer `otherDealsCount`.
+   */
+  otherDeals?: MobileDealStubDTO[];
+  /** Count of sibling deals — what clients actually render. */
+  otherDealsCount?: number;
+};
+
+/** Minimal sibling-deal reference; see `MobileDealPreviewDTO.otherDeals`. */
+export type MobileDealStubDTO = {
+  id: string;
+  merchant: string;
 };
 
 export type CardAssociation = {
