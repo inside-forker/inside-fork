@@ -38,3 +38,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local one-off scripts (not for distribution)
+/scripts/broadcast-test-push.mjs
+/scripts/pipeline-test-push.ts

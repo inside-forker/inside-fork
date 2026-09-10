@@ -183,7 +183,12 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   const dailyXp = await activityXp("daily_login", 5);
   const bonusXp = earnedBonus ? await activityXp("streak_7day", 20) : 0;
 
-  // Optimistic lock on updated_at: a concurrent winner changes it -> 0 rows -> 409.
+  // Idempotency guard: the UPDATE only fires while today's claim is still
+  // outstanding. Two concurrent claims -> the first stamps last_claimed_date,
+  // the second matches 0 rows -> 409. (Guarding on `updated_at` instead is
+  // broken: pg returns timestamptz as a millisecond-precision JS Date, so a
+  // stored microsecond `updated_at` never round-trips back equal and the
+  // UPDATE silently matches nothing.)
   let claimed: { user_id: string } | undefined;
   try {
     const { rows } = await query(
@@ -195,7 +200,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
            last_claimed_date = $4,
            streak_started_at = $5,
            updated_at = $6
-       WHERE user_id = $7 AND updated_at = $8
+       WHERE user_id = $7 AND last_claimed_date IS DISTINCT FROM $4::date
        RETURNING user_id`,
       [
         newStreak,
@@ -205,7 +210,6 @@ export const POST = mobileRoute(async (request: NextRequest) => {
         streakBroken ? now.toISOString() : streak.streak_started_at,
         now.toISOString(),
         user.id,
-        streak.updated_at,
       ],
     );
     claimed = rows[0];
