@@ -247,9 +247,15 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     // fewer items than it renders.
     const totalItems = Math.max(pinnedRows.length + insiderTotal, listings.length);
 
-    return ok(listings, {
-      pagination: buildPaginationMeta(page, limit, totalItems),
-    });
+    return ok(
+      listings,
+      { pagination: buildPaginationMeta(page, limit, totalItems) },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+        },
+      },
+    );
   } catch (error) {
     console.error(
       "[mobile-api] top-rated listings query failed:",

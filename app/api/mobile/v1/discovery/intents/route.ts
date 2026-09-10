@@ -34,5 +34,9 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     icon_name: intent.iconName,
   }));
 
-  return ok(intents);
+  return ok(intents, undefined, {
+    headers: {
+      "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+    },
+  });
 });

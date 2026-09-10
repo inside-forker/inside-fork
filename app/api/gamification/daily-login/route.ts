@@ -170,7 +170,11 @@ export async function POST(request: NextRequest) {
       bonusXP = streakBonusXP;
     }
 
-    // Optimistic lock via updated_at
+    // Idempotency guard: only fires while today's claim is still outstanding.
+    // A second concurrent claim finds last_claimed_date already stamped and
+    // matches 0 rows -> 409. (Guarding on `updated_at` is broken: pg returns
+    // timestamptz as a millisecond-precision JS Date, so a stored microsecond
+    // `updated_at` never round-trips back equal.)
     const { rows: updatedStreaks } = await query(
       `UPDATE public.daily_login_streaks
        SET current_streak = $1,
@@ -180,7 +184,7 @@ export async function POST(request: NextRequest) {
            last_claimed_date = $4,
            streak_started_at = $5,
            updated_at = $6
-       WHERE user_id = $7 AND updated_at = $8
+       WHERE user_id = $7 AND last_claimed_date IS DISTINCT FROM $4::date
        RETURNING user_id`,
       [
         newStreak,
@@ -190,7 +194,6 @@ export async function POST(request: NextRequest) {
         streakBroken ? now.toISOString() : streakData.streak_started_at,
         now.toISOString(),
         session.userId,
-        streakData.updated_at
       ]
     );
 

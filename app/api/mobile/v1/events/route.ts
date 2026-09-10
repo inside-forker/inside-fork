@@ -295,7 +295,13 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     ),
   );
 
-  return ok(events, {
-    pagination: buildPaginationMeta(page, limit, count),
-  });
+  return ok(
+    events,
+    { pagination: buildPaginationMeta(page, limit, count) },
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+      },
+    },
+  );
 });

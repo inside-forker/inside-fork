@@ -1,4 +1,5 @@
-import { type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
 import { mobileRoute } from "@/lib/mobile/handler";
 import { ok } from "@/lib/mobile/response";
 import { query } from "@/lib/db";
@@ -29,66 +30,23 @@ const DEAL_CATEGORIES = new Set<MobileDealCategory>([
 
 type DealSqlRow = DealFeedRow & { listing_id: number | string };
 
-/**
- * GET /api/mobile/v1/deals
- *
- * Deal-first catalog for the mobile Discounts tab. Active deals on published
- * listings, shaped as `DealPreview` (merchant, cardMatches, coords, image).
- *
- * Query params:
- * - `search` — ILIKE across merchant, deal title/description/discount, bank, category
- * - `bankId`, `cardVariantId`, `category` — optional filters
- * - `page` / `limit` — pagination
- */
-export const GET = mobileRoute(async (request: NextRequest) => {
-  await enforceMobileRateLimit(request);
+type CompiledCatalog = {
+  deals: MobileDealPreviewDTO[];
+  etag: string;
+  compiledAt: number;
+};
 
-  const { searchParams } = new URL(request.url);
-  const { page, limit, offset } = parsePagination(searchParams, {
-    defaultLimit: 100,
-    maxLimit: 200,
-  });
+const CATALOG_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+let compiledCache: CompiledCatalog | null = null;
+let inflightCompilePromise: Promise<CompiledCatalog> | null = null;
 
-  const bankIdRaw = searchParams.get("bankId");
-  const cardVariantIdRaw = searchParams.get("cardVariantId");
-  const categoryRaw = searchParams.get("category");
-  const rawSearch = searchParams.get("search");
-  const sanitizedSearch =
-    rawSearch && rawSearch.trim() ? sanitizeSearchTerm(rawSearch) : "";
-
-  const bankId =
-    bankIdRaw && /^\d+$/.test(bankIdRaw) ? parseInt(bankIdRaw, 10) : null;
-  const cardVariantId =
-    cardVariantIdRaw && /^\d+$/.test(cardVariantIdRaw)
-      ? parseInt(cardVariantIdRaw, 10)
-      : null;
-  const categoryFilter =
-    categoryRaw && DEAL_CATEGORIES.has(categoryRaw as MobileDealCategory)
-      ? (categoryRaw as MobileDealCategory)
-      : null;
-
+async function compileFullCatalog(): Promise<CompiledCatalog> {
   const where: string[] = [
     "d.is_active = true",
     "l.status = 'published'",
     "(d.start_date IS NULL OR d.start_date <= NOW())",
     "(d.end_date IS NULL OR d.end_date >= NOW())",
   ];
-  const params: unknown[] = [];
-
-  if (sanitizedSearch) {
-    params.push(`%${sanitizedSearch}%`);
-    const i = params.length;
-    where.push(`(
-      l.name ILIKE $${i}
-      OR COALESCE(d.title, '') ILIKE $${i}
-      OR COALESCE(d.description, '') ILIKE $${i}
-      OR COALESCE(d.discount_value, '') ILIKE $${i}
-      OR COALESCE(b.name, '') ILIKE $${i}
-      OR COALESCE(l.category_name, '') ILIKE $${i}
-      OR COALESCE(c.name, '') ILIKE $${i}
-      OR COALESCE(l.address, '') ILIKE $${i}
-    )`);
-  }
 
   let dealRows: DealSqlRow[];
   try {
@@ -116,13 +74,13 @@ export const GET = mobileRoute(async (request: NextRequest) => {
        LEFT JOIN categories c ON c.id = l.category_id
        WHERE ${where.join(" AND ")}
        ORDER BY d.created_at DESC
-       LIMIT 2000`,
-      params,
+       LIMIT 3000`,
+      [],
     );
     dealRows = rows as DealSqlRow[];
   } catch (error) {
     console.error(
-      "[mobile-api] deals feed query failed:",
+      "[mobile-api] deals feed compilation query failed:",
       error instanceof Error ? error.message : error,
     );
     throw new MobileApiError("internal_error", "Failed to load deals.", 500);
@@ -147,13 +105,11 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   }
 
   const uniqueListingIds = [...new Set(listingIds.filter(Number.isFinite))];
-
   const bankIds = [...bankIdSet];
   const cardById = new Map<number, CardVariantLookup>();
   const cardsByBankName = new Map<string, CardVariantLookup>();
   const imageByListingId = new Map<number, string>();
 
-  // Fetch card variants and listing images in parallel
   const [cardsResult, imagesResult] = await Promise.all([
     bankIds.length > 0 || variantIdSet.size > 0
       ? query(
@@ -235,32 +191,9 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       imageUrl,
       now,
     );
-    if (!dto) continue;
-
-    if (categoryFilter && dto.category !== categoryFilter) continue;
-
-    if (cardVariantId != null) {
-      const okVariant =
-        dto.cardMatches.some((m) => m.cardVariantId === cardVariantId) ||
-        (dto.matchByBank &&
-          dto.bankId != null &&
-          cardById.get(cardVariantId)?.bankId === dto.bankId);
-      if (!okVariant) continue;
-    }
-
-    if (bankId != null) {
-      const bankMatch =
-        dto.bankId === bankId ||
-        dto.cardMatches.some((m) => m.bankId === bankId);
-      if (!bankMatch) continue;
-    }
-
-    mapped.push(dto);
+    if (dto) mapped.push(dto);
   }
 
-  // Group deals by listing (or merchant if listing_id is missing) so a single
-  // merchant with multiple deals produces one primary card with the best offer,
-  // and remaining offers attached in `otherDeals`.
   const dealsByListing = new Map<string, MobileDealPreviewDTO[]>();
   for (const dto of mapped) {
     const key = dto.listingId != null ? `listing:${dto.listingId}` : `merchant:${dto.merchant}`;
@@ -274,7 +207,6 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   const groupedDeals: MobileDealPreviewDTO[] = [];
   for (const list of dealsByListing.values()) {
-    // Sort descending by discount weight so best deal is first
     list.sort((a, b) => b.discountWeight - a.discountWeight);
     const primary = { ...list[0] };
     if (list.length > 1) {
@@ -283,8 +215,123 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     groupedDeals.push(primary);
   }
 
-  const totalItems = groupedDeals.length;
-  const pageSlice = groupedDeals.slice(offset, offset + limit);
+  const hashContent = groupedDeals
+    .slice(0, 50)
+    .map((d) => `${d.id}:${d.discountLabel}`)
+    .join("|") + `:${groupedDeals.length}`;
+  const etag = `W/"deals-${createHash("md5").update(hashContent).digest("hex")}"`;
+
+  const result: CompiledCatalog = {
+    deals: groupedDeals,
+    etag,
+    compiledAt: Date.now(),
+  };
+
+  compiledCache = result;
+  return result;
+}
+
+async function getCompiledCatalog(): Promise<CompiledCatalog> {
+  if (
+    compiledCache &&
+    Date.now() - compiledCache.compiledAt < CATALOG_CACHE_TTL_MS
+  ) {
+    return compiledCache;
+  }
+
+  if (!inflightCompilePromise) {
+    inflightCompilePromise = compileFullCatalog().finally(() => {
+      inflightCompilePromise = null;
+    });
+  }
+
+  return inflightCompilePromise;
+}
+
+/**
+ * GET /api/mobile/v1/deals
+ *
+ * Pre-compiled, cached deal-first catalog for the mobile Discounts tab.
+ * Supports single-request downloads (up to 2000 items), ETag / 304 Not Modified,
+ * and 5-minute background compilation.
+ */
+export const GET = mobileRoute(async (request: NextRequest) => {
+  await enforceMobileRateLimit(request);
+
+  const { searchParams } = new URL(request.url);
+  const { page, limit, offset } = parsePagination(searchParams, {
+    defaultLimit: 200,
+    maxLimit: 2000,
+  });
+
+  const bankIdRaw = searchParams.get("bankId");
+  const cardVariantIdRaw = searchParams.get("cardVariantId");
+  const categoryRaw = searchParams.get("category");
+  const rawSearch = searchParams.get("search");
+  const sanitizedSearch =
+    rawSearch && rawSearch.trim() ? sanitizeSearchTerm(rawSearch) : "";
+
+  const bankId =
+    bankIdRaw && /^\d+$/.test(bankIdRaw) ? parseInt(bankIdRaw, 10) : null;
+  const cardVariantId =
+    cardVariantIdRaw && /^\d+$/.test(cardVariantIdRaw)
+      ? parseInt(cardVariantIdRaw, 10)
+      : null;
+  const categoryFilter =
+    categoryRaw && DEAL_CATEGORIES.has(categoryRaw as MobileDealCategory)
+      ? (categoryRaw as MobileDealCategory)
+      : null;
+
+  const catalog = await getCompiledCatalog();
+
+  // Fast-path: Unfiltered request with matching ETag -> 304 Not Modified
+  const ifNoneMatch = request.headers.get("if-none-match");
+  const isUnfiltered =
+    !sanitizedSearch && bankId === null && cardVariantId === null && categoryFilter === null && page === 1;
+
+  if (isUnfiltered && ifNoneMatch && ifNoneMatch === catalog.etag) {
+    return new NextResponse(null, {
+      status: 304,
+      headers: {
+        ETag: catalog.etag,
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+      },
+    });
+  }
+
+  let deals = catalog.deals;
+
+  if (sanitizedSearch) {
+    const q = sanitizedSearch.toLowerCase();
+    deals = deals.filter(
+      (d) =>
+        d.merchant.toLowerCase().includes(q) ||
+        d.discountLabel.toLowerCase().includes(q) ||
+        d.blurb.toLowerCase().includes(q) ||
+        (d.bankName && d.bankName.toLowerCase().includes(q)) ||
+        d.category.toLowerCase().includes(q),
+    );
+  }
+
+  if (categoryFilter) {
+    deals = deals.filter((d) => d.category === categoryFilter);
+  }
+
+  if (cardVariantId != null) {
+    deals = deals.filter((d) =>
+      d.cardMatches.some((m) => m.cardVariantId === cardVariantId),
+    );
+  }
+
+  if (bankId != null) {
+    deals = deals.filter(
+      (d) =>
+        d.bankId === bankId || d.cardMatches.some((m) => m.bankId === bankId),
+    );
+  }
+
+  const totalItems = deals.length;
+  const pageSlice = deals.slice(offset, offset + limit);
 
   return ok(
     pageSlice,
@@ -293,7 +340,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     },
     {
       headers: {
-        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+        ETag: catalog.etag,
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
       },
     },
   );

@@ -94,5 +94,9 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     listingCount: Number(c.listing_count ?? 0),
   }));
 
-  return ok(categories);
+  return ok(categories, undefined, {
+    headers: {
+      "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
+    },
+  });
 });

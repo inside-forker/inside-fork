@@ -92,13 +92,21 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       added_at: row.added_at,
     }));
 
-    return ok(listings, {
-      pagination: buildPaginationMeta(
-        page,
-        limit,
-        Number(countRows[0]?.total ?? 0),
-      ),
-    });
+    return ok(
+      listings,
+      {
+        pagination: buildPaginationMeta(
+          page,
+          limit,
+          Number(countRows[0]?.total ?? 0),
+        ),
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+        },
+      },
+    );
   } catch (error) {
     console.error(
       "[mobile-api] recently added listings query failed:",
