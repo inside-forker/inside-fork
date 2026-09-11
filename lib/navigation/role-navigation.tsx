@@ -131,7 +131,7 @@ export const adminNavigation: RoleNavItem[] = [
   { name: "Listing Scraper", href: "/admin/listing-scraper", icon: Store, description: "Bulk-import listings", requiredRole: "super_admin" },
   { name: "Logs Management", href: "/admin/logs", icon: FileText, description: "View system logs", requiredRole: "super_admin" },
   { name: "Security Center", href: "/admin/security", icon: Shield, description: "Platform security", requiredRole: "super_admin" },
-  { name: "System Settings", href: "/admin/settings", icon: Settings, description: "Global configuration", requiredRole: "super_admin" },
+  { name: "System Settings", href: "/admin/settings", icon: Settings, description: "Global configuration" },
 ];
 
 // ---- Lister ----
