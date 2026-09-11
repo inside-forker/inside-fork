@@ -103,30 +103,34 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   let backfillRows: HiddenGemRow[] = [];
 
   try {
-    const { rows: pinned } = await query(
-      `${FAVORITES_CTE}
-       SELECT ${CARD_COLUMNS_QUALIFIED},
-              COALESCE(f.cnt, 0) AS favorite_count,
-              NULL::numeric AS discovery_score
-       FROM listings_with_details ld
-       JOIN listings l ON l.id = ld.id
-       LEFT JOIN all_time_favorites f ON f.listing_id = ld.id
-       WHERE ld.status = 'published'
-         AND l.hidden_gem_pinned = true
-         AND l.hidden_gem_hidden = false
-       ORDER BY l.hidden_gem_pinned_at DESC NULLS LAST, ld.id ASC`,
-    );
+    // Pinned tier and the organic eligibility count are independent of each
+    // other - only the pagination math below needs both - so run concurrently
+    // instead of as two sequential round trips.
+    const [{ rows: pinned }, { rows: countRows }] = await Promise.all([
+      query(
+        `${FAVORITES_CTE}
+         SELECT ${CARD_COLUMNS_QUALIFIED},
+                COALESCE(f.cnt, 0) AS favorite_count,
+                NULL::numeric AS discovery_score
+         FROM listings_with_details ld
+         JOIN listings l ON l.id = ld.id
+         LEFT JOIN all_time_favorites f ON f.listing_id = ld.id
+         WHERE ld.status = 'published'
+           AND l.hidden_gem_pinned = true
+           AND l.hidden_gem_hidden = false
+         ORDER BY l.hidden_gem_pinned_at DESC NULLS LAST, ld.id ASC`,
+      ),
+      query(
+        `${FAVORITES_CTE}
+         SELECT COUNT(*)::integer AS total
+         FROM listings_with_details ld
+         JOIN listings l ON l.id = ld.id
+         LEFT JOIN all_time_favorites f ON f.listing_id = ld.id
+         WHERE ${ORGANIC_ELIGIBILITY_SQL}`,
+        [MIN_RATING, MIN_REVIEWS, MAX_REVIEWS, MAX_FAVORITES],
+      ),
+    ]);
     pinnedRows = pinned as HiddenGemRow[];
-
-    const { rows: countRows } = await query(
-      `${FAVORITES_CTE}
-       SELECT COUNT(*)::integer AS total
-       FROM listings_with_details ld
-       JOIN listings l ON l.id = ld.id
-       LEFT JOIN all_time_favorites f ON f.listing_id = ld.id
-       WHERE ${ORGANIC_ELIGIBILITY_SQL}`,
-      [MIN_RATING, MIN_REVIEWS, MAX_REVIEWS, MAX_FAVORITES],
-    );
     organicTotal = Number(countRows[0]?.total ?? 0);
 
     const pinnedPageRows = pinnedRows.slice(offset, offset + limit);

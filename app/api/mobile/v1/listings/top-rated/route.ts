@@ -125,37 +125,41 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   let backfillRows: TopRatedRow[] = [];
 
   try {
-    // Tier 1: pinned - always shown, always first, no eligibility gate.
-    // Admin-curated (a handful of rows), fetched whole and sliced in JS.
-    const { rows: pinned } = await query(
-      `${INSIDER_CTE}
-       SELECT ${CARD_COLUMNS_QUALIFIED},
-              ir.cnt AS insider_review_count,
-              ir.avg_rating AS insider_avg_rating,
-              NULL::numeric AS weighted_score
-       FROM listings_with_details ld
-       JOIN listings l ON l.id = ld.id
-       LEFT JOIN insider_reviews ir ON ir.listing_id = ld.id
-       WHERE ld.status = 'published'
-         AND l.top_rated_pinned = true
-         AND l.top_rated_hidden = false
-       ORDER BY l.top_rated_pinned_at DESC NULLS LAST, ld.id ASC`,
-    );
+    // Pinned tier and the insider eligibility count are independent of each
+    // other - only the pagination math below needs both - so run concurrently
+    // instead of as two sequential round trips.
+    const [{ rows: pinned }, { rows: countRows }] = await Promise.all([
+      // Tier 1: pinned - always shown, always first, no eligibility gate.
+      // Admin-curated (a handful of rows), fetched whole and sliced in JS.
+      query(
+        `${INSIDER_CTE}
+         SELECT ${CARD_COLUMNS_QUALIFIED},
+                ir.cnt AS insider_review_count,
+                ir.avg_rating AS insider_avg_rating,
+                NULL::numeric AS weighted_score
+         FROM listings_with_details ld
+         JOIN listings l ON l.id = ld.id
+         LEFT JOIN insider_reviews ir ON ir.listing_id = ld.id
+         WHERE ld.status = 'published'
+           AND l.top_rated_pinned = true
+           AND l.top_rated_hidden = false
+         ORDER BY l.top_rated_pinned_at DESC NULLS LAST, ld.id ASC`,
+      ),
+      // Tier 2: insider - Bayesian-weighted insider rating, excludes pinned/hidden.
+      query(
+        `${INSIDER_CTE}
+         SELECT COUNT(*)::integer AS total
+         FROM listings_with_details ld
+         JOIN listings l ON l.id = ld.id
+         JOIN insider_reviews ir ON ir.listing_id = ld.id
+         WHERE ld.status = 'published'
+           AND l.top_rated_hidden = false
+           AND l.top_rated_pinned = false
+           AND ir.cnt >= $1`,
+        [MIN_INSIDER_REVIEWS],
+      ),
+    ]);
     pinnedRows = pinned as TopRatedRow[];
-
-    // Tier 2: insider - Bayesian-weighted insider rating, excludes pinned/hidden.
-    const { rows: countRows } = await query(
-      `${INSIDER_CTE}
-       SELECT COUNT(*)::integer AS total
-       FROM listings_with_details ld
-       JOIN listings l ON l.id = ld.id
-       JOIN insider_reviews ir ON ir.listing_id = ld.id
-       WHERE ld.status = 'published'
-         AND l.top_rated_hidden = false
-         AND l.top_rated_pinned = false
-         AND ir.cnt >= $1`,
-      [MIN_INSIDER_REVIEWS],
-    );
     insiderTotal = countRows[0]?.total ?? 0;
 
     const pinnedPageRows = pinnedRows.slice(offset, offset + limit);
@@ -196,6 +200,12 @@ export const GET = mobileRoute(async (request: NextRequest) => {
           Number(r.id),
         );
         const { rows: backfill } = await query(
+          // No review_count floor here: the whole point of backfill is to
+          // guarantee non-empty results when the insider tier can't fill the
+          // page, including the case where the catalog has zero reviews
+          // anywhere yet - a `review_count >= 1` floor made backfill itself
+          // return nothing in exactly that situation. Ordering still puts any
+          // real rating first; zero-review listings just sort last.
           `SELECT ${CARD_COLUMNS_QUALIFIED},
                   NULL::bigint AS insider_review_count,
                   NULL::numeric AS insider_avg_rating,
@@ -204,7 +214,6 @@ export const GET = mobileRoute(async (request: NextRequest) => {
            JOIN listings l ON l.id = ld.id
            WHERE ld.status = 'published'
              AND l.top_rated_hidden = false
-             AND ld.review_count >= 1
              AND ld.id != ALL($1::int[])
            ORDER BY ld.avg_rating DESC NULLS LAST, ld.review_count DESC, ld.id ASC
            LIMIT $2`,
