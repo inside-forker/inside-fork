@@ -51,9 +51,11 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   // `connectionTimeoutMillis` (10s), which is what made this screen fail
   // intermittently while unrelated screens loaded fine.
   const { rows: favRows } = await query(
-    `SELECT listing_id, COUNT(*) OVER () AS total_count
-     FROM favorite_listings WHERE user_id = $1
-     ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+    `SELECT fl.listing_id, COUNT(*) OVER () AS total_count
+     FROM favorite_listings fl
+     JOIN listings_with_details l ON l.id = fl.listing_id AND l.status = 'published'
+     WHERE fl.user_id = $1
+     ORDER BY fl.created_at DESC LIMIT $2 OFFSET $3`,
     [user.id, limit, offset],
   );
 
@@ -64,7 +66,9 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     countRows = [{ count: favRows[0].total_count }];
   } else {
     const res = await query(
-      `SELECT COUNT(*) FROM favorite_listings WHERE user_id = $1`,
+      `SELECT COUNT(*) FROM favorite_listings fl
+       JOIN listings_with_details l ON l.id = fl.listing_id AND l.status = 'published'
+       WHERE fl.user_id = $1`,
       [user.id],
     );
     countRows = res.rows;
