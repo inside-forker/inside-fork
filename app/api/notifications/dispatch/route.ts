@@ -76,3 +76,8 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// Vercel Cron Jobs invoke this path with a GET request, not POST - without
+// this alias the scheduled run 405s before isAuthorized() is ever checked,
+// regardless of CRON_SECRET being configured correctly.
+export const GET = POST;
