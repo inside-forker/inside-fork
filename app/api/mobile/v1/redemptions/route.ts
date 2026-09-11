@@ -6,6 +6,7 @@ import { requireMobileUser } from "@/lib/mobile/auth";
 import { enforceMobileRateLimit } from "@/lib/mobile/rate-limit";
 import { MobileApiError } from "@/lib/mobile/errors";
 import { query } from "@/lib/db";
+import { parsePagination, buildPaginationMeta } from "@/lib/mobile/pagination";
 import {
   generateRedemptionCode,
   REDEMPTION_CODE_TTL_MS,
@@ -13,6 +14,76 @@ import {
 import { emitRedemptionAnalytics } from "@/lib/redemptions/analytics";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * GET /api/mobile/v1/redemptions
+ * Returns the signed-in user's redemption history, newest first.
+ */
+export const GET = mobileRoute(async (request: NextRequest) => {
+  await enforceMobileRateLimit(request);
+  const { user } = await requireMobileUser(request);
+  await enforceMobileRateLimit(request, user.id);
+
+  const { searchParams } = new URL(request.url);
+  const { page, limit, offset } = parsePagination(searchParams, {
+    defaultLimit: 20,
+    maxLimit: 50,
+  });
+
+  // Soft-expire any pending codes past TTL for this user
+  try {
+    await query(
+      `UPDATE public.redemptions
+       SET status = 'expired'
+       WHERE user_id = $1 AND status = 'pending' AND code_expires_at < NOW()`,
+      [user.id],
+    );
+  } catch (err) {
+    console.error("[mobile-api] soft-expire redemptions failed:", err);
+  }
+
+  const { rows } = await query(
+    `SELECT r.id, r.status, r.code, r.code_expires_at, r.bill_value,
+            r.discount_value, r.currency, r.void_reason, r.created_at,
+            r.validated_at, r.voided_at, r.listing_id, r.deal_id,
+            l.name AS listing_name, l.slug AS listing_slug,
+            d.title AS deal_title, d.discount_value AS deal_discount,
+            COUNT(*) OVER() AS total_count
+     FROM public.redemptions r
+     INNER JOIN listings l ON l.id = r.listing_id
+     LEFT JOIN deals d ON d.id = r.deal_id
+     WHERE r.user_id = $1
+     ORDER BY r.created_at DESC
+     LIMIT $2 OFFSET $3`,
+    [user.id, limit, offset],
+  );
+
+  const total = Number(rows[0]?.total_count ?? 0);
+  const redemptions = rows.map((row) => ({
+    id: row.id,
+    status: row.status,
+    code: row.code,
+    expiresAt: row.code_expires_at,
+    listingId: Number(row.listing_id),
+    listingName: row.listing_name,
+    listingSlug: row.listing_slug,
+    dealId: row.deal_id != null ? Number(row.deal_id) : null,
+    dealTitle: row.deal_title,
+    discountLabel: row.deal_discount,
+    billValue: row.bill_value != null ? Number(row.bill_value) : null,
+    discountValue: row.discount_value != null ? Number(row.discount_value) : null,
+    currency: row.currency || "PKR",
+    voidReason: row.void_reason,
+    createdAt: row.created_at,
+    validatedAt: row.validated_at,
+    voidedAt: row.voided_at,
+  }));
+
+  return ok(redemptions, {
+    pagination: buildPaginationMeta(page, limit, total),
+  });
+});
+
 
 const startSchema = z.object({
   dealId: z.coerce.number().int().positive(),
