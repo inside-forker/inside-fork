@@ -112,31 +112,34 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   let backfillRows: TrendingRow[] = [];
 
   try {
-    // Tier 1: pinned - always shown, always first, no eligibility gate.
-    // Admin-curated and expected to be a handful of rows, so fetched whole
-    // (unpaginated) and sliced in JS alongside the organic tier below.
-    const { rows: pinned } = await query(
-      `SELECT ${CARD_COLUMNS_QUALIFIED}
-       FROM listings_with_details ld
-       JOIN listings l ON l.id = ld.id
-       WHERE ld.status = 'published'
-         AND l.trending_pinned = true
-         AND l.trending_hidden = false
-       ORDER BY l.trending_pinned_at DESC NULLS LAST, ld.id ASC`,
-    );
+    // Tier 1 (pinned) and the organic eligibility count don't depend on each
+    // other - only the pagination math below needs both - so they run
+    // concurrently rather than as two sequential round trips.
+    const [{ rows: pinned }, { rows: countRows }] = await Promise.all([
+      // Admin-curated and expected to be a handful of rows, so fetched whole
+      // (unpaginated) and sliced in JS alongside the organic tier below.
+      query(
+        `SELECT ${CARD_COLUMNS_QUALIFIED}
+         FROM listings_with_details ld
+         JOIN listings l ON l.id = ld.id
+         WHERE ld.status = 'published'
+           AND l.trending_pinned = true
+           AND l.trending_hidden = false
+         ORDER BY l.trending_pinned_at DESC NULLS LAST, ld.id ASC`,
+      ),
+      // Tier 2: organic - real weekly-signal scoring, excludes pinned/hidden.
+      query(
+        `${WEEKLY_SIGNALS_CTE}
+         SELECT COUNT(*)::integer AS total
+         FROM listings_with_details ld
+         JOIN listings l ON l.id = ld.id
+         LEFT JOIN recent_favorites rf ON rf.listing_id = ld.id
+         LEFT JOIN recent_reviews rr ON rr.listing_id = ld.id
+         LEFT JOIN recent_checkins rc ON rc.listing_id = ld.id
+         WHERE ${ORGANIC_ELIGIBILITY_SQL}`,
+      ),
+    ]);
     pinnedRows = pinned as TrendingRow[];
-
-    // Tier 2: organic - real weekly-signal scoring, excludes pinned/hidden.
-    const { rows: countRows } = await query(
-      `${WEEKLY_SIGNALS_CTE}
-       SELECT COUNT(*)::integer AS total
-       FROM listings_with_details ld
-       JOIN listings l ON l.id = ld.id
-       LEFT JOIN recent_favorites rf ON rf.listing_id = ld.id
-       LEFT JOIN recent_reviews rr ON rr.listing_id = ld.id
-       LEFT JOIN recent_checkins rc ON rc.listing_id = ld.id
-       WHERE ${ORGANIC_ELIGIBILITY_SQL}`,
-    );
     organicTotal = countRows[0]?.total ?? 0;
 
     // Combined pinned+organic list is ordered [pinned..., organic...]; slicing
@@ -184,12 +187,17 @@ export const GET = mobileRoute(async (request: NextRequest) => {
           Number(r.id),
         );
         const { rows: backfill } = await query(
+          // Quality floor excludes only a genuinely bad rating (< 3.5) -
+          // `avg_rating` is 0 (not NULL) for listings with zero reviews, so
+          // treating 0 the same as NULL keeps unrated listings eligible for
+          // backfill instead of the floor silently excluding everything
+          // whenever the catalog has little/no review data yet.
           `SELECT ${CARD_COLUMNS_QUALIFIED}
            FROM listings_with_details ld
            JOIN listings l ON l.id = ld.id
            WHERE ld.status = 'published'
              AND l.trending_hidden = false
-             AND (ld.avg_rating IS NULL OR ld.avg_rating >= 3.5)
+             AND (ld.avg_rating IS NULL OR ld.avg_rating = 0 OR ld.avg_rating >= 3.5)
              AND ld.id != ALL($1::int[])
            ORDER BY ld.is_featured DESC NULLS LAST, ld.avg_rating DESC NULLS LAST, ld.id ASC
            LIMIT $2`,
