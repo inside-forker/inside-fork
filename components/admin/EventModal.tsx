@@ -1319,10 +1319,10 @@ export function EventModal({
                         <ShieldCheck className="h-5 w-5 text-primary" />
                         <div>
                           <h4 className="text-base font-semibold">
-                            Gate Scanning & Attendance Mode
+                            Device Verification & Attendance Mode
                           </h4>
                           <p className="text-xs text-muted-foreground">
-                            Configure single device or offline-first jammer-proof zone slicing for gate pass scanners.
+                            Configure single device or offline-first jammer-proof multi-device partition for scanners.
                           </p>
                         </div>
                       </div>
@@ -1330,7 +1330,7 @@ export function EventModal({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                         <div className="space-y-2">
                           <Label htmlFor="scanning_mode" className="text-sm font-medium">
-                            Scanning Architecture
+                            Verification Architecture
                           </Label>
                           <Select
                             value={formData.scanning_mode}
@@ -1345,13 +1345,13 @@ export function EventModal({
                               <SelectItem value="single">
                                 <div className="flex items-center gap-2">
                                   <QrCode className="h-4 w-4 text-emerald-500" />
-                                  <span>Single Scanner Device (All Tickets)</span>
+                                  <span>Single Device Verification (1 Device)</span>
                                 </div>
                               </SelectItem>
                               <SelectItem value="multi_gate">
                                 <div className="flex items-center gap-2">
                                   <Layers className="h-4 w-4 text-primary" />
-                                  <span>Multi-Gate Zone Slicing (Anti-Fraud)</span>
+                                  <span>Multi-Device Verification (Anti-Fraud)</span>
                                 </div>
                               </SelectItem>
                             </SelectContent>
@@ -1361,7 +1361,7 @@ export function EventModal({
                         {formData.scanning_mode === "multi_gate" && (
                           <div className="space-y-2">
                             <Label htmlFor="total_gates" className="text-sm font-medium">
-                              Configured Total Gates / Devices
+                              Configured Total Devices
                             </Label>
                             <Select
                               value={formData.total_gates}
@@ -1375,7 +1375,7 @@ export function EventModal({
                               <SelectContent>
                                 {[2, 3, 4, 5, 6, 8, 10].map((num) => (
                                   <SelectItem key={num} value={num.toString()}>
-                                    {num} Gates / Devices (Equal Slice Partition)
+                                    {num} Devices (Partitioned Verification)
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -1383,6 +1383,25 @@ export function EventModal({
                           </div>
                         )}
                       </div>
+
+                      {event?.event_id && (
+                        <div className="mt-3 pt-3 border-t border-border/40 flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground">
+                            Assign individual attendees to Device 1, Device 2 or link scanner operator accounts:
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              window.location.href = `/admin/events/${event.event_id}/device-allocation`;
+                            }}
+                            className="text-xs border-primary/30 text-primary hover:bg-primary/5"
+                          >
+                            Manage Device & Operator Allocations →
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </form>

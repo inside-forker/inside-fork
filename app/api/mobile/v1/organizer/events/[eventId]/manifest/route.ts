@@ -73,6 +73,7 @@ export const GET = mobileRoute(async (request: NextRequest, context) => {
       tp.status,
       tp.guest_name,
       tp.checked_in_at,
+      tp.assigned_gate_index,
       tp.booking_id,
       b.customer_name,
       b.customer_phone,
@@ -94,18 +95,34 @@ export const GET = mobileRoute(async (request: NextRequest, context) => {
     status: t.status,
     guestName: t.guest_name || t.customer_name || null,
     ticketType: t.ticket_type_name || "General Admission",
+    assignedGateIndex:
+      t.assigned_gate_index !== null && t.assigned_gate_index !== undefined
+        ? Number(t.assigned_gate_index)
+        : null,
     checkedInAt: t.checked_in_at ? new Date(t.checked_in_at).toISOString() : null,
     isCheckedIn: !!t.checked_in_at || t.status === "checked_in",
   }));
 
   const totalTickets = allFormattedTickets.length;
 
-  // Partition tickets for this gate if totalGates > 1
+  // Partition tickets for this device/gate if totalGates > 1
   let gateTickets = allFormattedTickets;
   if (totalGates > 1 && totalTickets > 0) {
-    const startIndex = Math.floor((gateIndex * totalTickets) / totalGates);
-    const endIndex = Math.floor(((gateIndex + 1) * totalTickets) / totalGates);
-    gateTickets = allFormattedTickets.slice(startIndex, endIndex);
+    const hasExplicitAssignments = allFormattedTickets.some(
+      (t) => t.assignedGateIndex !== null,
+    );
+
+    if (hasExplicitAssignments) {
+      // Filter directly by explicit assigned device index
+      gateTickets = allFormattedTickets.filter(
+        (t) => t.assignedGateIndex === gateIndex,
+      );
+    } else {
+      // Deterministic slice fallback
+      const startIndex = Math.floor((gateIndex * totalTickets) / totalGates);
+      const endIndex = Math.floor(((gateIndex + 1) * totalTickets) / totalGates);
+      gateTickets = allFormattedTickets.slice(startIndex, endIndex);
+    }
   }
 
   const checkedInCount = gateTickets.filter((t) => t.isCheckedIn).length;
@@ -131,6 +148,8 @@ export const GET = mobileRoute(async (request: NextRequest, context) => {
     generatedAt: new Date().toISOString(),
     totalGates,
     gateIndex,
+    deviceIndex: gateIndex,
+    totalDevices: totalGates,
     totalTickets,
     assignedTicketsCount: totalAssignedTickets,
     checkedInCount,
