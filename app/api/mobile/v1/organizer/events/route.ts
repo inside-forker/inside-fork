@@ -18,6 +18,8 @@ interface EventRecord {
   status: string;
   location_name?: string | null;
   address?: string | null;
+  scanning_mode?: "single" | "multi_gate";
+  total_gates?: number;
 }
 
 interface BookingRecord {
@@ -66,7 +68,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   let eventsSql = `SELECT id, name, slug, description,
       to_json(start_time) #>> '{}' AS start_time,
       to_json(end_time) #>> '{}' AS end_time,
-      max_capacity, status, location_name, address
+      max_capacity, status, location_name, address,
+      scanning_mode, total_gates
     FROM events WHERE organizer_id = $1`;
   if (eventId) {
     eventParams.push(parseInt(eventId, 10));
@@ -78,6 +81,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const events: EventRecord[] = eventRows.map((row) => ({
     ...row,
     id: Number(row.id),
+    total_gates: row.total_gates !== null && row.total_gates !== undefined ? Number(row.total_gates) : 1,
+    scanning_mode: row.scanning_mode || "single",
   }));
 
   if (events.length === 0) {

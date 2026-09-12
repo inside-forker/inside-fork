@@ -12,13 +12,14 @@ const EVENT_DETAIL_COLUMNS =
   "category_id, max_capacity, is_featured, " +
   "featured_rank, is_commission_based, commission_rate, require_guest_details, " +
   "organizer_id, organizer_name, organizer_avatar, location_name, address, " +
-  "latitude, longitude";
+  "latitude, longitude, scanning_mode, total_gates";
 
 function toNumericEvent(row: Record<string, unknown>) {
   return {
     ...row,
     event_id: Number(row.event_id),
     category_id: row.category_id !== null ? Number(row.category_id) : null,
+    total_gates: row.total_gates !== null && row.total_gates !== undefined ? Number(row.total_gates) : 1,
     // latitude/longitude/commission_rate are numeric columns; node-pg
     // returns them as strings by default (no custom type parser
     // configured), unlike the old PostgREST path which serialized them
@@ -39,13 +40,14 @@ const EVENTS_ROW_COLUMNS =
   "is_commission_based, commission_rate, status, " +
   "to_json(created_at) #>> '{}' AS created_at, to_json(updated_at) #>> '{}' AS updated_at, " +
   "category_id, max_capacity, is_featured, featured_rank, require_guest_details, " +
-  "location_name, address, latitude, longitude";
+  "location_name, address, latitude, longitude, scanning_mode, total_gates";
 
 function toNumericEventsRow(row: Record<string, unknown>) {
   return {
     ...row,
     id: Number(row.id),
     category_id: row.category_id !== null ? Number(row.category_id) : null,
+    total_gates: row.total_gates !== null && row.total_gates !== undefined ? Number(row.total_gates) : 1,
     latitude: row.latitude !== null ? Number(row.latitude) : null,
     longitude: row.longitude !== null ? Number(row.longitude) : null,
     commission_rate:
@@ -210,6 +212,8 @@ export async function PATCH(
       status,
       organizer_id,
       require_guest_details,
+      scanning_mode,
+      total_gates,
     } = body;
 
     // Build update
@@ -250,6 +254,10 @@ export async function PATCH(
     if (organizer_id !== undefined) pushField("organizer_id", organizer_id);
     if (require_guest_details !== undefined)
       pushField("require_guest_details", require_guest_details);
+    if (scanning_mode !== undefined)
+      pushField("scanning_mode", scanning_mode);
+    if (total_gates !== undefined)
+      pushField("total_gates", Math.max(1, parseInt(total_gates, 10) || 1));
 
     updateParams.push(eventId);
     const idIdx = updateParams.length;

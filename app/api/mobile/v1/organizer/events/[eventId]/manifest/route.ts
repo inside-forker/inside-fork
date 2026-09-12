@@ -36,7 +36,7 @@ export const GET = mobileRoute(async (request: NextRequest, context) => {
 
   // 1. Fetch Event Header Info
   const { rows: eventRows } = await query(
-    `SELECT id, name, location_name, start_time, end_time, organizer_id 
+    `SELECT id, name, location_name, start_time, end_time, organizer_id, scanning_mode, total_gates 
      FROM public.events 
      WHERE id = $1 LIMIT 1`,
     [eventIdNum],
@@ -46,9 +46,16 @@ export const GET = mobileRoute(async (request: NextRequest, context) => {
     throw MobileErrors.notFound("Event not found.");
   }
 
-  // Parse gate allocation query params
+  const defaultTotalGates =
+    event.scanning_mode === "multi_gate" && event.total_gates && event.total_gates > 1
+      ? Number(event.total_gates)
+      : 1;
+
+  // Parse gate allocation query params (fallback to event's configured default if not overridden)
   const url = new URL(request.url);
-  const rawTotalGates = parseInt(url.searchParams.get("totalGates") || "1", 10);
+  const rawTotalGates = url.searchParams.has("totalGates")
+    ? parseInt(url.searchParams.get("totalGates") || "1", 10)
+    : defaultTotalGates;
   const rawGateIndex = parseInt(url.searchParams.get("gateIndex") || "0", 10);
 
   const totalGates = Number.isFinite(rawTotalGates) && rawTotalGates >= 1 ? Math.min(rawTotalGates, 50) : 1;
@@ -117,6 +124,8 @@ export const GET = mobileRoute(async (request: NextRequest, context) => {
       location: event.location_name,
       startDate: event.start_time,
       endDate: event.end_time,
+      scanning_mode: event.scanning_mode || "single",
+      total_gates: event.total_gates ? Number(event.total_gates) : 1,
     },
     manifestVersion,
     generatedAt: new Date().toISOString(),
