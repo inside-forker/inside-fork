@@ -50,13 +50,19 @@ interface TicketPassRecord {
  */
 export const GET = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
-  const { user } = await requireMobileOrganizer(request);
+  const { user, isGatePass, linkedOrganizerId } = await requireMobileOrganizer(
+    request,
+    { allowGatePass: true },
+  );
   await enforceMobileRateLimit(request, user.id);
 
   const { searchParams } = new URL(request.url);
   const eventId = searchParams.get("eventId");
 
-  const eventParams: unknown[] = [user.id];
+  const targetOrganizerId =
+    isGatePass && linkedOrganizerId ? linkedOrganizerId : user.id;
+
+  const eventParams: unknown[] = [targetOrganizerId];
   let eventsSql = `SELECT id, name, slug, description,
       to_json(start_time) #>> '{}' AS start_time,
       to_json(end_time) #>> '{}' AS end_time,
@@ -186,7 +192,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       stats: {
         ticketsSold,
         totalCapacity: totalCapacity || event.max_capacity || 0,
-        revenue,
+        revenue: isGatePass ? 0 : revenue,
         checkIns,
         totalPasses: eventPasses.length,
         occupancyRate:
@@ -207,7 +213,9 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   const summary = {
     totalEvents: events.length,
-    totalRevenue: eventsWithStats.reduce((sum, e) => sum + e.stats.revenue, 0),
+    totalRevenue: isGatePass
+      ? 0
+      : eventsWithStats.reduce((sum, e) => sum + e.stats.revenue, 0),
     totalTicketsSold: eventsWithStats.reduce(
       (sum, e) => sum + e.stats.ticketsSold,
       0,
