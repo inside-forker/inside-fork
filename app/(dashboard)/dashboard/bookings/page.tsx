@@ -59,8 +59,21 @@ export default async function DashboardBookingsPage() {
 
     if (bookingIds.length > 0) {
       const { rows: passRows } = await query(
-        `SELECT id, booking_id, code, status, quantity_index, issued_at, ticket_type_id, guest_name, cnic_last4
-         FROM ticket_passes WHERE booking_id = ANY($1)`,
+        `SELECT 
+          tp.id, 
+          tp.booking_id, 
+          tp.code, 
+          tp.status, 
+          tp.quantity_index, 
+          tp.issued_at, 
+          tp.ticket_type_id, 
+          tp.guest_name, 
+          tp.cnic_last4,
+          tp.assigned_gate_index,
+          COALESCE(edo.device_label, CASE WHEN tp.assigned_gate_index IS NOT NULL THEN 'Gate ' || (tp.assigned_gate_index + 1) ELSE NULL END) AS gate_label
+         FROM ticket_passes tp
+         LEFT JOIN event_device_operators edo ON edo.event_id = tp.event_id AND edo.device_index = tp.assigned_gate_index
+         WHERE tp.booking_id = ANY($1)`,
         [bookingIds],
       );
       passesByBooking = new Map();
@@ -73,6 +86,8 @@ export default async function DashboardBookingsPage() {
           booking_id: bookingId,
           quantity_index: Number(pass.quantity_index),
           ticket_type_id: Number(pass.ticket_type_id),
+          assigned_gate_index: pass.assigned_gate_index !== null && pass.assigned_gate_index !== undefined ? Number(pass.assigned_gate_index) : null,
+          gate_label: pass.gate_label || null,
         });
         passesByBooking.set(bookingId, list);
       }

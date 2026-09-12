@@ -71,6 +71,18 @@ function TicketCard({
           >
             Pass #{index + 1}
           </span>
+          {pass.gate_label && (
+            <span
+              className={cn(
+                "px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider",
+                variant === "dashboard"
+                  ? "bg-primary/15 text-primary border border-primary/30"
+                  : "bg-white/10 text-white border border-white/20"
+              )}
+            >
+              🚪 {pass.gate_label}
+            </span>
+          )}
         </div>
         <div
           className={cn(
