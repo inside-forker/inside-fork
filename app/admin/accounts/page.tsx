@@ -3,11 +3,15 @@ import { requireSessionUser } from "@/lib/auth/require-session";
 import { AccountCreationHub } from "@/components/admin/AccountCreationHub";
 
 export const metadata = {
-  title: "Account Creation Hub | Inside Karachi Admin",
-  description: "Create and manage Event Organizers and Gate Pass operators.",
+  title: "Accounts & Gate Allocation Hub | Inside Karachi Admin",
+  description: "Create and manage Event Organizers, Gate Pass operators, and device gate allocations.",
 };
 
-export default async function AdminAccountsPage() {
+interface AdminAccountsPageProps {
+  searchParams?: Promise<{ tab?: string; event_id?: string }>;
+}
+
+export default async function AdminAccountsPage({ searchParams }: AdminAccountsPageProps) {
   const { profile } = await requireSessionUser();
 
   if (!profile) {
@@ -19,5 +23,15 @@ export default async function AdminAccountsPage() {
     redirect("/dashboard");
   }
 
-  return <AccountCreationHub />;
+  const params = searchParams ? await searchParams : {};
+  const initialTab = typeof params.tab === "string" ? params.tab : undefined;
+  const rawEventId = params.event_id ? parseInt(params.event_id, 10) : undefined;
+  const initialEventId = rawEventId && !isNaN(rawEventId) ? rawEventId : undefined;
+
+  return (
+    <AccountCreationHub
+      initialTab={initialTab}
+      initialEventId={initialEventId}
+    />
+  );
 }

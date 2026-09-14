@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import { requireSessionUser } from "@/lib/auth/require-session";
-import { DeviceAllocationClient } from "@/components/admin/DeviceAllocationClient";
+import { AccountCreationHub } from "@/components/admin/AccountCreationHub";
+
+export const metadata = {
+  title: "Event Device Allocation & Gate Settings | Inside Karachi Admin",
+  description: "Configure multi-device verification architecture, assign gate operators, and allocate tickets.",
+};
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -13,7 +18,7 @@ export default async function EventDeviceAllocationPage({ params }: PageProps) {
     redirect("/login");
   }
 
-  // Verify admin, super_admin, or staff/lister access
+  // Verify admin, super_admin, or staff/lister/organizer access
   if (
     profile.role !== "admin" &&
     profile.role !== "super_admin" &&
@@ -27,12 +32,15 @@ export default async function EventDeviceAllocationPage({ params }: PageProps) {
   const eventId = parseInt(id, 10);
 
   if (isNaN(eventId)) {
-    redirect("/admin/events");
+    redirect("/admin/accounts?tab=allocation");
   }
 
   return (
     <div className="space-y-6">
-      <DeviceAllocationClient eventId={eventId} />
+      <AccountCreationHub
+        initialEventId={eventId}
+        initialTab="allocation"
+      />
     </div>
   );
 }

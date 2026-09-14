@@ -110,7 +110,7 @@ export const adminSecondaryNavigation: RoleNavItem[] = [
 // Admin Tools section — shared by admin + super_admin, some items gated to super_admin only
 export const adminNavigation: RoleNavItem[] = [
   { name: "User Management", href: "/admin/users", icon: Users, description: "Manage user accounts" },
-  { name: "Account Hub (EO / Gate Pass)", href: "/admin/accounts", icon: UserPlus, description: "Create & manage EO and Gate Pass operators" },
+  { name: "Accounts & Gate Allocation", href: "/admin/accounts", icon: UserPlus, description: "Manage EOs, Gate Pass operators, and device gate allocations" },
   { name: "Event Management", href: "/admin/events", icon: Calendar, description: "Manage all events" },
   { name: "Event Approvals", href: "/admin/events/approvals", icon: ClipboardCheck, description: "Review pending events" },
   { name: "Bookings", href: "/admin/bookings", icon: CreditCard, description: "View all bookings" },
