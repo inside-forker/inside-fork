@@ -97,9 +97,12 @@ export async function GET(request: NextRequest) {
       query(`SELECT COUNT(*) FROM bookings WHERE user_id = $1`, [
         session.userId,
       ]),
-      query(`SELECT COUNT(*) FROM favorite_listings WHERE user_id = $1`, [
-        session.userId,
-      ]),
+      query(
+        `SELECT COUNT(*) FROM favorite_listings fl
+         JOIN listings_with_details l ON l.id = fl.listing_id AND l.status = 'published'
+         WHERE fl.user_id = $1`,
+        [session.userId],
+      ),
     ]);
 
     return NextResponse.json({

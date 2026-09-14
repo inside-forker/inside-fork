@@ -43,7 +43,7 @@ export function toBooking(row: BookingRow): BookingDTO {
 // ---------------------------------------------------------------------------
 
 export const PASS_COLUMNS =
-  "id, code, status, quantity_index, issued_at, ticket_type_id, guest_name, cnic_last4";
+  "tp.id, tp.code, tp.status, tp.quantity_index, tp.issued_at, tp.ticket_type_id, tp.guest_name, tp.cnic_last4, tp.assigned_gate_index, COALESCE(edo.device_label, CASE WHEN tp.assigned_gate_index IS NOT NULL THEN 'Gate ' || (tp.assigned_gate_index + 1) ELSE NULL END) AS gate_label";
 
 export type PassRow = Pick<
   Database["public"]["Tables"]["ticket_passes"]["Row"],
@@ -55,7 +55,10 @@ export type PassRow = Pick<
   | "ticket_type_id"
   | "guest_name"
   | "cnic_last4"
->;
+> & {
+  assigned_gate_index?: number | null;
+  gate_label?: string | null;
+};
 
 export type PassDTO = {
   id: number;
@@ -66,6 +69,8 @@ export type PassDTO = {
   ticket_type_id: number | null;
   guest_name: string | null;
   cnic_last4: string | null;
+  assigned_gate_index: number | null;
+  gate_label: string | null;
 };
 
 /** `code` is withheld until paid (matches the storage RLS + the contract). */
@@ -79,6 +84,8 @@ export function toPass(row: PassRow, isPaid: boolean): PassDTO {
     ticket_type_id: row.ticket_type_id,
     guest_name: row.guest_name,
     cnic_last4: row.cnic_last4,
+    assigned_gate_index: row.assigned_gate_index !== undefined ? row.assigned_gate_index : null,
+    gate_label: row.gate_label || null,
   };
 }
 

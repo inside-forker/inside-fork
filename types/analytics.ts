@@ -41,6 +41,7 @@ const userRoleValues = [
   "lister",
   "data_entry",
   "organizer",
+  "eo_gate_pass",
   "admin",
   "super_admin",
 ] as const satisfies readonly AnalyticsUserRole[];

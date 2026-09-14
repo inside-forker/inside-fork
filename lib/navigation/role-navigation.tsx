@@ -25,6 +25,7 @@ import {
   Layers,
   Search,
   Link2,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/types/auth.types";
@@ -109,6 +110,7 @@ export const adminSecondaryNavigation: RoleNavItem[] = [
 // Admin Tools section — shared by admin + super_admin, some items gated to super_admin only
 export const adminNavigation: RoleNavItem[] = [
   { name: "User Management", href: "/admin/users", icon: Users, description: "Manage user accounts" },
+  { name: "Accounts & Gate Allocation", href: "/admin/accounts", icon: UserPlus, description: "Manage EOs, Gate Pass operators, and device gate allocations" },
   { name: "Event Management", href: "/admin/events", icon: Calendar, description: "Manage all events" },
   { name: "Event Approvals", href: "/admin/events/approvals", icon: ClipboardCheck, description: "Review pending events" },
   { name: "Bookings", href: "/admin/bookings", icon: CreditCard, description: "View all bookings" },
@@ -131,7 +133,7 @@ export const adminNavigation: RoleNavItem[] = [
   { name: "Listing Scraper", href: "/admin/listing-scraper", icon: Store, description: "Bulk-import listings", requiredRole: "super_admin" },
   { name: "Logs Management", href: "/admin/logs", icon: FileText, description: "View system logs", requiredRole: "super_admin" },
   { name: "Security Center", href: "/admin/security", icon: Shield, description: "Platform security", requiredRole: "super_admin" },
-  { name: "System Settings", href: "/admin/settings", icon: Settings, description: "Global configuration", requiredRole: "super_admin" },
+  { name: "System Settings", href: "/admin/settings", icon: Settings, description: "Global configuration" },
 ];
 
 // ---- Lister ----

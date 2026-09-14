@@ -92,7 +92,9 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     `SELECT
        (SELECT COUNT(*) FROM reviews WHERE user_id = $1) AS reviews,
        (SELECT COUNT(*) FROM bookings WHERE user_id = $1) AS bookings,
-       (SELECT COUNT(*) FROM favorite_listings WHERE user_id = $1) AS favorites,
+       (SELECT COUNT(*) FROM favorite_listings fl
+          JOIN listings_with_details l ON l.id = fl.listing_id AND l.status = 'published'
+          WHERE fl.user_id = $1) AS favorites,
        -- "Visits" on the profile screen: every place the user has physically
        -- turned up at. Check-ins are not their own table - they land in
        -- points_log under the two check-in XP slugs, the same pair the

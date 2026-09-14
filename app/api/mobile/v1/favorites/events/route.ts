@@ -45,9 +45,10 @@ const toggleSchema = z.object({
  * Toggles the caller's favorite for an event: inserts if absent (-> favorited),
  * deletes if present (-> unfavorited). Ownership is enforced by the explicit
  * `user_id` filter below (scoped to the caller's own rows). Mirrors
- * `POST /api/mobile/v1/favorites` (listings) semantics; no analytics logging
- * here since `user_listing_events` is listing-scoped by design and there is
- * no event equivalent to write into.
+ * `POST /api/mobile/v1/favorites` (listings) semantics; also logs a
+ * favorite/unfavorite row to `user_event_events` for event-recommendation
+ * affinity (see lib/recommendations/affinity.ts's getEventCategoryAffinity),
+ * same as the listings favorite route logs to `user_listing_events`.
  */
 export const POST = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
@@ -74,6 +75,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
       `DELETE FROM favorite_events WHERE user_id = $1 AND event_id = $2`,
       [user.id, eventId],
     );
+    await logEventInteraction(user.id, eventId, "unfavorite");
     return ok({ favorited: false });
   }
 
@@ -104,5 +106,23 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     throw new MobileApiError("internal_error", "Failed to add favorite.", 500);
   }
 
+  await logEventInteraction(user.id, eventId, "favorite");
   return ok({ favorited: true });
 });
+
+/** Fire-and-forget: a lost affinity signal is fine, a broken favorite toggle isn't. */
+async function logEventInteraction(
+  userId: string,
+  eventId: number,
+  eventType: "favorite" | "unfavorite",
+): Promise<void> {
+  try {
+    await query(
+      `INSERT INTO public.user_event_events (user_id, event_id, event_type, source_context)
+       VALUES ($1, $2, $3, 'favorite_toggle')`,
+      [userId, eventId, eventType],
+    );
+  } catch (error) {
+    console.error("[mobile-api] event favorite affinity log failed:", error);
+  }
+}

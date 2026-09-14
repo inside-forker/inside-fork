@@ -17,6 +17,8 @@ export type AdminEvent = {
   category_id: number | null;
   max_capacity: number | null;
   is_featured: boolean;
+  scanning_mode?: "single" | "multi_gate";
+  total_gates?: number;
   created_at: string;
   updated_at: string;
   images?: EventImage[];
@@ -44,6 +46,8 @@ export type Event = {
   address: string | null;
   latitude: number | null;
   longitude: number | null;
+  scanning_mode?: "single" | "multi_gate";
+  total_gates?: number;
   // Editorial feature flags exposed from events_with_details
   is_featured?: boolean | null;
   featured_rank?: number | null;
