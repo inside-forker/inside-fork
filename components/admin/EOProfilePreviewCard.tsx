@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 
 interface EOProfilePreviewCardProps {
   fullName: string;
-  username: string;
+  username?: string;
   email: string;
   phone?: string;
   company?: string;

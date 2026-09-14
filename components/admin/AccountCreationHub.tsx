@@ -35,6 +35,9 @@ import {
   Link as LinkIcon,
   Check,
   ChevronDown,
+  MapPin,
+  Clock,
+  Ticket,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,44 +68,6 @@ import { useToast } from "@/hooks/use-toast";
 import { EOProfilePreviewCard } from "@/components/admin/EOProfilePreviewCard";
 
 // ================= TYPES =================
-
-interface Account {
-  id: string;
-  full_name: string | null;
-  username: string | null;
-  email: string | null;
-  avatar_url: string | null;
-  role: "organizer" | "eo_gate_pass";
-  active_role: string;
-  phone: string | null;
-  organizer_company: string | null;
-  organizer_bio: string | null;
-  organizer_website: string | null;
-  is_verified_organizer: boolean | null;
-  linked_organizer_id: string | null;
-  linked_organizer_name: string | null;
-  linked_organizer_company: string | null;
-  linked_organizer_username: string | null;
-  event_count: number;
-  gate_pass_count: number;
-  email_confirmed_at: string | null;
-  last_sign_in_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface Stats {
-  total_eos: number;
-  total_gate_passes: number;
-  verified_eos: number;
-}
-
-interface OrganizerOption {
-  id: string;
-  full_name: string;
-  username?: string | null;
-  organizer_company?: string | null;
-}
 
 interface EventSummaryOption {
   event_id: number;
@@ -182,33 +147,20 @@ interface AccountCreationHubProps {
 
 export function AccountCreationHub({
   initialEventId,
-  initialTab = "directory",
+  initialTab = "gates",
 }: AccountCreationHubProps) {
   const { toast } = useToast();
 
-  // Active Tab: "directory" | "allocation" | "create-eo" | "create-gate-pass"
-  const [activeTab, setActiveTab] = useState<string>(initialTab);
+  // Active Tab: "gates" | "staff" | "create-staff" | "organizer-profile"
+  const [activeTab, setActiveTab] = useState<string>(initialTab === "allocation" ? "gates" : initialTab);
 
-  // Directory State
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [stats, setStats] = useState<Stats>({ total_eos: 0, total_gate_passes: 0, verified_eos: 0 });
-  const [isLoadingDirectory, setIsLoadingDirectory] = useState(true);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [organizerFilter, setOrganizerFilter] = useState<string>("");
-
-  // Organizer list for Gate Pass dropdown
-  const [availableOrganizers, setAvailableOrganizers] = useState<OrganizerOption[]>([]);
-
-  // Events List for Allocation switcher
+  // Events List for Selector
   const [eventsList, setEventsList] = useState<EventSummaryOption[]>([]);
-  const [isLoadingEventsList, setIsLoadingEventsList] = useState(false);
+  const [isLoadingEventsList, setIsLoadingEventsList] = useState(true);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(initialEventId || null);
 
-  // Event Device Allocation State
-  const [loadingAllocation, setLoadingAllocation] = useState(false);
+  // Event Data State (Per Event)
+  const [loadingEvent, setLoadingEvent] = useState(false);
   const [eventData, setEventData] = useState<EventData | null>(null);
   const [deviceSlots, setDeviceSlots] = useState<DeviceSlot[]>([]);
   const [tickets, setTickets] = useState<TicketItem[]>([]);
@@ -219,13 +171,17 @@ export function AccountCreationHub({
     isFullyAssigned: boolean;
   }>({ totalTickets: 0, totalCheckedInCount: 0, unassignedCount: 0, isFullyAssigned: false });
 
-  // Ticket Filters in Allocation
+  // Event Operators List
+  const [eventOperators, setEventOperators] = useState<OperatorOption[]>([]);
+  const [loadingOperators, setLoadingOperators] = useState(false);
+
+  // Ticket Filters in Gates Tab
   const [ticketSearchQuery, setTicketSearchQuery] = useState("");
   const [deviceFilter, setDeviceFilter] = useState<string>("all");
   const [ticketStatusFilter, setTicketStatusFilter] = useState<string>("all");
   const [selectedTicketIds, setSelectedTicketIds] = useState<number[]>([]);
 
-  // Allocation Modals State
+  // Modals State
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [configMode, setConfigMode] = useState<"single" | "multi_gate">("single");
   const [configDevices, setConfigDevices] = useState<string>("2");
@@ -250,8 +206,6 @@ export function AccountCreationHub({
   const [isCreateOperatorModalOpen, setIsCreateOperatorModalOpen] = useState(false);
   const [isLinkOperatorModalOpen, setIsLinkOperatorModalOpen] = useState(false);
   const [targetDeviceIndex, setTargetDeviceIndex] = useState<number>(0);
-  const [availableOperators, setAvailableOperators] = useState<OperatorOption[]>([]);
-  const [loadingOperators, setLoadingOperators] = useState(false);
 
   const [slotOperatorForm, setSlotOperatorForm] = useState({
     fullName: "",
@@ -266,27 +220,12 @@ export function AccountCreationHub({
     name: string;
   } | null>(null);
 
-  // EO Creation Form State
-  const [eoForm, setEoForm] = useState({
-    fullName: "",
-    username: "",
-    email: "",
-    phone: "",
-    company: "",
-    website: "",
-    bio: "",
-    isVerified: true,
-    customPassword: "",
-  });
-  const [isSubmittingEo, setIsSubmittingEo] = useState(false);
-
-  // Gate Pass Creation Form State
+  // Gate Pass Operator Creation Tab Form State
   const [gpForm, setGpForm] = useState({
     fullName: "",
     username: "",
     email: "",
     phone: "",
-    linkedOrganizerId: "",
     customPassword: "",
   });
   const [isSubmittingGp, setIsSubmittingGp] = useState(false);
@@ -308,60 +247,7 @@ export function AccountCreationHub({
 
   // ================= DATA FETCHING =================
 
-  // 1. Fetch Accounts Directory
-  const fetchAccounts = useCallback(async () => {
-    setIsLoadingDirectory(true);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: "20",
-      });
-      if (searchQuery.trim()) params.set("search", searchQuery.trim());
-      if (roleFilter !== "all") params.set("role", roleFilter);
-      if (organizerFilter) params.set("organizer_id", organizerFilter);
-
-      const res = await fetch(`/api/admin/accounts?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to load accounts");
-
-      const data = await res.json();
-      if (data.success) {
-        setAccounts(data.data.accounts || []);
-        setStats(data.data.stats || { total_eos: 0, total_gate_passes: 0, verified_eos: 0 });
-        setTotalPages(data.data.pagination.totalPages || 1);
-      }
-    } catch (err) {
-      console.error("Error fetching accounts:", err);
-      toast({
-        title: "Fetch Error",
-        description: "Could not load the accounts directory",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingDirectory(false);
-    }
-  }, [page, searchQuery, roleFilter, organizerFilter, toast]);
-
-  // 2. Fetch Organizers List for select dropdowns
-  const fetchOrganizersForSelect = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/accounts?role=organizer&limit=100");
-      if (!res.ok) throw new Error("Failed to load organizers");
-      const data = await res.json();
-      if (data.success) {
-        const orgs = (data.data.accounts || []).map((acc: Account) => ({
-          id: acc.id,
-          full_name: acc.full_name || acc.username || "Organizer",
-          username: acc.username,
-          organizer_company: acc.organizer_company,
-        }));
-        setAvailableOrganizers(orgs);
-      }
-    } catch (err) {
-      console.error("Error loading organizers dropdown:", err);
-    }
-  }, []);
-
-  // 3. Fetch Events List for Allocation Selector
+  // 1. Fetch Events List for Selector
   const fetchEventsList = useCallback(async () => {
     setIsLoadingEventsList(true);
     try {
@@ -380,10 +266,14 @@ export function AccountCreationHub({
           scanning_mode: e.scanning_mode || "single",
         }));
         setEventsList(evts);
-        if (!selectedEventId && evts.length > 0 && initialEventId) {
-          setSelectedEventId(initialEventId);
-        } else if (!selectedEventId && evts.length > 0 && activeTab === "allocation") {
-          setSelectedEventId(evts[0].event_id);
+
+        // Select initial or first event
+        if (!selectedEventId && evts.length > 0) {
+          if (initialEventId && evts.some((e) => e.event_id === initialEventId)) {
+            setSelectedEventId(initialEventId);
+          } else {
+            setSelectedEventId(evts[0].event_id);
+          }
         }
       }
     } catch (err) {
@@ -391,13 +281,13 @@ export function AccountCreationHub({
     } finally {
       setIsLoadingEventsList(false);
     }
-  }, [selectedEventId, initialEventId, activeTab]);
+  }, [selectedEventId, initialEventId]);
 
-  // 4. Fetch Selected Event Device Allocation Data
-  const fetchEventAllocationData = useCallback(
+  // 2. Fetch Selected Event's Full Allocation Data
+  const fetchEventData = useCallback(
     async (eventId: number, silent = false) => {
       try {
-        if (!silent) setLoadingAllocation(true);
+        if (!silent) setLoadingEvent(true);
         const res = await fetch(`/api/admin/events/${eventId}/device-allocation`);
         const result = await res.json();
         if (result.success) {
@@ -407,17 +297,9 @@ export function AccountCreationHub({
           setAllocationSummary(result.data.summary);
           setConfigMode(result.data.event.scanningMode);
           setConfigDevices(result.data.event.totalDevices.toString());
-
-          // If Gate Pass form has no linked organizer, pre-select this event's organizer
-          if (!gpForm.linkedOrganizerId && result.data.event.organizerId) {
-            setGpForm((prev) => ({
-              ...prev,
-              linkedOrganizerId: result.data.event.organizerId,
-            }));
-          }
         } else {
           toast({
-            title: "Error loading device allocation",
+            title: "Error loading event",
             description: result.error,
             variant: "destructive",
           });
@@ -426,46 +308,42 @@ export function AccountCreationHub({
         console.error(err);
         toast({
           title: "Network error",
-          description: "Could not retrieve event allocation data",
+          description: "Could not retrieve event data",
           variant: "destructive",
         });
       } finally {
-        if (!silent) setLoadingAllocation(false);
+        if (!silent) setLoadingEvent(false);
       }
     },
-    [gpForm.linkedOrganizerId, toast],
+    [toast],
   );
 
-  // Fetch Available Operators for Current Event
-  const fetchAvailableOperatorsForEvent = async (eventId: number) => {
+  // 3. Fetch Available Operators for Current Event's Organizer
+  const fetchEventOperators = useCallback(async (eventId: number) => {
     try {
       setLoadingOperators(true);
       const res = await fetch(`/api/admin/events/${eventId}/device-allocation/operators`);
       const result = await res.json();
       if (result.success) {
-        setAvailableOperators(result.data.operators || []);
+        setEventOperators(result.data.operators || []);
       }
     } catch (err) {
       console.error("Failed to load operators for event", err);
     } finally {
       setLoadingOperators(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchAccounts();
-  }, [fetchAccounts]);
-
-  useEffect(() => {
-    fetchOrganizersForSelect();
     fetchEventsList();
-  }, [fetchOrganizersForSelect, fetchEventsList]);
+  }, [fetchEventsList]);
 
   useEffect(() => {
     if (selectedEventId) {
-      fetchEventAllocationData(selectedEventId);
+      fetchEventData(selectedEventId);
+      fetchEventOperators(selectedEventId);
     }
-  }, [selectedEventId, fetchEventAllocationData]);
+  }, [selectedEventId, fetchEventData, fetchEventOperators]);
 
   // Auto-copy password on modal open
   useEffect(() => {
@@ -482,138 +360,15 @@ export function AccountCreationHub({
     }
   }, [isPasswordDialogOpen, createdCredentials, toast]);
 
-  // Copy helper
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2500);
   };
 
-  // ================= ACTION HANDLERS =================
+  // ================= ACTIONS =================
 
-  // 1. Create EO Account
-  const handleCreateEo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!eoForm.fullName.trim() || !eoForm.email.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Full Name and Email are required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmittingEo(true);
-    try {
-      const res = await fetch("/api/admin/accounts/eo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: eoForm.fullName,
-          username: eoForm.username || undefined,
-          email: eoForm.email,
-          phone: eoForm.phone || undefined,
-          organizer_company: eoForm.company || undefined,
-          organizer_bio: eoForm.bio || undefined,
-          organizer_website: eoForm.website || undefined,
-          is_verified_organizer: eoForm.isVerified,
-          custom_password: eoForm.customPassword || undefined,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to create Event Organizer account");
-      }
-
-      setEoForm({
-        fullName: "",
-        username: "",
-        email: "",
-        phone: "",
-        company: "",
-        website: "",
-        bio: "",
-        isVerified: true,
-        customPassword: "",
-      });
-
-      setCreatedCredentials(data.data);
-      setIsPasswordDialogOpen(true);
-      fetchAccounts();
-      fetchOrganizersForSelect();
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Error creating account";
-      toast({
-        title: "Creation Failed",
-        description: errorMsg,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmittingEo(false);
-    }
-  };
-
-  // 2. Create Gate Pass Operator Account
-  const handleCreateGp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!gpForm.fullName.trim() || !gpForm.email.trim() || !gpForm.linkedOrganizerId) {
-      toast({
-        title: "Validation Error",
-        description: "Operator Name, Email, and Linked Organizer are required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmittingGp(true);
-    try {
-      const res = await fetch("/api/admin/accounts/gate-pass", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: gpForm.fullName,
-          username: gpForm.username || undefined,
-          email: gpForm.email,
-          phone: gpForm.phone || undefined,
-          linked_organizer_id: gpForm.linkedOrganizerId,
-          custom_password: gpForm.customPassword || undefined,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to create Gate Pass operator account");
-      }
-
-      setGpForm({
-        fullName: "",
-        username: "",
-        email: "",
-        phone: "",
-        linkedOrganizerId: gpForm.linkedOrganizerId,
-        customPassword: "",
-      });
-
-      setCreatedCredentials(data.data);
-      setIsPasswordDialogOpen(true);
-      fetchAccounts();
-      if (selectedEventId) {
-        fetchEventAllocationData(selectedEventId, true);
-      }
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Error creating operator";
-      toast({
-        title: "Creation Failed",
-        description: errorMsg,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmittingGp(false);
-    }
-  };
-
-  // 3. Save Custom Gate Label
+  // Save Custom Gate Label
   const handleSaveLabel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEventId || !labelForm.deviceLabel.trim()) return;
@@ -636,7 +391,7 @@ export function AccountCreationHub({
           description: result.message,
         });
         setIsLabelModalOpen(false);
-        fetchEventAllocationData(selectedEventId, true);
+        fetchEventData(selectedEventId, true);
       } else {
         toast({
           title: "Failed to update label",
@@ -656,7 +411,7 @@ export function AccountCreationHub({
     }
   };
 
-  // 4. Save Operator Credentials & Password Reset
+  // Save Operator Credentials & Password Reset
   const handleSaveCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEventId) return;
@@ -684,8 +439,8 @@ export function AccountCreationHub({
           description: result.message,
         });
         setIsCredentialsModalOpen(false);
-        fetchEventAllocationData(selectedEventId, true);
-        fetchAccounts();
+        fetchEventData(selectedEventId, true);
+        fetchEventOperators(selectedEventId);
       } else {
         toast({
           title: "Update failed",
@@ -705,7 +460,7 @@ export function AccountCreationHub({
     }
   };
 
-  // 5. Create Operator directly on Device Slot
+  // Create Operator directly on Device Slot
   const handleCreateSlotOperator = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEventId || !slotOperatorForm.fullName.trim() || !slotOperatorForm.email.trim()) {
@@ -744,8 +499,8 @@ export function AccountCreationHub({
           title: "Operator Account Created 🎉",
           description: `Assigned to ${slot?.label || `Device ${targetDeviceIndex + 1}`}`,
         });
-        fetchEventAllocationData(selectedEventId, true);
-        fetchAccounts();
+        fetchEventData(selectedEventId, true);
+        fetchEventOperators(selectedEventId);
       } else {
         toast({
           title: "Failed to create operator",
@@ -765,7 +520,63 @@ export function AccountCreationHub({
     }
   };
 
-  // 6. Link Existing Operator to Device Slot
+  // Create Gate Pass from Tab 3 (Pre-locked to current event organizer)
+  const handleCreateGp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEventId || !eventData) return;
+    if (!gpForm.fullName.trim() || !gpForm.email.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Operator Name and Email are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmittingGp(true);
+    try {
+      const res = await fetch("/api/admin/accounts/gate-pass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: gpForm.fullName,
+          username: gpForm.username || undefined,
+          email: gpForm.email,
+          phone: gpForm.phone || undefined,
+          linked_organizer_id: eventData.organizerId,
+          custom_password: gpForm.customPassword || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to create Gate Pass operator account");
+      }
+
+      setGpForm({
+        fullName: "",
+        username: "",
+        email: "",
+        phone: "",
+        customPassword: "",
+      });
+
+      setCreatedCredentials(data.data);
+      setIsPasswordDialogOpen(true);
+      fetchEventOperators(selectedEventId);
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Error creating operator";
+      toast({
+        title: "Creation Failed",
+        description: errorMsg,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingGp(false);
+    }
+  };
+
+  // Link Existing Operator to Device Slot
   const handleLinkOperator = async (operatorId: string | null) => {
     if (!selectedEventId) return;
     const slot = deviceSlots.find((s) => s.deviceIndex === targetDeviceIndex);
@@ -788,7 +599,8 @@ export function AccountCreationHub({
           description: result.message,
         });
         setIsLinkOperatorModalOpen(false);
-        fetchEventAllocationData(selectedEventId, true);
+        fetchEventData(selectedEventId, true);
+        fetchEventOperators(selectedEventId);
       } else {
         toast({
           title: "Update failed",
@@ -806,7 +618,7 @@ export function AccountCreationHub({
     }
   };
 
-  // 7. Save Architecture Configuration
+  // Save Architecture Configuration
   const handleSaveArchitecture = async () => {
     if (!selectedEventId) return;
     try {
@@ -823,11 +635,11 @@ export function AccountCreationHub({
       const result = await res.json();
       if (result.success) {
         toast({
-          title: "Configuration Saved",
+          title: "Architecture Saved ✨",
           description: result.message,
         });
         setIsConfigModalOpen(false);
-        fetchEventAllocationData(selectedEventId, false);
+        fetchEventData(selectedEventId, false);
       } else {
         toast({
           title: "Error saving config",
@@ -847,7 +659,7 @@ export function AccountCreationHub({
     }
   };
 
-  // 8. Assign Single Ticket Pass to Device
+  // Assign Single Ticket Pass to Device
   const handleAssignTicket = async (ticketId: number, deviceIndex: number | null) => {
     if (!selectedEventId) return;
     try {
@@ -874,20 +686,14 @@ export function AccountCreationHub({
               : t,
           ),
         );
-        fetchEventAllocationData(selectedEventId, true);
-      } else {
-        toast({
-          title: "Assignment failed",
-          description: result.error,
-          variant: "destructive",
-        });
+        fetchEventData(selectedEventId, true);
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  // 9. Batch Assign Selected Tickets
+  // Batch Assign Selected Tickets
   const handleBatchAssign = async (deviceIndex: number | null) => {
     if (!selectedEventId || selectedTicketIds.length === 0) return;
     const targetSlot = deviceSlots.find((s) => s.deviceIndex === deviceIndex);
@@ -911,20 +717,14 @@ export function AccountCreationHub({
           }`,
         });
         setSelectedTicketIds([]);
-        fetchEventAllocationData(selectedEventId, true);
-      } else {
-        toast({
-          title: "Batch update failed",
-          description: result.error,
-          variant: "destructive",
-        });
+        fetchEventData(selectedEventId, true);
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  // 10. Smart Auto-Distribute Evenly
+  // Smart Auto-Distribute Evenly
   const handleAutoDistribute = async (onlyUnassigned = false) => {
     if (!selectedEventId) return;
     try {
@@ -942,25 +742,14 @@ export function AccountCreationHub({
           title: "Smart Distribution Complete ✨",
           description: result.message,
         });
-        fetchEventAllocationData(selectedEventId, true);
-      } else {
-        toast({
-          title: "Auto-distribution failed",
-          description: result.error,
-          variant: "destructive",
-        });
+        fetchEventData(selectedEventId, true);
       }
     } catch (err) {
       console.error(err);
-      toast({
-        title: "Network error",
-        description: "Failed to execute auto-distribution",
-        variant: "destructive",
-      });
     }
   };
 
-  // 11. Clear All Assignments
+  // Clear All Assignments
   const handleClearAllAssignments = async () => {
     if (!selectedEventId) return;
     if (!confirm("Are you sure you want to clear all attendee gate allocations for this event?")) return;
@@ -978,14 +767,14 @@ export function AccountCreationHub({
           title: "Assignments Cleared",
           description: result.message,
         });
-        fetchEventAllocationData(selectedEventId, true);
+        fetchEventData(selectedEventId, true);
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  // 12. Export Attendees CSV
+  // Export Attendees CSV
   const handleExportCSV = () => {
     if (!selectedEventId) return;
     const headers = [
@@ -1026,7 +815,7 @@ export function AccountCreationHub({
     document.body.removeChild(link);
   };
 
-  // Filtered Tickets in Allocation
+  // Filtered Tickets
   const filteredTickets = useMemo(() => {
     return tickets.filter((ticket) => {
       if (ticketSearchQuery.trim()) {
@@ -1068,498 +857,221 @@ export function AccountCreationHub({
     );
   };
 
-  const selectedOrganizerName = availableOrganizers.find(
-    (o) => o.id === gpForm.linkedOrganizerId,
-  )?.full_name;
-
   const isMultiDevice = eventData && eventData.scanningMode === "multi_gate" && eventData.totalDevices > 1;
+  const assignedOperatorsCount = deviceSlots.filter((d) => !!d.assignedOperator).length;
 
   return (
     <div className="space-y-6">
-      {/* Top Header & Context */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            <UserPlus className="h-7 w-7 text-primary" />
-            Accounts & Gate Allocation Hub
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Provision verified Event Organizers, manage Gate Pass operators, and configure live multi-gate verification devices.
-          </p>
-        </div>
+      {/* Top Event Header & Selector Banner */}
+      <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-background via-muted/20 to-background p-5 md:p-6 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="space-y-2 max-w-2xl">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+              <span>Admin Event Console</span>
+              <span>•</span>
+              <span className="text-primary font-semibold">Device Allocation & Gate Pass Control</span>
+            </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {activeTab === "allocation" && selectedEventId && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsConfigModalOpen(true)}
-                className="border-primary/30 hover:bg-primary/5 text-foreground text-xs"
+            {/* Event Switcher Dropdown */}
+            <div className="flex flex-wrap items-center gap-3">
+              <Select
+                value={selectedEventId ? selectedEventId.toString() : ""}
+                onValueChange={(val) => setSelectedEventId(parseInt(val, 10))}
               >
-                <Sliders className="h-3.5 w-3.5 mr-1.5 text-primary" />
-                Configure Gate Architecture
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleExportCSV}
-                disabled={tickets.length === 0}
-                className="text-xs"
-              >
-                <Download className="h-3.5 w-3.5 mr-1.5" />
-                Export Roster
-              </Button>
-            </>
-          )}
+                <SelectTrigger className="w-full sm:w-[360px] bg-background font-bold text-base h-11 border-primary/40 shadow-xs focus:ring-primary">
+                  <div className="flex items-center gap-2 truncate">
+                    <Calendar className="h-4 w-4 text-primary shrink-0" />
+                    <span className="truncate">{eventData?.name || "Select an event..."}</span>
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  {eventsList.map((e) => (
+                    <SelectItem key={e.event_id} value={e.event_id.toString()}>
+                      <div className="flex flex-col text-left py-1">
+                        <span className="font-bold text-sm text-foreground">{e.event_name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {e.organizer_name} • {new Date(e.start_time).toLocaleDateString()} {e.location_name ? `• ${e.location_name}` : ""}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              fetchAccounts();
-              fetchOrganizersForSelect();
-              fetchEventsList();
-              if (selectedEventId) fetchEventAllocationData(selectedEventId);
-            }}
-            disabled={isLoadingDirectory || loadingAllocation}
-            className="border-border/60 hover:bg-muted text-xs"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoadingDirectory || loadingAllocation ? "animate-spin" : ""}`} />
-            Refresh All
-          </Button>
+              {eventData && (
+                <Badge
+                  variant="outline"
+                  className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                    isMultiDevice
+                      ? "bg-primary/10 text-primary border-primary/30"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {isMultiDevice
+                    ? `⚡ ${eventData.totalDevices}-Gate Multi-Device`
+                    : "Single Scanner Mode"}
+                </Badge>
+              )}
+            </div>
+
+            {eventData && (
+              <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground pt-1">
+                <span className="flex items-center gap-1.5">
+                  <Building className="h-3.5 w-3.5 text-primary" />
+                  Organizer: <strong className="text-foreground">{eventData.organizerName}</strong>
+                </span>
+                {eventData.location && (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                    {eventData.location}
+                  </span>
+                )}
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                  {new Date(eventData.startTime).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Header Actions */}
+          <div className="flex flex-wrap items-center gap-2">
+            {eventData && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsConfigModalOpen(true)}
+                  className="border-primary/40 hover:bg-primary/5 text-foreground text-xs font-semibold h-9"
+                >
+                  <Sliders className="h-3.5 w-3.5 mr-1.5 text-primary" />
+                  Configure Gate Architecture
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleExportCSV}
+                  disabled={tickets.length === 0}
+                  className="text-xs h-9"
+                >
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                  Export Roster
+                </Button>
+              </>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                fetchEventsList();
+                if (selectedEventId) {
+                  fetchEventData(selectedEventId);
+                  fetchEventOperators(selectedEventId);
+                }
+              }}
+              disabled={loadingEvent || isLoadingEventsList}
+              className="hover:bg-muted text-xs h-9"
+              title="Refresh Event Data"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loadingEvent ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Global KPI Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border-border/50 bg-card/60 backdrop-blur-sm shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10 text-primary">
-            <Building className="h-16 w-16" />
-          </div>
-          <CardHeader className="p-4 pb-2">
-            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Building className="h-3.5 w-3.5 text-primary" /> Total Event Organizers
-            </CardDescription>
-            <CardTitle className="text-2xl font-black text-foreground">
-              {stats.total_eos}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0 text-xs text-muted-foreground">
-            <span className="font-semibold text-emerald-500">{stats.verified_eos} verified</span> profiles
-          </CardContent>
-        </Card>
+      {/* Per-Event KPI Stats Cards */}
+      {eventData && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <Card className="border-border/60 bg-card/70 backdrop-blur-sm shadow-xs p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Building className="h-3.5 w-3.5 text-primary" /> Event Organizer
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <div className="truncate">
+                <div className="text-base font-bold text-foreground truncate">{eventData.organizerName}</div>
+                <div className="text-[11px] text-muted-foreground truncate">{eventData.organizerCompany || "Platform EO"}</div>
+              </div>
+              <BadgeCheck className="h-5 w-5 text-emerald-500 shrink-0" />
+            </div>
+          </Card>
 
-        <Card className="border-border/50 bg-card/60 backdrop-blur-sm shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10 text-amber-500">
-            <Shield className="h-16 w-16" />
-          </div>
-          <CardHeader className="p-4 pb-2">
-            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Shield className="h-3.5 w-3.5 text-amber-500" /> Gate Pass Operators
-            </CardDescription>
-            <CardTitle className="text-2xl font-black text-foreground">
-              {stats.total_gate_passes}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0 text-xs text-muted-foreground">
-            Linked to active EO scanner devices
-          </CardContent>
-        </Card>
+          <Card className="border-border/60 bg-card/70 backdrop-blur-sm shadow-xs p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Smartphone className="h-3.5 w-3.5 text-primary" /> Verification Gates
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <div className="text-2xl font-black text-foreground">
+                {eventData.totalDevices} <span className="text-xs font-normal text-muted-foreground">{eventData.totalDevices === 1 ? "Gate Slot" : "Gate Slots"}</span>
+              </div>
+              <Badge variant="outline" className="text-[10px] font-semibold text-primary">
+                {isMultiDevice ? "Multi-Gate" : "Single Device"}
+              </Badge>
+            </div>
+          </Card>
 
-        <Card className="border-border/50 bg-card/60 backdrop-blur-sm shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10 text-emerald-500">
-            <Smartphone className="h-16 w-16" />
-          </div>
-          <CardHeader className="p-4 pb-2">
-            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Smartphone className="h-3.5 w-3.5 text-emerald-500" /> Active Platform Events
-            </CardDescription>
-            <CardTitle className="text-2xl font-black text-foreground">
-              {eventsList.length}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0 text-xs text-muted-foreground">
-            Available for device & gate allocation
-          </CardContent>
-        </Card>
-      </div>
+          <Card className="border-border/60 bg-card/70 backdrop-blur-sm shadow-xs p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Shield className="h-3.5 w-3.5 text-amber-500" /> Active Gate Staff
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <div className="text-2xl font-black text-foreground">
+                {assignedOperatorsCount} <span className="text-xs font-normal text-muted-foreground">/ {eventData.totalDevices} Assigned</span>
+              </div>
+              <span className={`text-[11px] font-semibold ${assignedOperatorsCount === eventData.totalDevices ? "text-emerald-500" : "text-amber-500"}`}>
+                {assignedOperatorsCount === eventData.totalDevices ? "● All Linked" : "○ Unlinked Gates"}
+              </span>
+            </div>
+          </Card>
 
-      {/* Main Synchronized Tabs Hub */}
+          <Card className="border-border/60 bg-card/70 backdrop-blur-sm shadow-xs p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Ticket className="h-3.5 w-3.5 text-emerald-500" /> Total Attendees
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <div className="text-2xl font-black text-foreground">
+                {allocationSummary.totalTickets}
+              </div>
+              <div className="text-right">
+                <span className="text-xs font-bold text-emerald-500">{allocationSummary.totalCheckedInCount} Checked In</span>
+                {allocationSummary.unassignedCount > 0 && (
+                  <div className="text-[10px] text-amber-500 font-medium">({allocationSummary.unassignedCount} Unassigned)</div>
+                )}
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Main Per-Event Synchronized Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full max-w-2xl bg-muted/60 p-1 rounded-xl border border-border/50">
-          <TabsTrigger value="directory" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs font-semibold">
-            <Users className="h-3.5 w-3.5 mr-1.5" />
-            Directory
-          </TabsTrigger>
-          <TabsTrigger value="allocation" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs font-semibold">
+        <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full max-w-2xl bg-muted/60 p-1 rounded-xl border border-border/50">
+          <TabsTrigger value="gates" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs font-semibold">
             <Smartphone className="h-3.5 w-3.5 mr-1.5 text-primary" />
-            Gate Allocation
+            Gates & Allocation
           </TabsTrigger>
-          <TabsTrigger value="create-eo" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs font-semibold">
-            <Building className="h-3.5 w-3.5 mr-1.5 text-primary" />
-            + New EO
-          </TabsTrigger>
-          <TabsTrigger value="create-gate-pass" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs font-semibold">
+          <TabsTrigger value="staff" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs font-semibold">
             <Shield className="h-3.5 w-3.5 mr-1.5 text-amber-500" />
-            + New Gate Pass
+            Gate Staff ({eventOperators.length})
+          </TabsTrigger>
+          <TabsTrigger value="create-staff" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs font-semibold">
+            <UserPlus className="h-3.5 w-3.5 mr-1.5 text-primary" />
+            + Add Gate Staff
+          </TabsTrigger>
+          <TabsTrigger value="organizer-profile" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm text-xs font-semibold">
+            <Building className="h-3.5 w-3.5 mr-1.5 text-emerald-500" />
+            Organizer Profile
           </TabsTrigger>
         </TabsList>
 
-        {/* ================= TAB 1: DIRECTORY ================= */}
-        <TabsContent value="directory" className="space-y-4 outline-none">
-          <Card className="border-border/50 bg-card/70 backdrop-blur-xl shadow-lg">
-            <CardHeader className="p-4 pb-3 border-b border-border/40">
-              <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-                {/* Search */}
-                <div className="relative w-full sm:w-80">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search name, company, email..."
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      setPage(1);
-                    }}
-                    className="pl-9 bg-background/50 rounded-xl text-sm"
-                  />
-                </div>
-
-                {/* Filters */}
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <Select
-                    value={roleFilter}
-                    onValueChange={(val) => {
-                      setRoleFilter(val);
-                      setPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="w-[160px] bg-background/50 rounded-xl text-xs font-medium">
-                      <SelectValue placeholder="All Roles" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Roles</SelectItem>
-                      <SelectItem value="organizer">Event Organizers</SelectItem>
-                      <SelectItem value="eo_gate_pass">Gate Pass Operators</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  {roleFilter === "eo_gate_pass" && (
-                    <Select
-                      value={organizerFilter}
-                      onValueChange={(val) => {
-                        setOrganizerFilter(val === "all" ? "" : val);
-                        setPage(1);
-                      }}
-                    >
-                      <SelectTrigger className="w-[180px] bg-background/50 rounded-xl text-xs font-medium">
-                        <SelectValue placeholder="Filter by EO" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Organizers</SelectItem>
-                        {availableOrganizers.map((o) => (
-                          <SelectItem key={o.id} value={o.id}>
-                            {o.full_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-
-            <CardContent className="p-0">
-              {isLoadingDirectory ? (
-                <div className="py-20 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-                  <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-                  <p className="text-sm font-medium">Loading accounts directory...</p>
-                </div>
-              ) : accounts.length === 0 ? (
-                <div className="py-16 text-center text-muted-foreground">
-                  <UserCheck className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
-                  <p className="text-sm font-semibold text-foreground">No accounts found</p>
-                  <p className="text-xs mt-1 text-muted-foreground">
-                    Try adjusting your search criteria or create a new account.
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-muted/30 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/40">
-                      <tr>
-                        <th className="py-3 px-4">Account / Name</th>
-                        <th className="py-3 px-4">Role</th>
-                        <th className="py-3 px-4">Company / Linked EO</th>
-                        <th className="py-3 px-4 text-center">Events / Passes</th>
-                        <th className="py-3 px-4">Created</th>
-                        <th className="py-3 px-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/30">
-                      {accounts.map((acc) => {
-                        const isEO = acc.role === "organizer";
-                        return (
-                          <tr
-                            key={acc.id}
-                            className="hover:bg-muted/20 transition-colors group"
-                          >
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className={`h-9 w-9 rounded-xl flex items-center justify-center font-bold text-xs ${
-                                    isEO
-                                      ? "bg-primary/10 text-primary border border-primary/20"
-                                      : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
-                                  }`}
-                                >
-                                  {acc.full_name ? acc.full_name[0].toUpperCase() : "U"}
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-semibold text-foreground truncate">
-                                      {acc.full_name || "Unnamed"}
-                                    </span>
-                                    {isEO && acc.is_verified_organizer && (
-                                      <BadgeCheck className="h-3.5 w-3.5 text-emerald-500 fill-emerald-500/20 flex-shrink-0" />
-                                    )}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground font-mono truncate">
-                                    {acc.email || `@${acc.username}`}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-
-                            <td className="py-3 px-4">
-                              {isEO ? (
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs border-primary/30 text-primary bg-primary/5 font-semibold"
-                                >
-                                  Organizer
-                                </Badge>
-                              ) : (
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs border-amber-500/30 text-amber-500 bg-amber-500/5 font-semibold"
-                                >
-                                  Gate Pass
-                                </Badge>
-                              )}
-                            </td>
-
-                            <td className="py-3 px-4">
-                              {isEO ? (
-                                <span className="font-medium text-foreground truncate block max-w-[180px]">
-                                  {acc.organizer_company || (
-                                    <span className="text-muted-foreground/50 italic">—</span>
-                                  )}
-                                </span>
-                              ) : (
-                                <div className="min-w-0">
-                                  <span className="font-medium text-foreground truncate block max-w-[180px]">
-                                    {acc.linked_organizer_name || "Unknown EO"}
-                                  </span>
-                                  {acc.linked_organizer_company && (
-                                    <span className="text-xs text-muted-foreground truncate block">
-                                      {acc.linked_organizer_company}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </td>
-
-                            <td className="py-3 px-4 text-center">
-                              {isEO ? (
-                                <div className="flex items-center justify-center gap-2 text-xs">
-                                  <span
-                                    className="px-2 py-0.5 rounded-md bg-background border border-border/50 font-mono"
-                                    title="Hosted Events"
-                                  >
-                                    {acc.event_count} events
-                                  </span>
-                                  <span
-                                    className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono"
-                                    title="Gate Pass Operators"
-                                  >
-                                    {acc.gate_pass_count} operators
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-muted-foreground italic">—</span>
-                              )}
-                            </td>
-
-                            <td className="py-3 px-4 text-xs text-muted-foreground whitespace-nowrap">
-                              {new Date(acc.created_at).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </td>
-
-                            <td className="py-3 px-4 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                {isEO && (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 text-xs text-primary hover:bg-primary/10"
-                                      onClick={() => {
-                                        const matchingEvent = eventsList.find((e) => e.organizer_id === acc.id);
-                                        if (matchingEvent) {
-                                          setSelectedEventId(matchingEvent.event_id);
-                                        }
-                                        setActiveTab("allocation");
-                                      }}
-                                      title="Manage Gate Allocation"
-                                    >
-                                      <Smartphone className="h-3.5 w-3.5 mr-1" />
-                                      Gates
-                                    </Button>
-
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
-                                      onClick={() => {
-                                        setRoleFilter("eo_gate_pass");
-                                        setOrganizerFilter(acc.id);
-                                        setPage(1);
-                                      }}
-                                    >
-                                      <Shield className="h-3.5 w-3.5 mr-1" />
-                                      Passes ({acc.gate_pass_count})
-                                    </Button>
-                                  </>
-                                )}
-
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(acc.id);
-                                    toast({
-                                      title: "ID Copied",
-                                      description: "User UUID copied to clipboard",
-                                    });
-                                  }}
-                                  title="Copy User ID"
-                                >
-                                  <Copy className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between p-4 border-t border-border/40 text-xs text-muted-foreground">
-                  <span>
-                    Page {page} of {totalPages}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page <= 1}
-                      className="h-8 px-2"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={page >= totalPages}
-                      className="h-8 px-2"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ================= TAB 2: EVENT GATE & DEVICE ALLOCATION ================= */}
-        <TabsContent value="allocation" className="space-y-6 outline-none">
-          {/* Event Switcher Selector Toolbar */}
-          <Card className="border-border/60 bg-card/80 backdrop-blur-md shadow-sm">
-            <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Calendar className="h-3.5 w-3.5 text-primary" /> Active Event Context
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={selectedEventId ? selectedEventId.toString() : ""}
-                    onValueChange={(val) => setSelectedEventId(parseInt(val, 10))}
-                  >
-                    <SelectTrigger className="w-full md:w-[320px] bg-background font-semibold text-sm h-10 border-primary/30">
-                      <SelectValue placeholder="Select an event to manage gates..." />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-72">
-                      {eventsList.map((e) => (
-                        <SelectItem key={e.event_id} value={e.event_id.toString()}>
-                          <div className="flex flex-col text-left py-0.5">
-                            <span className="font-semibold text-sm">{e.event_name}</span>
-                            <span className="text-[11px] text-muted-foreground">
-                              {e.organizer_name} • {new Date(e.start_time).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {eventData && (
-                <div className="flex flex-wrap items-center gap-3 text-xs bg-muted/40 p-2.5 rounded-xl border border-border/50">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-muted-foreground">Mode:</span>
-                    <Badge
-                      variant="outline"
-                      className={`text-[11px] font-semibold ${
-                        isMultiDevice
-                          ? "bg-primary/10 text-primary border-primary/30"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {isMultiDevice
-                        ? `⚡ ${eventData.totalDevices}-Gate Multi-Device`
-                        : "Single Scanner Mode"}
-                    </Badge>
-                  </div>
-                  <div className="h-4 w-px bg-border hidden sm:block" />
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-muted-foreground">Organizer:</span>
-                    <strong className="text-foreground">{eventData.organizerName}</strong>
-                  </div>
-                  <div className="h-4 w-px bg-border hidden sm:block" />
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-muted-foreground">Total Tickets:</span>
-                    <strong className="text-foreground">{allocationSummary.totalTickets}</strong>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Allocation Content */}
-          {loadingAllocation ? (
+        {/* ================= TAB 1: GATES & DEVICE ALLOCATION ================= */}
+        <TabsContent value="gates" className="space-y-6 outline-none">
+          {loadingEvent ? (
             <div className="flex flex-col items-center justify-center min-h-[350px] space-y-3">
               <RefreshCw className="h-8 w-8 animate-spin text-primary" />
               <p className="text-muted-foreground font-medium text-sm">
@@ -1571,7 +1083,7 @@ export function AccountCreationHub({
               <Smartphone className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
               <h3 className="text-base font-semibold text-foreground">No Event Selected</h3>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1">
-                Please choose an event from the dropdown above to view its gate slots, assign scanning operators, and allocate tickets.
+                Please choose an event from the dropdown above.
               </p>
             </div>
           ) : (
@@ -1585,7 +1097,7 @@ export function AccountCreationHub({
                       Verification Devices & Gate Operators
                     </h2>
                     <p className="text-xs text-muted-foreground">
-                      Manage gate slots, custom entrance names (e.g. <strong>GATE A</strong>, <strong>VIP ENTRANCE</strong>), and operator credentials.
+                      Manage gate slots, custom entrance names (e.g. <strong>GATE A</strong>, <strong>VIP ENTRANCE</strong>), and operator credentials for <strong>{eventData.name}</strong>.
                     </p>
                   </div>
                 </div>
@@ -1740,7 +1252,7 @@ export function AccountCreationHub({
                               size="sm"
                               onClick={() => {
                                 setTargetDeviceIndex(slot.deviceIndex);
-                                if (selectedEventId) fetchAvailableOperatorsForEvent(selectedEventId);
+                                if (selectedEventId) fetchEventOperators(selectedEventId);
                                 setIsLinkOperatorModalOpen(true);
                               }}
                               className="text-xs h-8 px-2 font-medium"
@@ -2070,250 +1582,165 @@ export function AccountCreationHub({
           )}
         </TabsContent>
 
-        {/* ================= TAB 3: CREATE EVENT ORGANIZER ================= */}
-        <TabsContent value="create-eo" className="outline-none">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <Card className="lg:col-span-7 border-border/50 bg-card/70 backdrop-blur-xl shadow-lg">
-              <CardHeader className="p-5 pb-3">
-                <CardTitle className="text-lg font-bold flex items-center gap-2">
-                  <Building className="h-5 w-5 text-primary" />
-                  Create Event Organizer Account
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Provision an organizer profile for hosting ticketed and free events.
-                </CardDescription>
-              </CardHeader>
+        {/* ================= TAB 2: GATE STAFF & OPERATORS (FOR THIS EVENT) ================= */}
+        <TabsContent value="staff" className="space-y-4 outline-none">
+          <Card className="border-border/60 bg-card/70 backdrop-blur-xl shadow-sm">
+            <CardHeader className="p-5 pb-3 border-b border-border/40">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <CardTitle className="text-lg font-bold flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-amber-500" />
+                    Gate Scanner Staff for {eventData?.name || "this event"}
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Staff operators provisioned under <strong>{eventData?.organizerName}</strong> authorized to scan attendee tickets.
+                  </CardDescription>
+                </div>
 
-              <CardContent className="p-5 pt-2">
-                <form onSubmit={handleCreateEo} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold">
-                        Full Name <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        placeholder="e.g. Sarah Khan"
-                        value={eoForm.fullName}
-                        onChange={(e) =>
-                          setEoForm({ ...eoForm, fullName: e.target.value })
-                        }
-                        className="bg-background/60 rounded-xl text-sm"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold">
-                        Email Address <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        type="email"
-                        placeholder="organizer@domain.com"
-                        value={eoForm.email}
-                        onChange={(e) =>
-                          setEoForm({ ...eoForm, email: e.target.value })
-                        }
-                        className="bg-background/60 rounded-xl text-sm"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold">Username (Optional)</Label>
-                      <Input
-                        placeholder="auto-generated if blank"
-                        value={eoForm.username}
-                        onChange={(e) =>
-                          setEoForm({ ...eoForm, username: e.target.value })
-                        }
-                        className="bg-background/60 rounded-xl text-sm font-mono"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold">Phone Number</Label>
-                      <Input
-                        placeholder="+92 300 1234567"
-                        value={eoForm.phone}
-                        onChange={(e) =>
-                          setEoForm({ ...eoForm, phone: e.target.value })
-                        }
-                        className="bg-background/60 rounded-xl text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold">Company / Brand Name</Label>
-                      <Input
-                        placeholder="e.g. Karachi Underground Events"
-                        value={eoForm.company}
-                        onChange={(e) =>
-                          setEoForm({ ...eoForm, company: e.target.value })
-                        }
-                        className="bg-background/60 rounded-xl text-sm"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold">Website / Social URL</Label>
-                      <Input
-                        placeholder="https://insidekhi.com"
-                        value={eoForm.website}
-                        onChange={(e) =>
-                          setEoForm({ ...eoForm, website: e.target.value })
-                        }
-                        className="bg-background/60 rounded-xl text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Organizer Bio</Label>
-                    <Textarea
-                      placeholder="Brief overview of the organizer's background, track record, and event genres..."
-                      value={eoForm.bio}
-                      onChange={(e) =>
-                        setEoForm({ ...eoForm, bio: e.target.value })
-                      }
-                      rows={2}
-                      className="bg-background/60 rounded-xl text-sm resize-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">
-                      Custom Temporary Password (Optional)
-                    </Label>
-                    <Input
-                      type="text"
-                      placeholder="Leave empty to auto-generate a secure password"
-                      value={eoForm.customPassword}
-                      onChange={(e) =>
-                        setEoForm({ ...eoForm, customPassword: e.target.value })
-                      }
-                      className="bg-background/60 rounded-xl text-sm font-mono"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border/40">
-                    <div className="space-y-0.5">
-                      <Label className="text-xs font-semibold flex items-center gap-1.5 text-foreground cursor-pointer">
-                        <BadgeCheck className="h-4 w-4 text-emerald-500" />
-                        Grant Verified Organizer Status
-                      </Label>
-                      <p className="text-[11px] text-muted-foreground">
-                        Displays the verified badge on event pages and ticket listings.
-                      </p>
-                    </div>
-                    <Switch
-                      checked={eoForm.isVerified}
-                      onCheckedChange={(checked) =>
-                        setEoForm({ ...eoForm, isVerified: checked })
-                      }
-                    />
-                  </div>
-
-                  <Button
-                    type="submit"
-                    disabled={isSubmittingEo}
-                    className="w-full h-11 rounded-xl bg-gradient-to-r from-primary to-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
-                  >
-                    {isSubmittingEo ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Creating EO Account...
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Create Event Organizer Account
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            {/* Right Live Preview */}
-            <div className="lg:col-span-5 space-y-4">
-              <EOProfilePreviewCard
-                fullName={eoForm.fullName}
-                username={eoForm.username}
-                email={eoForm.email}
-                phone={eoForm.phone}
-                company={eoForm.company}
-                bio={eoForm.bio}
-                website={eoForm.website}
-                isVerified={eoForm.isVerified}
-                role="organizer"
-              />
-
-              <div className="rounded-2xl border border-border/50 bg-card/40 p-4 text-xs text-muted-foreground space-y-2">
-                <p className="font-semibold text-foreground flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-primary" /> Organizer Permissions
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-muted-foreground/90">
-                  <li>Direct authenticated login with permanent <strong>organizer</strong> role.</li>
-                  <li>Can create, publish, and manage ticketed and free events.</li>
-                  <li>Admin can immediately assign Gate Pass scan staff under this EO.</li>
-                </ul>
+                <Button
+                  size="sm"
+                  onClick={() => setActiveTab("create-staff")}
+                  className="text-xs font-semibold bg-primary text-primary-foreground"
+                >
+                  <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                  + Add New Operator
+                </Button>
               </div>
-            </div>
-          </div>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              {loadingOperators ? (
+                <div className="py-16 text-center text-muted-foreground">
+                  <RefreshCw className="h-8 w-8 animate-spin mx-auto text-primary mb-2" />
+                  <p className="text-xs font-medium">Loading gate staff...</p>
+                </div>
+              ) : eventOperators.length === 0 ? (
+                <div className="py-16 text-center text-muted-foreground">
+                  <Shield className="h-10 w-10 mx-auto text-muted-foreground/30 mb-2" />
+                  <p className="text-sm font-semibold text-foreground">No gate staff provisioned yet</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                    Create scanner operator accounts for gate attendants to scan QR codes at venue doors.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setActiveTab("create-staff")}
+                    className="mt-4 text-xs font-semibold"
+                  >
+                    <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                    Create First Operator
+                  </Button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-muted/30 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/40">
+                      <tr>
+                        <th className="py-3 px-4">Operator Name</th>
+                        <th className="py-3 px-4">Login Email / Username</th>
+                        <th className="py-3 px-4">Phone</th>
+                        <th className="py-3 px-4">Current Assigned Gate</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/30">
+                      {eventOperators.map((op) => {
+                        const assignedSlot = deviceSlots.find(
+                          (s) => s.assignedOperator?.operatorId === op.id,
+                        );
+
+                        return (
+                          <tr key={op.id} className="hover:bg-muted/20 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-9 w-9 border border-border">
+                                  <AvatarImage src={op.avatar || ""} />
+                                  <AvatarFallback className="text-xs font-bold bg-amber-500/10 text-amber-500">
+                                    {op.name.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-semibold text-foreground">{op.name}</div>
+                                  <Badge variant="outline" className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/5 border-amber-500/30">
+                                    Gate Pass Role
+                                  </Badge>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="py-3 px-4 font-mono text-xs text-muted-foreground">
+                              {op.email || `@${op.username}`}
+                            </td>
+
+                            <td className="py-3 px-4 text-xs text-muted-foreground">
+                              {op.phone || "—"}
+                            </td>
+
+                            <td className="py-3 px-4">
+                              {assignedSlot ? (
+                                <Badge className="bg-primary/10 text-primary border-primary/30 text-xs font-semibold">
+                                  🚪 {assignedSlot.label}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic">Unassigned</span>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setCredentialsForm({
+                                      operatorId: op.id,
+                                      fullName: op.name,
+                                      email: op.email || "",
+                                      password: "",
+                                      phone: op.phone || "",
+                                      deviceIndex: assignedSlot ? assignedSlot.deviceIndex : 0,
+                                      deviceLabel: assignedSlot ? assignedSlot.label : `Device 1`,
+                                    });
+                                    setCopiedKey(null);
+                                    setIsCredentialsModalOpen(true);
+                                  }}
+                                  className="h-8 text-xs"
+                                >
+                                  <KeyRound className="h-3.5 w-3.5 mr-1" />
+                                  Reset Password
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        {/* ================= TAB 4: CREATE GATE PASS OPERATOR ================= */}
-        <TabsContent value="create-gate-pass" className="outline-none">
+        {/* ================= TAB 3: PROVISION GATE PASS OPERATOR ================= */}
+        <TabsContent value="create-staff" className="outline-none">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <Card className="lg:col-span-7 border-border/50 bg-card/70 backdrop-blur-xl shadow-lg">
               <CardHeader className="p-5 pb-3">
                 <CardTitle className="text-lg font-bold flex items-center gap-2">
                   <Shield className="h-5 w-5 text-amber-500" />
-                  Create EO Gate Pass Operator Account
+                  Add Gate Pass Staff for {eventData?.name || "Event"}
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Provision a dedicated gate scanner account linked to a specific Event Organizer.
+                  Provision a dedicated scanner operator account automatically linked to <strong>{eventData?.organizerName}</strong>.
                 </CardDescription>
               </CardHeader>
 
               <CardContent className="p-5 pt-2">
                 <form onSubmit={handleCreateGp} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">
-                      Linked Event Organizer <span className="text-red-500">*</span>
-                    </Label>
-                    <Select
-                      value={gpForm.linkedOrganizerId}
-                      onValueChange={(val) =>
-                        setGpForm({ ...gpForm, linkedOrganizerId: val })
-                      }
-                      required
-                    >
-                      <SelectTrigger className="bg-background/60 rounded-xl text-sm h-11 border-amber-500/30 focus:border-amber-500">
-                        <SelectValue placeholder="Select the Event Organizer this operator works for..." />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        {availableOrganizers.map((org) => (
-                          <SelectItem key={org.id} value={org.id}>
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">{org.full_name}</span>
-                              {org.organizer_company && (
-                                <span className="text-xs text-muted-foreground">
-                                  ({org.organizer_company})
-                                </span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[11px] text-muted-foreground">
-                      This operator will only have permissions to validate tickets for events organized by this EO.
-                    </p>
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-muted-foreground flex items-center justify-between">
+                    <span className="font-semibold text-foreground">Assigned Event Organizer:</span>
+                    <strong className="text-amber-600 dark:text-amber-400 font-bold">{eventData?.organizerName}</strong>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2322,7 +1749,7 @@ export function AccountCreationHub({
                         Operator Full Name <span className="text-red-500">*</span>
                       </Label>
                       <Input
-                        placeholder="e.g. Gate Staff #1 (Bilal)"
+                        placeholder="e.g. Gate Attendant 1 (Bilal)"
                         value={gpForm.fullName}
                         onChange={(e) =>
                           setGpForm({ ...gpForm, fullName: e.target.value })
@@ -2398,12 +1825,12 @@ export function AccountCreationHub({
                     {isSubmittingGp ? (
                       <>
                         <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Creating Operator Account...
+                        Creating Gate Staff Account...
                       </>
                     ) : (
                       <>
                         <Shield className="h-4 w-4 mr-2" />
-                        Create Gate Pass Operator Account
+                        Create Gate Staff Account
                       </>
                     )}
                   </Button>
@@ -2419,7 +1846,7 @@ export function AccountCreationHub({
                 email={gpForm.email}
                 phone={gpForm.phone}
                 role="eo_gate_pass"
-                linkedOrganizerName={selectedOrganizerName}
+                linkedOrganizerName={eventData?.organizerName}
               />
 
               <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-xs text-muted-foreground space-y-2">
@@ -2427,11 +1854,89 @@ export function AccountCreationHub({
                   <Shield className="h-3.5 w-3.5" /> Gate Pass Role Security Constraints
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-muted-foreground/90">
-                  <li>Can log into the Inside Karachi mobile scanner & attendance list.</li>
-                  <li><strong>Cannot</strong> access organizer revenue, payouts, or event edit settings.</li>
-                  <li>Scans are cryptographically signed and tagged with this operator's ID for audit reconciliation.</li>
+                  <li>Can log into the Inside Karachi mobile scanner & verify ticket QR codes.</li>
+                  <li><strong>Cannot</strong> access organizer revenue, payouts, or event settings.</li>
+                  <li>Assigned directly to this event's gates on mobile.</li>
                 </ul>
               </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ================= TAB 4: EVENT ORGANIZER PROFILE ================= */}
+        <TabsContent value="organizer-profile" className="outline-none">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <Card className="lg:col-span-7 border-border/50 bg-card/70 backdrop-blur-xl shadow-lg">
+              <CardHeader className="p-5 pb-3">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <Building className="h-5 w-5 text-emerald-500" />
+                  Event Organizer Information
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Details for the Event Organizer hosting <strong>{eventData?.name}</strong>.
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className="p-5 pt-2 space-y-4">
+                {eventData ? (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-xl bg-muted/40 border border-border/60 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-lg">
+                          {eventData.organizerName.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <h3 className="text-base font-bold text-foreground">{eventData.organizerName}</h3>
+                            <BadgeCheck className="h-4 w-4 text-emerald-500 fill-emerald-500/20" />
+                          </div>
+                          <p className="text-xs text-muted-foreground font-mono">{eventData.organizerEmail || "No public email"}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 pt-2 text-xs border-t border-border/40">
+                        <div>
+                          <span className="text-muted-foreground">Company / Brand:</span>
+                          <p className="font-semibold text-foreground mt-0.5">{eventData.organizerCompany || "—"}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Organizer UUID:</span>
+                          <p className="font-mono text-foreground truncate mt-0.5" title={eventData.organizerId}>{eventData.organizerId}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(eventData.organizerId);
+                          toast({ title: "Copied", description: "Organizer UUID copied to clipboard" });
+                        }}
+                        className="text-xs"
+                      >
+                        <Copy className="h-3.5 w-3.5 mr-1.5" />
+                        Copy Organizer ID
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No event data available.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="lg:col-span-5 space-y-4">
+              {eventData && (
+                <EOProfilePreviewCard
+                  fullName={eventData.organizerName}
+                  email={eventData.organizerEmail || ""}
+                  company={eventData.organizerCompany || undefined}
+                  isVerified={true}
+                  role="organizer"
+                />
+              )}
             </div>
           </div>
         </TabsContent>
@@ -2448,7 +1953,7 @@ export function AccountCreationHub({
               Event Verification Architecture
             </DialogTitle>
             <DialogDescription>
-              Configure how tickets will be verified at the venue on mobile scanners.
+              Configure how tickets will be verified at the venue on mobile scanners for <strong>{eventData?.name}</strong>.
             </DialogDescription>
           </DialogHeader>
 
@@ -2497,7 +2002,7 @@ export function AccountCreationHub({
             <Button variant="outline" onClick={() => setIsConfigModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveArchitecture} disabled={isSavingConfig}>
+            <Button onClick={handleSaveArchitecture} disabled={isSavingConfig} className="bg-primary text-primary-foreground font-semibold">
               {isSavingConfig ? "Saving..." : "Save Architecture"}
             </Button>
           </DialogFooter>
@@ -2535,7 +2040,7 @@ export function AccountCreationHub({
               <Button type="button" variant="outline" onClick={() => setIsLabelModalOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSavingLabel}>
+              <Button type="submit" disabled={isSavingLabel} className="bg-primary text-primary-foreground">
                 {isSavingLabel ? "Saving..." : "Save Gate Name"}
               </Button>
             </DialogFooter>
@@ -2660,7 +2165,7 @@ export function AccountCreationHub({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSavingCredentials}>
+              <Button type="submit" disabled={isSavingCredentials} className="bg-primary text-primary-foreground">
                 {isSavingCredentials ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
@@ -2787,7 +2292,7 @@ export function AccountCreationHub({
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmittingSlotOperator}>
+                <Button type="submit" disabled={isSubmittingSlotOperator} className="bg-primary text-primary-foreground">
                   {isSubmittingSlotOperator ? "Creating..." : `Create & Assign to Gate`}
                 </Button>
               </DialogFooter>
@@ -2805,7 +2310,7 @@ export function AccountCreationHub({
               Link Operator to {deviceSlots.find((s) => s.deviceIndex === targetDeviceIndex)?.label || `Device ${targetDeviceIndex + 1}`}
             </DialogTitle>
             <DialogDescription>
-              Select an existing Scanner Operator account to handle this device slot.
+              Select an existing Scanner Operator account from <strong>{eventData?.organizerName}</strong>.
             </DialogDescription>
           </DialogHeader>
 
@@ -2815,9 +2320,9 @@ export function AccountCreationHub({
                 <RefreshCw className="h-6 w-6 animate-spin mx-auto text-primary" />
                 <p className="text-xs text-muted-foreground mt-2">Loading operators...</p>
               </div>
-            ) : availableOperators.length === 0 ? (
+            ) : eventOperators.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
-                <p>No scanner operator accounts found.</p>
+                <p>No scanner operator accounts found for this organizer.</p>
                 <Button
                   variant="link"
                   size="sm"
@@ -2839,7 +2344,7 @@ export function AccountCreationHub({
                 </Button>
               </div>
             ) : (
-              availableOperators.map((op) => (
+              eventOperators.map((op) => (
                 <div
                   key={op.id}
                   onClick={() => handleLinkOperator(op.id)}
@@ -2848,7 +2353,7 @@ export function AccountCreationHub({
                   <div className="flex items-center gap-3">
                     <Avatar className="h-9 w-9">
                       <AvatarImage src={op.avatar || ""} />
-                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                      <AvatarFallback className="text-xs bg-primary/10 text-primary font-bold">
                         {op.name.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -2857,7 +2362,7 @@ export function AccountCreationHub({
                       <p className="text-xs text-muted-foreground">{op.email}</p>
                     </div>
                   </div>
-                  <Button size="sm" variant="ghost" className="text-xs text-primary">
+                  <Button size="sm" variant="ghost" className="text-xs text-primary font-semibold">
                     Select
                   </Button>
                 </div>
@@ -2887,7 +2392,7 @@ export function AccountCreationHub({
         </DialogContent>
       </Dialog>
 
-      {/* 6. Success Temporary Password Dialog for EO & Gate Pass Forms */}
+      {/* 6. Success Temporary Password Dialog */}
       <Dialog
         open={isPasswordDialogOpen}
         onOpenChange={(open) => {
@@ -2906,7 +2411,7 @@ export function AccountCreationHub({
               Account Created Successfully
             </DialogTitle>
             <DialogDescription className="text-center text-xs text-muted-foreground">
-              Provide these initial login credentials securely to the user.
+              Provide these initial login credentials securely to the gate operator.
             </DialogDescription>
           </DialogHeader>
 
