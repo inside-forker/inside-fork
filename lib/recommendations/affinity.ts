@@ -84,3 +84,77 @@ export async function getUserCategoryAffinity(
     return EMPTY;
   }
 }
+
+/**
+ * learned(u,c) for calendar events - the events sibling of
+ * {@link getUserCategoryAffinity}, kept as a separate function (not a mode
+ * flag on the existing one) so that function's signature stays stable per its
+ * own doc comment above.
+ *
+ * Combines two signals into one per-category score, since listings and
+ * events share the same `categories` table/taxonomy: browsing taste learned
+ * from `user_listing_events` (joined via `listing_categories`) and taste
+ * learned from `user_event_events` (joined directly via `events.category_id`,
+ * no join table needed there). Both are UNIONed and normalized together in
+ * one query rather than computed separately and averaged, so the result is
+ * one consistent [0,1] scale.
+ */
+export async function getEventCategoryAffinity(
+  actor: ActorKey,
+): Promise<AffinityResult> {
+  if (!actor.userId && !actor.anonId) return EMPTY;
+
+  try {
+    const [{ rows: categoryRows }, { rows: countRows }] = await Promise.all([
+      query(
+        `SELECT category_id, SUM(weighted_score) AS weighted_score FROM (
+           SELECT lc.category_id AS category_id,
+                  (CASE ule.event_type ${EVENT_WEIGHT_CASE} ELSE 0 END)
+                  * exp(-EXTRACT(EPOCH FROM (now() - ule.created_at)) / ${HALF_LIFE_SECONDS})
+                  * COALESCE(lc.relevance_score, 1.0) AS weighted_score
+           FROM public.user_listing_events ule
+           JOIN public.listing_categories lc ON lc.listing_id = ule.listing_id
+           WHERE (ule.user_id = $1 OR ule.anon_id = $2)
+           UNION ALL
+           SELECT e.category_id AS category_id,
+                  (CASE uee.event_type ${EVENT_WEIGHT_CASE} ELSE 0 END)
+                  * exp(-EXTRACT(EPOCH FROM (now() - uee.created_at)) / ${HALF_LIFE_SECONDS}) AS weighted_score
+           FROM public.user_event_events uee
+           JOIN public.events e ON e.id = uee.event_id
+           WHERE (uee.user_id = $1 OR uee.anon_id = $2) AND e.category_id IS NOT NULL
+         ) combined
+         GROUP BY category_id`,
+        [actor.userId, actor.anonId],
+      ),
+      query(
+        `SELECT
+           (SELECT count(*) FROM public.user_listing_events
+            WHERE (user_id = $1 OR anon_id = $2) AND event_type <> 'rec_impression')
+           +
+           (SELECT count(*) FROM public.user_event_events
+            WHERE (user_id = $1 OR anon_id = $2) AND event_type <> 'rec_impression')
+           AS n`,
+        [actor.userId, actor.anonId],
+      ),
+    ]);
+
+    const raw = (categoryRows as Array<{ category_id: number | string; weighted_score: number | string }>)
+      .map((r) => ({ categoryId: Number(r.category_id), score: Number(r.weighted_score) }))
+      .filter((r) => Number.isFinite(r.score));
+
+    const maxScore = raw.reduce((max, r) => Math.max(max, r.score), 0);
+    const byCategoryId = new Map<number, number>();
+    if (maxScore > 0) {
+      for (const r of raw) {
+        byCategoryId.set(r.categoryId, Math.max(0, r.score / maxScore));
+      }
+    }
+
+    const eventCount = Number(countRows[0]?.n ?? 0);
+
+    return { byCategoryId, eventCount: Number.isFinite(eventCount) ? eventCount : 0 };
+  } catch (error) {
+    console.error("[recommendations] event affinity lookup failed, degrading to time-intent only:", error);
+    return EMPTY;
+  }
+}

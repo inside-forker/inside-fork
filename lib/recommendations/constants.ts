@@ -71,3 +71,20 @@ export const MMR_MAX_PER_PARENT = 3;
 
 /** Timezone every time-of-day computation is anchored to (no DST). */
 export const RECS_TIMEZONE = "Asia/Karachi";
+
+/**
+ * Tunables for the events "for you" scorer (lib/recommendations/event-scoring.ts).
+ * Same priors-not-measured caveat as the listings tunables above.
+ */
+
+/** Term weights before gate-based renormalisation. Must sum to 1. */
+export const EVENT_TERM_WEIGHTS = {
+  category: 0.5,
+  soonness: 0.4,
+  /** Gated out entirely when a candidate has no lat/lng. */
+  proximity: 0.1,
+} as const;
+
+/** exp(-hoursUntilStart / EVENT_SOON_HALF_LIFE_HOURS) - an event ~36h out
+ * scores half of one starting now. */
+export const EVENT_SOON_HALF_LIFE_HOURS = 36;
