@@ -29,6 +29,8 @@ export class MobileApiError extends Error {
 export const MobileErrors = {
   notAuthenticated: () =>
     new MobileApiError("not_authenticated", "Authentication required.", 401),
+  forbidden: (message = "Forbidden.") =>
+    new MobileApiError("forbidden", message, 403),
   notFound: (message = "Not found.") =>
     new MobileApiError("not_found", message, 404),
   badRequest: (message: string, field?: string) =>

@@ -25,6 +25,11 @@ import {
   Shield,
   Eye,
   EyeOff,
+  Smartphone,
+  ArrowUpCircle,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
 } from "lucide-react";
 import { CategoriesManagementPage } from "./CategoriesManagementPage";
 
@@ -139,6 +144,29 @@ export function SystemSettingsPage() {
   const [slaHoursLow, setSlaHoursLow] = useState(48);
   const [maxReplyEdits, setMaxReplyEdits] = useState(3);
 
+  // Mobile App Config states
+  const [mobileMaintenanceEnabled, setMobileMaintenanceEnabled] = useState(false);
+  const [mobileMaintenanceTitle, setMobileMaintenanceTitle] = useState("System Under Maintenance");
+  const [mobileMaintenanceMessage, setMobileMaintenanceMessage] = useState(
+    "We are performing scheduled maintenance to improve your experience. We'll be back shortly!"
+  );
+  const [mobileMaintenanceEstimatedEnd, setMobileMaintenanceEstimatedEnd] = useState(getDefaultEstimatedEnd);
+
+  const [mobileMinVersion, setMobileMinVersion] = useState("1.0.0");
+  const [mobileLatestVersion, setMobileLatestVersion] = useState("1.0.1");
+  const [mobileForceUpdateEnabled, setMobileForceUpdateEnabled] = useState(true);
+  const [mobileUpdateTitle, setMobileUpdateTitle] = useState("Update Required");
+  const [mobileUpdateMessage, setMobileUpdateMessage] = useState(
+    "A new version of Inside Karachi is available with new features and improvements. Please update the app to continue."
+  );
+  const [mobileAndroidStoreUrl, setMobileAndroidStoreUrl] = useState(
+    "https://play.google.com/store/apps/details?id=com.inside.cityguide"
+  );
+  const [mobileIosStoreUrl, setMobileIosStoreUrl] = useState(
+    "https://apps.apple.com/app/inside-karachi/id6470000000"
+  );
+  const [mobilePreviewMode, setMobilePreviewMode] = useState<"maintenance" | "force_update">("force_update");
+
   const fetchSettings = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -230,6 +258,90 @@ export function SystemSettingsPage() {
           Array.isArray(visibleRolesSetting.config_value)
         ) {
           setAdminVisibleRoles(visibleRolesSetting.config_value as string[]);
+        }
+
+        // Extract Mobile App config
+        const mobMaintEnabled = data.settings.find(
+          (s: SystemConfig) => s.config_key === "mobile.maintenance.enabled",
+        );
+        const mobMaintTitle = data.settings.find(
+          (s: SystemConfig) => s.config_key === "mobile.maintenance.title",
+        );
+        const mobMaintMsg = data.settings.find(
+          (s: SystemConfig) => s.config_key === "mobile.maintenance.message",
+        );
+        const mobMaintEnd = data.settings.find(
+          (s: SystemConfig) => s.config_key === "mobile.maintenance.estimated_end",
+        );
+        const mobMinVer = data.settings.find(
+          (s: SystemConfig) => s.config_key === "mobile.min_version",
+        );
+        const mobLatestVer = data.settings.find(
+          (s: SystemConfig) => s.config_key === "mobile.latest_version",
+        );
+        const mobForceUpdate = data.settings.find(
+          (s: SystemConfig) => s.config_key === "mobile.force_update_enabled",
+        );
+        const mobUpdTitle = data.settings.find(
+          (s: SystemConfig) => s.config_key === "mobile.update_title",
+        );
+        const mobUpdMsg = data.settings.find(
+          (s: SystemConfig) => s.config_key === "mobile.update_message",
+        );
+        const mobAndroidUrl = data.settings.find(
+          (s: SystemConfig) => s.config_key === "mobile.android_store_url",
+        );
+        const mobIosUrl = data.settings.find(
+          (s: SystemConfig) => s.config_key === "mobile.ios_store_url",
+        );
+
+        if (mobMaintEnabled !== undefined) {
+          setMobileMaintenanceEnabled(
+            mobMaintEnabled.config_value === true ||
+              mobMaintEnabled.config_value === "true",
+          );
+        }
+        if (typeof mobMaintTitle?.config_value === "string") {
+          setMobileMaintenanceTitle(
+            mobMaintTitle.config_value.replace(/^"|"$/g, ""),
+          );
+        }
+        if (typeof mobMaintMsg?.config_value === "string") {
+          setMobileMaintenanceMessage(
+            mobMaintMsg.config_value.replace(/^"|"$/g, ""),
+          );
+        }
+        if (mobMaintEnd?.config_value) {
+          const formatted = formatForDateTimeLocal(mobMaintEnd.config_value);
+          setMobileMaintenanceEstimatedEnd(
+            formatted ?? getDefaultEstimatedEnd(),
+          );
+        }
+        if (typeof mobMinVer?.config_value === "string") {
+          setMobileMinVersion(mobMinVer.config_value.replace(/^"|"$/g, ""));
+        }
+        if (typeof mobLatestVer?.config_value === "string") {
+          setMobileLatestVersion(mobLatestVer.config_value.replace(/^"|"$/g, ""));
+        }
+        if (mobForceUpdate !== undefined) {
+          setMobileForceUpdateEnabled(
+            mobForceUpdate.config_value === true ||
+              mobForceUpdate.config_value === "true",
+          );
+        }
+        if (typeof mobUpdTitle?.config_value === "string") {
+          setMobileUpdateTitle(mobUpdTitle.config_value.replace(/^"|"$/g, ""));
+        }
+        if (typeof mobUpdMsg?.config_value === "string") {
+          setMobileUpdateMessage(mobUpdMsg.config_value.replace(/^"|"$/g, ""));
+        }
+        if (typeof mobAndroidUrl?.config_value === "string") {
+          setMobileAndroidStoreUrl(
+            mobAndroidUrl.config_value.replace(/^"|"$/g, ""),
+          );
+        }
+        if (typeof mobIosUrl?.config_value === "string") {
+          setMobileIosStoreUrl(mobIosUrl.config_value.replace(/^"|"$/g, ""));
         }
       }
     } catch (error) {
@@ -467,6 +579,109 @@ export function SystemSettingsPage() {
     }
   };
 
+  const handleMobileMaintenanceToggle = async (enabled: boolean) => {
+    setIsSaving(true);
+    let didAutoResetEstimatedEnd = false;
+
+    if (enabled) {
+      const parsedCurrentEstimatedEnd = mobileMaintenanceEstimatedEnd
+        ? new Date(mobileMaintenanceEstimatedEnd)
+        : null;
+      const hasValidEstimatedEnd =
+        parsedCurrentEstimatedEnd !== null &&
+        !Number.isNaN(parsedCurrentEstimatedEnd.getTime());
+      const isStaleEstimatedEnd =
+        hasValidEstimatedEnd &&
+        parsedCurrentEstimatedEnd.getTime() <= Date.now();
+
+      if (!hasValidEstimatedEnd || isStaleEstimatedEnd) {
+        const refreshedEstimatedEnd = getDefaultEstimatedEnd();
+        const estimatedEndUpdated = await updateSetting(
+          "mobile.maintenance.estimated_end",
+          refreshedEstimatedEnd,
+        );
+
+        if (estimatedEndUpdated) {
+          setMobileMaintenanceEstimatedEnd(refreshedEstimatedEnd);
+          didAutoResetEstimatedEnd = true;
+        }
+      }
+    }
+
+    const success = await updateSetting("mobile.maintenance.enabled", enabled);
+
+    if (success) {
+      setMobileMaintenanceEnabled(enabled);
+      toast({
+        title: enabled
+          ? "Mobile Maintenance Mode Enabled"
+          : "Mobile Maintenance Mode Disabled",
+        description: enabled
+          ? "Mobile app users will now see the maintenance screen."
+          : "Mobile app is now fully accessible to all users.",
+      });
+      if (didAutoResetEstimatedEnd) {
+        toast({
+          title: "Estimated End Updated",
+          description:
+            "Estimated end time was stale and has been reset to 2 hours from now.",
+        });
+      }
+      await fetchSettings();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to toggle mobile maintenance mode",
+        variant: "destructive",
+      });
+    }
+
+    setIsSaving(false);
+  };
+
+  const handleSaveMobileAppConfig = async () => {
+    setIsSaving(true);
+    try {
+      const results = await Promise.all([
+        updateSetting("mobile.maintenance.enabled", mobileMaintenanceEnabled),
+        updateSetting("mobile.maintenance.title", mobileMaintenanceTitle),
+        updateSetting("mobile.maintenance.message", mobileMaintenanceMessage),
+        updateSetting(
+          "mobile.maintenance.estimated_end",
+          mobileMaintenanceEstimatedEnd && mobileMaintenanceEstimatedEnd.trim() !== ""
+            ? mobileMaintenanceEstimatedEnd
+            : null,
+        ),
+        updateSetting("mobile.min_version", mobileMinVersion),
+        updateSetting("mobile.latest_version", mobileLatestVersion),
+        updateSetting("mobile.force_update_enabled", mobileForceUpdateEnabled),
+        updateSetting("mobile.update_title", mobileUpdateTitle),
+        updateSetting("mobile.update_message", mobileUpdateMessage),
+        updateSetting("mobile.android_store_url", mobileAndroidStoreUrl),
+        updateSetting("mobile.ios_store_url", mobileIosStoreUrl),
+      ]);
+
+      if (results.some((ok) => !ok)) {
+        throw new Error("partial failure");
+      }
+
+      toast({
+        title: "Mobile App Config Saved",
+        description:
+          "Maintenance mode and force update settings updated successfully.",
+      });
+      await fetchSettings();
+    } catch (_error) {
+      toast({
+        title: "Error",
+        description: "Failed to save mobile app configuration",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -478,8 +693,12 @@ export function SystemSettingsPage() {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="maintenance" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 lg:w-[900px]">
+        <TabsList className="grid w-full grid-cols-6 lg:w-[1050px]">
           <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+          <TabsTrigger value="mobile-app">
+            <Smartphone className="h-4 w-4 mr-1.5" />
+            Mobile App
+          </TabsTrigger>
           <TabsTrigger value="ticketing">Ticketing & Fees</TabsTrigger>
           <TabsTrigger value="business-portal">
             <Building2 className="h-4 w-4 mr-1.5" />
@@ -641,6 +860,413 @@ export function SystemSettingsPage() {
                 </div>
               </CardContent>
             </Card>
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="mobile-app" className="mt-6 space-y-6">
+          {/* Mobile App Configuration Header */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="grid grid-cols-1 lg:grid-cols-12 gap-6"
+          >
+            <div className="lg:col-span-7 space-y-6">
+              {/* Card 1: Mobile Maintenance Mode */}
+              <Card className="border-2 border-primary/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl">
+                <CardHeader className="border-b border-border/50 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`p-2 rounded-xl ${
+                          mobileMaintenanceEnabled
+                            ? "bg-orange-500/10 text-orange-500"
+                            : "bg-green-500/10 text-green-500"
+                        }`}
+                      >
+                        {mobileMaintenanceEnabled ? (
+                          <PowerOff className="h-6 w-6" />
+                        ) : (
+                          <Power className="h-6 w-6" />
+                        )}
+                      </div>
+                      <div>
+                        <CardTitle className="text-xl">
+                          Mobile Maintenance Mode
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          Lock mobile app access during updates and backend downtime
+                        </p>
+                      </div>
+                    </div>
+                    <Badge
+                      variant={mobileMaintenanceEnabled ? "destructive" : "default"}
+                      className="text-sm px-3 py-1"
+                    >
+                      {mobileMaintenanceEnabled ? "ACTIVE" : "INACTIVE"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-5">
+                  {/* Toggle */}
+                  <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-border/50">
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="mobile-maintenance-toggle"
+                        className="text-base font-semibold cursor-pointer"
+                      >
+                        Enable Mobile Maintenance
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {mobileMaintenanceEnabled
+                          ? "Mobile users are blocked and shown the maintenance screen."
+                          : "Mobile app is running normally for all users."}
+                      </p>
+                    </div>
+                    <Switch
+                      id="mobile-maintenance-toggle"
+                      checked={mobileMaintenanceEnabled}
+                      onCheckedChange={handleMobileMaintenanceToggle}
+                      disabled={isSaving}
+                      className="data-[state=checked]:bg-orange-500"
+                    />
+                  </div>
+
+                  {mobileMaintenanceEnabled && (
+                    <div className="flex items-start gap-3 p-3.5 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                      <AlertTriangle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
+                      <div className="text-xs space-y-0.5">
+                        <p className="font-semibold text-orange-600 dark:text-orange-400">
+                          Mobile App Maintenance Active
+                        </p>
+                        <p className="text-muted-foreground">
+                          Any mobile request will display the maintenance screen.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="mobile-maint-title" className="text-sm">
+                        Maintenance Title
+                      </Label>
+                      <Input
+                        id="mobile-maint-title"
+                        value={mobileMaintenanceTitle}
+                        onChange={(e) => setMobileMaintenanceTitle(e.target.value)}
+                        placeholder="System Under Maintenance"
+                        className="bg-background"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="mobile-maint-message" className="text-sm">
+                        Maintenance Message
+                      </Label>
+                      <textarea
+                        id="mobile-maint-message"
+                        value={mobileMaintenanceMessage}
+                        onChange={(e) => setMobileMaintenanceMessage(e.target.value)}
+                        rows={3}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        placeholder="We are performing scheduled maintenance to improve your experience..."
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="mobile-maint-estimated-end" className="text-sm">
+                        Estimated End Time (Optional)
+                      </Label>
+                      <Input
+                        id="mobile-maint-estimated-end"
+                        type="datetime-local"
+                        value={mobileMaintenanceEstimatedEnd}
+                        onChange={(e) =>
+                          setMobileMaintenanceEstimatedEnd(e.target.value)
+                        }
+                        className="bg-background"
+                      />
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Displays estimated time remaining countdown on mobile
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Card 2: App Version Control & Force Update */}
+              <Card className="border-2 border-primary/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl">
+                <CardHeader className="border-b border-border/50 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500">
+                        <ArrowUpCircle className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-xl">
+                          Version Control & Force Update
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          Enforce minimum build requirements and promote latest releases
+                        </p>
+                      </div>
+                    </div>
+                    <Badge
+                      variant={mobileForceUpdateEnabled ? "default" : "secondary"}
+                      className="text-sm px-3 py-1"
+                    >
+                      {mobileForceUpdateEnabled ? "FORCE UPDATE ON" : "FORCE UPDATE OFF"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-5">
+                  {/* Force Update Toggle */}
+                  <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-border/50">
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="mobile-force-update-toggle"
+                        className="text-base font-semibold cursor-pointer"
+                      >
+                        Enforce Minimum App Version
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        When enabled, users on versions below the minimum version are forced to update before accessing the app.
+                      </p>
+                    </div>
+                    <Switch
+                      id="mobile-force-update-toggle"
+                      checked={mobileForceUpdateEnabled}
+                      onCheckedChange={setMobileForceUpdateEnabled}
+                      disabled={isSaving}
+                    />
+                  </div>
+
+                  {/* Versions Input Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="mobile-min-ver" className="text-sm font-semibold">
+                        Minimum Required Version *
+                      </Label>
+                      <Input
+                        id="mobile-min-ver"
+                        value={mobileMinVersion}
+                        onChange={(e) => setMobileMinVersion(e.target.value)}
+                        placeholder="1.0.0"
+                        className="bg-background font-mono"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Versions below this cannot proceed without updating.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="mobile-latest-ver" className="text-sm font-semibold">
+                        Latest Store Version
+                      </Label>
+                      <Input
+                        id="mobile-latest-ver"
+                        value={mobileLatestVersion}
+                        onChange={(e) => setMobileLatestVersion(e.target.value)}
+                        placeholder="1.0.1"
+                        className="bg-background font-mono"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Current live version deployed on App Store / Play Store.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Update Modal Text Fields */}
+                  <div className="space-y-4 pt-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="mobile-update-title" className="text-sm">
+                        Update Prompt Title
+                      </Label>
+                      <Input
+                        id="mobile-update-title"
+                        value={mobileUpdateTitle}
+                        onChange={(e) => setMobileUpdateTitle(e.target.value)}
+                        placeholder="Update Required"
+                        className="bg-background"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="mobile-update-message" className="text-sm">
+                        Update Description / Release Notes
+                      </Label>
+                      <textarea
+                        id="mobile-update-message"
+                        value={mobileUpdateMessage}
+                        onChange={(e) => setMobileUpdateMessage(e.target.value)}
+                        rows={3}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        placeholder="A new version of Inside Karachi is available with new features and performance improvements..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Store URLs */}
+                  <div className="space-y-4 pt-2 border-t border-border/50">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      <ExternalLink className="h-4 w-4 text-primary" />
+                      Platform Store Links
+                    </h4>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="mobile-android-url" className="text-xs text-muted-foreground">
+                        Google Play Store URL (Android)
+                      </Label>
+                      <Input
+                        id="mobile-android-url"
+                        value={mobileAndroidStoreUrl}
+                        onChange={(e) => setMobileAndroidStoreUrl(e.target.value)}
+                        placeholder="https://play.google.com/store/apps/details?id=com.inside.cityguide"
+                        className="bg-background text-xs font-mono"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="mobile-ios-url" className="text-xs text-muted-foreground">
+                        Apple App Store URL (iOS)
+                      </Label>
+                      <Input
+                        id="mobile-ios-url"
+                        value={mobileIosStoreUrl}
+                        onChange={(e) => setMobileIosStoreUrl(e.target.value)}
+                        placeholder="https://apps.apple.com/app/inside-karachi/id6470000000"
+                        className="bg-background text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleSaveMobileAppConfig}
+                    disabled={isSaving}
+                    className="w-full gap-2 mt-4"
+                  >
+                    {isSaving ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    Save Mobile App Configuration
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Live Mobile Simulator Preview */}
+            <div className="lg:col-span-5 space-y-4">
+              <Card className="border-2 border-primary/20 bg-card sticky top-6">
+                <CardHeader className="border-b border-border/50 pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-lg">Mobile Preview</CardTitle>
+                    </div>
+                    <div className="flex gap-1 bg-muted p-1 rounded-lg">
+                      <Button
+                        size="sm"
+                        variant={mobilePreviewMode === "force_update" ? "default" : "ghost"}
+                        className="h-7 text-xs px-2.5"
+                        onClick={() => setMobilePreviewMode("force_update")}
+                      >
+                        Update Dialog
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={mobilePreviewMode === "maintenance" ? "default" : "ghost"}
+                        className="h-7 text-xs px-2.5"
+                        onClick={() => setMobilePreviewMode("maintenance")}
+                      >
+                        Maintenance
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6 flex justify-center">
+                  {/* Phone Mockup Frame */}
+                  <div className="w-[300px] h-[580px] bg-slate-950 rounded-[40px] p-3 shadow-2xl border-4 border-slate-800 relative flex flex-col overflow-hidden">
+                    {/* Speaker / Dynamic Island notch */}
+                    <div className="w-24 h-4 bg-slate-800 rounded-full mx-auto mb-2 z-20 flex items-center justify-center">
+                      <div className="w-2.5 h-2.5 bg-slate-950 rounded-full mr-2" />
+                      <div className="w-2 h-2 bg-slate-900 rounded-full" />
+                    </div>
+
+                    {/* Phone Screen Area */}
+                    <div className="flex-1 bg-white dark:bg-slate-900 rounded-[28px] overflow-hidden flex flex-col p-4 relative text-foreground">
+                      {mobilePreviewMode === "maintenance" ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center p-2 space-y-4">
+                          <div className="w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500">
+                            <AlertCircle className="h-9 w-9" />
+                          </div>
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-500/10 text-orange-600 text-[11px] font-semibold">
+                            <AlertCircle className="h-3 w-3" />
+                            {mobileMaintenanceTitle || "System Under Maintenance"}
+                          </div>
+                          <h3 className="text-base font-bold leading-tight">
+                            We&apos;ll Be Right Back
+                          </h3>
+                          <p className="text-xs text-muted-foreground line-clamp-4">
+                            {mobileMaintenanceMessage ||
+                              "We are performing scheduled maintenance to improve your experience. We'll be back shortly!"}
+                          </p>
+                          {mobileMaintenanceEstimatedEnd && (
+                            <div className="px-3 py-1.5 bg-muted/60 border border-border rounded-full text-[11px] font-medium text-foreground">
+                              Estimated downtime: ~2h 00m
+                            </div>
+                          )}
+                          <div className="w-full pt-2">
+                            <div className="w-full py-2 bg-primary text-primary-foreground text-xs font-semibold rounded-xl shadow text-center">
+                              Retry Connection
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">
+                            support@insidekarachi.com
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center p-2">
+                          <div className="w-full bg-card/80 border border-border/80 rounded-2xl p-4 shadow-lg flex flex-col items-center text-center space-y-3">
+                            <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                              <ArrowUpCircle className="h-7 w-7" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold">
+                                {mobileUpdateTitle || "Update Required"}
+                              </h4>
+                              <div className="inline-block mt-1 px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 text-[10px] font-mono font-medium">
+                                Minimum v{mobileMinVersion} required
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground line-clamp-4 leading-relaxed">
+                              {mobileUpdateMessage ||
+                                "A new version of Inside Karachi is available with new features and improvements. Please update the app to continue."}
+                            </p>
+                            <div className="w-full pt-1 space-y-1.5">
+                              <div className="w-full py-2 bg-primary text-primary-foreground text-xs font-semibold rounded-xl shadow text-center">
+                                Update Now
+                              </div>
+                              {!mobileForceUpdateEnabled && (
+                                <div className="text-[11px] text-muted-foreground py-1 text-center font-medium">
+                                  Later
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Home Indicator */}
+                    <div className="w-28 h-1 bg-slate-700 rounded-full mx-auto mt-2" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </motion.div>
         </TabsContent>
 

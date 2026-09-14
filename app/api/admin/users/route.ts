@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
       params.push(`%${search}%`);
       paramIdx++;
     }
-    const validRoles = ["public_user", "business_owner", "writer", "lister", "data_entry", "organizer", "admin", "super_admin"];
+    const validRoles = ["public_user", "business_owner", "writer", "lister", "data_entry", "organizer", "eo_gate_pass", "admin", "super_admin"];
     if (role && validRoles.includes(role)) {
       conditions.push(`p.role = $${paramIdx}`);
       params.push(role);
@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validCreateRoles = ["public_user", "business_owner", "writer", "lister", "data_entry", "organizer", "admin", "super_admin"];
+    const validCreateRoles = ["public_user", "business_owner", "writer", "lister", "data_entry", "organizer", "eo_gate_pass", "admin", "super_admin"];
     if (!validCreateRoles.includes(role)) {
       return NextResponse.json(
         { success: false, error: "Invalid role" },

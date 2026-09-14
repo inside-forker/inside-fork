@@ -3003,6 +3003,7 @@ export type Database = {
           id: string
           is_verified_organizer: boolean | null
           last_verification_request: string | null
+          linked_organizer_id: string | null
           membership_plan: string | null
           organizer_bio: string | null
           organizer_company: string | null
@@ -3027,6 +3028,7 @@ export type Database = {
           id: string
           is_verified_organizer?: boolean | null
           last_verification_request?: string | null
+          linked_organizer_id?: string | null
           membership_plan?: string | null
           organizer_bio?: string | null
           organizer_company?: string | null
@@ -3051,6 +3053,7 @@ export type Database = {
           id?: string
           is_verified_organizer?: boolean | null
           last_verification_request?: string | null
+          linked_organizer_id?: string | null
           membership_plan?: string | null
           organizer_bio?: string | null
           organizer_company?: string | null
@@ -5484,6 +5487,7 @@ export type Database = {
         | "admin"
         | "super_admin"
         | "data_entry"
+        | "eo_gate_pass"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -5741,6 +5745,7 @@ export const Constants = {
         "admin",
         "super_admin",
         "data_entry",
+        "eo_gate_pass",
       ],
     },
   },

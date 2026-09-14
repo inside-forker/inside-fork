@@ -109,6 +109,54 @@ export async function POST(
       const rpcResult = rpcRows[0]?.result as MarkBookingPaidRpcResponse | null;
 
       if (rpcResult && rpcResult.success) {
+        // Ensure passes have assigned_gate_index if event is multi_gate
+        try {
+          const { rows: bEventRows } = await query(
+            `SELECT b.event_id, e.scanning_mode, e.total_gates 
+             FROM bookings b 
+             INNER JOIN events e ON e.id = b.event_id 
+             WHERE b.id = $1 LIMIT 1`,
+            [bookingId],
+          );
+          if (
+            bEventRows.length > 0 &&
+            bEventRows[0].scanning_mode === "multi_gate" &&
+            Number(bEventRows[0].total_gates) > 1
+          ) {
+            const evId = bEventRows[0].event_id;
+            const totalGates = Number(bEventRows[0].total_gates);
+            const { rows: gateLoadRows } = await query(
+              `SELECT assigned_gate_index, COUNT(*)::int AS count
+               FROM public.ticket_passes
+               WHERE event_id = $1 AND status != 'revoked' AND assigned_gate_index IS NOT NULL
+               GROUP BY assigned_gate_index`,
+              [evId],
+            );
+            const loadMap: Record<number, number> = {};
+            for (let g = 0; g < totalGates; g++) loadMap[g] = 0;
+            gateLoadRows.forEach((r) => {
+              const idx = Number(r.assigned_gate_index);
+              if (idx >= 0 && idx < totalGates) loadMap[idx] = Number(r.count);
+            });
+            let minG = 0;
+            let minC = loadMap[0];
+            for (let g = 1; g < totalGates; g++) {
+              if (loadMap[g] < minC) {
+                minC = loadMap[g];
+                minG = g;
+              }
+            }
+            await query(
+              `UPDATE public.ticket_passes 
+               SET assigned_gate_index = $1 
+               WHERE booking_id = $2 AND assigned_gate_index IS NULL`,
+              [minG, bookingId],
+            );
+          }
+        } catch (gateErr) {
+          console.error("[RPC PATH] Failed to auto-allocate gate index:", gateErr);
+        }
+
         // === SEND NOTIFICATION: Payment Success (RPC Path) ===
         try {
           // Fetch booking details for notification
@@ -336,6 +384,48 @@ export async function POST(
       );
     }
 
+    // Determine smart gate allocation if event is multi_gate
+    let fallbackGateIndex: number | null = null;
+    if (eventId) {
+      try {
+        const { rows: eventModeRows } = await query(
+          `SELECT scanning_mode, total_gates FROM public.events WHERE id = $1 LIMIT 1`,
+          [eventId],
+        );
+        if (
+          eventModeRows.length > 0 &&
+          eventModeRows[0].scanning_mode === "multi_gate" &&
+          Number(eventModeRows[0].total_gates) > 1
+        ) {
+          const totalGates = Number(eventModeRows[0].total_gates);
+          const { rows: gateLoadRows } = await query(
+            `SELECT assigned_gate_index, COUNT(*)::int AS count
+             FROM public.ticket_passes
+             WHERE event_id = $1 AND status != 'revoked' AND assigned_gate_index IS NOT NULL
+             GROUP BY assigned_gate_index`,
+            [eventId],
+          );
+          const loadMap: Record<number, number> = {};
+          for (let g = 0; g < totalGates; g++) loadMap[g] = 0;
+          gateLoadRows.forEach((r) => {
+            const idx = Number(r.assigned_gate_index);
+            if (idx >= 0 && idx < totalGates) loadMap[idx] = Number(r.count);
+          });
+          let minG = 0;
+          let minC = loadMap[0];
+          for (let g = 1; g < totalGates; g++) {
+            if (loadMap[g] < minC) {
+              minC = loadMap[g];
+              minG = g;
+            }
+          }
+          fallbackGateIndex = minG;
+        }
+      } catch (e) {
+        console.error("Failed to determine fallback gate index:", e);
+      }
+    }
+
     // Create ticket passes if needed
     let passesCreated = 0;
     if (passesToCreate.length > 0) {
@@ -343,7 +433,7 @@ export async function POST(
         const values: unknown[] = [];
         const placeholders = passesToCreate
           .map((p, idx) => {
-            const base = idx * 8;
+            const base = idx * 9;
             values.push(
               p.booking_id,
               p.event_id,
@@ -353,13 +443,14 @@ export async function POST(
               p.guest_name,
               p.status,
               p.quantity_index,
+              fallbackGateIndex,
             );
-            return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8})`;
+            return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9})`;
           })
           .join(", ");
         const { rows: createdPasses } = await query(
           `INSERT INTO ticket_passes
-             (booking_id, event_id, ticket_type_id, code, signature, guest_name, status, quantity_index)
+             (booking_id, event_id, ticket_type_id, code, signature, guest_name, status, quantity_index, assigned_gate_index)
            VALUES ${placeholders}
            RETURNING id`,
           values,

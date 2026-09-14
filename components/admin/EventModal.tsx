@@ -21,6 +21,9 @@ import {
   Clock,
   Image as ImageIcon,
   Ticket,
+  ShieldCheck,
+  Layers,
+  QrCode,
 } from "lucide-react";
 import {
   Dialog,
@@ -78,6 +81,8 @@ export function EventModal({
     is_featured: false,
     status: "draft",
     require_guest_details: false,
+    scanning_mode: "single",
+    total_gates: "1",
   });
 
   const [categories, setCategories] = React.useState<Category[]>([]);
@@ -190,6 +195,8 @@ export function EventModal({
         is_featured: false,
         status: "draft",
         require_guest_details: false,
+        scanning_mode: "single",
+        total_gates: "1",
       });
       setImages([]);
       setPendingImageDeletions(new Set());
@@ -218,6 +225,8 @@ export function EventModal({
         is_featured: false,
         status: "draft",
         require_guest_details: false,
+        scanning_mode: "single",
+        total_gates: "1",
       });
       setImages([]);
       setPendingImageDeletions(new Set());
@@ -253,6 +262,8 @@ export function EventModal({
               is_featured: eventData.is_featured || false,
               status: eventData.event_status || "draft",
               require_guest_details: eventData.require_guest_details || false,
+              scanning_mode: eventData.scanning_mode || "single",
+              total_gates: (eventData.total_gates || 1).toString(),
             });
             setImages(eventData.images || []);
           }
@@ -680,6 +691,8 @@ export function EventModal({
         is_featured: formData.is_featured,
         status: formData.status,
         require_guest_details: formData.require_guest_details,
+        scanning_mode: formData.scanning_mode as "single" | "multi_gate",
+        total_gates: Math.max(1, parseInt(formData.total_gates || "1", 10) || 1),
       };
 
       const result = await onSave(eventData);
@@ -1296,6 +1309,99 @@ export function EventModal({
                           }
                         />
                       </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* Gate Scanner & Zone Partitioning Settings */}
+                    <div className="space-y-4 rounded-xl border border-primary/20 bg-primary/5 p-4 dark:bg-primary/10">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-5 w-5 text-primary" />
+                        <div>
+                          <h4 className="text-base font-semibold">
+                            Device Verification & Attendance Mode
+                          </h4>
+                          <p className="text-xs text-muted-foreground">
+                            Configure single device or offline-first jammer-proof multi-device partition for scanners.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="scanning_mode" className="text-sm font-medium">
+                            Verification Architecture
+                          </Label>
+                          <Select
+                            value={formData.scanning_mode}
+                            onValueChange={(value) =>
+                              handleInputChange("scanning_mode", value)
+                            }
+                          >
+                            <SelectTrigger id="scanning_mode" className="h-11 bg-background">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="single">
+                                <div className="flex items-center gap-2">
+                                  <QrCode className="h-4 w-4 text-emerald-500" />
+                                  <span>Single Device Verification (1 Device)</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="multi_gate">
+                                <div className="flex items-center gap-2">
+                                  <Layers className="h-4 w-4 text-primary" />
+                                  <span>Multi-Device Verification (Anti-Fraud)</span>
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {formData.scanning_mode === "multi_gate" && (
+                          <div className="space-y-2">
+                            <Label htmlFor="total_gates" className="text-sm font-medium">
+                              Configured Total Devices
+                            </Label>
+                            <Select
+                              value={formData.total_gates}
+                              onValueChange={(value) =>
+                                handleInputChange("total_gates", value)
+                              }
+                            >
+                              <SelectTrigger id="total_gates" className="h-11 bg-background">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {[2, 3, 4, 5, 6, 8, 10].map((num) => (
+                                  <SelectItem key={num} value={num.toString()}>
+                                    {num} Devices (Partitioned Verification)
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </div>
+
+                      {event?.event_id && (
+                        <div className="mt-3 pt-3 border-t border-border/40 flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground">
+                            Assign individual attendees to Device 1, Device 2 or link scanner operator accounts:
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              window.location.href = `/admin/events/${event.event_id}/device-allocation`;
+                            }}
+                            className="text-xs border-primary/30 text-primary hover:bg-primary/5"
+                          >
+                            Manage Device & Operator Allocations →
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </form>

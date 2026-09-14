@@ -53,7 +53,11 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const passes = paid
     ? (
         await query(
-          `SELECT ${PASS_COLUMNS} FROM ticket_passes WHERE booking_id = $1 ORDER BY quantity_index ASC`,
+          `SELECT ${PASS_COLUMNS} 
+           FROM ticket_passes tp
+           LEFT JOIN event_device_operators edo ON edo.event_id = tp.event_id AND edo.device_index = tp.assigned_gate_index
+           WHERE tp.booking_id = $1 
+           ORDER BY tp.quantity_index ASC`,
           [bookingId],
         )
       ).rows

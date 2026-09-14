@@ -37,8 +37,9 @@ type ActivityFeedItem = {
   occurred_at: string;
   /** Listing/event thumbnail for rows that resolve to one — favourites, a
    * booked event, and points_log rows tied to a listing (leave_review,
-   * react_review). null for kinds with no photo to show (badges, rank-ups,
-   * check-ins) — the client falls back to its type icon there. */
+   * react_review, comment_review, and a listing QR scan). null for kinds with
+   * no photo to show (badges, rank-ups, daily logins) — the client falls back
+   * to its type icon there. */
   image_url: string | null;
 };
 
@@ -74,12 +75,35 @@ type FeedRow = {
  * Slugs are the `xp_activities.activity_slug` values passed to `awardXP()` —
  * grep `awardXP(` in this repo before adding one.
  */
-const SLUG_META: Record<string, { type: ActivityFeedType; title?: string }> = {
-  leave_review: { type: "review", title: "Wrote a review" },
-  react_review: { type: "review_helpful", title: "Reacted to a review" },
-  comment_review: { type: "review", title: "Commented on a review" },
-  check_in: { type: "checkin", title: "Checked in" },
-  visit_location: { type: "checkin", title: "Visited a location" },
+const SLUG_META: Record<
+  string,
+  { type: ActivityFeedType; title?: string; withName?: (name: string) => string }
+> = {
+  leave_review: {
+    type: "review",
+    title: "Wrote a review",
+    withName: (name) => `Reviewed ${name}`,
+  },
+  react_review: {
+    type: "review_helpful",
+    title: "Reacted to a review",
+    withName: (name) => `Reacted to a review of ${name}`,
+  },
+  comment_review: {
+    type: "review",
+    title: "Commented on a review",
+    withName: (name) => `Commented on a review of ${name}`,
+  },
+  check_in: {
+    type: "checkin",
+    title: "Checked in",
+    withName: (name) => `Checked in at ${name}`,
+  },
+  visit_location: {
+    type: "checkin",
+    title: "Visited a location",
+    withName: (name) => `Visited ${name}`,
+  },
   attend_event: { type: "booking", title: "Attended an event" },
   daily_login: { type: "streak", title: "Claimed a daily login reward" },
   refer_friend: { type: "referral", title: "Referred a friend" },
@@ -120,6 +144,9 @@ const PROFILE_SLUGS = new Set(["profile_complete"]);
  * `related_id` semantics on `points_log` (integers, set by `awardXP()`):
  *   - `leave_review` → a `listings.id`
  *   - `react_review` → a `reviews.id` (→ its `listing_id`)
+ *   - `comment_review` → a `review_comments.id` (→ its review's `listing_id`)
+ *   - `visit_location` → a `qr_codes.id` (→ its `related_id` when the code is
+ *     a listing code; listing QR codes store 0 when no listing was picked)
  * Other slugs leave the listing columns null and fall back to `HREF_BY_TYPE`.
  */
 const FEED_UNION_SQL = `
@@ -128,13 +155,15 @@ const FEED_UNION_SQL = `
     'xp'                                            AS kind,
     pl.reason                                       AS reason,
     pl.points                                       AS points,
-    COALESCE(lrev.name, lreact.name)                AS name,
-    COALESCE(lrev.slug, lreact.slug)                AS slug,
+    COALESCE(lrev.name, lreact.name,
+             lcmt.name, lqr.name)                   AS name,
+    COALESCE(lrev.slug, lreact.slug,
+             lcmt.slug, lqr.slug)                   AS slug,
     NULL::text                                      AS detail,
     (SELECT xa.activity_name FROM public.xp_activities xa
       WHERE xa.activity_slug = pl.reason LIMIT 1)   AS activity_name,
     (SELECT li.url FROM public.listing_images li
-      WHERE li.listing_id = COALESCE(lrev.id, lreact.id)
+      WHERE li.listing_id = COALESCE(lrev.id, lreact.id, lcmt.id, lqr.id)
       ORDER BY li.is_primary DESC NULLS LAST, li.display_order ASC
       LIMIT 1)                                      AS image_url,
     pl.created_at                                   AS occurred_at
@@ -145,6 +174,17 @@ const FEED_UNION_SQL = `
          ON pl.reason = 'react_review' AND rv.id = pl.related_id
   LEFT JOIN public.listings lreact
          ON lreact.id = rv.listing_id
+  LEFT JOIN public.review_comments rc
+         ON pl.reason = 'comment_review' AND rc.id = pl.related_id
+  LEFT JOIN public.reviews rvc
+         ON rvc.id = rc.review_id
+  LEFT JOIN public.listings lcmt
+         ON lcmt.id = rvc.listing_id
+  LEFT JOIN public.qr_codes qr
+         ON pl.reason = 'visit_location' AND qr.id = pl.related_id
+        AND qr.qr_type = 'listing' AND qr.related_id > 0
+  LEFT JOIN public.listings lqr
+         ON lqr.id = qr.related_id
   WHERE pl.user_id = $1
 
   UNION ALL
@@ -208,7 +248,10 @@ function xpItem(row: FeedRow): ActivityFeedItem {
   const type = meta?.type ?? "xp";
   const points = Number(row.points);
 
-  const title = meta?.title ?? row.activity_name ?? getFriendlyActivityName(slug);
+  // A resolved listing folds into the headline ("Visited Café Flo"), so the
+  // subtitle that used to carry the name would only repeat it.
+  const named = row.name && meta?.withName ? meta.withName(row.name) : null;
+  const title = named ?? meta?.title ?? row.activity_name ?? getFriendlyActivityName(slug);
 
   // A resolved listing gives us both the warmer subtitle and a real tap target;
   // otherwise fall back to the per-type destination.
@@ -220,7 +263,7 @@ function xpItem(row: FeedRow): ActivityFeedItem {
     id: row.id,
     type,
     title,
-    subtitle: row.name ?? null,
+    subtitle: named ? null : (row.name ?? null),
     href,
     // Only surface positive awards — the client renders this as a "+N" pill, and
     // negative rows (moderation clawbacks) shouldn't read as an achievement.
@@ -304,7 +347,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   try {
     const res = await query(
       `SELECT feed.id, feed.kind, feed.reason, feed.points, feed.name,
-              feed.slug, feed.detail, feed.activity_name,
+              feed.slug, feed.detail, feed.activity_name, feed.image_url,
               to_json(feed.occurred_at) #>> '{}' AS occurred_at,
               COUNT(*) OVER () AS total_count
        FROM (${FEED_UNION_SQL}) feed

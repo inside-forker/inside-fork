@@ -1,0 +1,45 @@
+{
+  "monotonic-in-soonness": [
+    {
+      "hoursUntilStart": 0,
+      "score": 0.5833
+    },
+    {
+      "hoursUntilStart": 6,
+      "score": 0.5151
+    },
+    {
+      "hoursUntilStart": 24,
+      "score": 0.3671
+    },
+    {
+      "hoursUntilStart": 48,
+      "score": 0.256
+    },
+    {
+      "hoursUntilStart": 96,
+      "score": 0.1698
+    },
+    {
+      "hoursUntilStart": 200,
+      "score": 0.1406
+    }
+  ],
+  "cold-start-time-intent-prior": {
+    "boosted": 0.755,
+    "floor": 0.3939
+  },
+  "strong-affinity-flips-ranking": {
+    "without": [
+      3001,
+      3002
+    ],
+    "with": [
+      3002,
+      3001
+    ]
+  },
+  "null-category-and-distance": {
+    "score": 0.5257
+  }
+}

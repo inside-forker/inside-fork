@@ -224,8 +224,8 @@ export async function checkAndProcessRankUp(
           title: `🎉 You've reached ${newRank.name}!`,
           body: `Your new rank unlocks fresh perks — check them out.`,
           priority: "high",
-          ctaLabel: "View leaderboard",
-          ctaUrl: "/leaderboard",
+          ctaLabel: "See what's on",
+          ctaUrl: "/events",
           metadata: {
             rank_id: newRank.id,
             rank_slug: newRank.slug,

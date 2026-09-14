@@ -3,44 +3,52 @@ import { MobileApiError } from "./errors";
 import { query } from "@/lib/db";
 
 /**
- * Roles allowed to use the mobile organizer surface. Mirrors `ORGANIZER_ROLES`
- * in `app/api/organizer/events/manage/route.ts` (web) — keep in sync.
+ * Roles allowed to use the mobile organizer surface.
  */
 export const ORGANIZER_ROLES = ["organizer", "lister", "admin", "super_admin"];
+export const SCANNER_ROLES = ["organizer", "eo_gate_pass", "lister", "admin", "super_admin"];
 const ADMIN_ROLES = ["admin", "super_admin"];
 
 export type MobileOrganizerContext = {
   user: { id: string; email?: string; role: string };
   isAdmin: boolean;
+  isGatePass: boolean;
+  linkedOrganizerId: string | null;
 };
 
 /**
  * Requires a Bearer-authenticated user whose current `profiles.role` (read
  * fresh from the DB, not the JWT claim, since a role change must take effect
- * immediately) is in `ORGANIZER_ROLES`. When `eventId` is passed, additionally
- * requires the user to own that event unless they're an admin — consolidates
- * the ownership-or-admin check duplicated across the web organizer routes
- * (`app/api/organizer/events/route.ts`, `.../attendees/route.ts`,
- * `.../events/[eventId]/tickets/route.ts`, `app/api/tickets/verify/route.ts`).
+ * immediately) has organizer or gate pass permissions. When `eventId` is passed, additionally
+ * requires the user to own that event (or be a linked gate pass operator for the event's organizer)
+ * unless they're an admin.
  */
 export async function requireMobileOrganizer(
   request: Request,
-  opts?: { eventId?: number },
+  opts?: { eventId?: number; allowGatePass?: boolean },
 ): Promise<MobileOrganizerContext> {
   const { user } = await requireMobileUser(request);
+  const allowGatePass = opts?.allowGatePass ?? true;
 
-  const { rows } = await query(`SELECT role FROM profiles WHERE id = $1`, [
-    user.id,
-  ]);
+  const { rows } = await query(
+    `SELECT role, linked_organizer_id FROM profiles WHERE id = $1`,
+    [user.id],
+  );
   const role: string | undefined = rows[0]?.role;
-  if (!role || !ORGANIZER_ROLES.includes(role)) {
+  const linkedOrganizerId: string | null = rows[0]?.linked_organizer_id || null;
+
+  const allowedRoles = allowGatePass ? SCANNER_ROLES : ORGANIZER_ROLES;
+
+  if (!role || !allowedRoles.includes(role)) {
     throw new MobileApiError(
       "forbidden",
-      "Organizer access required.",
+      "Organizer or Gate Pass access required.",
       403,
     );
   }
+
   const isAdmin = ADMIN_ROLES.includes(role);
+  const isGatePass = role === "eo_gate_pass";
 
   if (opts?.eventId !== undefined) {
     const { rows: eventRows } = await query(
@@ -51,7 +59,11 @@ export async function requireMobileOrganizer(
     if (!event) {
       throw new MobileApiError("not_found", "Event not found.", 404);
     }
-    if (!isAdmin && event.organizer_id !== user.id) {
+
+    const isOwner = event.organizer_id === user.id;
+    const isLinkedGatePass = isGatePass && linkedOrganizerId && event.organizer_id === linkedOrganizerId;
+
+    if (!isAdmin && !isOwner && !isLinkedGatePass) {
       throw new MobileApiError(
         "forbidden",
         "You do not have access to this event.",
@@ -60,5 +72,10 @@ export async function requireMobileOrganizer(
     }
   }
 
-  return { user: { ...user, role }, isAdmin };
+  return {
+    user: { ...user, role },
+    isAdmin,
+    isGatePass,
+    linkedOrganizerId,
+  };
 }

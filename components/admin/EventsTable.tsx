@@ -19,6 +19,7 @@ import {
   Eye,
   Calendar,
   MapPin,
+  Smartphone,
 } from "lucide-react";
 
 import type { EventsTableProps } from "@/types/events.types";
@@ -267,6 +268,15 @@ export function EventsTable({
                           >
                             <Edit className="h-4 w-4 mr-2" />
                             Edit Event
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              window.location.href = `/admin/events/${event.event_id}/device-allocation`;
+                            }}
+                            className="cursor-pointer hover:bg-primary/10 focus:bg-primary/10 transition-colors duration-200"
+                          >
+                            <Smartphone className="h-4 w-4 mr-2 text-primary" />
+                            Device Allocation & Staff
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => onViewEvent(event)}

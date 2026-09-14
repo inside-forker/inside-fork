@@ -20,9 +20,9 @@ export async function GET() {
     );
     const profile = profileRows[0] as { role: string } | undefined;
 
-    if (!profile || profile.role !== "super_admin") {
+    if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
       return NextResponse.json(
-        { error: "Super admin access required" },
+        { error: "Admin access required" },
         { status: 403 },
       );
     }
@@ -62,16 +62,16 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is super admin
+    // Check if user is admin or super admin
     const { rows: profileRows } = await query(
       "SELECT role FROM profiles WHERE id = $1 LIMIT 1",
       [session.userId]
     );
     const profile = profileRows[0] as { role: string } | undefined;
 
-    if (!profile || profile.role !== "super_admin") {
+    if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
       return NextResponse.json(
-        { error: "Super admin access required" },
+        { error: "Admin access required" },
         { status: 403 },
       );
     }

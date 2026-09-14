@@ -19,9 +19,10 @@ export default async function CleanupLogsPage() {
   let logs;
   try {
     const result = await query(
-      `SELECT l.*, p.full_name AS deleted_by_full_name, p.email AS deleted_by_email
+      `SELECT l.*, p.full_name AS deleted_by_full_name, u.email AS deleted_by_email
        FROM form_reply_cleanup_logs l
        LEFT JOIN profiles p ON p.id = l.executed_by
+       LEFT JOIN auth.users u ON u.id = l.executed_by
        ORDER BY l.executed_at DESC
        LIMIT 100`,
     );

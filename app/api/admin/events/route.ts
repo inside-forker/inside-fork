@@ -14,13 +14,14 @@ const EVENT_COLUMNS =
   "category_id, max_capacity, is_featured, " +
   "featured_rank, is_commission_based, commission_rate, require_guest_details, " +
   "organizer_id, organizer_name, organizer_avatar, location_name, address, " +
-  "latitude, longitude";
+  "latitude, longitude, scanning_mode, total_gates";
 
 function toNumericEvent(row: Record<string, unknown>) {
   return {
     ...row,
     event_id: Number(row.event_id),
     category_id: row.category_id !== null ? Number(row.category_id) : null,
+    total_gates: row.total_gates !== null && row.total_gates !== undefined ? Number(row.total_gates) : 1,
     // latitude/longitude/commission_rate are numeric columns; node-pg
     // returns them as strings by default (no custom type parser
     // configured), unlike the old PostgREST path which serialized them
@@ -197,6 +198,8 @@ export async function POST(request: NextRequest) {
       is_commission_based,
       status,
       require_guest_details,
+      scanning_mode,
+      total_gates,
     } = body;
 
     const slug = name
@@ -210,8 +213,9 @@ export async function POST(request: NextRequest) {
         `INSERT INTO events (
            name, slug, description, start_time, end_time,
            location_name, address, latitude, longitude, category_id, organizer_id, max_capacity,
-           is_featured, featured_rank, commission_rate, is_commission_based, status, require_guest_details
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+           is_featured, featured_rank, commission_rate, is_commission_based, status, require_guest_details,
+           scanning_mode, total_gates
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
          RETURNING id, organizer_id, name, slug, description,
            to_json(start_time) #>> '{}' AS start_time,
            to_json(end_time) #>> '{}' AS end_time,
@@ -219,7 +223,7 @@ export async function POST(request: NextRequest) {
            to_json(created_at) #>> '{}' AS created_at,
            to_json(updated_at) #>> '{}' AS updated_at,
            category_id, max_capacity, is_featured, featured_rank, require_guest_details,
-           location_name, address, latitude, longitude`,
+           location_name, address, latitude, longitude, scanning_mode, total_gates`,
         [
           name,
           slug,
@@ -239,6 +243,8 @@ export async function POST(request: NextRequest) {
           is_commission_based || false,
           status || "draft",
           require_guest_details || false,
+          scanning_mode || "single",
+          total_gates ? parseInt(total_gates, 10) : 1,
         ]
       );
       const row = rows[0];
@@ -246,6 +252,7 @@ export async function POST(request: NextRequest) {
         ...row,
         id: Number(row.id),
         category_id: row.category_id !== null ? Number(row.category_id) : null,
+        total_gates: row.total_gates !== null && row.total_gates !== undefined ? Number(row.total_gates) : 1,
         latitude: row.latitude !== null ? Number(row.latitude) : null,
         longitude: row.longitude !== null ? Number(row.longitude) : null,
         commission_rate:

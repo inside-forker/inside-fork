@@ -370,6 +370,22 @@ export function PrintableTicket({
                             </div>
                           </div>
                         )}
+
+                        {pass.gate_label && (
+                          <div className="detail-row flex items-center gap-3">
+                            <div className="detail-icon w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <Ticket className="w-4 h-4 text-primary" />
+                            </div>
+                            <div className="detail-content">
+                              <div className="detail-label text-[9px] uppercase tracking-wider text-primary font-bold mb-0.5">
+                                Gate / Entrance
+                              </div>
+                              <div className="detail-value text-sm text-primary font-extrabold tracking-wide">
+                                {pass.gate_label}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Guest Info */}

@@ -278,6 +278,48 @@ export async function POST(request: NextRequest) {
           }
 
           if (passesToCreate.length > 0) {
+            // Determine smart gate allocation if event is multi_gate
+            let assignedGateIndex: number | null = null;
+            if (booking.event_id) {
+              try {
+                const { rows: eventModeRows } = await query(
+                  `SELECT scanning_mode, total_gates FROM public.events WHERE id = $1 LIMIT 1`,
+                  [booking.event_id],
+                );
+                if (
+                  eventModeRows.length > 0 &&
+                  eventModeRows[0].scanning_mode === "multi_gate" &&
+                  Number(eventModeRows[0].total_gates) > 1
+                ) {
+                  const totalGates = Number(eventModeRows[0].total_gates);
+                  const { rows: gateLoadRows } = await query(
+                    `SELECT assigned_gate_index, COUNT(*)::int AS count
+                     FROM public.ticket_passes
+                     WHERE event_id = $1 AND status != 'revoked' AND assigned_gate_index IS NOT NULL
+                     GROUP BY assigned_gate_index`,
+                    [booking.event_id],
+                  );
+                  const loadMap: Record<number, number> = {};
+                  for (let g = 0; g < totalGates; g++) loadMap[g] = 0;
+                  gateLoadRows.forEach((r) => {
+                    const idx = Number(r.assigned_gate_index);
+                    if (idx >= 0 && idx < totalGates) loadMap[idx] = Number(r.count);
+                  });
+                  let minG = 0;
+                  let minC = loadMap[0];
+                  for (let g = 1; g < totalGates; g++) {
+                    if (loadMap[g] < minC) {
+                      minC = loadMap[g];
+                      minG = g;
+                    }
+                  }
+                  assignedGateIndex = minG;
+                }
+              } catch (e) {
+                console.error("[PayFast Webhook] Error determining gate index:", e);
+              }
+            }
+
             // Check if passes already exist to avoid duplicates
             const { rows: existingPasses } = await query(
               `SELECT id FROM ticket_passes WHERE booking_id = $1 LIMIT 1`,
@@ -289,7 +331,7 @@ export async function POST(request: NextRequest) {
                 const values: unknown[] = [];
                 const placeholders = passesToCreate
                   .map((p, idx) => {
-                    const base = idx * 8;
+                    const base = idx * 9;
                     values.push(
                       p.booking_id,
                       p.event_id,
@@ -299,13 +341,14 @@ export async function POST(request: NextRequest) {
                       p.status,
                       p.quantity_index,
                       p.guest_name,
+                      assignedGateIndex,
                     );
-                    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8})`;
+                    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9})`;
                   })
                   .join(", ");
                 const { rows: createdPasses } = await query(
                   `INSERT INTO ticket_passes
-                     (booking_id, event_id, ticket_type_id, code, signature, status, quantity_index, guest_name)
+                     (booking_id, event_id, ticket_type_id, code, signature, status, quantity_index, guest_name, assigned_gate_index)
                    VALUES ${placeholders}
                    RETURNING id`,
                   values,
@@ -321,8 +364,17 @@ export async function POST(request: NextRequest) {
                 );
               }
             } else {
+              // Passes already exist - ensure gate index is backfilled if null
+              if (assignedGateIndex !== null) {
+                await query(
+                  `UPDATE public.ticket_passes 
+                   SET assigned_gate_index = $1 
+                   WHERE booking_id = $2 AND assigned_gate_index IS NULL`,
+                  [assignedGateIndex, booking.id],
+                );
+              }
               console.log(
-                "[PayFast Webhook] Passes already exist for booking, skipping creation",
+                "[PayFast Webhook] Passes already exist for booking, updated gate allocation",
               );
             }
           }

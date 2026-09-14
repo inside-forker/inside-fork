@@ -174,7 +174,12 @@ export const AUTH_VALIDATION = {
 // User role constants
 export const USER_ROLES = {
   USER: "public_user" as UserRole,
+  BUSINESS_OWNER: "business_owner" as UserRole,
+  WRITER: "writer" as UserRole,
   LISTER: "lister" as UserRole,
+  DATA_ENTRY: "data_entry" as UserRole,
+  ORGANIZER: "organizer" as UserRole,
+  EO_GATE_PASS: "eo_gate_pass" as UserRole,
   ADMIN: "admin" as UserRole,
   SUPER_ADMIN: "super_admin" as UserRole,
 } as const;

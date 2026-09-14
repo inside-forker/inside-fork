@@ -67,6 +67,7 @@ async function compileFullCatalog(): Promise<CompiledCatalog> {
          l.latitude,
          l.longitude,
          l.category_name,
+         l.address,
          c.slug AS category_slug
        FROM deals d
        INNER JOIN listings_with_details l ON l.id = d.listing_id
@@ -223,7 +224,7 @@ async function compileFullCatalog(): Promise<CompiledCatalog> {
   // Bump when the serialized shape changes, not just the data: the hash below
   // only covers ids/labels, so without this a client holding a body from an
   // older shape would revalidate into a 304 and keep it.
-  const PAYLOAD_SHAPE_VERSION = "v2-stub-siblings";
+  const PAYLOAD_SHAPE_VERSION = "v3-location-name";
 
   const hashContent =
     `${PAYLOAD_SHAPE_VERSION}|` +

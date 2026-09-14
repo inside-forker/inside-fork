@@ -282,13 +282,56 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Determine smart assigned_gate_index if event is multi_gate
+    let assignedGateIndex: number | null = null;
+    const targetEventId = verifiedItems[0]?.eventId;
+    if (targetEventId) {
+      try {
+        const { rows: eventModeRows } = await query(
+          `SELECT scanning_mode, total_gates FROM public.events WHERE id = $1 LIMIT 1`,
+          [targetEventId],
+        );
+        if (
+          eventModeRows.length > 0 &&
+          eventModeRows[0].scanning_mode === "multi_gate" &&
+          Number(eventModeRows[0].total_gates) > 1
+        ) {
+          const totalGates = Number(eventModeRows[0].total_gates);
+          const { rows: gateLoadRows } = await query(
+            `SELECT assigned_gate_index, COUNT(*)::int AS count
+             FROM public.ticket_passes
+             WHERE event_id = $1 AND status != 'revoked' AND assigned_gate_index IS NOT NULL
+             GROUP BY assigned_gate_index`,
+            [targetEventId],
+          );
+          const loadMap: Record<number, number> = {};
+          for (let g = 0; g < totalGates; g++) loadMap[g] = 0;
+          gateLoadRows.forEach((r) => {
+            const idx = Number(r.assigned_gate_index);
+            if (idx >= 0 && idx < totalGates) loadMap[idx] = Number(r.count);
+          });
+          let minG = 0;
+          let minC = loadMap[0];
+          for (let g = 1; g < totalGates; g++) {
+            if (loadMap[g] < minC) {
+              minC = loadMap[g];
+              minG = g;
+            }
+          }
+          assignedGateIndex = minG;
+        }
+      } catch (e) {
+        console.error("Failed to calculate gate index for new passes:", e);
+      }
+    }
+
     // Insert ticket passes (non-fatal)
     if (ticketPasses.length > 0) {
       try {
         const values: unknown[] = [];
         const placeholders = ticketPasses
           .map((p, idx) => {
-            const base = idx * 9;
+            const base = idx * 10;
             values.push(
               p.booking_id,
               p.event_id,
@@ -299,13 +342,14 @@ export async function POST(request: NextRequest) {
               p.quantity_index,
               p.guest_name,
               p.cnic_last4,
+              assignedGateIndex,
             );
-            return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9})`;
+            return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10})`;
           })
           .join(", ");
         await query(
           `INSERT INTO ticket_passes
-             (booking_id, event_id, ticket_type_id, code, signature, status, quantity_index, guest_name, cnic_last4)
+             (booking_id, event_id, ticket_type_id, code, signature, status, quantity_index, guest_name, cnic_last4, assigned_gate_index)
            VALUES ${placeholders}`,
           values,
         );

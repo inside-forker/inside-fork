@@ -16,20 +16,20 @@ export const dynamic = "force-dynamic";
 const bodySchema = z.object({
   code: z.string().min(1).max(64),
   eventId: z.number().int().positive().optional(),
+  deviceId: z.string().optional(),
 });
 
 /**
  * POST /api/mobile/v1/organizer/tickets/verify
  *
- * Ticket check-in for the mobile scanner. Reimplements
- * `app/api/tickets/verify/route.ts` (web) behind Bearer auth: IK- prefix
- * check, ownership-or-admin check, HMAC signature verify (shared via
- * `lib/tickets/signature.ts`), rejects revoked/unpaid tickets, atomic
- * race-safe check-in (`checked_in_at IS NULL` guard), awards XP once.
+ * Online ticket check-in for the mobile scanner.
+ * Supports Event Organizers, linked Gate Pass operators, and Admins.
+ * Logs all attempts to scan_audit_log.
  */
 export const POST = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
-  const { user, isAdmin } = await requireMobileOrganizer(request);
+  const { user, isAdmin, isGatePass, linkedOrganizerId } =
+    await requireMobileOrganizer(request, { allowGatePass: true });
   await enforceTicketVerifyRateLimit(user.id);
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
@@ -41,7 +41,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
       "code",
     );
   }
-  const { code, eventId } = parsed.data;
+  const { code, eventId, deviceId = "online_scanner" } = parsed.data;
 
   const normalizedCode = code.toUpperCase().trim();
   if (!normalizedCode.startsWith("IK-")) {
@@ -60,15 +60,22 @@ export const POST = mobileRoute(async (request: NextRequest) => {
             b.payment_status AS booking_payment_status,
             e.id AS event_row_id, e.name AS event_name, e.organizer_id AS event_organizer_id,
             tt.name AS ticket_type_name
-     FROM ticket_passes tp
-     INNER JOIN bookings b ON b.id = tp.booking_id
-     INNER JOIN events e ON e.id = tp.event_id
-     LEFT JOIN ticket_types tt ON tt.id = tp.ticket_type_id
+     FROM public.ticket_passes tp
+     INNER JOIN public.bookings b ON b.id = tp.booking_id
+     INNER JOIN public.events e ON e.id = tp.event_id
+     LEFT JOIN public.ticket_types tt ON tt.id = tp.ticket_type_id
      WHERE tp.code = $1`,
     [normalizedCode],
   );
   const ticketPass = ticketPassRows[0];
   if (!ticketPass) {
+    await query(
+      `INSERT INTO public.scan_audit_log (
+        ticket_code, event_id, scanned_by, device_id, scanned_at, synced_at,
+        is_duplicate, status
+      ) VALUES ($1, $2, $3, $4, NOW(), NOW(), false, 'not_found')`,
+      [normalizedCode, eventId || 0, user.id, deviceId],
+    );
     throw new MobileApiError(
       "not_found",
       "Ticket not found. Please check the code.",
@@ -90,7 +97,12 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     ? { name: ticketPass.ticket_type_name as string }
     : null;
 
-  if (event.organizer_id !== user.id && !isAdmin) {
+  // Authorization check: Owner OR Linked Gate Pass OR Admin
+  const isOwner = event.organizer_id === user.id;
+  const isLinkedGatePass =
+    isGatePass && linkedOrganizerId && event.organizer_id === linkedOrganizerId;
+
+  if (!isOwner && !isLinkedGatePass && !isAdmin) {
     throw new MobileApiError(
       "forbidden",
       "You are not authorized to verify tickets for this event.",
@@ -126,6 +138,13 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     console.error(
       `[FRAUD_ALERT] Invalid signature for ticket ${ticketPass.code} (mobile)`,
     );
+    await query(
+      `INSERT INTO public.scan_audit_log (
+        ticket_code, ticket_pass_id, event_id, scanned_by, device_id, scanned_at, synced_at,
+        is_duplicate, status
+      ) VALUES ($1, $2, $3, $4, NOW(), NOW(), false, 'invalid_signature')`,
+      [normalizedCode, ticketPass.id, event.id, user.id, deviceId],
+    );
     throw new MobileApiError(
       "invalid_signature",
       "Ticket verification failed. This may be a fraudulent ticket.",
@@ -134,6 +153,13 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   }
 
   if (ticketPass.status === "revoked") {
+    await query(
+      `INSERT INTO public.scan_audit_log (
+        ticket_code, ticket_pass_id, event_id, scanned_by, device_id, scanned_at, synced_at,
+        is_duplicate, status
+      ) VALUES ($1, $2, $3, $4, NOW(), NOW(), false, 'revoked')`,
+      [normalizedCode, ticketPass.id, event.id, user.id, deviceId],
+    );
     throw new MobileApiError(
       "revoked",
       "This ticket has been revoked.",
@@ -145,6 +171,13 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     booking.payment_status !== "paid" &&
     booking.payment_status !== "confirmed"
   ) {
+    await query(
+      `INSERT INTO public.scan_audit_log (
+        ticket_code, ticket_pass_id, event_id, scanned_by, device_id, scanned_at, synced_at,
+        is_duplicate, status
+      ) VALUES ($1, $2, $3, $4, NOW(), NOW(), false, 'unpaid')`,
+      [normalizedCode, ticketPass.id, event.id, user.id, deviceId],
+    );
     throw new MobileApiError(
       "payment_required",
       "Ticket cannot be checked in: payment has not been completed.",
@@ -156,16 +189,21 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     ticketPass.status === "checked_in" || !!ticketPass.checked_in_at;
 
   let xpAwarded = 0;
+  const now = new Date().toISOString();
 
   if (!alreadyCheckedIn) {
     let updatedRows;
     try {
       ({ rows: updatedRows } = await query(
-        `UPDATE ticket_passes
-         SET status = 'checked_in', checked_in_at = $2
+        `UPDATE public.ticket_passes
+         SET status = 'checked_in',
+             checked_in_at = $2,
+             checked_in_by = $3,
+             checked_in_device_id = $4,
+             checked_in_device_time = $5
          WHERE id = $1 AND checked_in_at IS NULL
          RETURNING id`,
-        [ticketPass.id, new Date().toISOString()],
+        [ticketPass.id, now, user.id, deviceId, now],
       ));
     } catch (updateError) {
       console.error("[mobile-api] ticket check-in update failed:", updateError);
@@ -176,8 +214,16 @@ export const POST = mobileRoute(async (request: NextRequest) => {
       );
     }
 
-    // No rows updated: a concurrent request already checked this ticket in.
+    // Concurrent check-in collision check
     if (!updatedRows || updatedRows.length === 0) {
+      await query(
+        `INSERT INTO public.scan_audit_log (
+          ticket_code, ticket_pass_id, event_id, scanned_by, device_id, scanned_at, synced_at,
+          is_duplicate, status
+        ) VALUES ($1, $2, $3, $4, NOW(), NOW(), true, 'already_used')`,
+        [normalizedCode, ticketPass.id, event.id, user.id, deviceId],
+      );
+
       return ok({
         ticket: {
           id: ticketPass.id,
@@ -187,19 +233,22 @@ export const POST = mobileRoute(async (request: NextRequest) => {
           ticketType: ticketType?.name || undefined,
           eventName: event.name,
           alreadyCheckedIn: true,
-          checkedInAt: new Date().toISOString(),
+          checkedInAt: now,
         },
         xpAwarded: 0,
       });
     }
 
-    // Award XP via the shared helper - matches app/api/tickets/verify/route.ts
-    // (web), which used to hand-roll this insert with
-    // reason: `Attended event: ${event.name}` instead of the canonical
-    // "attend_event" activity_slug, breaking any eligibility/cooldown check
-    // or admin dashboard aggregation keyed on that slug, and skipping
-    // checkAndProcessRankUp() (a rank-up at check-in never awarded its
-    // badge). awardXP() does both correctly.
+    // Log valid winning scan
+    await query(
+      `INSERT INTO public.scan_audit_log (
+        ticket_code, ticket_pass_id, event_id, scanned_by, device_id, scanned_at, synced_at,
+        is_duplicate, status
+      ) VALUES ($1, $2, $3, $4, NOW(), NOW(), false, 'valid')`,
+      [normalizedCode, ticketPass.id, event.id, user.id, deviceId],
+    );
+
+    // Award XP
     try {
       const { awardXP } = await import("@/lib/gamification");
       const xpResult = await awardXP(booking.user_id, "attend_event", ticketPass.id);
@@ -211,6 +260,15 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     } catch (xpError) {
       console.error("[mobile-api] failed to award XP:", xpError);
     }
+  } else {
+    // Already checked in prior to this call
+    await query(
+      `INSERT INTO public.scan_audit_log (
+        ticket_code, ticket_pass_id, event_id, scanned_by, device_id, scanned_at, synced_at,
+        is_duplicate, status
+      ) VALUES ($1, $2, $3, $4, NOW(), NOW(), true, 'already_used')`,
+      [normalizedCode, ticketPass.id, event.id, user.id, deviceId],
+    );
   }
 
   return ok({
@@ -222,7 +280,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
       ticketType: ticketType?.name || undefined,
       eventName: event.name,
       alreadyCheckedIn,
-      checkedInAt: ticketPass.checked_in_at || new Date().toISOString(),
+      checkedInAt: ticketPass.checked_in_at || now,
     },
     xpAwarded: alreadyCheckedIn ? 0 : xpAwarded,
   });

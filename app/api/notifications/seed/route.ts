@@ -67,6 +67,13 @@ const SCENARIO_COPY: Record<NotificationUserRole, ScenarioCopy> = {
     ctaLabel: "View dashboard",
     ctaUrl: "/dashboard",
   },
+  eo_gate_pass: {
+    title: "Gate Pass Scanner active",
+    body: "Your gate scanner permissions are configured and ready for scanning attendees.",
+    priority: "normal",
+    ctaLabel: "Open scanner",
+    ctaUrl: "/dashboard/scan",
+  },
   public_user: {
     title: "Your booking is confirmed—get ready for Karachi!",
     body: "We’ve locked in your spot. Keep this confirmation handy and check the event page for last-minute updates or perks.",

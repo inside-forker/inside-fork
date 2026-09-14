@@ -9,8 +9,8 @@ export default async function AdminSettingsPage() {
     redirect("/login");
   }
 
-  // Check super admin access (only super admins can access system settings)
-  if (profile.role !== "super_admin") {
+  // Check admin/super admin access
+  if (profile.role !== "admin" && profile.role !== "super_admin") {
     redirect("/dashboard");
   }
 
