@@ -7,6 +7,8 @@
  * `app/api/bank-cards`: id lookup, then name match via metadata.card_associations
  * within the deal's bank, then bank-name display fallback.
  */
+import { extractArea } from "@/lib/outing/templates";
+import { normalizeSearchText } from "@/lib/utils/places-search";
 
 import { mapListingToDealCategory } from "@/lib/mobile/deal-category";
 
@@ -34,6 +36,13 @@ export type MobileDealPreviewDTO = {
    */
   matchByBank: boolean;
   blurb: string;
+  /**
+   * Venue area — "Clifton", "DHA". Derived from the listing's street address by
+   * matching the known Karachi neighbourhood tokens, because listings carry a
+   * full address and no area column of their own. Null when no token matches;
+   * clients fall back to distance.
+   */
+  locationName: string | null;
   latitude: number | null;
   longitude: number | null;
   expiryDaysLeft: number | null;
@@ -121,6 +130,7 @@ export type DealFeedRow = {
   latitude: number | string | null;
   longitude: number | string | null;
   category_name: string | null;
+  address: string | null;
   category_slug: string | null;
 };
 
@@ -275,6 +285,7 @@ export function toMobileDealPreview(
     bankName,
     matchByBank,
     blurb,
+    locationName: row.address ? extractArea(normalizeSearchText(row.address)) : null,
     latitude: lat !== null && Number.isFinite(lat) ? lat : null,
     longitude: lng !== null && Number.isFinite(lng) ? lng : null,
     expiryDaysLeft: expiryDaysLeftFromEnd(row.end_date, now),
