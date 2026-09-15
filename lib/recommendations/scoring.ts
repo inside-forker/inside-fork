@@ -16,8 +16,8 @@ import {
   MMR_LAMBDA,
   MMR_MAX_PER_PARENT,
   MMR_MAX_PER_SUBCATEGORY,
-  OPEN_NOW_SCORE,
   TERM_WEIGHTS,
+  TOP_RATED_PINNED_QUALITY_SCORE,
 } from "./constants";
 import { TIME_INTENT_FLOOR } from "./time-intent";
 
@@ -31,11 +31,18 @@ export type CandidateInput = {
   parentCategoryIds: number[];
   /** null when the caller has no coords or the listing has no lat/lng - gates the proximity term off. */
   distanceMeters: number | null;
-  /** null when the listing has no opening_hours rows at all - gates the open-now term off. */
+  /** Not scored here (see candidates.ts's `onlyOpen`, which hard-filters to
+   * "open" before candidates ever reach this file) - kept only for the
+   * "Open now"/"Closed now" reason text callers build from it. */
   openState: OpenState | null;
   /** null when created_at is missing - gates the freshness term off. */
   ageDays: number | null;
+  /** null/0 when the listing has no organic rating yet - gates the quality
+   * term to the `topRatedPinned` fallback (or off entirely if unpinned too). */
   avgRating: number | null;
+  /** Admin-curated "Top Rated by Insiders" pin - same flag that feature uses
+   * for its own cold start. Fallback quality signal when avgRating is empty. */
+  topRatedPinned?: boolean;
   /** Impression-fatigue signal in [0,1]; 0 (default) is a structural no-op until Phase 2 data exists. */
   seenScore?: number;
   /** Structural "stays open late" signal (see candidates.ts's computeClosesLate) - unused by this file's own scorer, read by lib/discovery's Late Night intent. Optional so older fixtures/tests that predate this field still compile. */
@@ -52,7 +59,6 @@ export type ScoringContext = {
   now?: Date;
   /** Seeds the anti-staleness jitter; pass the user id or an anon id. */
   actorKey?: string;
-  qualityEnabled?: boolean;
   /** Test-only: zeroes the jitter term so fixture assertions are exact. */
   disableJitter?: boolean;
 };
@@ -60,7 +66,6 @@ export type ScoringContext = {
 export type ScoreBreakdown = {
   affinity: number;
   proximity: number;
-  openNow: number;
   freshness: number;
   quality: number;
 };
@@ -111,17 +116,20 @@ export function scoreCandidate(
     candidate.distanceMeters != null
       ? Math.exp(-candidate.distanceMeters / GEO_D0_METERS)
       : null;
-  const openNow = candidate.openState != null ? OPEN_NOW_SCORE[candidate.openState] : null;
   const freshness =
     candidate.ageDays != null ? Math.exp(-candidate.ageDays / FRESHNESS_HALF_LIFE_DAYS) : null;
-  const quality = 0;
+  const quality =
+    candidate.avgRating != null && candidate.avgRating > 0
+      ? candidate.avgRating / 5
+      : candidate.topRatedPinned
+        ? TOP_RATED_PINNED_QUALITY_SCORE
+        : null;
 
   const terms: Array<[number, number | null]> = [
     [TERM_WEIGHTS.affinity, affinity],
     [TERM_WEIGHTS.proximity, proximity],
-    [TERM_WEIGHTS.openNow, openNow],
+    [TERM_WEIGHTS.quality, quality],
     [TERM_WEIGHTS.freshness, freshness],
-    [TERM_WEIGHTS.quality, ctx.qualityEnabled ? quality : null],
   ];
   const availableWeight = terms.reduce((sum, [w, v]) => sum + (v != null ? w : 0), 0);
 
@@ -149,9 +157,8 @@ export function scoreCandidate(
     breakdown: {
       affinity,
       proximity: proximity ?? 0,
-      openNow: openNow ?? 0,
       freshness: freshness ?? 0,
-      quality: 0,
+      quality: quality ?? 0,
     },
   };
 }

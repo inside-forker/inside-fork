@@ -96,7 +96,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const now = new Date();
 
   const [candidates, timeIntentByCategoryId, affinity] = await Promise.all([
-    getRecommendationCandidates({ lat, lng, now }),
+    getRecommendationCandidates({ lat, lng, now, onlyOpen: true }),
     getTimeIntentBoostsByCategoryId(now),
     getUserCategoryAffinity({ userId: user?.id ?? null, anonId: user ? null : anonId }),
   ]);
