@@ -144,6 +144,7 @@ export async function getRecommendationCandidates(
     const { rows } = await query(
       `SELECT id FROM listings_with_details
        WHERE status = 'published'
+         AND EXISTS (SELECT 1 FROM listing_images li WHERE li.listing_id = listings_with_details.id)
        ORDER BY created_at DESC NULLS LAST, id DESC
        LIMIT $1`,
       [poolSize],
