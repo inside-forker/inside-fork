@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { exchangeGoogleCode } from "@/lib/auth/google";
-import { getGoogleCallbackUrl } from "@/lib/auth/url";
+import { getGoogleCallbackUrl, getRequestOrigin } from "@/lib/auth/url";
 import { setSession } from "@/lib/auth/session";
 import { findOrCreateOAuthUser } from "@/lib/auth/oauth-account";
 
@@ -27,15 +27,13 @@ function loginErrorRedirect(origin: string, message: string) {
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
+  const origin = getRequestOrigin(request);
   const code = requestUrl.searchParams.get("code");
   const state = requestUrl.searchParams.get("state");
   const oauthError = requestUrl.searchParams.get("error");
 
   if (oauthError) {
-    return loginErrorRedirect(
-      requestUrl.origin,
-      "Google sign-in was cancelled."
-    );
+    return loginErrorRedirect(origin, "Google sign-in was cancelled.");
   }
 
   const stateCookie = request.cookies.get(STATE_COOKIE_NAME)?.value;
@@ -48,7 +46,7 @@ export async function GET(request: NextRequest) {
 
   if (!code || !state || !expectedState.nonce || state !== expectedState.nonce) {
     return loginErrorRedirect(
-      requestUrl.origin,
+      origin,
       "Google sign-in session expired. Please try again."
     );
   }
@@ -58,19 +56,19 @@ export async function GET(request: NextRequest) {
     typeof expectedState.invite === "string" ? expectedState.invite : undefined;
 
   try {
-    const redirectUri = getGoogleCallbackUrl(request.url);
+    const redirectUri = getGoogleCallbackUrl(request);
     const profile = await exchangeGoogleCode(code, redirectUri);
 
     if (!profile.email_verified) {
       return loginErrorRedirect(
-        requestUrl.origin,
+        origin,
         "Your Google account email is not verified."
       );
     }
 
     const user = await findOrCreateOAuthUser("google", profile, inviteCode);
 
-    const response = NextResponse.redirect(new URL(next, requestUrl.origin));
+    const response = NextResponse.redirect(new URL(next, origin));
     response.cookies.delete(STATE_COOKIE_NAME);
     await setSession(response, {
       userId: user.id,
@@ -89,7 +87,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("GOOGLE CALLBACK: Authentication failed:", error);
     return loginErrorRedirect(
-      requestUrl.origin,
+      origin,
       "An error occurred during Google sign-in. Please try again."
     );
   }

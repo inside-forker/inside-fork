@@ -32,15 +32,31 @@ function getConfiguredSiteOrigin(): string | null {
   return null;
 }
 
-function resolveSiteOrigin(requestUrl?: string): string {
+interface RequestLike {
+  url: string;
+  headers: Pick<Headers, "get">;
+}
+
+function resolveSiteOrigin(request?: RequestLike): string {
   // Outside production, always use the request's own origin (localhost, a
   // LAN IP for testing on a phone, ...) when we have one. NEXT_PUBLIC_SITE_URL
   // in .env is the shared production value - preferring it here would
   // silently send the OAuth round-trip to production instead of the local
   // dev server, and the state cookie set on this origin would never come
   // back on that unrelated domain.
-  if (process.env.NODE_ENV !== "production" && requestUrl) {
-    return new URL(requestUrl).origin;
+  //
+  // We read the Host header directly rather than `request.url`: when the
+  // dev server is started with `next dev -H 0.0.0.0` (to allow LAN/phone
+  // testing), Next.js builds `request.url` from that bind address instead
+  // of the incoming Host header, so it always reports 0.0.0.0 regardless of
+  // what host the browser actually used.
+  if (process.env.NODE_ENV !== "production" && request) {
+    const host = request.headers.get("host");
+    if (host) {
+      const protocol = request.headers.get("x-forwarded-proto") ?? "http";
+      return `${protocol}://${host}`;
+    }
+    return new URL(request.url).origin;
   }
 
   const configuredOrigin = getConfiguredSiteOrigin();
@@ -48,8 +64,8 @@ function resolveSiteOrigin(requestUrl?: string): string {
     return configuredOrigin;
   }
 
-  if (requestUrl) {
-    return new URL(requestUrl).origin;
+  if (request) {
+    return new URL(request.url).origin;
   }
 
   throw new Error(
@@ -77,20 +93,30 @@ export function getStateCookieDomain(): string | undefined {
   return `.${bareHostname}`;
 }
 
-export function getAuthCallbackUrl(requestUrl?: string): string {
-  return new URL("/api/auth/callback", resolveSiteOrigin(requestUrl)).toString();
+/**
+ * The origin to redirect the browser back to after login (e.g. "/dashboard",
+ * "/login?error=..."). Same origin resolution as the OAuth redirect_uri, so
+ * post-login navigation lands on the same host the user actually started on
+ * rather than the dev server's `-H` bind address or a stray Vercel preview host.
+ */
+export function getRequestOrigin(request?: RequestLike): string {
+  return resolveSiteOrigin(request);
 }
 
-export function getGoogleCallbackUrl(requestUrl?: string): string {
+export function getAuthCallbackUrl(request?: RequestLike): string {
+  return new URL("/api/auth/callback", resolveSiteOrigin(request)).toString();
+}
+
+export function getGoogleCallbackUrl(request?: RequestLike): string {
   return new URL(
     "/api/auth/google/callback",
-    resolveSiteOrigin(requestUrl)
+    resolveSiteOrigin(request)
   ).toString();
 }
 
-export function getAppleCallbackUrl(requestUrl?: string): string {
+export function getAppleCallbackUrl(request?: RequestLike): string {
   return new URL(
     "/api/auth/apple/callback",
-    resolveSiteOrigin(requestUrl)
+    resolveSiteOrigin(request)
   ).toString();
 }
