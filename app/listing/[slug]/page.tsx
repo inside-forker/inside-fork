@@ -42,10 +42,11 @@ interface ListingPageProps {
 
 export default async function ListingPage({ params }: ListingPageProps) {
   const { slug } = await params;
+  const decodedSlug = decodeURIComponent(slug);
 
   const { rows: listingRows } = await query(
-    `SELECT * FROM listings_with_details WHERE slug = $1 LIMIT 1`,
-    [slug],
+    `SELECT * FROM listings_with_details WHERE slug = $1 OR slug = $2 LIMIT 1`,
+    [slug, decodedSlug],
   );
   const listing = listingRows[0];
 
@@ -97,67 +98,91 @@ export default async function ListingPage({ params }: ListingPageProps) {
        WHERE listing_id = $1
        ORDER BY display_order ASC`,
       [listingId],
-    ),
-    getFavoritedListingIdsForUser(null, [listingId]).catch(() => new Set()),
+    ).catch((err) => {
+      console.error("[listing-page] images query error:", err);
+      return { rows: [] };
+    }),
+    getFavoritedListingIdsForUser(null, [listingId]).catch(() => new Set<number>()),
     query(
       `SELECT COUNT(*)::integer AS count FROM menu_sections WHERE listing_id = $1`,
       [listingId],
-    ),
+    ).catch((err) => {
+      console.error("[listing-page] menuCount query error:", err);
+      return { rows: [{ count: 0 }] };
+    }),
     query(
       `SELECT COUNT(*)::integer AS count FROM deals
        WHERE listing_id = $1
          AND is_active = true
          AND (end_date IS NULL OR end_date >= $2)`,
       [listingId, nowIso],
-    ),
+    ).catch((err) => {
+      console.error("[listing-page] dealsCount query error:", err);
+      return { rows: [{ count: 0 }] };
+    }),
     query(
       `SELECT COUNT(*)::integer AS count FROM opening_hours WHERE listing_id = $1`,
       [listingId],
-    ),
+    ).catch((err) => {
+      console.error("[listing-page] hoursCount query error:", err);
+      return { rows: [{ count: 0 }] };
+    }),
     query(
       `SELECT * FROM listing_branches
        WHERE listing_id = $1
        ORDER BY is_primary DESC, created_at ASC`,
       [listingId],
-    ),
+    ).catch((err) => {
+      console.error("[listing-page] branches query error:", err);
+      return { rows: [] };
+    }),
     query(
       `SELECT * FROM opening_hours
        WHERE listing_id = $1
        ORDER BY day_of_week ASC`,
       [listingId],
-    ),
+    ).catch((err) => {
+      console.error("[listing-page] openingHours query error:", err);
+      return { rows: [] };
+    }),
     query(
       `SELECT m.name, m.description, m.icon_emoji
        FROM listing_features lf
        JOIN listing_features_master m ON m.id = lf.feature_id
        WHERE lf.listing_id = $1 AND m.is_active = true`,
       [listingId],
-    ),
-    getListingCategoryIds(listingId),
+    ).catch((err) => {
+      console.error("[listing-page] features query error:", err);
+      return { rows: [] };
+    }),
+    getListingCategoryIds(listingId).catch((err) => {
+      console.error("[listing-page] categoryIds query error:", err);
+      return [];
+    }),
   ]);
 
-  const images = imagesResult.rows;
-  const menuCount = menuCountResult.rows[0]?.count as number | undefined;
-  const dealsCount = dealsCountResult.rows[0]?.count as number | undefined;
-  const hoursCount = hoursCountResult.rows[0]?.count as number | undefined;
-  const branches = branchesResult.rows;
-  const _openingHours = _openingHoursResult.rows;
-  const dbFeatures = featuresResult.rows.map((f) => ({
-    name: String(f.name),
+  const images = imagesResult?.rows || [];
+  const menuCount = Number(menuCountResult?.rows?.[0]?.count ?? 0);
+  const dealsCount = Number(dealsCountResult?.rows?.[0]?.count ?? 0);
+  const hoursCount = Number(hoursCountResult?.rows?.[0]?.count ?? 0);
+  const branches = branchesResult?.rows || [];
+  const _openingHours = _openingHoursResult?.rows || [];
+  const dbFeatures = (featuresResult?.rows || []).map((f) => ({
+    name: String(f.name || ""),
     icon: String(f.icon_emoji || "✨"),
     description: String(f.description || ""),
   }));
 
   // Filter out menu images from gallery (they have /menu/ in the URL path)
   const galleryImages = (images || []).filter(
-    (img) => !String(img.url).includes("/menu/"),
+    (img) => !String(img.url || "").includes("/menu/"),
   );
 
   const menuImages = (images || [])
-    .filter((img) => String(img.url).includes("/menu/"))
+    .filter((img) => String(img.url || "").includes("/menu/"))
     .map((img, index) => ({
       id: img.id as number,
-      url: String(img.url),
+      url: String(img.url || ""),
       alt_text: (img.alt_text as string | null) || "Menu image",
       display_order: index,
     }));
