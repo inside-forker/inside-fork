@@ -27,7 +27,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!["admin", "super_admin", "lister"].includes(profile.role)) {
+    if (!["admin", "super_admin", "lister", "data_entry"].includes(profile.role)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!["admin", "super_admin", "lister"].includes(profile.role)) {
+    if (!["admin", "super_admin", "lister", "data_entry"].includes(profile.role)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 

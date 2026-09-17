@@ -41,7 +41,12 @@ export function isDataEntryRoute(pathname: string): boolean {
   return (
     pathname === "/admin/listing-capacity" ||
     pathname.startsWith("/admin/listing-capacity/") ||
-    pathname.startsWith("/api/admin/listing-capacity")
+    pathname.startsWith("/api/admin/listing-capacity") ||
+    pathname.startsWith("/api/admin/listings") ||
+    pathname.startsWith("/api/admin/categories") ||
+    pathname.startsWith("/api/admin/upload") ||
+    pathname.startsWith("/api/categories") ||
+    pathname.startsWith("/api/upload")
   );
 }
 
