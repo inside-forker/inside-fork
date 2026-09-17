@@ -417,27 +417,7 @@ export default function LocationMapCanvas({
     import("leaflet").then(({ default: L }) => {
       const latLngs: [number, number][] = userPings.map((p) => [p.lat, p.lng]);
 
-      // Draw polyline route connecting pings
-      if (latLngs.length > 1) {
-        // Glowing halo path
-        L.polyline(latLngs, {
-          color: "#ff184d",
-          weight: 7,
-          opacity: 0.35,
-          lineCap: "round",
-          lineJoin: "round",
-        }).addTo(trajGroup);
-
-        // Vibrant dashed core line
-        L.polyline(latLngs, {
-          color: "#38bdf8",
-          weight: 3.5,
-          opacity: 0.95,
-          dashArray: "8, 8",
-          lineCap: "round",
-          lineJoin: "round",
-        }).addTo(trajGroup);
-      }
+      // Render individual ping bubble markers for all pings (no connecting path)
 
       // Render markers for all pings
       userPings.forEach((ping, idx) => {

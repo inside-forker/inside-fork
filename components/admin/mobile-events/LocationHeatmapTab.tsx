@@ -373,7 +373,7 @@ export function LocationHeatmapTab({ dateRange }: LocationHeatmapTabProps) {
             <span>
               {selectedTrackedUser
                 ? `🧭 Tracking ${selectedTrackedUser.fullName || selectedTrackedUser.username || "User"} (${userPings.length} sequential GPS pings plotted on map)`
-                : "💡 Tip: Click on any glowing hotspot or switch to User Tracker Mode to inspect multi-ping user paths."}
+                : "💡 Tip: Click on any glowing hotspot or switch to User Tracker Mode to inspect user GPS ping locations."}
             </span>
             <span>Esri Dark Canvas • OpenStreetMap Karachi</span>
           </div>
