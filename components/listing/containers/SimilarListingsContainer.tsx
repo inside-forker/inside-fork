@@ -60,10 +60,14 @@ export async function SimilarListingsContainer({
   // the listing has - not just its legacy primary one.
   let relatedCategoryIds: number[] = [];
 
-  if (categoryIds.length > 0) {
+  const numericCategoryIds = (categoryIds || [])
+    .map((id) => Number(id))
+    .filter((n) => Number.isFinite(n) && n > 0);
+
+  if (numericCategoryIds.length > 0) {
     const { rows: categoryRows } = await query(
       `SELECT id, parent_id FROM categories WHERE id = ANY($1::int[])`,
-      [categoryIds],
+      [numericCategoryIds],
     );
     const parentIds = new Set<number>(
       categoryRows.map((c) => Number(c.parent_id ?? c.id)),

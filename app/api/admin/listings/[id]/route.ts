@@ -360,6 +360,15 @@ export async function PATCH(
           ? (error as { code?: string }).code
           : undefined;
       console.error("Error updating listing:", error);
+      if (updateErrorCode === "23505") {
+        return patchErrorResponse(
+          requestId,
+          409,
+          "VALIDATION_ERROR",
+          "A listing with this name or slug already exists.",
+          { dbCode: updateErrorCode },
+        );
+      }
       const isValidationError =
         updateErrorCode === "23503" || updateErrorCode === "22P02";
       if (!isValidationError) {
@@ -369,7 +378,9 @@ export async function PATCH(
         requestId,
         isValidationError ? 400 : 500,
         isValidationError ? "VALIDATION_ERROR" : "UPDATE_FAILED",
-        "Failed to update listing",
+        isValidationError
+          ? "Invalid data provided (e.g. category or format mismatch)"
+          : "Failed to update listing",
         {
           dbCode: updateErrorCode ?? null,
         },

@@ -117,8 +117,10 @@ export async function getListingCategoryIds(
      WHERE listing_id = $1
      ORDER BY is_primary DESC, category_id ASC`,
     [listingId],
-  )) as { rows: Array<{ category_id: number }> };
-  return rows.map((r) => r.category_id);
+  )) as { rows: Array<{ category_id: number | string }> };
+  return rows
+    .map((r) => Number(r.category_id))
+    .filter((n) => Number.isFinite(n) && n > 0);
 }
 
 export async function getListingCategoryIdsMap(

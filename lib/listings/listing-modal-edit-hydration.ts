@@ -175,6 +175,19 @@ export function mergePrimaryBranchIntoEditor(params: {
   };
 }
 
+async function safeFetchJson<T = Record<string, unknown>>(
+  url: string,
+  opts?: RequestInit,
+): Promise<T | null> {
+  try {
+    const res = await fetch(url, opts);
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Loads edit-mode dependencies in parallel and returns a single hydrated pack.
  * All network calls respect `AbortSignal` for cancellation during listing switches or modal close.
@@ -195,52 +208,51 @@ export async function loadListingEditModalHydration(
     banksRaw,
     listingJson,
   ] = await Promise.all([
-    fetch(`/api/admin/listings/${listingId}/menu`, fetchOpts).then((r) =>
-      r.json(),
+    safeFetchJson<Record<string, unknown>>(
+      `/api/admin/listings/${listingId}/menu`,
+      fetchOpts,
     ),
-    fetch(`/api/admin/listings/${listingId}/images`, fetchOpts).then((r) =>
-      r.json(),
+    safeFetchJson<Record<string, unknown>>(
+      `/api/admin/listings/${listingId}/images`,
+      fetchOpts,
     ),
-    fetch(`/api/admin/listings/${listingId}/opening-hours`, fetchOpts).then(
-      (r) => r.json(),
+    safeFetchJson<Record<string, unknown>>(
+      `/api/admin/listings/${listingId}/opening-hours`,
+      fetchOpts,
     ),
-    fetchBranchesWithOpeningHours(listingId, signal),
-    fetch(`/api/admin/listings/${listingId}/deals`, fetchOpts).then((r) =>
-      r.json(),
+    fetchBranchesWithOpeningHours(listingId, signal).catch(() => []),
+    safeFetchJson<{ deals?: DealRow[]; error?: string }>(
+      `/api/admin/listings/${listingId}/deals`,
+      fetchOpts,
     ),
-    fetch("/api/banks", fetchOpts).then((r) => r.json()),
-    fetch(`/api/admin/listings/${listingId}`, fetchOpts).then((r) => r.json()),
-  ]) as [
-    Record<string, unknown>,
-    Record<string, unknown>,
-    Record<string, unknown>,
-    BranchWithHours[],
-    { deals?: DealRow[]; error?: string },
-    Record<string, unknown>,
-    Record<string, unknown>,
-  ];
+    safeFetchJson<Record<string, unknown>>("/api/banks", fetchOpts),
+    safeFetchJson<Record<string, unknown>>(
+      `/api/admin/listings/${listingId}`,
+      fetchOpts,
+    ),
+  ]);
 
   let menuSections: ListingModalMenuSection[] = [];
-  if (menuJson.success === true && Array.isArray(menuJson.data)) {
+  if (menuJson && menuJson.success === true && Array.isArray(menuJson.data)) {
     menuSections = menuJson.data as ListingModalMenuSection[];
   }
 
   let images: ListingImage[] = [];
-  if (imagesJson.success === true && Array.isArray(imagesJson.data)) {
+  if (imagesJson && imagesJson.success === true && Array.isArray(imagesJson.data)) {
     images = imagesJson.data as ListingImage[];
   }
 
   let openingHours = defaultOpeningSevenDays();
-  if (hoursJson.success === true && Array.isArray(hoursJson.data)) {
+  if (hoursJson && hoursJson.success === true && Array.isArray(hoursJson.data)) {
     openingHours = mapListingOpeningHoursFromApi(hoursJson.data);
   }
 
-  const deals: DealRow[] = Array.isArray(dealsRaw.deals)
-    ? (dealsRaw.deals as DealRow[])
-    : [];
+  const deals: DealRow[] =
+    dealsRaw && Array.isArray(dealsRaw.deals) ? dealsRaw.deals : [];
 
   let banks: BankOption[] = [];
   if (
+    banksRaw &&
     banksRaw.success === true &&
     Array.isArray((banksRaw as { banks?: unknown[] }).banks)
   ) {
@@ -261,6 +273,7 @@ export async function loadListingEditModalHydration(
 
   let categoryIds: number[] = [];
   if (
+    listingJson &&
     listingJson.success === true &&
     listingJson.data &&
     typeof listingJson.data === "object" &&
