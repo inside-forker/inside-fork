@@ -34,13 +34,13 @@ const FOOD_RELATED_SLUGS = [
  * @returns Promise<boolean> - True if any category or its parent is food-related
  */
 export async function isRestaurantCategory(
-  categoryIds: Array<number | null | undefined> | null | undefined,
+  categoryIds: Array<number | string | null | undefined> | null | undefined,
 ): Promise<boolean> {
   const ids = [
     ...new Set(
-      (categoryIds ?? []).filter(
-        (id): id is number => typeof id === "number" && id > 0,
-      ),
+      (categoryIds ?? [])
+        .map((id) => (typeof id === "number" ? id : parseInt(String(id), 10)))
+        .filter((id): id is number => Number.isFinite(id) && id > 0),
     ),
   ];
   if (ids.length === 0) return false;
