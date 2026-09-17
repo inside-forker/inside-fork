@@ -367,7 +367,7 @@ export function LocationHeatmapTab({ dateRange }: LocationHeatmapTabProps) {
             onClearTrackedUser={handleClearTrackedUser}
             onSelectPing={(ping) => setFocusedPing(ping)}
             intensityMultiplier={intensityMultiplier}
-            showHotspotBadges={true}
+            showHotspotBadges={sidebarMode === "hotspots" && !selectedTrackedUser}
           />
           <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
             <span>

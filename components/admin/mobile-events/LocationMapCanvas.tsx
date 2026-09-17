@@ -206,7 +206,8 @@ export default function LocationMapCanvas({
     zonesGroup.clearLayers();
     markersGroup.clearLayers();
 
-    // In user tracker mode with active trajectory, keep hotspot background subtle
+    if (!showHotspotBadges) return;
+
     const isTracking = !!(trackedUser && userPings && userPings.length > 0);
 
     import("leaflet").then(({ default: L }) => {
