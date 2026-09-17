@@ -26,10 +26,13 @@ import {
   TrendingUp,
   AlertCircle,
   CheckCircle2,
+  Copy,
+  Check,
 } from "lucide-react";
 import type {
   AreaDetailIntelligence,
   NeighborhoodCluster,
+  PinnedUserTarget,
 } from "@/lib/analytics/mobile-location";
 import type { DateRangeFilter } from "@/lib/analytics/mobile-events";
 
@@ -39,6 +42,7 @@ interface AreaDetailDrawerProps {
   dateRange: DateRangeFilter;
   isOpen: boolean;
   onClose: () => void;
+  onPinUser?: (user: PinnedUserTarget) => void;
 }
 
 function formatDwell(seconds: number): string {
@@ -65,11 +69,19 @@ export function AreaDetailDrawer({
   dateRange,
   isOpen,
   onClose,
+  onPinUser,
 }: AreaDetailDrawerProps) {
   const [data, setData] = useState<AreaDetailIntelligence | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("searches");
+  const [copiedUserIndex, setCopiedUserIndex] = useState<number | null>(null);
+
+  const handleCopyUserCoords = (lat: number, lng: number, index: number) => {
+    navigator.clipboard.writeText(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+    setCopiedUserIndex(index);
+    setTimeout(() => setCopiedUserIndex(null), 2000);
+  };
 
   useEffect(() => {
     if (!neighborhood || !isOpen) return;
@@ -109,19 +121,19 @@ export function AreaDetailDrawer({
 
   const intensityColor =
     clusterData?.intensityLevel === "blazing"
-      ? "bg-rose-500/20 text-rose-400 border-rose-500/40"
+      ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30"
       : clusterData?.intensityLevel === "hot"
-      ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
-      : "bg-emerald-500/20 text-emerald-400 border-emerald-500/40";
+      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
+      : "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30";
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-xl md:max-w-2xl bg-zinc-950/95 backdrop-blur-xl border-zinc-800 text-zinc-100 p-0 flex flex-col h-full overflow-hidden"
+        className="w-full sm:max-w-xl md:max-w-2xl bg-card border-border text-foreground p-0 flex flex-col h-full overflow-hidden shadow-2xl"
       >
         {/* Header Banner */}
-        <div className="relative p-6 bg-gradient-to-b from-zinc-900 to-zinc-950 border-b border-zinc-800/80">
+        <div className="relative p-6 bg-muted/40 border-b border-border">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -136,15 +148,15 @@ export function AreaDetailDrawer({
                   <Flame className="w-3 h-3 mr-1 inline" />
                   {clusterData?.intensityLevel || "Active"} Zone
                 </Badge>
-                <Badge variant="outline" className="text-zinc-400 border-zinc-700 text-xs">
+                <Badge variant="outline" className="text-muted-foreground border-border text-xs">
                   {dateRange.toUpperCase()}
                 </Badge>
               </div>
-              <SheetTitle className="text-2xl font-bold tracking-tight text-white flex items-center gap-2 pt-1">
+              <SheetTitle className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2 pt-1">
                 <MapPin className="w-6 h-6 text-primary" />
                 {neighborhood}
               </SheetTitle>
-              <SheetDescription className="text-zinc-400 text-xs line-clamp-1">
+              <SheetDescription className="text-muted-foreground text-xs line-clamp-1">
                 {clusterData?.categoryAffinity?.join(" • ") || "Karachi Location Intelligence"}
               </SheetDescription>
             </div>
@@ -152,35 +164,35 @@ export function AreaDetailDrawer({
 
           {/* Quick Metrics Bar */}
           <div className="grid grid-cols-4 gap-2 mt-5">
-            <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-lg p-2.5 text-center">
-              <div className="text-zinc-400 text-[10px] font-medium uppercase tracking-wider">
+            <div className="bg-background border border-border rounded-lg p-2.5 text-center shadow-sm">
+              <div className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
                 Total Events
               </div>
-              <div className="text-lg font-bold text-white mt-0.5">
+              <div className="text-lg font-bold text-foreground mt-0.5">
                 {data?.overview.totalEvents ?? clusterData?.totalEvents ?? 0}
               </div>
             </div>
-            <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-lg p-2.5 text-center">
-              <div className="text-zinc-400 text-[10px] font-medium uppercase tracking-wider">
+            <div className="bg-background border border-border rounded-lg p-2.5 text-center shadow-sm">
+              <div className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
                 Active Users
               </div>
-              <div className="text-lg font-bold text-emerald-400 mt-0.5">
+              <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
                 {data?.overview.uniqueUsers ?? clusterData?.uniqueUsers ?? 0}
               </div>
             </div>
-            <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-lg p-2.5 text-center">
-              <div className="text-zinc-400 text-[10px] font-medium uppercase tracking-wider">
+            <div className="bg-background border border-border rounded-lg p-2.5 text-center shadow-sm">
+              <div className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
                 Dwell Time
               </div>
-              <div className="text-lg font-bold text-amber-400 mt-0.5">
+              <div className="text-lg font-bold text-amber-600 dark:text-amber-400 mt-0.5">
                 {formatDwell(data?.overview.totalDwellSeconds ?? clusterData?.totalDwellSeconds ?? 0)}
               </div>
             </div>
-            <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-lg p-2.5 text-center">
-              <div className="text-zinc-400 text-[10px] font-medium uppercase tracking-wider">
+            <div className="bg-background border border-border rounded-lg p-2.5 text-center shadow-sm">
+              <div className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
                 Peak Time
               </div>
-              <div className="text-sm font-bold text-rose-400 mt-1 truncate">
+              <div className="text-sm font-bold text-rose-600 dark:text-rose-400 mt-1 truncate">
                 {data?.overview.peakHour ?? "8:00 PM"}
               </div>
             </div>
@@ -193,8 +205,8 @@ export function AreaDetailDrawer({
           onValueChange={setActiveTab}
           className="flex-1 flex flex-col min-h-0"
         >
-          <div className="px-6 pt-3 border-b border-zinc-800 bg-zinc-950">
-            <TabsList className="bg-zinc-900 border border-zinc-800/80 p-1 w-full grid grid-cols-4">
+          <div className="px-6 pt-3 border-b border-border bg-card">
+            <TabsList className="bg-muted border border-border p-1 w-full grid grid-cols-4">
               <TabsTrigger
                 value="searches"
                 className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
@@ -205,7 +217,7 @@ export function AreaDetailDrawer({
                 value="places"
                 className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
               >
-                <Building2 className="w-3.5 h-3.5" /> Venues & Deals
+                <Building2 className="w-3.5 h-3.5" /> Places
               </TabsTrigger>
               <TabsTrigger
                 value="users"
@@ -217,7 +229,7 @@ export function AreaDetailDrawer({
                 value="stream"
                 className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
               >
-                <Zap className="w-3.5 h-3.5" /> Live Stream
+                <Zap className="w-3.5 h-3.5" /> Stream
               </TabsTrigger>
             </TabsList>
           </div>
@@ -227,10 +239,10 @@ export function AreaDetailDrawer({
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 space-y-3">
                 <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-zinc-400 text-xs">Aggregating {neighborhood} intelligence...</p>
+                <p className="text-muted-foreground text-xs">Aggregating {neighborhood} intelligence...</p>
               </div>
             ) : error ? (
-              <div className="p-4 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+              <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs">
                 {error}
               </div>
             ) : (
@@ -238,11 +250,11 @@ export function AreaDetailDrawer({
                 {/* 1. Searches Tab */}
                 <TabsContent value="searches" className="mt-0 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <TrendingUp className="w-4 h-4 text-emerald-400" />
+                    <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <TrendingUp className="w-4 h-4 text-emerald-500" />
                       Top Search Demand in {neighborhood}
                     </h4>
-                    <span className="text-[11px] text-zinc-500">
+                    <span className="text-[11px] text-muted-foreground">
                       {data?.topSearches.length || 0} queries captured
                     </span>
                   </div>
@@ -252,37 +264,37 @@ export function AreaDetailDrawer({
                       {data.topSearches.map((s, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700 transition-colors"
+                          className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border hover:border-border/80 transition-colors"
                         >
                           <div className="flex items-center gap-3">
-                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-zinc-800 text-xs font-mono font-medium text-zinc-300">
+                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-xs font-mono font-medium text-foreground border border-border">
                               #{idx + 1}
                             </span>
                             <div>
-                              <div className="text-sm font-medium text-white flex items-center gap-2">
+                              <div className="text-sm font-medium text-foreground flex items-center gap-2">
                                 {s.query}
                                 {!s.hasResults && (
                                   <Badge
                                     variant="outline"
-                                    className="bg-rose-500/10 border-rose-500/30 text-rose-400 text-[10px] px-1.5 py-0"
+                                    className="bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 text-[10px] px-1.5 py-0"
                                   >
                                     0 Results (Demand Gap)
                                   </Badge>
                                 )}
                               </div>
-                              <span className="text-[11px] text-zinc-500">
+                              <span className="text-[11px] text-muted-foreground">
                                 Last searched {formatRelativeTime(s.lastSeen)}
                               </span>
                             </div>
                           </div>
-                          <Badge className="bg-zinc-800 text-zinc-200 hover:bg-zinc-700 font-mono text-xs">
+                          <Badge className="bg-muted text-foreground hover:bg-muted font-mono text-xs border border-border">
                             {s.count} searches
                           </Badge>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-12 border border-dashed border-zinc-800 rounded-lg text-zinc-500 text-xs">
+                    <div className="text-center py-12 border border-dashed border-border rounded-lg text-muted-foreground text-xs">
                       No search telemetry recorded in {neighborhood} for this date range.
                     </div>
                   )}
@@ -292,7 +304,7 @@ export function AreaDetailDrawer({
                 <TabsContent value="places" className="mt-0 space-y-5">
                   {/* Visited Places */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <Building2 className="w-4 h-4 text-primary" />
                       Most Viewed Listings from this Area
                     </h4>
@@ -301,13 +313,13 @@ export function AreaDetailDrawer({
                         {data.topListings.map((l) => (
                           <div
                             key={l.listingId}
-                            className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/60 border border-zinc-800/80"
+                            className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border"
                           >
                             <div className="space-y-0.5">
-                              <div className="text-sm font-medium text-white">
+                              <div className="text-sm font-medium text-foreground">
                                 {l.listingName}
                               </div>
-                              <div className="text-[11px] text-zinc-500">
+                              <div className="text-[11px] text-muted-foreground">
                                 {l.uniqueViewers} unique mobile visitors
                               </div>
                             </div>
@@ -320,7 +332,7 @@ export function AreaDetailDrawer({
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-8 border border-dashed border-zinc-800 rounded-lg text-zinc-500 text-xs">
+                      <div className="text-center py-8 border border-dashed border-border rounded-lg text-muted-foreground text-xs">
                         No listing clicks recorded in this area.
                       </div>
                     )}
@@ -328,8 +340,8 @@ export function AreaDetailDrawer({
 
                   {/* Deals Engaged */}
                   <div className="space-y-3 pt-2">
-                    <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <Ticket className="w-4 h-4 text-amber-400" />
+                    <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Ticket className="w-4 h-4 text-amber-500" />
                       Deals & Offers Viewed in {neighborhood}
                     </h4>
                     {data?.topDeals && data.topDeals.length > 0 ? (
@@ -337,18 +349,18 @@ export function AreaDetailDrawer({
                         {data.topDeals.map((d) => (
                           <div
                             key={d.dealId}
-                            className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/60 border border-zinc-800/80"
+                            className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border"
                           >
                             <div className="space-y-0.5">
-                              <div className="text-sm font-medium text-white">{d.dealTitle}</div>
-                              <div className="text-[11px] text-zinc-400">{d.listingName}</div>
+                              <div className="text-sm font-medium text-foreground">{d.dealTitle}</div>
+                              <div className="text-[11px] text-muted-foreground">{d.listingName}</div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs border-zinc-700">
+                              <Badge variant="outline" className="text-xs border-border">
                                 {d.views} views
                               </Badge>
                               {d.redeems > 0 && (
-                                <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs">
+                                <Badge className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-xs">
                                   {d.redeems} redeems
                                 </Badge>
                               )}
@@ -357,7 +369,7 @@ export function AreaDetailDrawer({
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-8 border border-dashed border-zinc-800 rounded-lg text-zinc-500 text-xs">
+                      <div className="text-center py-8 border border-dashed border-border rounded-lg text-muted-foreground text-xs">
                         No deals engaged from this area yet.
                       </div>
                     )}
@@ -367,11 +379,11 @@ export function AreaDetailDrawer({
                 {/* 3. Users Tab */}
                 <TabsContent value="users" className="mt-0 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <Users className="w-4 h-4 text-cyan-400" />
+                    <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-cyan-500" />
                       Active Users in {neighborhood}
                     </h4>
-                    <span className="text-[11px] text-zinc-500">
+                    <span className="text-[11px] text-muted-foreground">
                       {data?.activeUsers.length || 0} active devices
                     </span>
                   </div>
@@ -381,10 +393,10 @@ export function AreaDetailDrawer({
                       {data.activeUsers.map((u, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700 transition-colors"
+                          className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border hover:border-border/80 transition-colors"
                         >
                           <div className="flex items-center gap-3">
-                            <Avatar className="w-9 h-9 border border-zinc-700 bg-zinc-800">
+                            <Avatar className="w-9 h-9 border border-border bg-muted">
                               <AvatarImage src={u.avatarUrl || undefined} />
                               <AvatarFallback className="text-xs bg-primary/20 text-primary font-bold">
                                 {u.fullName
@@ -395,17 +407,17 @@ export function AreaDetailDrawer({
                               </AvatarFallback>
                             </Avatar>
                             <div className="space-y-0.5">
-                              <div className="text-sm font-medium text-white flex items-center gap-2">
+                              <div className="text-sm font-medium text-foreground flex items-center gap-2">
                                 {u.fullName || (u.username ? `@${u.username}` : "Anonymous Device")}
                                 {u.userId && (
-                                  <Badge className="bg-primary/20 text-primary text-[10px] px-1.5 py-0">
+                                  <Badge className="bg-primary/20 text-primary text-[10px] px-1.5 py-0 border border-primary/30">
                                     Signed In
                                   </Badge>
                                 )}
                               </div>
-                              <div className="text-[11px] text-zinc-400 flex items-center gap-2">
+                              <div className="text-[11px] text-muted-foreground flex items-center gap-2">
                                 {u.platform && (
-                                  <span className="flex items-center gap-1 text-zinc-400">
+                                  <span className="flex items-center gap-1">
                                     <Smartphone className="w-3 h-3" />
                                     {u.platform.toUpperCase()}
                                   </span>
@@ -415,19 +427,81 @@ export function AreaDetailDrawer({
                               </div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-xs font-mono font-semibold text-white">
-                              {u.eventsCount} pings
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="text-right">
+                              <div className="text-xs font-mono font-semibold text-foreground">
+                                {u.eventsCount} pings
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">
+                                {formatRelativeTime(u.lastSeen)}
+                              </div>
                             </div>
-                            <div className="text-[10px] text-zinc-500">
-                              {formatRelativeTime(u.lastSeen)}
+
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  const targetLat =
+                                    u.lastLatitude ?? clusterData?.center.lat ?? 24.89;
+                                  const targetLng =
+                                    u.lastLongitude ?? clusterData?.center.lng ?? 67.06;
+                                  handleCopyUserCoords(targetLat, targetLng, idx);
+                                }}
+                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+                                title="Copy Lat, Lng coordinates"
+                              >
+                                {copiedUserIndex === idx ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                    <span className="text-[10px] text-emerald-500 font-semibold">Copied</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3.5 h-3.5" />
+                                    <span className="text-[10px] hidden sm:inline">Copy</span>
+                                  </>
+                                )}
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  const targetLat =
+                                    u.lastLatitude ?? clusterData?.center.lat ?? 24.89;
+                                  const targetLng =
+                                    u.lastLongitude ?? clusterData?.center.lng ?? 67.06;
+
+                                  onPinUser?.({
+                                    lat: targetLat,
+                                    lng: targetLng,
+                                    name:
+                                      u.fullName ||
+                                      (u.username ? `@${u.username}` : "Anonymous Device"),
+                                    username: u.username,
+                                    avatarUrl: u.avatarUrl,
+                                    lastSeen: u.lastSeen,
+                                    platform: u.platform,
+                                    topScreen: u.topScreen,
+                                    lastEventName: u.lastEventName,
+                                    isSigned: !!u.userId,
+                                  });
+                                  onClose();
+                                }}
+                                className="h-7 px-2.5 text-xs border-border hover:border-primary hover:text-primary gap-1 shadow-sm bg-background font-medium"
+                                title="Pin this user's last location on map"
+                              >
+                                <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                                Pin Location
+                              </Button>
                             </div>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-12 border border-dashed border-zinc-800 rounded-lg text-zinc-500 text-xs">
+                    <div className="text-center py-12 border border-dashed border-border rounded-lg text-muted-foreground text-xs">
                       No user telemetry recorded in this neighborhood.
                     </div>
                   )}
@@ -436,8 +510,8 @@ export function AreaDetailDrawer({
                 {/* 4. Live Stream Tab */}
                 <TabsContent value="stream" className="mt-0 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <Zap className="w-4 h-4 text-amber-400" />
+                    <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Zap className="w-4 h-4 text-amber-500" />
                       Recent Activity Stream ({neighborhood})
                     </h4>
                   </div>
@@ -447,26 +521,26 @@ export function AreaDetailDrawer({
                       {data.recentEvents.map((evt) => (
                         <div
                           key={evt.id}
-                          className="p-3 rounded-lg bg-zinc-900/60 border border-zinc-800/80 space-y-1"
+                          className="p-3 rounded-lg bg-muted/40 border border-border space-y-1"
                         >
                           <div className="flex items-center justify-between text-xs">
-                            <span className="font-mono font-medium text-emerald-400">
+                            <span className="font-mono font-medium text-emerald-600 dark:text-emerald-400">
                               {evt.eventName}
                             </span>
-                            <span className="text-[11px] text-zinc-500">
+                            <span className="text-[11px] text-muted-foreground">
                               {formatRelativeTime(evt.occurredAt)}
                             </span>
                           </div>
-                          <div className="text-xs text-zinc-300 flex items-center justify-between">
+                          <div className="text-xs text-foreground flex items-center justify-between">
                             <span>{evt.userDisplay}</span>
                             {evt.screen && (
-                              <span className="text-[11px] text-zinc-500 font-mono">
+                              <span className="text-[11px] text-muted-foreground font-mono">
                                 {evt.screen}
                               </span>
                             )}
                           </div>
                           {evt.details && (
-                            <div className="text-[11px] text-amber-300/90 font-medium pt-0.5">
+                            <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-0.5">
                               {evt.details}
                             </div>
                           )}
@@ -474,7 +548,7 @@ export function AreaDetailDrawer({
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-12 border border-dashed border-zinc-800 rounded-lg text-zinc-500 text-xs">
+                    <div className="text-center py-12 border border-dashed border-border rounded-lg text-muted-foreground text-xs">
                       No live events in this area.
                     </div>
                   )}

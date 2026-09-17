@@ -303,12 +303,19 @@ export function ListingsTable({
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-base leading-tight truncate pr-2 text-foreground group-hover:text-primary transition-colors duration-300">
+                          <button
+                            type="button"
+                            onClick={() => onEditListing(listing)}
+                            className="text-left font-semibold text-base leading-tight truncate pr-2 text-foreground group-hover:text-primary hover:underline transition-colors duration-300 cursor-pointer"
+                            title={`Edit ${listing.name}`}
+                          >
                             {listing.name}
-                          </h3>
+                          </button>
                           {userRole === "super_admin" && (
                             <button
-                              onClick={() => {
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 navigator.clipboard.writeText(
                                   listing.id.toString(),
                                 );
@@ -372,9 +379,10 @@ export function ListingsTable({
                           Edit Listing
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() =>
-                            window.open(`/listing/${listing.slug}`, "_blank")
-                          }
+                          onClick={() => {
+                            const targetSlug = listing.slug || listing.id.toString();
+                            window.open(`/listing/${targetSlug}`, "_blank");
+                          }}
                         >
                           <Eye className="h-4 w-4 mr-2" />
                           View Details

@@ -56,12 +56,13 @@ export default async function CategoryListingsPage({
 
   if (!category) {
     // Listing slugs sometimes land here via mistaken /listings/{slug} links.
+    const decodedSlug = decodeURIComponent(slug);
     const { rows: listingMatches } = await query(
-      "SELECT id FROM listings WHERE slug = $1 AND status = 'published' LIMIT 1",
-      [slug],
+      "SELECT id, slug FROM listings WHERE slug = $1 OR slug = $2 LIMIT 1",
+      [slug, decodedSlug],
     );
     if (listingMatches[0]) {
-      redirect(`/listing/${slug}`);
+      redirect(`/listing/${listingMatches[0].slug || slug}`);
     }
 
     notFound();
