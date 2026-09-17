@@ -34,6 +34,47 @@ export function createEmptyListingFormData(): ListingFormData {
   };
 }
 
+export function parseParkingAmenities(value: unknown): string[] | null {
+  if (!value) return null;
+  if (Array.isArray(value)) {
+    const list = value
+      .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+      .map((v) => v.trim());
+    return list.length > 0 ? list : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          const list = parsed
+            .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+            .map((v) => v.trim());
+          return list.length > 0 ? list : null;
+        }
+      } catch {
+        // ignore JSON parse error
+      }
+    }
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      const list = trimmed
+        .slice(1, -1)
+        .split(",")
+        .map((s) => s.replace(/^"|"$/g, "").trim())
+        .filter(Boolean);
+      return list.length > 0 ? list : null;
+    }
+    if (trimmed.includes(",")) {
+      const list = trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+      return list.length > 0 ? list : null;
+    }
+    return [trimmed];
+  }
+  return null;
+}
+
 export function listingRowToListingFormData(listing: Listing): ListingFormData {
   return {
     name: listing.name || "",
@@ -71,12 +112,13 @@ export function listingRowToListingFormData(listing: Listing): ListingFormData {
           parking_information?: string | null;
         }
       ).parking_information ?? null,
-    parking_amenities:
+    parking_amenities: parseParkingAmenities(
       (
         listing as unknown as {
-          parking_amenities?: string[] | null;
+          parking_amenities?: unknown;
         }
-      ).parking_amenities ?? null,
+      ).parking_amenities
+    ),
     facebook_url: listing.facebook_url || "",
     instagram_url: listing.instagram_url || "",
     whatsapp_number: listing.whatsapp_number || "",

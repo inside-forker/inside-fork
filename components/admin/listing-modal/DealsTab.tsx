@@ -684,14 +684,18 @@ export function DealsTab({
                       <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 max-h-[320px] overflow-y-auto pr-1 pb-1">
                         {cards.map((card) => {
                           const isSelected =
+                            Array.isArray(formData.valid_card_variants) &&
                             formData.valid_card_variants.includes(card.id);
                           return (
                             <div
                               key={`card-${card.id}`}
                               onClick={(event) => {
                                 event.stopPropagation();
-                                const currentVariants =
-                                  formData.valid_card_variants;
+                                const currentVariants = Array.isArray(
+                                  formData.valid_card_variants
+                                )
+                                  ? formData.valid_card_variants
+                                  : [];
                                 if (isSelected) {
                                   handleInputChange(
                                     "valid_card_variants",
