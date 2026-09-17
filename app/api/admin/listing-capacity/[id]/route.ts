@@ -9,13 +9,22 @@ import type { ListingCapacityFields } from "@/types/listing.types";
 
 type CapacityFieldKey = keyof ListingCapacityFields;
 
-const ALLOWED_FIELDS: Array<CapacityFieldKey | "category_id"> = [
+const ALLOWED_FIELDS: Array<CapacityFieldKey | "category_id" | "status"> = [
   "min_price_per_person",
   "max_price_per_person",
   "min_guest_capacity",
   "max_guest_capacity",
   "category_id",
+  "status",
 ];
+
+const VALID_STATUSES = [
+  "published",
+  "draft",
+  "pending_approval",
+  "rejected",
+  "archived",
+] as const;
 
 function parseNullableNumber(
   value: unknown,
@@ -46,6 +55,7 @@ function validateCapacityPayload(body: Record<string, unknown>):
         ListingCapacityFields & {
           category_id: number | null;
           category_ids?: number[];
+          status?: string;
         }
       >;
     }
@@ -54,6 +64,7 @@ function validateCapacityPayload(body: Record<string, unknown>):
     ListingCapacityFields & {
       category_id: number | null;
       category_ids?: number[];
+      status?: string;
     }
   > = {};
 
@@ -67,6 +78,21 @@ function validateCapacityPayload(body: Record<string, unknown>):
 
   for (const field of ALLOWED_FIELDS) {
     if (!(field in body)) continue;
+
+    if (field === "status") {
+      const val = body.status;
+      if (
+        typeof val !== "string" ||
+        !VALID_STATUSES.includes(val as (typeof VALID_STATUSES)[number])
+      ) {
+        return {
+          ok: false,
+          error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}`,
+        };
+      }
+      updates.status = val;
+      continue;
+    }
 
     if (field === "category_id") {
       if (!("category_ids" in body)) {
