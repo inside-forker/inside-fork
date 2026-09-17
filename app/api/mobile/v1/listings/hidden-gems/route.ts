@@ -15,6 +15,8 @@ import {
 } from "@/lib/mobile/pagination";
 import { ok } from "@/lib/mobile/response";
 import { enforceMobileRateLimit } from "@/lib/mobile/rate-limit";
+import { getOptionalMobileUser } from "@/lib/mobile/auth";
+import { getUserCategoryAffinity } from "@/lib/recommendations/affinity";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +99,17 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     maxLimit: 50,
   });
 
+  const isPersonalized =
+    searchParams.get("personalized") === "true" ||
+    searchParams.get("personalized") === "1";
+
+  const { user } = isPersonalized ? await getOptionalMobileUser(request) : { user: null };
+  const anonId = isPersonalized ? request.headers.get("x-anon-id") : null;
+  const affinity = isPersonalized
+    ? await getUserCategoryAffinity({ userId: user?.id ?? null, anonId: user ? null : anonId })
+    : null;
+  const hasTaste = affinity != null && affinity.eventCount > 0;
+
   let pinnedRows: HiddenGemRow[] = [];
   let organicRows: HiddenGemRow[] = [];
   let organicTotal = 0;
@@ -138,6 +151,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     const organicOffset = Math.max(0, offset - pinnedRows.length);
 
     if (organicNeeded > 0) {
+      const fetchLimit = hasTaste ? Math.max(organicNeeded * 3, 20) : organicNeeded;
       const { rows: organic } = await query(
         `${FAVORITES_CTE}
          SELECT ${CARD_COLUMNS_QUALIFIED},
@@ -168,11 +182,22 @@ export const GET = mobileRoute(async (request: NextRequest) => {
           MIN_REVIEWS,
           MAX_REVIEWS,
           MAX_FAVORITES,
-          organicNeeded,
+          fetchLimit,
           organicOffset,
         ],
       );
       organicRows = organic as HiddenGemRow[];
+      if (hasTaste && organicRows.length > 0) {
+        organicRows.sort((a, b) => {
+          const affA = affinity.byCategoryId.get(Number(a.category_id)) ?? 0;
+          const affB = affinity.byCategoryId.get(Number(b.category_id)) ?? 0;
+          if (Math.abs(affA - affB) > 0.001) return affB - affA;
+          const scoreA = Number(a.discovery_score ?? 0);
+          const scoreB = Number(b.discovery_score ?? 0);
+          return scoreB - scoreA;
+        });
+        organicRows = organicRows.slice(0, organicNeeded);
+      }
     }
 
     if (page === 1) {
@@ -181,6 +206,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
         const excludeIds = [...pinnedRows, ...organicRows].map((row) =>
           Number(row.id),
         );
+        const backfillLimit = hasTaste ? Math.max(shortBy * 4, 30) : shortBy;
         const { rows: backfill } = await query(
           `${FAVORITES_CTE}
            SELECT ${CARD_COLUMNS_QUALIFIED},
@@ -204,9 +230,21 @@ export const GET = mobileRoute(async (request: NextRequest) => {
              ld.created_at ASC,
              ld.id DESC
            LIMIT $4`,
-          [excludeIds, MIN_REVIEWS, DISCOVERY_MIN_AGE, shortBy],
+          [excludeIds, MIN_REVIEWS, DISCOVERY_MIN_AGE, backfillLimit],
         );
         backfillRows = backfill as HiddenGemRow[];
+        if (hasTaste && backfillRows.length > 0) {
+          backfillRows.sort((a, b) => {
+            const affA = affinity.byCategoryId.get(Number(a.category_id)) ?? 0;
+            const affB = affinity.byCategoryId.get(Number(b.category_id)) ?? 0;
+            if (Math.abs(affA - affB) > 0.001) return affB - affA;
+            const ratingA = Number(a.avg_rating ?? 0);
+            const ratingB = Number(b.avg_rating ?? 0);
+            if (Math.abs(ratingA - ratingB) > 0.01) return ratingB - ratingA;
+            return 0;
+          });
+          backfillRows = backfillRows.slice(0, shortBy);
+        }
       }
     }
 
@@ -244,12 +282,16 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       listings.length,
     );
 
+    const cacheControl = isPersonalized
+      ? "private, no-cache"
+      : "public, s-maxage=60, stale-while-revalidate=120";
+
     return ok(
       listings,
       { pagination: buildPaginationMeta(page, limit, totalItems) },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+          "Cache-Control": cacheControl,
         },
       },
     );

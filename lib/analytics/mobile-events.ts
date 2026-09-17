@@ -164,6 +164,40 @@ function nativePlatformClause(alias: string): string {
   return `(${alias}.platform IN ('ios', 'android') OR ${alias}.platform IS NULL)`;
 }
 
+/**
+ * Dwell time for one `mobile_events` row. The RN client already measures
+ * this itself — every navigation/background transition fires a
+ * `screen_engaged` event carrying `context.duration_seconds` (see the root
+ * layout's screen focus/blur instrumentation) — so prefer that real,
+ * client-measured value over a timestamp-gap estimate whenever one exists.
+ *
+ * Only applied for `screen_viewed` rows specifically: a different event type
+ * that happens to carry the same `screen` tag (e.g. a search fired mid-visit)
+ * would otherwise get credited with the *whole* visit's duration by matching
+ * the same closing `screen_engaged` row, inflating totals. Those rows - and
+ * any `screen_viewed` row from a visit that ended without a matching
+ * `screen_engaged` (older app builds, or the app being killed mid-visit) -
+ * fall back to the previous gap-to-next-event estimate, unchanged.
+ */
+function realDurationExpr(alias: string): string {
+  return `COALESCE(
+    CASE WHEN ${alias}.event_name = 'screen_viewed' THEN (
+      SELECT NULLIF(se.context->>'duration_seconds', '')::numeric
+      FROM public.mobile_events se
+      WHERE se.event_name = 'screen_engaged'
+        AND se.session_id = ${alias}.session_id
+        AND se.screen = ${alias}.screen
+        AND se.occurred_at > ${alias}.occurred_at
+      ORDER BY se.occurred_at ASC
+      LIMIT 1
+    ) END,
+    EXTRACT(EPOCH FROM (
+      LEAD(${alias}.occurred_at) OVER (PARTITION BY ${alias}.session_id ORDER BY ${alias}.occurred_at)
+      - ${alias}.occurred_at
+    ))
+  )`;
+}
+
 function parsePlatforms(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value
@@ -236,10 +270,7 @@ export async function getMobileEventsFullOverview(
           me.anon_id,
           me.session_id,
           me.occurred_at,
-          EXTRACT(EPOCH FROM (
-            LEAD(me.occurred_at) OVER (PARTITION BY me.session_id ORDER BY me.occurred_at)
-            - me.occurred_at
-          )) AS raw_duration
+          ${realDurationExpr("me")} AS raw_duration
         FROM public.mobile_events me
         WHERE me.screen IS NOT NULL AND me.screen != ''
           AND ${dateFilter}
@@ -265,10 +296,7 @@ export async function getMobileEventsFullOverview(
           me.anon_id,
           me.session_id,
           me.occurred_at,
-          EXTRACT(EPOCH FROM (
-            LEAD(me.occurred_at) OVER (PARTITION BY me.session_id ORDER BY me.occurred_at)
-            - me.occurred_at
-          )) AS raw_duration
+          ${realDurationExpr("me")} AS raw_duration
         FROM public.mobile_events me
         WHERE me.screen IS NOT NULL AND me.screen != ''
           AND ${dateFilter}
@@ -300,10 +328,7 @@ export async function getMobileEventsFullOverview(
           me.event_name,
           me.occurred_at,
           me.session_id,
-          EXTRACT(EPOCH FROM (
-            LEAD(me.occurred_at) OVER (PARTITION BY me.session_id ORDER BY me.occurred_at)
-            - me.occurred_at
-          )) AS raw_duration
+          ${realDurationExpr("me")} AS raw_duration
         FROM public.mobile_events me
         WHERE ${dateFilter}
           AND ${nativePlatformClause("me")}
@@ -614,10 +639,7 @@ export async function getUserJourney(
         me.occurred_at::text,
         me.source_context,
         me.context,
-        EXTRACT(EPOCH FROM (
-          LEAD(me.occurred_at) OVER (PARTITION BY me.session_id ORDER BY me.occurred_at)
-          - me.occurred_at
-        )) AS raw_duration
+        ${realDurationExpr("me")} AS raw_duration
       FROM public.mobile_events me
       WHERE ${identityClause}
         AND ${dateFilter}
@@ -681,10 +703,7 @@ export async function getScreenUsers(
         me.anon_id,
         me.session_id,
         me.occurred_at,
-        EXTRACT(EPOCH FROM (
-          LEAD(me.occurred_at) OVER (PARTITION BY me.session_id ORDER BY me.occurred_at)
-          - me.occurred_at
-        )) AS raw_duration
+        ${realDurationExpr("me")} AS raw_duration
       FROM public.mobile_events me
       WHERE ${screenCondition}
         AND ${dateFilter}

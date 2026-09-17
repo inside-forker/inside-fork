@@ -6,6 +6,8 @@ import { getOptionalMobileUser } from "@/lib/mobile/auth";
 import { enforceMobileRateLimit } from "@/lib/mobile/rate-limit";
 import { query } from "@/lib/db";
 
+import { resolveKarachiNeighborhood } from "@/lib/analytics/karachi-areas";
+
 export const dynamic = "force-dynamic";
 
 const MAX_BATCH = 50;
@@ -20,6 +22,11 @@ const eventSchema = z.object({
   platform: z.string().optional(),
   app_version: z.string().optional(),
   os_version: z.string().optional(),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
+  accuracy: z.number().nullable().optional(),
+  neighborhood: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
   context: z.record(z.unknown()).optional(),
 });
 
@@ -50,10 +57,17 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   const values: unknown[] = [];
   const placeholders: string[] = [];
   rows.forEach((e, i) => {
-    const base = i * 12;
+    const base = i * 17;
     placeholders.push(
-      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}::jsonb, $${base + 12})`,
+      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}::jsonb, $${base + 12}, $${base + 13}, $${base + 14}, $${base + 15}, $${base + 16}, $${base + 17})`,
     );
+
+    const lat = typeof e.latitude === "number" && !isNaN(e.latitude) ? e.latitude : null;
+    const lng = typeof e.longitude === "number" && !isNaN(e.longitude) ? e.longitude : null;
+    const resolvedNeighborhood =
+      e.neighborhood?.trim() ||
+      (lat && lng ? resolveKarachiNeighborhood(lat, lng) : null);
+
     values.push(
       e.event_name,
       e.occurred_at ?? new Date(),
@@ -67,13 +81,18 @@ export const POST = mobileRoute(async (request: NextRequest) => {
       e.os_version ?? null,
       JSON.stringify(e.context ?? {}),
       e.device_id ?? null,
+      lat,
+      lng,
+      e.accuracy ?? null,
+      resolvedNeighborhood,
+      e.city ?? "Karachi",
     );
   });
 
   try {
     await query(
       `INSERT INTO public.mobile_events
-         (event_name, occurred_at, user_id, anon_id, session_id, source_context, screen, platform, app_version, os_version, context, device_id)
+         (event_name, occurred_at, user_id, anon_id, session_id, source_context, screen, platform, app_version, os_version, context, device_id, latitude, longitude, accuracy, neighborhood, city)
        VALUES ${placeholders.join(", ")}`,
       values,
     );

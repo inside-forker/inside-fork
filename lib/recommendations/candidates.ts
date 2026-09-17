@@ -117,6 +117,11 @@ export type CandidateContext = {
   lng: number | null;
   now: Date;
   poolSize?: number;
+  /** Hard-filters out any candidate whose openState isn't exactly "open" -
+   * both "closed" and "unknown"/no-data listings are dropped. Only "For You"
+   * sets this; Discovery Intents leaves it unset since it deliberately still
+   * shows closed listings with a "Closed now" label. */
+  onlyOpen?: boolean;
 };
 
 export type RawCandidate = CandidateInput;
@@ -139,6 +144,7 @@ export async function getRecommendationCandidates(
     const { rows } = await query(
       `SELECT id FROM listings_with_details
        WHERE status = 'published'
+         AND EXISTS (SELECT 1 FROM listing_images li WHERE li.listing_id = listings_with_details.id)
        ORDER BY created_at DESC NULLS LAST, id DESC
        LIMIT $1`,
       [poolSize],
@@ -168,7 +174,13 @@ export async function getRecommendationCandidates(
         [ids],
       ),
       query(
-        `SELECT id, created_at, avg_rating FROM listings_with_details WHERE id = ANY($1::int[])`,
+        // top_rated_pinned isn't on the view, so it's reached by joining back
+        // to `listings` - same join top-rated/route.ts already does to read
+        // this same flag for its own cold-start fallback.
+        `SELECT ld.id, ld.created_at, ld.avg_rating, l.top_rated_pinned
+         FROM listings_with_details ld
+         JOIN listings l ON l.id = ld.id
+         WHERE ld.id = ANY($1::int[])`,
         [ids],
       ),
     ]);
@@ -183,15 +195,20 @@ export async function getRecommendationCandidates(
     list.push(row);
     hoursByListing.set(key, list);
   }
-  const metaByListing = new Map<number, { createdAt: string | null; avgRating: number | null }>();
+  const metaByListing = new Map<
+    number,
+    { createdAt: string | null; avgRating: number | null; topRatedPinned: boolean }
+  >();
   for (const row of metaRows as Array<{
     id: number;
     created_at: string | null;
     avg_rating: number | string | null;
+    top_rated_pinned: boolean | null;
   }>) {
     metaByListing.set(Number(row.id), {
       createdAt: row.created_at,
       avgRating: row.avg_rating != null ? Number(row.avg_rating) : null,
+      topRatedPinned: row.top_rated_pinned === true,
     });
   }
 
@@ -209,6 +226,9 @@ export async function getRecommendationCandidates(
       ),
     ];
 
+    const openState = computeOpenState(hoursByListing.get(base.id), ctx.now);
+    if (ctx.onlyOpen && openState !== "open") continue;
+
     const meta = metaByListing.get(base.id);
     const ageDays = meta?.createdAt
       ? (ctx.now.getTime() - new Date(meta.createdAt).getTime()) / 86_400_000
@@ -219,9 +239,10 @@ export async function getRecommendationCandidates(
       categoryIds,
       parentCategoryIds,
       distanceMeters: base.distanceMeters,
-      openState: computeOpenState(hoursByListing.get(base.id), ctx.now),
+      openState,
       ageDays,
       avgRating: meta?.avgRating ?? null,
+      topRatedPinned: meta?.topRatedPinned ?? false,
       closesLate: computeClosesLate(hoursByListing.get(base.id)),
     });
   }
