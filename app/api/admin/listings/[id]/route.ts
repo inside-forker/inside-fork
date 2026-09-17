@@ -58,9 +58,7 @@ export async function GET(
 
     if (
       !profile ||
-      (profile.role !== "admin" &&
-        profile.role !== "super_admin" &&
-        profile.role !== "lister")
+      !["admin", "super_admin", "lister", "data_entry"].includes(profile.role)
     ) {
       return NextResponse.json(
         { error: "Admin or lister access required" },
@@ -149,9 +147,7 @@ export async function PATCH(
 
     if (
       !profile ||
-      (profile.role !== "admin" &&
-        profile.role !== "super_admin" &&
-        profile.role !== "lister")
+      !["admin", "super_admin", "lister", "data_entry"].includes(profile.role)
     ) {
       return patchErrorResponse(
         requestId,
@@ -487,9 +483,7 @@ export async function DELETE(
 
     if (
       !profile ||
-      (profile.role !== "admin" &&
-        profile.role !== "super_admin" &&
-        profile.role !== "lister")
+      !["admin", "super_admin", "lister", "data_entry"].includes(profile.role)
     ) {
       return NextResponse.json(
         { error: "Admin or lister access required" },

@@ -1,7 +1,7 @@
 import { query } from "@/lib/db";
 import { getSessionFromCookies } from "@/lib/auth/session";
 
-const STAFF_ROLES = new Set(["admin", "super_admin", "lister"]);
+const STAFF_ROLES = new Set(["admin", "super_admin", "lister", "data_entry"]);
 
 export class ListingRouteAccessError extends Error {
   status: number;

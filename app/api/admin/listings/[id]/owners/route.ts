@@ -23,7 +23,7 @@ export async function GET(
       return NextResponse.json({ error: "Profile not found" }, { status: 403 });
     }
     // Only allow lister, admin, super_admin
-    if (!["admin", "super_admin", "lister"].includes(profile.role)) {
+    if (!["admin", "super_admin", "lister", "data_entry"].includes(profile.role)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
     const listingId = parseInt(params.id);
@@ -90,7 +90,7 @@ export async function PATCH(
     if (!profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 403 });
     }
-    if (!["admin", "super_admin", "lister"].includes(profile.role)) {
+    if (!["admin", "super_admin", "lister", "data_entry"].includes(profile.role)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
     const listingId = parseInt(params.id);
