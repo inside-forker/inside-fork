@@ -212,6 +212,9 @@ export default function LocationMapCanvas({
 
     import("leaflet").then(({ default: L }) => {
       clusters.forEach((cluster) => {
+        // Only show hotspots that have 1 or more users/events
+        if ((cluster.uniqueUsers ?? 0) < 1 && (cluster.totalEvents ?? 0) < 1) return;
+
         const isSelected = selectedArea === cluster.name;
         const isBlazing = cluster.intensityLevel === "blazing";
         const isHot = cluster.intensityLevel === "hot";
@@ -552,7 +555,10 @@ export default function LocationMapCanvas({
   };
 
   const handleFocusHottest = () => {
-    const hottest = clusters[0];
+    const activeClusters = clusters.filter(
+      (c) => (c.uniqueUsers ?? 0) > 0 || (c.totalEvents ?? 0) > 0
+    );
+    const hottest = activeClusters[0];
     if (hottest && mapInstanceRef.current) {
       onSelectArea(hottest.name);
       mapInstanceRef.current.flyTo(

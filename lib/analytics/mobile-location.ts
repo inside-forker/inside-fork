@@ -403,7 +403,9 @@ export async function getLocationIntelligenceData(
       intensityLevel,
       categoryAffinity: kn.categoryAffinity || [],
     };
-  }).sort((a, b) => b.totalEvents - a.totalEvents);
+  })
+    .filter((c) => c.uniqueUsers > 0 || c.totalEvents > 0)
+    .sort((a, b) => b.totalEvents - a.totalEvents);
 
   // Summary Metrics
   const totalGeoEvents = rawPoints.length;
