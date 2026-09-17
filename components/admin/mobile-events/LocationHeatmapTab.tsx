@@ -276,7 +276,7 @@ export function LocationHeatmapTab({ dateRange }: LocationHeatmapTabProps) {
           />
           <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
             <span>💡 Tip: Click on any glowing hotspot or neighborhood badge to inspect accumulated data.</span>
-            <span>CartoDB Dark Tiles • OpenStreetMap Karachi</span>
+            <span>Esri Dark Canvas • OpenStreetMap Karachi</span>
           </div>
         </div>
 

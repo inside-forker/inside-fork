@@ -81,16 +81,33 @@ export default function LocationMapCanvas({
           attributionControl: false,
         });
 
-        // High contrast dark tile layers
-        const tileUrl =
-          mapStyle === "midnight"
-            ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png";
+        // 100% Free, Zero-Key, Watermark-Free Tile Providers
+        if (mapStyle === "midnight") {
+          // Esri Dark Gray Canvas Base + Labels (Zero API Key, Zero Watermarks)
+          L.tileLayer(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+            {
+              maxZoom: 18,
+              attribution: "Esri, HERE, Garmin, © OpenStreetMap",
+            }
+          ).addTo(map);
 
-        L.tileLayer(tileUrl, {
-          maxZoom: 19,
-          subdomains: "abcd",
-        }).addTo(map);
+          // Add road names and landmark labels overlay
+          L.tileLayer(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+            {
+              maxZoom: 18,
+              pane: "shadowPane",
+            }
+          ).addTo(map);
+        } else {
+          // OpenStreetMap Standard / High Contrast (100% Free, Zero API Key)
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            subdomains: ["a", "b", "c"],
+            attribution: "© OpenStreetMap contributors",
+          }).addTo(map);
+        }
 
         L.control.zoom({ position: "topright" }).addTo(map);
 
