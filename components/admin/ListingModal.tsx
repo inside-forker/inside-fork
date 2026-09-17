@@ -1221,8 +1221,20 @@ export function ListingModal({
           typeof (result as { id: number }).id === "number"
         ) {
           newListingId = (result as { id: number }).id;
+        } else if (
+          "data" in result &&
+          typeof (result as { data: any }).data === "object" &&
+          (result as { data: any }).data !== null
+        ) {
+          const dataObj = (result as { data: any }).data;
+          if (typeof dataObj.id === "number") {
+            newListingId = dataObj.id;
+          } else if (typeof dataObj.listing?.id === "number") {
+            newListingId = dataObj.listing.id;
+          }
         }
       }
+
       if (!listing?.id && images.length > 0 && newListingId) {
         try {
           const moveRes = await fetch("/api/admin/listings/temp-images/move", {
@@ -1241,35 +1253,6 @@ export function ListingModal({
           }
         } catch (err) {
           console.error("[ListingModal] Failed to move temp images", err);
-        }
-      } else {
-        let resultListingId = undefined;
-        if (
-          result &&
-          typeof result === "object" &&
-          "listing" in result &&
-          typeof (result as { listing: { id: number } }).listing?.id ===
-            "number"
-        ) {
-          resultListingId = (result as { listing: { id: number } }).listing.id;
-        }
-        let resultId = undefined;
-        if (
-          result &&
-          typeof result === "object" &&
-          "id" in result &&
-          typeof (result as { id: number }).id === "number"
-        ) {
-          resultId = (result as { id: number }).id;
-        }
-        if (!newListingId) {
-          console.error("[ListingModal] Unexpected result shape from onSave", {
-            result,
-            listingId: listing?.id,
-            imagesLength: images.length,
-            resultId,
-            resultListingId,
-          });
         }
       }
 

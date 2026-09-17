@@ -57,6 +57,7 @@ type DraftFields = {
   min_guest_capacity: string;
   max_guest_capacity: string;
   category_ids: string[];
+  status: string;
 };
 
 type CategoryOption = {
@@ -85,6 +86,7 @@ function toDraft(row: ListingCapacityRow): DraftFields {
     max_guest_capacity:
       row.max_guest_capacity == null ? "" : String(row.max_guest_capacity),
     category_ids: ids,
+    status: row.status || "draft",
   };
 }
 
@@ -94,6 +96,7 @@ function draftEqualsRow(draft: DraftFields, row: ListingCapacityRow): boolean {
   const origIdsStr = [...original.category_ids].sort().join(",");
 
   return (
+    draft.status === original.status &&
     draft.min_price_per_person === original.min_price_per_person &&
     draft.max_price_per_person === original.max_price_per_person &&
     draft.min_guest_capacity === original.min_guest_capacity &&
@@ -457,6 +460,16 @@ export function ListingCapacityPage() {
     }));
   };
 
+  const updateDraftStatus = (id: number, status: string) => {
+    setDrafts((prev) => ({
+      ...prev,
+      [id]: {
+        ...(prev[id] || toDraft(listings.find((l) => l.id === id)!)),
+        status,
+      },
+    }));
+  };
+
   const handleSave = async (row: ListingCapacityRow) => {
     const draft = drafts[row.id];
     if (!draft) return;
@@ -486,6 +499,7 @@ export function ListingCapacityPage() {
       min_guest_capacity: minCapacity as number | null,
       max_guest_capacity: maxCapacity as number | null,
       category_ids: categoryIdsNums,
+      status: draft.status,
     };
 
     if (
@@ -962,12 +976,45 @@ export function ListingCapacityPage() {
                           </button>
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={statusBadgeClass(row.status)}
+                          <Select
+                            value={draft.status || row.status}
+                            onValueChange={(val) => updateDraftStatus(row.id, val)}
                           >
-                            {row.status.replace(/_/g, " ")}
-                          </Badge>
+                            <SelectTrigger
+                              className={`h-7 px-2.5 py-0 text-xs font-medium capitalize rounded-md border min-w-[130px] ${statusBadgeClass(
+                                draft.status || row.status
+                              )}`}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="published">
+                                <span className="inline-flex items-center gap-1.5 text-xs">
+                                  <span className="h-2 w-2 rounded-full bg-green-500" /> Published
+                                </span>
+                              </SelectItem>
+                              <SelectItem value="draft">
+                                <span className="inline-flex items-center gap-1.5 text-xs">
+                                  <span className="h-2 w-2 rounded-full bg-yellow-500" /> Draft
+                                </span>
+                              </SelectItem>
+                              <SelectItem value="pending_approval">
+                                <span className="inline-flex items-center gap-1.5 text-xs">
+                                  <span className="h-2 w-2 rounded-full bg-blue-500" /> Pending Approval
+                                </span>
+                              </SelectItem>
+                              <SelectItem value="rejected">
+                                <span className="inline-flex items-center gap-1.5 text-xs">
+                                  <span className="h-2 w-2 rounded-full bg-red-500" /> Rejected
+                                </span>
+                              </SelectItem>
+                              <SelectItem value="archived">
+                                <span className="inline-flex items-center gap-1.5 text-xs">
+                                  <span className="h-2 w-2 rounded-full bg-gray-500" /> Archived
+                                </span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell>
                           <Input
