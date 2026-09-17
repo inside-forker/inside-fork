@@ -287,35 +287,43 @@ export function DetailsTab({
                     "24-Hour Access",
                     "Covered Parking",
                   ] as const
-                ).map((amenity) => (
-                  <div key={amenity} className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id={`amenity-${amenity}`}
-                      checked={
-                        formData.parking_amenities?.includes(amenity) || false
-                      }
-                      onChange={(e) => {
-                        const currentAmenities =
-                          formData.parking_amenities || [];
-                        const newAmenities = e.target.checked
-                          ? [...currentAmenities, amenity]
-                          : currentAmenities.filter((a) => a !== amenity);
-                        onInputChange(
-                          "parking_amenities",
-                          newAmenities.length > 0 ? newAmenities : null,
-                        );
-                      }}
-                      className="h-4 w-4 rounded border-border bg-background cursor-pointer"
-                    />
-                    <Label
-                      htmlFor={`amenity-${amenity}`}
-                      className="cursor-pointer flex-1 text-sm font-normal"
-                    >
-                      {amenity}
-                    </Label>
-                  </div>
-                ))}
+                ).map((amenity) => {
+                  const amenitiesList = Array.isArray(formData.parking_amenities)
+                    ? formData.parking_amenities
+                    : [];
+                  const isChecked = amenitiesList.includes(amenity);
+
+                  return (
+                    <div key={amenity} className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id={`amenity-${amenity}`}
+                        checked={isChecked}
+                        onChange={(e) => {
+                          const currentAmenities = Array.isArray(
+                            formData.parking_amenities
+                          )
+                            ? formData.parking_amenities
+                            : [];
+                          const newAmenities = e.target.checked
+                            ? [...currentAmenities, amenity]
+                            : currentAmenities.filter((a) => a !== amenity);
+                          onInputChange(
+                            "parking_amenities",
+                            newAmenities.length > 0 ? newAmenities : null,
+                          );
+                        }}
+                        className="h-4 w-4 rounded border-border bg-background cursor-pointer"
+                      />
+                      <Label
+                        htmlFor={`amenity-${amenity}`}
+                        className="cursor-pointer flex-1 text-sm font-normal"
+                      >
+                        {amenity}
+                      </Label>
+                    </div>
+                  );
+                })}
               </div>
               <p className="text-xs text-muted-foreground">
                 These will appear as badges below the parking description

@@ -81,6 +81,7 @@ export default function LocationMapCanvas({
   const zonesLayerGroupRef = useRef<any>(null);
   const userPinLayerGroupRef = useRef<any>(null);
   const trajectoryLayerGroupRef = useRef<any>(null);
+  const pingMarkersMapRef = useRef<Map<string, any>>(new Map());
   const [mapLoaded, setMapLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mapStyle, setMapStyle] = useState<"midnight" | "contrast">("midnight");
@@ -212,6 +213,9 @@ export default function LocationMapCanvas({
 
     import("leaflet").then(({ default: L }) => {
       clusters.forEach((cluster) => {
+        // Only show hotspots that have 1 or more users/events
+        if ((cluster.uniqueUsers ?? 0) < 1 && (cluster.totalEvents ?? 0) < 1) return;
+
         const isSelected = selectedArea === cluster.name;
         const isBlazing = cluster.intensityLevel === "blazing";
         const isHot = cluster.intensityLevel === "hot";
@@ -410,6 +414,8 @@ export default function LocationMapCanvas({
 
     trajGroup.clearLayers();
 
+    pingMarkersMapRef.current.clear();
+
     if (!trackedUser || !userPings || userPings.length === 0) return;
 
     if (userPinGroup) userPinGroup.clearLayers();
@@ -417,127 +423,93 @@ export default function LocationMapCanvas({
     import("leaflet").then(({ default: L }) => {
       const latLngs: [number, number][] = userPings.map((p) => [p.lat, p.lng]);
 
-      // Draw polyline route connecting pings
-      if (latLngs.length > 1) {
-        // Glowing halo path
-        L.polyline(latLngs, {
-          color: "#ff184d",
-          weight: 7,
-          opacity: 0.35,
-          lineCap: "round",
-          lineJoin: "round",
-        }).addTo(trajGroup);
-
-        // Vibrant dashed core line
-        L.polyline(latLngs, {
-          color: "#38bdf8",
-          weight: 3.5,
-          opacity: 0.95,
-          dashArray: "8, 8",
-          lineCap: "round",
-          lineJoin: "round",
-        }).addTo(trajGroup);
-      }
-
-      // Render markers for all pings
+      // Render clean avatar bubble markers (detail cards reveal ONLY on click)
       userPings.forEach((ping, idx) => {
         const isLatest = idx === userPings.length - 1;
         const relativeTime = formatRelativeTime(ping.occurredAt);
 
-        if (isLatest) {
-          const initialLetter = trackedUser.fullName
-            ? trackedUser.fullName[0].toUpperCase()
-            : trackedUser.username
-            ? trackedUser.username[0].toUpperCase()
-            : "U";
+        const initialLetter = trackedUser.fullName
+          ? trackedUser.fullName[0].toUpperCase()
+          : trackedUser.username
+          ? trackedUser.username[0].toUpperCase()
+          : "U";
 
-          const latestIconHtml = `
-            <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; transform: translate(-50%, -50%); pointer-events: auto; z-index: 1000;">
-              <div style="position: absolute; top: -20px; left: -20px; width: 88px; height: 88px; pointer-events: none;">
-                <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.75; background-color: #ff184d; animation: ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
-                <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.35; background-color: #ff184d; transform: scale(1.4);"></span>
-              </div>
-              <div style="position: relative; z-index: 100; width: 48px; height: 48px; border-radius: 9999px; background: #ff184d; border: 3px solid #ffffff; box-shadow: 0 0 25px rgba(255,24,77,0.9); display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                ${
-                  trackedUser.avatarUrl
-                    ? `<img src="${trackedUser.avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" />`
-                    : `<span style="font-size: 20px; font-weight: 800; color: #ffffff;">${initialLetter}</span>`
-                }
-              </div>
-              <div style="margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: rgba(9, 9, 11, 0.96); border: 1.5px solid #ff184d; box-shadow: 0 8px 25px rgba(0,0,0,0.8); text-align: center; white-space: nowrap; backdrop-filter: blur(12px);">
-                <div style="font-size: 12px; font-weight: 700; color: #ffffff; display: flex; align-items: center; justify-content: center; gap: 4px;">
-                  <span>${trackedUser.fullName || trackedUser.username || "Tracked User"}</span>
-                  ${
-                    trackedUser.isUserId
-                      ? `<span style="font-size: 9px; padding: 1px 5px; border-radius: 9999px; background: rgba(255,24,77,0.3); color: #fda4af; font-weight: 600;">Signed In</span>`
-                      : ""
-                  }
-                </div>
-                <div style="font-size: 10px; color: #fbbf24; font-weight: 600; margin-top: 2px;">
-                  🏁 Latest Ping (#${idx + 1}): ${relativeTime}
-                </div>
-                <div style="font-size: 9px; color: #a1a1aa; margin-top: 1px;">
-                  ${ping.neighborhood || "Karachi"} • ${ping.screen ? `Screen: ${ping.screen}` : ping.eventName}
-                </div>
-                <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; gap: 5px;">
-                  <div style="font-family: monospace; font-size: 10px; font-weight: 600; color: #38bdf8; background: rgba(56,189,248,0.12); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(56,189,248,0.3);">
-                    📍 ${ping.lat.toFixed(5)}, ${ping.lng.toFixed(5)}
-                  </div>
-                  <a href="https://www.google.com/maps?q=${ping.lat},${ping.lng}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 600; color: #ffffff; background: #ff184d; padding: 2px 7px; border-radius: 6px; text-decoration: none;">Maps ↗</a>
-                </div>
-              </div>
+        // Clean avatar bubble icon (no overlapping cards)
+        const iconHtml = `
+          <div style="display: flex; align-items: center; justify-content: center; cursor: pointer; transform: translate(-50%, -50%); pointer-events: auto; width: 44px; height: 44px;">
+            <!-- Glowing Ring Aura -->
+            <div style="position: absolute; top: -14px; left: -14px; width: 72px; height: 72px; pointer-events: none;">
+              ${
+                isLatest
+                  ? `<span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.75; background-color: #ff184d; animation: ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
+                     <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.35; background-color: #ff184d; transform: scale(1.35);"></span>`
+                  : `<span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.3; background-color: #ff184d; transform: scale(1.15);"></span>`
+              }
             </div>
-          `;
 
-          const latestMarker = L.marker([ping.lat, ping.lng], {
-            icon: L.divIcon({
-              html: latestIconHtml,
-              className: "snapchat-pinned-user-icon",
-              iconSize: [0, 0],
-              iconAnchor: [0, 0],
-            }),
-            zIndexOffset: 1200,
-          });
+            <!-- Avatar Pin Bubble -->
+            <div style="position: relative; z-index: 100; width: 42px; height: 42px; border-radius: 9999px; background: #ff184d; border: 3px solid #ffffff; box-shadow: 0 0 20px rgba(255,24,77,0.9); display: flex; align-items: center; justify-content: center; overflow: hidden;">
+              ${
+                trackedUser.avatarUrl
+                  ? `<img src="${trackedUser.avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" />`
+                  : `<span style="font-size: 18px; font-weight: 800; color: #ffffff;">${initialLetter}</span>`
+              }
+            </div>
+          </div>
+        `;
 
-          latestMarker.on("click", () => onSelectPing?.(ping));
-          latestMarker.addTo(trajGroup);
-        } else {
-          // Numbered historical breadcrumb marker
-          const breadcrumbHtml = `
-            <div style="display: flex; align-items: center; justify-content: center; cursor: pointer; transform: translate(-50%, -50%); pointer-events: auto;">
-              <div style="width: 26px; height: 26px; border-radius: 9999px; background: #0284c7; border: 2.5px solid #ffffff; box-shadow: 0 0 14px rgba(2,132,199,0.9); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #ffffff;">
-                ${idx + 1}
+        const pingMarker = L.marker([ping.lat, ping.lng], {
+          icon: L.divIcon({
+            html: iconHtml,
+            className: "snapchat-pinned-user-icon",
+            iconSize: [0, 0],
+            iconAnchor: [0, 0],
+          }),
+          zIndexOffset: isLatest ? 1200 : 900 + idx,
+        });
+
+        // Rich detail card popup (shown ONLY on user click)
+        const popupContent = `
+          <div style="text-align: center; white-space: nowrap; color: #ffffff; font-family: inherit;">
+            <div style="font-size: 12px; font-weight: 700; color: #ffffff; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <span>${trackedUser.fullName || trackedUser.username || "Tracked User"}</span>
+              ${
+                trackedUser.isUserId
+                  ? `<span style="font-size: 9px; padding: 1px 5px; border-radius: 9999px; background: rgba(255,24,77,0.3); color: #fda4af; font-weight: 600;">Signed In</span>`
+                  : ""
+              }
+            </div>
+            <div style="font-size: 10px; color: #fbbf24; font-weight: 600; margin-top: 3px;">
+              ${isLatest ? `🏁 Latest Ping (#${idx + 1}):` : `📍 Ping #${idx + 1}:`} ${relativeTime}
+            </div>
+            <div style="font-size: 9px; color: #a1a1aa; margin-top: 2px;">
+              ${ping.neighborhood || "Karachi"} • ${ping.screen ? `Screen: ${ping.screen}` : ping.eventName}
+            </div>
+            <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; gap: 5px;">
+              <div style="font-family: monospace; font-size: 10px; font-weight: 600; color: #38bdf8; background: rgba(56,189,248,0.12); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(56,189,248,0.3);">
+                📍 ${ping.lat.toFixed(5)}, ${ping.lng.toFixed(5)}
               </div>
+              <a href="https://www.google.com/maps?q=${ping.lat},${ping.lng}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 600; color: #ffffff; background: #ff184d; padding: 2px 7px; border-radius: 6px; text-decoration: none;">Maps ↗</a>
             </div>
-          `;
+          </div>
+        `;
 
-          const breadcrumbMarker = L.marker([ping.lat, ping.lng], {
-            icon: L.divIcon({
-              html: breadcrumbHtml,
-              className: "trajectory-breadcrumb-icon",
-              iconSize: [0, 0],
-              iconAnchor: [0, 0],
-            }),
-            zIndexOffset: 900 + idx,
-          });
+        pingMarker.bindPopup(popupContent, {
+          className: "user-tracker-popup",
+          offset: [0, -22],
+          autoClose: true,
+          closeOnClick: false,
+        });
 
-          const popupContent = `
-            <div style="padding: 6px 8px; text-align: center; color: #ffffff; min-width: 150px;">
-              <div style="font-size: 12px; font-weight: 800; color: #38bdf8;">📍 Ping #${idx + 1} of ${userPings.length}</div>
-              <div style="font-size: 11px; font-weight: 600; margin-top: 3px;">${ping.neighborhood || "Karachi"}</div>
-              <div style="font-size: 10px; color: #fbbf24; margin-top: 2px;">🕒 ${relativeTime}</div>
-              <div style="font-size: 9px; color: #a1a1aa; margin-top: 1px;">Event: ${ping.eventName}${ping.screen ? ` (${ping.screen})` : ""}</div>
-              <div style="font-family: monospace; font-size: 9px; color: #38bdf8; margin-top: 4px;">${ping.lat.toFixed(5)}, ${ping.lng.toFixed(5)}</div>
-            </div>
-          `;
+        pingMarker.on("click", () => {
+          onSelectPing?.(ping);
+          pingMarker.openPopup();
+        });
 
-          breadcrumbMarker.bindPopup(popupContent, {
-            className: "dark-custom-leaflet-popup",
-          });
+        const markerKey = `${ping.lat}-${ping.lng}-${ping.occurredAt}`;
+        pingMarkersMapRef.current.set(markerKey, pingMarker);
 
-          breadcrumbMarker.on("click", () => onSelectPing?.(ping));
-          breadcrumbMarker.addTo(trajGroup);
-        }
+        pingMarker.addTo(trajGroup);
       });
 
       // Fit map bounds to show full journey
@@ -561,6 +533,12 @@ export default function LocationMapCanvas({
     map.flyTo([focusedPing.lat, focusedPing.lng], 16, {
       duration: 0.8,
     });
+
+    const markerKey = `${focusedPing.lat}-${focusedPing.lng}-${focusedPing.occurredAt}`;
+    const marker = pingMarkersMapRef.current.get(markerKey);
+    if (marker) {
+      marker.openPopup();
+    }
   }, [focusedPing, mapLoaded]);
 
   const handleResetKarachi = () => {
@@ -572,7 +550,10 @@ export default function LocationMapCanvas({
   };
 
   const handleFocusHottest = () => {
-    const hottest = clusters[0];
+    const activeClusters = clusters.filter(
+      (c) => (c.uniqueUsers ?? 0) > 0 || (c.totalEvents ?? 0) > 0
+    );
+    const hottest = activeClusters[0];
     if (hottest && mapInstanceRef.current) {
       onSelectArea(hottest.name);
       mapInstanceRef.current.flyTo(
@@ -816,6 +797,33 @@ export default function LocationMapCanvas({
           </div>
         </div>
       </div>
+
+      <style jsx global>{`
+        .user-tracker-popup .leaflet-popup-content-wrapper {
+          background: rgba(9, 9, 11, 0.96) !important;
+          border: 1.5px solid #ff184d !important;
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.85) !important;
+          backdrop-filter: blur(12px) !important;
+          border-radius: 12px !important;
+          padding: 2px !important;
+          color: #ffffff !important;
+        }
+        .user-tracker-popup .leaflet-popup-content {
+          margin: 8px 12px !important;
+          line-height: 1.4 !important;
+        }
+        .user-tracker-popup .leaflet-popup-tip {
+          background: rgba(9, 9, 11, 0.96) !important;
+          border: 1px solid #ff184d !important;
+        }
+        .user-tracker-popup .leaflet-popup-close-button {
+          color: #a1a1aa !important;
+          padding: 4px 4px 0 0 !important;
+        }
+        .user-tracker-popup .leaflet-popup-close-button:hover {
+          color: #ffffff !important;
+        }
+      `}</style>
     </div>
   );
 }
