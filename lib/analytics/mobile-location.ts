@@ -82,6 +82,33 @@ export type PinnedUserTarget = {
   isSigned: boolean;
 };
 
+export type TrackedUserSummary = {
+  actorId: string;
+  isUserId: boolean;
+  fullName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+  platform: string | null;
+  totalPings: number;
+  firstSeen: string;
+  lastSeen: string;
+  lastLatitude: number;
+  lastLongitude: number;
+  lastNeighborhood: string | null;
+  neighborhoodsVisited: string[];
+};
+
+export type UserPingHistoryItem = {
+  id: string;
+  lat: number;
+  lng: number;
+  neighborhood: string | null;
+  eventName: string;
+  screen: string | null;
+  occurredAt: string;
+  context: Record<string, any>;
+};
+
 export type AreaSearch = {
   query: string;
   count: number;
@@ -738,4 +765,169 @@ export async function getAreaDetailIntelligence(
     hourlyActivity,
     recentEvents,
   };
+}
+
+/**
+ * Fetches all tracked users with their location summary across Karachi
+ */
+export async function getAllTrackedUsers(
+  range: DateRangeFilter = "7d",
+  search?: string
+): Promise<TrackedUserSummary[]> {
+  const dateClause = dateRangeClause("me", range);
+  const params: any[] = [];
+  let searchFilter = "";
+
+  if (search && search.trim()) {
+    params.push(`%${search.trim().toLowerCase()}%`);
+    const pIdx = params.length;
+    searchFilter = `AND (
+      LOWER(p.full_name) LIKE $${pIdx} OR
+      LOWER(p.username) LIKE $${pIdx} OR
+      LOWER(me.anon_id) LIKE $${pIdx} OR
+      LOWER(me.neighborhood) LIKE $${pIdx}
+    )`;
+  }
+
+  const res = await query<{
+    actor_id: string;
+    is_user_id: boolean;
+    full_name: string | null;
+    username: string | null;
+    avatar_url: string | null;
+    platform: string | null;
+    total_pings: string;
+    first_seen: string;
+    last_seen: string;
+    last_latitude: number;
+    last_longitude: number;
+    last_neighborhood: string | null;
+    neighborhoods: string[] | null;
+  }>(
+    `SELECT
+       COALESCE(me.user_id::text, me.anon_id) as actor_id,
+       (me.user_id IS NOT NULL) as is_user_id,
+       p.full_name,
+       p.username,
+       p.avatar_url,
+       MODE() WITHIN GROUP (ORDER BY me.platform) as platform,
+       COUNT(*)::text as total_pings,
+       MIN(me.occurred_at)::text as first_seen,
+       MAX(me.occurred_at)::text as last_seen,
+       (
+         SELECT sub.latitude
+         FROM public.mobile_events sub
+         WHERE sub.latitude IS NOT NULL
+           AND (
+             (me.user_id IS NOT NULL AND sub.user_id = me.user_id) OR
+             (me.user_id IS NULL AND sub.anon_id = me.anon_id)
+           )
+         ORDER BY sub.occurred_at DESC
+         LIMIT 1
+       ) as last_latitude,
+       (
+         SELECT sub.longitude
+         FROM public.mobile_events sub
+         WHERE sub.longitude IS NOT NULL
+           AND (
+             (me.user_id IS NOT NULL AND sub.user_id = me.user_id) OR
+             (me.user_id IS NULL AND sub.anon_id = me.anon_id)
+           )
+         ORDER BY sub.occurred_at DESC
+         LIMIT 1
+       ) as last_longitude,
+       (
+         SELECT sub.neighborhood
+         FROM public.mobile_events sub
+         WHERE sub.neighborhood IS NOT NULL
+           AND (
+             (me.user_id IS NOT NULL AND sub.user_id = me.user_id) OR
+             (me.user_id IS NULL AND sub.anon_id = me.anon_id)
+           )
+         ORDER BY sub.occurred_at DESC
+         LIMIT 1
+       ) as last_neighborhood,
+       array_agg(DISTINCT me.neighborhood) FILTER (WHERE me.neighborhood IS NOT NULL) as neighborhoods
+     FROM public.mobile_events me
+     LEFT JOIN public.profiles p ON p.id = me.user_id
+     WHERE me.latitude IS NOT NULL
+       ${dateClause}
+       ${searchFilter}
+     GROUP BY me.user_id, me.anon_id, p.full_name, p.username, p.avatar_url
+     ORDER BY COUNT(*) DESC, MAX(me.occurred_at) DESC
+     LIMIT 100`,
+    params
+  );
+
+  return res.rows.map((r) => ({
+    actorId: r.actor_id,
+    isUserId: r.is_user_id,
+    fullName: r.full_name,
+    username: r.username,
+    avatarUrl: r.avatar_url,
+    platform: r.platform,
+    totalPings: parseInt(r.total_pings, 10),
+    firstSeen: r.first_seen,
+    lastSeen: r.last_seen,
+    lastLatitude: Number(r.last_latitude) || 24.89,
+    lastLongitude: Number(r.last_longitude) || 67.06,
+    lastNeighborhood: r.last_neighborhood,
+    neighborhoodsVisited: r.neighborhoods || [],
+  }));
+}
+
+/**
+ * Fetches chronological location pings for a specific user to draw their movement path
+ */
+export async function getUserLocationPings(
+  actorId: string,
+  isUserId: boolean,
+  range: DateRangeFilter = "all"
+): Promise<UserPingHistoryItem[]> {
+  const dateClause = dateRangeClause("me", range);
+  const params: any[] = [actorId];
+
+  const userCondition = isUserId
+    ? "me.user_id::text = $1"
+    : "me.anon_id = $1";
+
+  const res = await query<{
+    id: string;
+    latitude: number;
+    longitude: number;
+    neighborhood: string | null;
+    event_name: string;
+    screen: string | null;
+    occurred_at: string;
+    context: any;
+  }>(
+    `SELECT
+       me.id,
+       me.latitude,
+       me.longitude,
+       me.neighborhood,
+       me.event_name,
+       COALESCE(me.screen, me.context->>'screen') as screen,
+       me.occurred_at::text,
+       me.context
+     FROM public.mobile_events me
+     WHERE me.latitude IS NOT NULL
+       AND me.longitude IS NOT NULL
+       AND ${userCondition}
+       ${dateClause}
+     ORDER BY me.occurred_at ASC
+     LIMIT 300`,
+    params
+  );
+
+  return res.rows.map((r) => ({
+    id: r.id,
+    lat: Number(r.latitude),
+    lng: Number(r.longitude),
+    neighborhood: r.neighborhood,
+    eventName: r.event_name,
+    screen: r.screen,
+    occurredAt: r.occurred_at,
+    context: r.context || {},
+  }));
 }

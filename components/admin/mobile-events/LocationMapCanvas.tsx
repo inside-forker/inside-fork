@@ -25,6 +25,8 @@ import type {
   HeatmapPoint,
   NeighborhoodCluster,
   PinnedUserTarget,
+  TrackedUserSummary,
+  UserPingHistoryItem,
 } from "@/lib/analytics/mobile-location";
 
 interface LocationMapCanvasProps {
@@ -34,6 +36,11 @@ interface LocationMapCanvasProps {
   onSelectArea: (neighborhood: string) => void;
   pinnedUser?: PinnedUserTarget | null;
   onClearPinnedUser?: () => void;
+  trackedUser?: TrackedUserSummary | null;
+  userPings?: UserPingHistoryItem[];
+  focusedPing?: UserPingHistoryItem | null;
+  onClearTrackedUser?: () => void;
+  onSelectPing?: (ping: UserPingHistoryItem) => void;
   intensityMultiplier?: number;
   showHotspotBadges?: boolean;
 }
@@ -60,6 +67,12 @@ export default function LocationMapCanvas({
   onSelectArea,
   pinnedUser,
   onClearPinnedUser,
+  trackedUser,
+  userPings,
+  focusedPing,
+  onClearTrackedUser,
+  onSelectPing,
+  intensityMultiplier,
   showHotspotBadges = true,
 }: LocationMapCanvasProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -67,6 +80,7 @@ export default function LocationMapCanvas({
   const markersLayerGroupRef = useRef<any>(null);
   const zonesLayerGroupRef = useRef<any>(null);
   const userPinLayerGroupRef = useRef<any>(null);
+  const trajectoryLayerGroupRef = useRef<any>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mapStyle, setMapStyle] = useState<"midnight" | "contrast">("midnight");
@@ -155,6 +169,9 @@ export default function LocationMapCanvas({
         const userPinGroup = L.layerGroup().addTo(map);
         userPinLayerGroupRef.current = userPinGroup;
 
+        const trajectoryGroup = L.layerGroup().addTo(map);
+        trajectoryLayerGroupRef.current = trajectoryGroup;
+
         mapInstanceRef.current = map;
         setMapLoaded(true);
 
@@ -179,93 +196,102 @@ export default function LocationMapCanvas({
     };
   }, [mapStyle]);
 
-  // 2. Render Native Radiant Zones & Hotspot Nodes
+  // 2. Render Hotspots and Radial Heatmap Circles
   useEffect(() => {
     const map = mapInstanceRef.current;
-    const markersGroup = markersLayerGroupRef.current;
     const zonesGroup = zonesLayerGroupRef.current;
-    if (!map || !markersGroup || !zonesGroup || !mapLoaded) return;
+    const markersGroup = markersLayerGroupRef.current;
+    if (!map || !zonesGroup || !markersGroup || !mapLoaded) return;
+
+    zonesGroup.clearLayers();
+    markersGroup.clearLayers();
+
+    // In user tracker mode with active trajectory, keep hotspot background subtle
+    const isTracking = !!(trackedUser && userPings && userPings.length > 0);
 
     import("leaflet").then(({ default: L }) => {
-      markersGroup.clearLayers();
-      zonesGroup.clearLayers();
-
-      if (!showHotspotBadges) return;
-
       clusters.forEach((cluster) => {
-        if (cluster.totalEvents === 0) return;
-
         const isSelected = selectedArea === cluster.name;
         const isBlazing = cluster.intensityLevel === "blazing";
         const isHot = cluster.intensityLevel === "hot";
 
-        const primaryColor = isBlazing ? "#ff184d" : isHot ? "#f59e0b" : "#06b6d4";
-        const fillColor = isBlazing ? "#ff184d" : isHot ? "#eab308" : "#00f0ff";
-        const fillOpacity = isSelected ? 0.25 : isBlazing ? 0.18 : isHot ? 0.14 : 0.1;
+        let primaryColor = "#00f0ff";
+        let fillColor = "#00f0ff";
+        let fillOpacity = isTracking ? 0.04 : 0.12 * (intensityMultiplier || 1);
 
-        // Native Leaflet Radiant Area Circle
-        const radiusMeters = Math.max(1200, (cluster.radiusKm || 2.5) * 650);
-        const circle = L.circle([cluster.center.lat, cluster.center.lng], {
-          radius: radiusMeters,
+        if (isBlazing) {
+          primaryColor = "#ff184d";
+          fillColor = "#ff184d";
+          fillOpacity = isTracking ? 0.08 : 0.24 * (intensityMultiplier || 1);
+        } else if (isHot) {
+          primaryColor = "#f59e0b";
+          fillColor = "#f59e0b";
+          fillOpacity = isTracking ? 0.06 : 0.18 * (intensityMultiplier || 1);
+        }
+
+        const outerRadius = (cluster.radiusKm * 1000 * 1.5) * (isBlazing ? 1.25 : 1.0);
+        const outerCircle = L.circle([cluster.center.lat, cluster.center.lng], {
+          radius: outerRadius,
           color: primaryColor,
-          weight: isSelected ? 2.5 : 1.5,
-          opacity: isSelected ? 0.9 : 0.6,
+          weight: isSelected ? 2 : 1,
+          opacity: isTracking ? 0.2 : (isSelected ? 0.8 : 0.4),
           fillColor: fillColor,
-          fillOpacity: fillOpacity,
+          fillOpacity: fillOpacity * 0.4,
           dashArray: isSelected ? undefined : "4, 6",
         });
 
-        circle.on("click", () => {
+        outerCircle.on("click", () => {
           onSelectArea(cluster.name);
           map.flyTo([cluster.center.lat, cluster.center.lng], 14, {
             duration: 0.8,
           });
         });
 
-        circle.addTo(zonesGroup);
+        outerCircle.addTo(zonesGroup);
 
-        // Snapchat-Style Pulsing Radar Node
-        const pulseColor = isBlazing ? "#ff184d" : isHot ? "#fbbf24" : "#22d3ee";
-        const badgeBg = isSelected
-          ? "background: #ff184d; color: #ffffff; border: 2px solid #ffffff; box-shadow: 0 0 25px rgba(255,24,77,0.85);"
-          : isBlazing
-          ? "background: rgba(15, 15, 20, 0.95); color: #fda4af; border: 1.5px solid rgba(244, 63, 94, 0.9); box-shadow: 0 0 18px rgba(244,63,94,0.45);"
-          : isHot
-          ? "background: rgba(15, 15, 20, 0.95); color: #fde047; border: 1.5px solid rgba(234, 179, 8, 0.9); box-shadow: 0 0 18px rgba(234,179,8,0.45);"
-          : "background: rgba(15, 15, 20, 0.95); color: #67e8f9; border: 1.5px solid rgba(6, 182, 212, 0.9); box-shadow: 0 0 18px rgba(6,182,212,0.45);";
+        const innerRadius = cluster.radiusKm * 1000 * 0.8;
+        const innerCircle = L.circle([cluster.center.lat, cluster.center.lng], {
+          radius: innerRadius,
+          color: primaryColor,
+          weight: isSelected ? 2.5 : 1.5,
+          opacity: isTracking ? 0.3 : (isSelected ? 0.95 : 0.65),
+          fillColor: fillColor,
+          fillOpacity: fillOpacity,
+        });
 
-        const topSearchPreview = cluster.topSearches[0]?.query
-          ? `🔍 &ldquo;${cluster.topSearches[0].query}&rdquo;`
-          : "Active Zone";
+        innerCircle.on("click", () => {
+          onSelectArea(cluster.name);
+          map.flyTo([cluster.center.lat, cluster.center.lng], 14, {
+            duration: 0.8,
+          });
+        });
 
-        const iconHtml = `
-          <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; transform: translate(-50%, -50%); pointer-events: auto;">
-            <!-- Pulsing Radar Waves -->
-            <div style="position: absolute; top: -16px; left: -16px; width: 80px; height: 80px; pointer-events: none;">
-              <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.6; background-color: ${pulseColor}; animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
-              <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.25; background-color: ${pulseColor}; transform: scale(1.3);"></span>
+        innerCircle.addTo(zonesGroup);
+
+        if (!showHotspotBadges && !isSelected) return;
+
+        const badgeHtml = `
+          <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; transform: translate(-50%, -50%); pointer-events: auto; opacity: ${
+            isTracking ? "0.6" : "1"
+          };">
+            <div style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 9999px; background: rgba(9, 9, 11, 0.9); border: 1.5px solid ${primaryColor}; box-shadow: 0 0 15px ${primaryColor}66; white-space: nowrap; backdrop-filter: blur(8px);">
+              <span style="display: inline-block; width: 6px; height: 6px; border-radius: 9999px; background-color: ${primaryColor};"></span>
+              <span style="font-size: 11px; font-weight: 700; color: #ffffff;">${cluster.name}</span>
+              <span style="font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 9999px; background: ${primaryColor}26; color: ${primaryColor};">${cluster.uniqueUsers} 👤</span>
             </div>
-
-            <!-- Hotspot Node Pill -->
-            <div style="position: relative; z-index: 10; display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 9999px; backdrop-filter: blur(10px); ${badgeBg}; transition: all 0.2s ease;">
-              <span style="display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background-color: ${pulseColor}; box-shadow: 0 0 8px ${pulseColor};"></span>
-              <span style="font-size: 12px; font-weight: 700; white-space: nowrap;">${cluster.name}</span>
-              <span style="font-size: 10px; font-family: monospace; padding: 2px 6px; border-radius: 9999px; background: rgba(255,255,255,0.18); font-weight: 700;">
-                ${cluster.uniqueUsers} 👤
-              </span>
-              ${isBlazing ? `<span style="font-size: 12px;">🔥</span>` : ""}
-            </div>
-
-            <!-- Top Search Bubble -->
-            <div style="margin-top: 4px; padding: 2px 8px; border-radius: 6px; background: rgba(10, 10, 14, 0.92); border: 1px solid rgba(63, 63, 70, 0.8); font-size: 10px; color: #f4f4f5; font-weight: 600; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.6);">
-              ${topSearchPreview}
-            </div>
+            ${
+              cluster.topSearches[0] && !isTracking
+                ? `<div style="margin-top: 3px; padding: 2px 6px; border-radius: 6px; background: rgba(0, 0, 0, 0.85); border: 1px solid rgba(255,255,255,0.15); font-size: 9px; color: #e4e4e7; white-space: nowrap;">
+                    🔍 "${cluster.topSearches[0].query}"
+                   </div>`
+                : ""
+            }
           </div>
         `;
 
         const customIcon = L.divIcon({
-          html: iconHtml,
-          className: "snapchat-hotspot-div-icon",
+          html: badgeHtml,
+          className: "snapchat-hotspot-badge-icon",
           iconSize: [0, 0],
           iconAnchor: [0, 0],
         });
@@ -284,7 +310,7 @@ export default function LocationMapCanvas({
         marker.addTo(markersGroup);
       });
     });
-  }, [mapLoaded, clusters, selectedArea, showHotspotBadges, onSelectArea]);
+  }, [mapLoaded, clusters, selectedArea, showHotspotBadges, onSelectArea, intensityMultiplier, trackedUser, userPings]);
 
   // 3. Render Dedicated Pinned User Avatar Location
   useEffect(() => {
@@ -294,7 +320,7 @@ export default function LocationMapCanvas({
 
     userPinGroup.clearLayers();
 
-    if (!pinnedUser) return;
+    if (!pinnedUser || (trackedUser && userPings && userPings.length > 0)) return;
 
     import("leaflet").then(({ default: L }) => {
       // Smoothly pan to the user's coordinates with street-level zoom
@@ -372,7 +398,169 @@ export default function LocationMapCanvas({
 
       userMarker.addTo(userPinGroup);
     });
-  }, [mapLoaded, pinnedUser]);
+  }, [mapLoaded, pinnedUser, trackedUser, userPings]);
+
+  // 4. Render User Tracker Mode Trajectory & Historical Breadcrumbs
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const trajGroup = trajectoryLayerGroupRef.current;
+    const userPinGroup = userPinLayerGroupRef.current;
+    if (!map || !trajGroup || !mapLoaded) return;
+
+    trajGroup.clearLayers();
+
+    if (!trackedUser || !userPings || userPings.length === 0) return;
+
+    if (userPinGroup) userPinGroup.clearLayers();
+
+    import("leaflet").then(({ default: L }) => {
+      const latLngs: [number, number][] = userPings.map((p) => [p.lat, p.lng]);
+
+      // Draw polyline route connecting pings
+      if (latLngs.length > 1) {
+        // Glowing halo path
+        L.polyline(latLngs, {
+          color: "#ff184d",
+          weight: 7,
+          opacity: 0.35,
+          lineCap: "round",
+          lineJoin: "round",
+        }).addTo(trajGroup);
+
+        // Vibrant dashed core line
+        L.polyline(latLngs, {
+          color: "#38bdf8",
+          weight: 3.5,
+          opacity: 0.95,
+          dashArray: "8, 8",
+          lineCap: "round",
+          lineJoin: "round",
+        }).addTo(trajGroup);
+      }
+
+      // Render markers for all pings
+      userPings.forEach((ping, idx) => {
+        const isLatest = idx === userPings.length - 1;
+        const relativeTime = formatRelativeTime(ping.occurredAt);
+
+        if (isLatest) {
+          const initialLetter = trackedUser.fullName
+            ? trackedUser.fullName[0].toUpperCase()
+            : trackedUser.username
+            ? trackedUser.username[0].toUpperCase()
+            : "U";
+
+          const latestIconHtml = `
+            <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; transform: translate(-50%, -50%); pointer-events: auto; z-index: 1000;">
+              <div style="position: absolute; top: -20px; left: -20px; width: 88px; height: 88px; pointer-events: none;">
+                <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.75; background-color: #ff184d; animation: ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
+                <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.35; background-color: #ff184d; transform: scale(1.4);"></span>
+              </div>
+              <div style="position: relative; z-index: 100; width: 48px; height: 48px; border-radius: 9999px; background: #ff184d; border: 3px solid #ffffff; box-shadow: 0 0 25px rgba(255,24,77,0.9); display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                ${
+                  trackedUser.avatarUrl
+                    ? `<img src="${trackedUser.avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" />`
+                    : `<span style="font-size: 20px; font-weight: 800; color: #ffffff;">${initialLetter}</span>`
+                }
+              </div>
+              <div style="margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: rgba(9, 9, 11, 0.96); border: 1.5px solid #ff184d; box-shadow: 0 8px 25px rgba(0,0,0,0.8); text-align: center; white-space: nowrap; backdrop-filter: blur(12px);">
+                <div style="font-size: 12px; font-weight: 700; color: #ffffff; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                  <span>${trackedUser.fullName || trackedUser.username || "Tracked User"}</span>
+                  ${
+                    trackedUser.isUserId
+                      ? `<span style="font-size: 9px; padding: 1px 5px; border-radius: 9999px; background: rgba(255,24,77,0.3); color: #fda4af; font-weight: 600;">Signed In</span>`
+                      : ""
+                  }
+                </div>
+                <div style="font-size: 10px; color: #fbbf24; font-weight: 600; margin-top: 2px;">
+                  🏁 Latest Ping (#${idx + 1}): ${relativeTime}
+                </div>
+                <div style="font-size: 9px; color: #a1a1aa; margin-top: 1px;">
+                  ${ping.neighborhood || "Karachi"} • ${ping.screen ? `Screen: ${ping.screen}` : ping.eventName}
+                </div>
+                <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; gap: 5px;">
+                  <div style="font-family: monospace; font-size: 10px; font-weight: 600; color: #38bdf8; background: rgba(56,189,248,0.12); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(56,189,248,0.3);">
+                    📍 ${ping.lat.toFixed(5)}, ${ping.lng.toFixed(5)}
+                  </div>
+                  <a href="https://www.google.com/maps?q=${ping.lat},${ping.lng}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 600; color: #ffffff; background: #ff184d; padding: 2px 7px; border-radius: 6px; text-decoration: none;">Maps ↗</a>
+                </div>
+              </div>
+            </div>
+          `;
+
+          const latestMarker = L.marker([ping.lat, ping.lng], {
+            icon: L.divIcon({
+              html: latestIconHtml,
+              className: "snapchat-pinned-user-icon",
+              iconSize: [0, 0],
+              iconAnchor: [0, 0],
+            }),
+            zIndexOffset: 1200,
+          });
+
+          latestMarker.on("click", () => onSelectPing?.(ping));
+          latestMarker.addTo(trajGroup);
+        } else {
+          // Numbered historical breadcrumb marker
+          const breadcrumbHtml = `
+            <div style="display: flex; align-items: center; justify-content: center; cursor: pointer; transform: translate(-50%, -50%); pointer-events: auto;">
+              <div style="width: 26px; height: 26px; border-radius: 9999px; background: #0284c7; border: 2.5px solid #ffffff; box-shadow: 0 0 14px rgba(2,132,199,0.9); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #ffffff;">
+                ${idx + 1}
+              </div>
+            </div>
+          `;
+
+          const breadcrumbMarker = L.marker([ping.lat, ping.lng], {
+            icon: L.divIcon({
+              html: breadcrumbHtml,
+              className: "trajectory-breadcrumb-icon",
+              iconSize: [0, 0],
+              iconAnchor: [0, 0],
+            }),
+            zIndexOffset: 900 + idx,
+          });
+
+          const popupContent = `
+            <div style="padding: 6px 8px; text-align: center; color: #ffffff; min-width: 150px;">
+              <div style="font-size: 12px; font-weight: 800; color: #38bdf8;">📍 Ping #${idx + 1} of ${userPings.length}</div>
+              <div style="font-size: 11px; font-weight: 600; margin-top: 3px;">${ping.neighborhood || "Karachi"}</div>
+              <div style="font-size: 10px; color: #fbbf24; margin-top: 2px;">🕒 ${relativeTime}</div>
+              <div style="font-size: 9px; color: #a1a1aa; margin-top: 1px;">Event: ${ping.eventName}${ping.screen ? ` (${ping.screen})` : ""}</div>
+              <div style="font-family: monospace; font-size: 9px; color: #38bdf8; margin-top: 4px;">${ping.lat.toFixed(5)}, ${ping.lng.toFixed(5)}</div>
+            </div>
+          `;
+
+          breadcrumbMarker.bindPopup(popupContent, {
+            className: "dark-custom-leaflet-popup",
+          });
+
+          breadcrumbMarker.on("click", () => onSelectPing?.(ping));
+          breadcrumbMarker.addTo(trajGroup);
+        }
+      });
+
+      // Fit map bounds to show full journey
+      if (latLngs.length > 1) {
+        map.fitBounds(L.latLngBounds(latLngs), {
+          padding: [70, 70],
+          maxZoom: 15,
+          duration: 1.0,
+        });
+      } else if (latLngs.length === 1) {
+        map.flyTo(latLngs[0], 15, { duration: 1.0 });
+      }
+    });
+  }, [mapLoaded, trackedUser, userPings, onSelectPing]);
+
+  // 5. Focus specific ping when clicked in list
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !mapLoaded || !focusedPing) return;
+
+    map.flyTo([focusedPing.lat, focusedPing.lng], 16, {
+      duration: 0.8,
+    });
+  }, [focusedPing, mapLoaded]);
 
   const handleResetKarachi = () => {
     if (mapInstanceRef.current) {
@@ -410,7 +598,72 @@ export default function LocationMapCanvas({
 
       {/* Top Floating Controls Bar */}
       <div className="absolute top-4 left-4 z-[400] flex items-center gap-2 flex-wrap pointer-events-auto">
-        {pinnedUser ? (
+        {trackedUser ? (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge
+              variant="outline"
+              className="bg-background/95 backdrop-blur-md border-sky-500 text-foreground px-3 py-1.5 shadow-lg text-xs font-semibold flex items-center gap-2"
+            >
+              <Navigation className="w-3.5 h-3.5 text-sky-500 animate-pulse" />
+              <span>
+                Tracking: <strong className="text-sky-500">{trackedUser.fullName || trackedUser.username || "User"}</strong>
+              </span>
+              <Badge className="bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/30 text-[10px] px-1.5 py-0">
+                {userPings?.length || 0} pings
+              </Badge>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onClearTrackedUser}
+                className="h-5 w-5 p-0 hover:bg-muted ml-1 rounded-full text-muted-foreground hover:text-foreground"
+                title="Exit Tracker Mode"
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </Badge>
+
+            {/* Coordinates & Copy Bar for latest ping */}
+            <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-md border border-border px-2.5 py-1 rounded-lg shadow-lg">
+              <span className="text-xs font-mono font-bold text-cyan-600 dark:text-cyan-400">
+                {trackedUser.lastLatitude.toFixed(5)}, {trackedUser.lastLongitude.toFixed(5)}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleCopyCoords(trackedUser.lastLatitude, trackedUser.lastLongitude)}
+                className="h-6 px-2 text-[10px] gap-1 border-border font-medium hover:border-primary"
+                title="Copy Lat, Lng coordinates"
+              >
+                {copiedCoords ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-500" />
+                    <span className="text-emerald-500 font-semibold">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3" />
+                    Copy Lat/Lng
+                  </>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                asChild
+                className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground gap-0.5"
+              >
+                <a
+                  href={`https://www.google.com/maps?q=${trackedUser.lastLatitude},${trackedUser.lastLongitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open exact coordinates in Google Maps"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </Button>
+            </div>
+          </div>
+        ) : pinnedUser ? (
           <div className="flex items-center gap-1.5 flex-wrap">
             <Badge
               variant="outline"
