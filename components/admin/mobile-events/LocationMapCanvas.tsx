@@ -17,6 +17,9 @@ import {
   User,
   Smartphone,
   Clock,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import type {
   HeatmapPoint,
@@ -67,6 +70,13 @@ export default function LocationMapCanvas({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mapStyle, setMapStyle] = useState<"midnight" | "contrast">("midnight");
+  const [copiedCoords, setCopiedCoords] = useState(false);
+
+  const handleCopyCoords = (lat: number, lng: number) => {
+    navigator.clipboard.writeText(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+    setCopiedCoords(true);
+    setTimeout(() => setCopiedCoords(false), 2000);
+  };
 
   // 1. Initialize Map
   useEffect(() => {
@@ -311,7 +321,7 @@ export default function LocationMapCanvas({
           </div>
 
           <!-- Detailed Info Card Floating Above Pin -->
-          <div style="margin-top: 8px; padding: 6px 12px; border-radius: 10px; background: rgba(9, 9, 11, 0.96); border: 1.5px solid #ff184d; box-shadow: 0 8px 25px rgba(0,0,0,0.8); text-align: center; white-space: nowrap; backdrop-filter: blur(12px);">
+          <div style="margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: rgba(9, 9, 11, 0.96); border: 1.5px solid #ff184d; box-shadow: 0 8px 25px rgba(0,0,0,0.8); text-align: center; white-space: nowrap; backdrop-filter: blur(12px);">
             <div style="font-size: 12px; font-weight: 700; color: #ffffff; display: flex; align-items: center; justify-content: center; gap: 4px;">
               <span>${pinnedUser.name}</span>
               ${
@@ -327,6 +337,22 @@ export default function LocationMapCanvas({
               ${pinnedUser.platform ? `${pinnedUser.platform.toUpperCase()} • ` : ""}Screen: ${
         pinnedUser.topScreen || "Home"
       }
+            </div>
+
+            <!-- Coordinates Pill & External Map Link -->
+            <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; gap: 5px;">
+              <div style="font-family: monospace; font-size: 10px; font-weight: 600; color: #38bdf8; background: rgba(56,189,248,0.12); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(56,189,248,0.3);">
+                📍 ${pinnedUser.lat.toFixed(5)}, ${pinnedUser.lng.toFixed(5)}
+              </div>
+              <a 
+                href="https://www.google.com/maps?q=${pinnedUser.lat},${pinnedUser.lng}" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 600; color: #ffffff; background: #ff184d; padding: 2px 7px; border-radius: 6px; text-decoration: none;"
+                title="View exact location on Google Maps"
+              >
+                Maps ↗
+              </a>
             </div>
           </div>
         </div>
@@ -385,27 +411,70 @@ export default function LocationMapCanvas({
       {/* Top Floating Controls Bar */}
       <div className="absolute top-4 left-4 z-[400] flex items-center gap-2 flex-wrap pointer-events-auto">
         {pinnedUser ? (
-          <Badge
-            variant="outline"
-            className="bg-background/95 backdrop-blur-md border-rose-500 text-foreground px-3 py-1.5 shadow-lg text-xs font-semibold flex items-center gap-2"
-          >
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
-            </span>
-            <span>
-              Pinned User: <strong className="text-rose-500">{pinnedUser.name}</strong>
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onClearPinnedUser}
-              className="h-5 w-5 p-0 hover:bg-muted ml-1 rounded-full text-muted-foreground hover:text-foreground"
-              title="Clear User Pin"
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge
+              variant="outline"
+              className="bg-background/95 backdrop-blur-md border-rose-500 text-foreground px-3 py-1.5 shadow-lg text-xs font-semibold flex items-center gap-2"
             >
-              <X className="w-3.5 h-3.5" />
-            </Button>
-          </Badge>
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+              </span>
+              <span>
+                Pinned: <strong className="text-rose-500">{pinnedUser.name}</strong>
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onClearPinnedUser}
+                className="h-5 w-5 p-0 hover:bg-muted ml-1 rounded-full text-muted-foreground hover:text-foreground"
+                title="Clear User Pin"
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </Badge>
+
+            {/* Coordinates & Copy Bar */}
+            <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-md border border-border px-2.5 py-1 rounded-lg shadow-lg">
+              <span className="text-xs font-mono font-bold text-cyan-600 dark:text-cyan-400">
+                {pinnedUser.lat.toFixed(5)}, {pinnedUser.lng.toFixed(5)}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleCopyCoords(pinnedUser.lat, pinnedUser.lng)}
+                className="h-6 px-2 text-[10px] gap-1 border-border font-medium hover:border-primary"
+                title="Copy Lat, Lng coordinates"
+              >
+                {copiedCoords ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-500" />
+                    <span className="text-emerald-500 font-semibold">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3" />
+                    Copy Lat/Lng
+                  </>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                asChild
+                className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground gap-0.5"
+              >
+                <a
+                  href={`https://www.google.com/maps?q=${pinnedUser.lat},${pinnedUser.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open exact coordinates in Google Maps"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </Button>
+            </div>
+          </div>
         ) : (
           <Badge
             variant="outline"

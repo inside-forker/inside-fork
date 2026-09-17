@@ -26,6 +26,8 @@ import {
   TrendingUp,
   AlertCircle,
   CheckCircle2,
+  Copy,
+  Check,
 } from "lucide-react";
 import type {
   AreaDetailIntelligence,
@@ -73,6 +75,13 @@ export function AreaDetailDrawer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("searches");
+  const [copiedUserIndex, setCopiedUserIndex] = useState<number | null>(null);
+
+  const handleCopyUserCoords = (lat: number, lng: number, index: number) => {
+    navigator.clipboard.writeText(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+    setCopiedUserIndex(index);
+    setTimeout(() => setCopiedUserIndex(null), 2000);
+  };
 
   useEffect(() => {
     if (!neighborhood || !isOpen) return;
@@ -428,37 +437,65 @@ export function AreaDetailDrawer({
                               </div>
                             </div>
 
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                const targetLat =
-                                  u.lastLatitude ?? clusterData?.center.lat ?? 24.89;
-                                const targetLng =
-                                  u.lastLongitude ?? clusterData?.center.lng ?? 67.06;
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  const targetLat =
+                                    u.lastLatitude ?? clusterData?.center.lat ?? 24.89;
+                                  const targetLng =
+                                    u.lastLongitude ?? clusterData?.center.lng ?? 67.06;
+                                  handleCopyUserCoords(targetLat, targetLng, idx);
+                                }}
+                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+                                title="Copy Lat, Lng coordinates"
+                              >
+                                {copiedUserIndex === idx ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                    <span className="text-[10px] text-emerald-500 font-semibold">Copied</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3.5 h-3.5" />
+                                    <span className="text-[10px] hidden sm:inline">Copy</span>
+                                  </>
+                                )}
+                              </Button>
 
-                                onPinUser?.({
-                                  lat: targetLat,
-                                  lng: targetLng,
-                                  name:
-                                    u.fullName ||
-                                    (u.username ? `@${u.username}` : "Anonymous Device"),
-                                  username: u.username,
-                                  avatarUrl: u.avatarUrl,
-                                  lastSeen: u.lastSeen,
-                                  platform: u.platform,
-                                  topScreen: u.topScreen,
-                                  lastEventName: u.lastEventName,
-                                  isSigned: !!u.userId,
-                                });
-                                onClose();
-                              }}
-                              className="h-7 px-2.5 text-xs border-border hover:border-primary hover:text-primary gap-1 shadow-sm bg-background font-medium"
-                              title="Pin this user's last location on map"
-                            >
-                              <MapPin className="w-3.5 h-3.5 text-rose-500" />
-                              Pin Location
-                            </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  const targetLat =
+                                    u.lastLatitude ?? clusterData?.center.lat ?? 24.89;
+                                  const targetLng =
+                                    u.lastLongitude ?? clusterData?.center.lng ?? 67.06;
+
+                                  onPinUser?.({
+                                    lat: targetLat,
+                                    lng: targetLng,
+                                    name:
+                                      u.fullName ||
+                                      (u.username ? `@${u.username}` : "Anonymous Device"),
+                                    username: u.username,
+                                    avatarUrl: u.avatarUrl,
+                                    lastSeen: u.lastSeen,
+                                    platform: u.platform,
+                                    topScreen: u.topScreen,
+                                    lastEventName: u.lastEventName,
+                                    isSigned: !!u.userId,
+                                  });
+                                  onClose();
+                                }}
+                                className="h-7 px-2.5 text-xs border-border hover:border-primary hover:text-primary gap-1 shadow-sm bg-background font-medium"
+                                title="Pin this user's last location on map"
+                              >
+                                <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                                Pin Location
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       ))}
