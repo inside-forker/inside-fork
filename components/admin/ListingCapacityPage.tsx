@@ -37,12 +37,19 @@ import {
   FolderTree,
   Folder,
   Check,
+  Plus,
+  Pencil,
+  Camera,
+  Loader2,
 } from "lucide-react";
 import type {
+  Listing,
   ListingCapacityCompleteness,
   ListingCapacityFields,
   ListingCapacityRow,
 } from "@/types/listing.types";
+import { ListingModal } from "./ListingModal";
+import { useListingEditors } from "@/lib/hooks/useListingEditors";
 
 type DraftFields = {
   min_price_per_person: string;
@@ -167,6 +174,119 @@ export function ListingCapacityPage() {
   const [expandedCategoryIds, setExpandedCategoryIds] = React.useState<Set<number>>(
     new Set()
   );
+
+  // Listing Modal (Edit / Add Photos / Create) State
+  const [selectedListing, setSelectedListing] = React.useState<Listing | null>(null);
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [loadingEditId, setLoadingEditId] = React.useState<number | null>(null);
+  const [userProfile, setUserProfile] = React.useState<{
+    id: string;
+    full_name: string;
+    role: string;
+  } | null>(null);
+
+  const { editorsMap, trackEditing, stopTracking } = useListingEditors();
+
+  React.useEffect(() => {
+    async function loadUser() {
+      try {
+        const res = await fetch("/api/user/me");
+        const data = await res.json();
+        if (data.success && data.user) {
+          setUserProfile({
+            id: data.user.id,
+            full_name: data.user.full_name || data.user.email,
+            role: data.user.role,
+          });
+        }
+      } catch {
+        // ignore
+      }
+    }
+    loadUser();
+  }, []);
+
+  const handleCreateListing = () => {
+    setSelectedListing(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditListing = async (listingId: number) => {
+    try {
+      setLoadingEditId(listingId);
+      const res = await fetch(`/api/admin/listings/${listingId}`);
+      const result = await res.json();
+      if (result.success && result.data) {
+        const listingData = result.data.listing || result.data;
+        setSelectedListing(listingData);
+        setIsModalOpen(true);
+        trackEditing(listingId);
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to load listing details",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to fetch listing for editing",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingEditId(null);
+    }
+  };
+
+  const handleSaveListing = async (listingData: Partial<Listing>) => {
+    try {
+      const isUpdate = !!selectedListing;
+      const url = isUpdate
+        ? `/api/admin/listings/${selectedListing.id}`
+        : "/api/admin/listings";
+      const method = isUpdate ? "PATCH" : "POST";
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(listingData),
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (response.ok && result?.success) {
+        setIsModalOpen(false);
+        setSelectedListing(null);
+        stopTracking();
+        fetchListings();
+        toast({
+          title: "Success",
+          description: `Listing ${
+            isUpdate ? "updated" : "created"
+          } successfully`,
+        });
+        return result.data || null;
+      } else {
+        toast({
+          title: "Error",
+          description: result?.error || "Failed to save listing",
+          variant: "destructive",
+        });
+        return null;
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to save listing",
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
 
   const pageSize = 20;
 
@@ -703,6 +823,13 @@ export function ListingCapacityPage() {
           />
           Refresh
         </Button>
+        <Button
+          className="h-11 bg-primary text-primary-foreground hover:bg-primary/90 gap-2 shrink-0"
+          onClick={handleCreateListing}
+        >
+          <Plus className="h-4 w-4" />
+          Create Listing
+        </Button>
       </div>
 
       <Card>
@@ -724,7 +851,7 @@ export function ListingCapacityPage() {
                 </TableHead>
                 <TableHead className="min-w-[110px]">Min guest capacity</TableHead>
                 <TableHead className="min-w-[110px]">Max guest capacity</TableHead>
-                <TableHead className="w-[100px]">Actions</TableHead>
+                <TableHead className="w-[130px] text-right pr-4">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -910,15 +1037,32 @@ export function ListingCapacityPage() {
                             className="h-9"
                           />
                         </TableCell>
-                        <TableCell>
-                          <Button
-                            size="sm"
-                            disabled={!dirty || saving}
-                            onClick={() => handleSave(row)}
-                          >
-                            <Save className="h-3.5 w-3.5 mr-1" />
-                            {saving ? "Saving…" : "Save"}
-                          </Button>
+                        <TableCell className="pr-4">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              disabled={!dirty || saving}
+                              onClick={() => handleSave(row)}
+                              className="h-8 px-2.5"
+                            >
+                              <Save className="h-3.5 w-3.5 mr-1" />
+                              {saving ? "Saving…" : "Save"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditListing(row.id)}
+                              disabled={loadingEditId === row.id}
+                              className="h-8 px-2 hover:border-primary hover:text-primary transition-colors"
+                              title="Edit listing details, photos, menu, & hours"
+                            >
+                              {loadingEditId === row.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Pencil className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
 
@@ -1066,7 +1210,7 @@ export function ListingCapacityPage() {
                         <TableRow className="hover:bg-transparent">
                           <TableCell colSpan={9} className="bg-muted/30 p-4">
                             <div className="flex flex-col gap-4 sm:flex-row">
-                              <div className="relative h-40 w-full shrink-0 overflow-hidden rounded-xl border border-border/50 bg-muted sm:h-44 sm:w-56">
+                              <div className="relative h-40 w-full shrink-0 overflow-hidden rounded-xl border border-border/50 bg-muted sm:h-44 sm:w-56 group">
                                 {row.image_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
@@ -1083,17 +1227,49 @@ export function ListingCapacityPage() {
                                     <span className="text-xs">No photo</span>
                                   </div>
                                 )}
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => handleEditListing(row.id)}
+                                    disabled={loadingEditId === row.id}
+                                    className="gap-1.5 text-xs shadow-lg bg-background/95 text-foreground hover:bg-background border border-border/60"
+                                  >
+                                    {loadingEditId === row.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Camera className="h-3.5 w-3.5" />
+                                    )}
+                                    Manage Photos
+                                  </Button>
+                                </div>
                               </div>
                               <div className="min-w-0 flex-1 space-y-3">
-                                <div>
-                                  <h3 className="text-base font-semibold">
-                                    {row.name}
-                                  </h3>
-                                  {row.category_name ? (
-                                    <p className="text-sm text-muted-foreground">
-                                      {row.category_name}
-                                    </p>
-                                  ) : null}
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <h3 className="text-base font-semibold">
+                                      {row.name}
+                                    </h3>
+                                    {row.category_name ? (
+                                      <p className="text-sm text-muted-foreground">
+                                        {row.category_name}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEditListing(row.id)}
+                                    disabled={loadingEditId === row.id}
+                                    className="gap-1.5 text-xs shrink-0 hover:border-primary hover:text-primary transition-colors"
+                                  >
+                                    {loadingEditId === row.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    )}
+                                    Edit Listing & Photos
+                                  </Button>
                                 </div>
                                 {row.description ? (
                                   <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-6">
@@ -1174,6 +1350,22 @@ export function ListingCapacityPage() {
           </div>
         </div>
       )}
+
+      {/* Listing Modal for full Editing / Photos / Gallery / Creation */}
+      <ListingModal
+        listing={selectedListing}
+        isOpen={isModalOpen}
+        currentUserId={userProfile?.id || null}
+        activeEditors={
+          selectedListing ? editorsMap.get(selectedListing.id) || [] : []
+        }
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedListing(null);
+          stopTracking();
+        }}
+        onSave={handleSaveListing}
+      />
     </div>
   );
 }
