@@ -98,7 +98,7 @@ export default function LocationMapCanvas({
           center: KARACHI_CENTER,
           zoom: DEFAULT_ZOOM,
           minZoom: 10,
-          maxZoom: 17,
+          maxZoom: 16,
           zoomControl: false,
           attributionControl: false,
         });
@@ -109,7 +109,8 @@ export default function LocationMapCanvas({
           L.tileLayer(
             "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
             {
-              maxZoom: 18,
+              maxZoom: 16,
+              maxNativeZoom: 16,
               attribution: "Esri, HERE, Garmin, © OpenStreetMap",
             }
           ).addTo(map);
@@ -118,14 +119,16 @@ export default function LocationMapCanvas({
           L.tileLayer(
             "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
             {
-              maxZoom: 18,
+              maxZoom: 16,
+              maxNativeZoom: 16,
               pane: "shadowPane",
             }
           ).addTo(map);
         } else {
           // OpenStreetMap Standard (100% Free)
           L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            maxZoom: 19,
+            maxZoom: 16,
+            maxNativeZoom: 16,
             subdomains: ["a", "b", "c"],
             attribution: "© OpenStreetMap contributors",
           }).addTo(map);
