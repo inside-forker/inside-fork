@@ -5,20 +5,30 @@
  * `AFFINITY_K` and `EVENT_HALF_LIFE_DAYS` are priors, not measured values -
  * there isn't enough event volume yet to fit them. Revisit once
  * user_listing_events has real traffic (see Phase 2 go/no-go query).
+ *
+ * `openNow` is no longer a term here - "For You" hard-filters to confirmed-
+ * open listings before scoring (see candidates.ts's `onlyOpen`), so there's
+ * nothing left for a weighted term to differentiate. Discovery Intents still
+ * scores open/closed/unknown via its own module (lib/discovery/scoring.ts)
+ * and OPEN_NOW_SCORE below, which is untouched.
  */
 
 /** Term weights before gate-based renormalisation. Must sum to 1. */
 export const TERM_WEIGHTS = {
-  affinity: 0.35,
-  proximity: 0.3,
-  openNow: 0.25,
+  affinity: 0.5,
+  proximity: 0.25,
+  quality: 0.15,
   freshness: 0.1,
-  /** Re-enable once stddev(avg_rating) over published listings exceeds this. */
-  quality: 0,
 } as const;
 
-/** Re-enable the quality term once live stddev(avg_rating) exceeds this. */
-export const QUALITY_STDDEV_ENABLE_THRESHOLD = 0.5;
+/**
+ * Fallback quality score for a listing with no organic rating yet
+ * (avg_rating is 0 for effectively the whole catalog right now) but that an
+ * admin has already pinned via the same `top_rated_pinned` flag "Top Rated by
+ * Insiders" uses for its own cold start. Kept below 1.0 so a genuine 5-star
+ * organic rating, once real reviews exist, can still outrank a manual pin.
+ */
+export const TOP_RATED_PINNED_QUALITY_SCORE = 0.9;
 
 /** exp(-distanceMeters / GEO_D0) - Karachi is ~3,500 km^2, so this is in meters. */
 export const GEO_D0_METERS = 3000;
@@ -32,8 +42,15 @@ export const OPEN_NOW_SCORE = {
   closed: 0.15,
 } as const;
 
-/** aff(u,c) = alpha * learned(u,c) + (1 - alpha) * T(c); alpha = n / (n + K). */
-export const AFFINITY_K = 20;
+/**
+ * aff(u,c) = alpha * learned(u,c) + (1 - alpha) * T(c); alpha = n / (n + K).
+ * Lowered from 20: at ~15 active users, almost nobody reached the 20
+ * non-impression interactions needed for their own taste to meaningfully
+ * outweigh the generic time-of-day prior. At K=5, alpha=0.5 by n=5 and
+ * alpha=0.8 by n=20 - personal history now dominates much sooner, while a
+ * brand-new actor (n=0) still gets alpha=0, unchanged.
+ */
+export const AFFINITY_K = 5;
 
 /** Blend of max vs mean per-category affinity across a listing's categories. */
 export const AFFINITY_MAX_WEIGHT = 0.7;

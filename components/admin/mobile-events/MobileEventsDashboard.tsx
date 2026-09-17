@@ -63,6 +63,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 
+import { LocationHeatmapTab } from "./LocationHeatmapTab";
+
 import type {
   MobileEventsFullOverview,
   DateRangeFilter,
@@ -305,6 +307,9 @@ export function MobileEventsDashboard({
       {/* ——— Main Tabbed Dashboard ——— */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="bg-muted/50 p-1 h-auto flex-wrap">
+          <TabsTrigger value="location-map" className="gap-1.5 text-xs data-[state=active]:text-rose-400">
+            <MapPin className="h-3.5 w-3.5 text-rose-500" /> Location Heatmap
+          </TabsTrigger>
           <TabsTrigger value="screen-time" className="gap-1.5 text-xs">
             <Timer className="h-3.5 w-3.5" /> Screen Time
           </TabsTrigger>
@@ -321,6 +326,11 @@ export function MobileEventsDashboard({
             <Zap className="h-3.5 w-3.5" /> Event Stream
           </TabsTrigger>
         </TabsList>
+
+        {/* ——— Tab 0: Location Heatmap (Snapchat Maps Style) ——— */}
+        <TabsContent value="location-map">
+          <LocationHeatmapTab dateRange={dateRange} />
+        </TabsContent>
 
         {/* ——— Tab 1: Screen Time ——— */}
         <TabsContent value="screen-time">

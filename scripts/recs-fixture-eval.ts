@@ -108,9 +108,20 @@ function buildCandidates(): CandidateInput[] {
   for (const key of pool) {
     const cat = CAT[key];
     const distanceMeters = Math.round(200 + rand() * 14_800);
+    // Kept even though "For You" now hard-filters to open-only before
+    // candidates reach this file (see candidates.ts's onlyOpen) - this
+    // harness scores directly, and openState still needs to round-trip
+    // correctly since it feeds the "Open now"/"Closed now" reason text.
     const openRoll = rand();
     const openState = openRoll < 0.4 ? "open" : openRoll < 0.75 ? "closed" : openRoll < 0.9 ? "unknown" : null;
     const ageDays = Math.round(1 + rand() * 400);
+    // ~85% of listings have no rating and aren't pinned (matches the live
+    // catalog: 0 of 4,484 published listings currently have avg_rating > 0),
+    // a handful get a real rating, and a handful are top_rated_pinned with no
+    // rating - exercising both quality-term branches.
+    const qualityRoll = rand();
+    const avgRating = qualityRoll < 0.1 ? Math.round((3 + rand() * 2) * 10) / 10 : null;
+    const topRatedPinned = avgRating == null && qualityRoll < 0.15;
     candidates.push({
       id: id++,
       categoryIds: [cat.id],
@@ -118,7 +129,8 @@ function buildCandidates(): CandidateInput[] {
       distanceMeters,
       openState,
       ageDays,
-      avgRating: null,
+      avgRating,
+      topRatedPinned,
     });
   }
   return candidates;
@@ -232,11 +244,13 @@ function main() {
       categoryId: c.categoryIds[0],
       distanceMeters: c.distanceMeters,
       openState: c.openState,
+      avgRating: c.avgRating,
+      topRatedPinned: c.topRatedPinned ?? false,
       score: Number(c.score.toFixed(4)),
       breakdown: {
         affinity: Number(c.breakdown.affinity.toFixed(4)),
         proximity: Number(c.breakdown.proximity.toFixed(4)),
-        openNow: Number(c.breakdown.openNow.toFixed(4)),
+        quality: Number(c.breakdown.quality.toFixed(4)),
         freshness: Number(c.breakdown.freshness.toFixed(4)),
       },
     }));
@@ -272,6 +286,74 @@ function main() {
     }
     console.log(
       `\nmonotonic-in-distance: ${scored.map((c) => `${c.distanceMeters}m=${c.score.toFixed(4)}`).join(" > ")}`,
+    );
+  }
+
+  // Monotonic-in-rating check: same category/distance/age, jitter disabled,
+  // only avgRating varies - confirms the quality term (previously a hardcoded
+  // 0 placeholder) actually differentiates listings now.
+  {
+    const base: CandidateInput[] = [null, 2.5, 3.5, 4.0, 4.5, 5.0].map((r, i) => ({
+      id: 9100 + i,
+      categoryIds: [CAT.restaurantsCafes.id],
+      parentCategoryIds: [CAT.restaurantsCafes.parent],
+      distanceMeters: 1000,
+      openState: "open",
+      ageDays: 10,
+      avgRating: r,
+    }));
+    const ctx: ScoringContext = {
+      timeIntentByCategoryId: new Map(),
+      now: new Date("2026-07-27T08:00:00Z"),
+      actorKey: "monotonic-rating-check",
+      disableJitter: true,
+    };
+    const scored = scoreCandidates(base, ctx);
+    for (let i = 1; i < scored.length; i++) {
+      assert(
+        scored[i].score > scored[i - 1].score,
+        `monotonic-in-rating: score did not strictly increase at avgRating=${scored[i].avgRating} (${scored[i].score} <= ${scored[i - 1].score})`,
+      );
+    }
+    console.log(
+      `\nmonotonic-in-rating: ${scored.map((c) => `${c.avgRating ?? "none"}★=${c.score.toFixed(4)}`).join(" < ")}`,
+    );
+  }
+
+  // top_rated_pinned fallback: no rating, but pinned, should score between
+  // "no signal at all" and a genuine high organic rating - never above 5.0.
+  {
+    const unrated: CandidateInput = {
+      id: 9200,
+      categoryIds: [CAT.restaurantsCafes.id],
+      parentCategoryIds: [CAT.restaurantsCafes.parent],
+      distanceMeters: 1000,
+      openState: "open",
+      ageDays: 10,
+      avgRating: null,
+    };
+    const pinned: CandidateInput = { ...unrated, id: 9201, topRatedPinned: true };
+    const fiveStars: CandidateInput = { ...unrated, id: 9202, avgRating: 5.0 };
+    const ctx: ScoringContext = {
+      timeIntentByCategoryId: new Map(),
+      now: new Date("2026-07-27T08:00:00Z"),
+      actorKey: "pin-fallback-check",
+      disableJitter: true,
+    };
+    const [scoredUnrated, scoredPinned, scoredFiveStars] = scoreCandidates(
+      [unrated, pinned, fiveStars],
+      ctx,
+    );
+    assert(
+      scoredPinned.score > scoredUnrated.score,
+      `top-rated-pinned-fallback: a pinned listing with no rating (${scoredPinned.score}) should outrank an unrated, unpinned one (${scoredUnrated.score})`,
+    );
+    assert(
+      scoredFiveStars.score > scoredPinned.score,
+      `top-rated-pinned-fallback: a genuine 5-star rating (${scoredFiveStars.score}) should still outrank a manual pin (${scoredPinned.score})`,
+    );
+    console.log(
+      `\ntop-rated-pinned-fallback: unrated=${scoredUnrated.score.toFixed(4)} < pinned=${scoredPinned.score.toFixed(4)} < five-stars=${scoredFiveStars.score.toFixed(4)}`,
     );
   }
 

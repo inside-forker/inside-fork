@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { buildGoogleAuthUrl } from "@/lib/auth/google";
-import { getGoogleCallbackUrl, getStateCookieDomain } from "@/lib/auth/url";
+import {
+  getGoogleCallbackUrl,
+  getRequestOrigin,
+  getStateCookieDomain,
+} from "@/lib/auth/url";
 
 const STATE_COOKIE_NAME = "g_oauth_state";
 
@@ -20,11 +24,11 @@ export async function GET(request: NextRequest) {
 
   let authUrl: string;
   try {
-    const redirectUri = getGoogleCallbackUrl(request.url);
+    const redirectUri = getGoogleCallbackUrl(request);
     authUrl = buildGoogleAuthUrl({ redirectUri, state: nonce });
   } catch (error) {
     console.error("GOOGLE OAUTH: Failed to build authorization URL:", error);
-    const loginUrl = new URL("/login", requestUrl.origin);
+    const loginUrl = new URL("/login", getRequestOrigin(request));
     loginUrl.searchParams.set("error", "Google sign-in is not configured.");
     return NextResponse.redirect(loginUrl);
   }

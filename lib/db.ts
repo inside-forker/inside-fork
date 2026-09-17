@@ -137,10 +137,13 @@ function isConnectionSaturationError(error: unknown): boolean {
   );
 }
 
-export async function query(text: string, params?: unknown[]) {
+export async function query<R = any>(
+  text: string,
+  params?: unknown[]
+): Promise<import("pg").QueryResult<R extends import("pg").QueryResultRow ? R : any>> {
   try {
     const res = await pool.query(text, params);
-    return res;
+    return res as unknown as import("pg").QueryResult<R extends import("pg").QueryResultRow ? R : any>;
   } catch (error) {
     if (isRetryableConnectionError(error)) {
       // Saturation needs a longer backoff so other lambdas can release slots.
@@ -153,7 +156,7 @@ export async function query(text: string, params?: unknown[]) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
       try {
         const res = await pool.query(text, params);
-        return res;
+        return res as unknown as import("pg").QueryResult<R extends import("pg").QueryResultRow ? R : any>;
       } catch (retryError) {
         console.error("query error (after retry)", { text, error: retryError });
         throw retryError;
@@ -163,3 +166,4 @@ export async function query(text: string, params?: unknown[]) {
     throw error;
   }
 }
+

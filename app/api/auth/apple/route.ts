@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { randomBytes } from "crypto";
 import { buildAppleAuthUrl } from "@/lib/auth/apple";
-import { getAppleCallbackUrl, getStateCookieDomain } from "@/lib/auth/url";
+import {
+  getAppleCallbackUrl,
+  getRequestOrigin,
+  getStateCookieDomain,
+} from "@/lib/auth/url";
 
 const STATE_COOKIE_NAME = "a_oauth_state";
 
@@ -20,11 +24,11 @@ export async function GET(request: NextRequest) {
 
   let authUrl: string;
   try {
-    const redirectUri = getAppleCallbackUrl(request.url);
+    const redirectUri = getAppleCallbackUrl(request);
     authUrl = buildAppleAuthUrl({ redirectUri, state: nonce });
   } catch (error) {
     console.error("APPLE OAUTH: Failed to build authorization URL:", error);
-    const loginUrl = new URL("/login", requestUrl.origin);
+    const loginUrl = new URL("/login", getRequestOrigin(request));
     loginUrl.searchParams.set("error", "Apple sign-in is not configured.");
     return NextResponse.redirect(loginUrl);
   }

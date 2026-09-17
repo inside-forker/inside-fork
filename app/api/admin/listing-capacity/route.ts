@@ -4,6 +4,7 @@ import {
   getAdminAuthErrorStatus,
   requireListingCapacityAccess,
 } from "@/lib/auth/admin";
+import { resolveCategoryIdScope } from "@/lib/listings/category-scope";
 import type { ListingCapacityCompleteness } from "@/types/listing.types";
 
 const CAPACITY_SELECT = `
@@ -25,7 +26,17 @@ const CAPACITY_SELECT = `
   l.max_price_per_person,
   l.min_guest_capacity,
   l.max_guest_capacity,
-  c.name AS category_name,
+  COALESCE(
+    c.name,
+    (
+      SELECT c2.name
+      FROM listing_categories lc2
+      JOIN categories c2 ON c2.id = lc2.category_id
+      WHERE lc2.listing_id = l.id
+      ORDER BY lc2.is_primary DESC, lc2.category_id ASC
+      LIMIT 1
+    )
+  ) AS category_name,
   img.url AS image_url,
   img.alt_text AS image_alt
 `;
@@ -82,10 +93,15 @@ export async function GET(request: NextRequest) {
     if (categoryId && categoryId !== "all") {
       const categoryIdNum = parseInt(categoryId, 10);
       if (!Number.isNaN(categoryIdNum)) {
-        whereParams.push(categoryIdNum);
-        whereClauses.push(
-          `(l.category_id = $${whereParams.length} OR EXISTS (SELECT 1 FROM listing_categories lc WHERE lc.listing_id = l.id AND lc.category_id = $${whereParams.length}))`,
-        );
+        const categoryIds = await resolveCategoryIdScope(categoryIdNum);
+        if (categoryIds.length > 0) {
+          whereParams.push(categoryIds);
+          whereClauses.push(
+            `(l.category_id = ANY($${whereParams.length}::int[]) OR EXISTS (SELECT 1 FROM listing_categories lc WHERE lc.listing_id = l.id AND lc.category_id = ANY($${whereParams.length}::int[])))`,
+          );
+        } else {
+          whereClauses.push("1 = 0");
+        }
       }
     }
 

@@ -208,7 +208,7 @@ export function PrivacyPolicyContact() {
           {/* Footer Note */}
           <motion.div variants={itemVariants} className="text-center mt-16">
             <p className="text-sm text-muted-foreground">
-              This privacy policy was last updated on September 11, 2025. We
+              This privacy policy was last updated on September 16, 2026. We
               regularly review and update our privacy practices to ensure
               compliance with evolving data protection regulations.
             </p>

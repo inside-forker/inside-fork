@@ -82,9 +82,10 @@ export function PrivacyPolicyHero() {
           </h1>
 
           <p className="text-sm sm:text-base md:text-lg lg:text-xl text-muted-foreground max-w-4xl mx-auto leading-relaxed">
-            Your privacy matters to us. This policy explains how Inside Karachi
-            collects, uses, and protects your personal information in compliance
-            with applicable privacy laws and regulations.
+            Your privacy matters to us. This policy explains how Inside
+            (&ldquo;Inside: The City Guide&rdquo;, operated by City Guide Network
+            (Private) Limited) collects, uses and protects your personal
+            information in our mobile app and on this website.
           </p>
         </motion.div>
 
@@ -145,7 +146,7 @@ export function PrivacyPolicyHero() {
           className="text-center"
         >
           <p className="text-sm text-muted-foreground">
-            Last updated: September 11, 2025
+            Last updated: September 16, 2026
           </p>
         </motion.div>
       </motion.div>

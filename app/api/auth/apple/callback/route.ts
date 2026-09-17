@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { exchangeAppleCode } from "@/lib/auth/apple";
-import { getAppleCallbackUrl } from "@/lib/auth/url";
+import { getAppleCallbackUrl, getRequestOrigin } from "@/lib/auth/url";
 import { setSession } from "@/lib/auth/session";
 import { findOrCreateOAuthUser } from "@/lib/auth/oauth-account";
 
@@ -46,14 +46,14 @@ function extractAppleName(rawUser: FormDataEntryValue | null): string | undefine
 }
 
 export async function POST(request: NextRequest) {
-  const requestUrl = new URL(request.url);
+  const origin = getRequestOrigin(request);
   const formData = await request.formData();
   const code = formData.get("code");
   const state = formData.get("state");
   const oauthError = formData.get("error");
 
   if (oauthError) {
-    return loginErrorRedirect(requestUrl.origin, "Apple sign-in was cancelled.");
+    return loginErrorRedirect(origin, "Apple sign-in was cancelled.");
   }
 
   const stateCookie = request.cookies.get(STATE_COOKIE_NAME)?.value;
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     state !== expectedState.nonce
   ) {
     return loginErrorRedirect(
-      requestUrl.origin,
+      origin,
       "Apple sign-in session expired. Please try again."
     );
   }
@@ -81,12 +81,12 @@ export async function POST(request: NextRequest) {
     typeof expectedState.invite === "string" ? expectedState.invite : undefined;
 
   try {
-    const redirectUri = getAppleCallbackUrl(request.url);
+    const redirectUri = getAppleCallbackUrl(request);
     const profile = await exchangeAppleCode(code, redirectUri);
 
     if (!profile.email_verified) {
       return loginErrorRedirect(
-        requestUrl.origin,
+        origin,
         "Your Apple account email is not verified."
       );
     }
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       inviteCode
     );
 
-    const response = NextResponse.redirect(new URL(next, requestUrl.origin));
+    const response = NextResponse.redirect(new URL(next, origin));
     response.cookies.delete(STATE_COOKIE_NAME);
     await setSession(response, {
       userId: user.id,
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("APPLE CALLBACK: Authentication failed:", error);
     return loginErrorRedirect(
-      requestUrl.origin,
+      origin,
       "An error occurred during Apple sign-in. Please try again."
     );
   }

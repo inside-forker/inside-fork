@@ -14,22 +14,37 @@ export function PrivacyPolicyContent() {
       borderColor: "border-blue-500/30",
       iconColor: "text-blue-500",
       description:
-        "We collect information to provide our services and improve your experience.",
+        "We collect only what the app and website need to work, and we tell you what each permission is for.",
       subsections: [
         {
-          title: "Personal Information",
+          title: "Account Information",
           content:
-            "Name, email address, phone number, and account details you provide when registering or using our services.",
+            "Your name, email address, phone number, profile photo, and — if you sign in with Google or Apple — the basic profile details those services return.",
         },
         {
-          title: "Usage Information",
+          title: "Location",
           content:
-            "Information about how you interact with our platform, including pages visited, features used, and time spent.",
+            "With your permission, your device location, used to show places, events and deals near you. Location is read only while you are using the app, never in the background, and you can turn it off at any time in your device settings.",
         },
         {
-          title: "Device Information",
+          title: "Camera & Photos",
           content:
-            "Technical details about your device, browser, and internet connection for optimal service delivery.",
+            "Camera access is used only to scan QR codes at partner venues. Photo access is used only for images you pick yourself, such as a profile picture or photos added to a listing or review.",
+        },
+        {
+          title: "Device & Usage Information",
+          content:
+            "Device model, operating system, app version and language, plus in-app activity such as screens viewed, searches, saves and reviews.",
+        },
+        {
+          title: "Notifications",
+          content:
+            "If you allow notifications, a push token for your device so we can send alerts about events, deals and account activity. Turning notifications off removes it.",
+        },
+        {
+          title: "Crash & Performance Data",
+          content:
+            "Diagnostic reports collected through Sentry when the app crashes or misbehaves, so we can find and fix the problem.",
         },
       ],
     },
@@ -41,22 +56,27 @@ export function PrivacyPolicyContent() {
       borderColor: "border-emerald-500/30",
       iconColor: "text-emerald-500",
       description:
-        "Your information helps us deliver, maintain, and improve our services.",
+        "Your information helps us deliver, personalise and improve the service.",
       subsections: [
         {
           title: "Service Delivery",
           content:
-            "To provide access to listings, events, reviews, and other platform features.",
+            "To provide listings, events, tickets, card deals, reviews and the other features of the app and website.",
+        },
+        {
+          title: "Personalisation",
+          content:
+            "To recommend places, events and deals near you, and to keep track of your saves, visits and Explorer progress.",
         },
         {
           title: "Communication",
           content:
-            "To send important updates, respond to inquiries, and provide customer support.",
+            "To send service updates, respond to inquiries, provide support and — where you have allowed it — send notifications about events and deals.",
         },
         {
           title: "Platform Improvement",
           content:
-            "To analyze usage patterns, fix issues, and develop new features.",
+            "To analyse usage patterns, diagnose crashes, prevent abuse and develop new features.",
         },
       ],
     },
@@ -73,17 +93,17 @@ export function PrivacyPolicyContent() {
         {
           title: "Security Measures",
           content:
-            "Industry-standard encryption, secure data storage, and regular security assessments.",
+            "Industry-standard encryption in transit, secure storage, access controls and regular security reviews.",
         },
         {
           title: "Data Retention",
           content:
-            "We retain your information only as long as necessary for the purposes outlined in this policy.",
+            "We keep your information only while your account is active, or as long as needed for the purposes set out in this policy. Deleting your account removes your profile and personal data, except records we are required to keep by law.",
         },
         {
           title: "Third-Party Services",
           content:
-            "Limited sharing with trusted partners who help us provide our services.",
+            "Sentry (crash and performance reporting), Google and Apple (sign-in), Expo's push notification service (notification delivery), and our hosting providers. Partner promotions shown in the app, such as Parchi, are links only — opening one takes you to the partner's own site, and we do not share your personal data with them.",
         },
       ],
     },
@@ -100,17 +120,39 @@ export function PrivacyPolicyContent() {
         {
           title: "Access & Portability",
           content:
-            "Request access to your data and obtain copies in a portable format.",
+            "Request a copy of the personal data we hold about you, in a portable format.",
         },
         {
           title: "Correction & Deletion",
           content:
-            "Update inaccurate information, or permanently delete your account at any time — see insidekarachi.com/delete-account for details.",
+            "Update inaccurate information, or delete your account at any time — in the app from Settings → Delete Account, or on the web at insidekarachi.com/delete-account.",
         },
         {
-          title: "Communication Preferences",
+          title: "Permissions & Preferences",
           content:
-            "Control marketing communications and manage your privacy settings.",
+            "Location, camera, photo and notification access can each be withdrawn in your device settings, and marketing emails can be turned off at any time, without losing access to the rest of the service.",
+        },
+      ],
+    },
+    {
+      id: "childrens-privacy",
+      icon: FileText,
+      title: "Children's Privacy",
+      color: "from-amber-500/20 via-amber-500/10 to-amber-500/5",
+      borderColor: "border-amber-500/30",
+      iconColor: "text-amber-500",
+      description:
+        "The service is intended for adults and older teens, not for children.",
+      subsections: [
+        {
+          title: "Age Requirement",
+          content:
+            "You must be at least 13 years old to create an account. The service is not directed to children, and we do not knowingly collect personal information from anyone under 13.",
+        },
+        {
+          title: "Parental Requests",
+          content:
+            "If you believe a child under 13 has given us personal information, email privacy@insidekarachi.com and we will delete the account and its data.",
         },
       ],
     },
