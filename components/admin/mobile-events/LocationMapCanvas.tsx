@@ -12,6 +12,7 @@ import {
   Sparkles,
   MapPin,
   RefreshCw,
+  Radio,
 } from "lucide-react";
 import type {
   HeatmapPoint,
@@ -35,18 +36,17 @@ export default function LocationMapCanvas({
   heatmapPoints,
   selectedArea,
   onSelectArea,
-  intensityMultiplier = 1.0,
   showHotspotBadges = true,
 }: LocationMapCanvasProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
-  const canvasLayerRef = useRef<HTMLCanvasElement | null>(null);
   const markersLayerGroupRef = useRef<any>(null);
+  const zonesLayerGroupRef = useRef<any>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mapStyle, setMapStyle] = useState<"midnight" | "contrast">("midnight");
 
-  // 1. Initialize Leaflet safely on Client
+  // 1. Initialize Map
   useEffect(() => {
     let isCancelled = false;
 
@@ -83,7 +83,7 @@ export default function LocationMapCanvas({
 
         // 100% Free, Zero-Key, Watermark-Free Tile Providers
         if (mapStyle === "midnight") {
-          // Esri Dark Gray Canvas Base + Labels (Zero API Key, Zero Watermarks)
+          // Esri Dark Gray Canvas Base
           L.tileLayer(
             "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
             {
@@ -101,7 +101,7 @@ export default function LocationMapCanvas({
             }
           ).addTo(map);
         } else {
-          // OpenStreetMap Standard / High Contrast (100% Free, Zero API Key)
+          // OpenStreetMap Standard (100% Free)
           L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             maxZoom: 19,
             subdomains: ["a", "b", "c"],
@@ -111,25 +111,12 @@ export default function LocationMapCanvas({
 
         L.control.zoom({ position: "topright" }).addTo(map);
 
+        const zonesGroup = L.layerGroup().addTo(map);
+        zonesLayerGroupRef.current = zonesGroup;
+
         const markersGroup = L.layerGroup().addTo(map);
         markersLayerGroupRef.current = markersGroup;
         mapInstanceRef.current = map;
-
-        // Setup Canvas Overlay
-        if (canvasLayerRef.current && canvasLayerRef.current.parentNode) {
-          canvasLayerRef.current.parentNode.removeChild(canvasLayerRef.current);
-        }
-
-        const canvas = document.createElement("canvas");
-        canvas.style.position = "absolute";
-        canvas.style.top = "0";
-        canvas.style.left = "0";
-        canvas.style.pointerEvents = "none";
-        canvas.style.zIndex = "350";
-        canvasLayerRef.current = canvas;
-
-        const mapPanes = map.getPanes();
-        mapPanes.overlayPane.appendChild(canvas);
 
         setMapLoaded(true);
 
@@ -137,7 +124,7 @@ export default function LocationMapCanvas({
           if (!isCancelled && mapInstanceRef.current) {
             mapInstanceRef.current.invalidateSize();
           }
-        }, 200);
+        }, 150);
       } catch (err) {
         console.error("Failed to initialize Leaflet Map:", err);
       }
@@ -154,89 +141,17 @@ export default function LocationMapCanvas({
     };
   }, [mapStyle]);
 
-  // 2. Render Canvas Heatmap Blooms
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    const canvas = canvasLayerRef.current;
-    if (!map || !canvas || !mapLoaded) return;
-
-    import("leaflet").then(({ default: L }) => {
-      const renderHeatmap = () => {
-        if (!canvas || !map) return;
-        const size = map.getSize();
-        if (!size || size.x <= 0 || size.y <= 0) return;
-
-        if (canvas.width !== size.x || canvas.height !== size.y) {
-          canvas.width = size.x;
-          canvas.height = size.y;
-        }
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        ctx.clearRect(0, 0, size.x, size.y);
-        if (!heatmapPoints || heatmapPoints.length === 0) return;
-
-        const zoom = map.getZoom();
-        const radius = Math.max(18, Math.min(75, (zoom - 8) * 13)) * intensityMultiplier;
-
-        ctx.save();
-        ctx.globalCompositeOperation = "screen";
-
-        heatmapPoints.forEach((point) => {
-          const latLng = L.latLng(point.lat, point.lng);
-          const containerPoint = map.latLngToContainerPoint(latLng);
-
-          if (
-            containerPoint.x < -radius ||
-            containerPoint.x > size.x + radius ||
-            containerPoint.y < -radius ||
-            containerPoint.y > size.y + radius
-          ) {
-            return;
-          }
-
-          const pointWeight = Math.min(1.0, point.weight * 1.25);
-          const grad = ctx.createRadialGradient(
-            containerPoint.x,
-            containerPoint.y,
-            0,
-            containerPoint.x,
-            containerPoint.y,
-            radius
-          );
-
-          // Snapchat thermal bloom gradient
-          grad.addColorStop(0, `rgba(255, 20, 80, ${0.9 * pointWeight})`); // Red Hot Core
-          grad.addColorStop(0.25, `rgba(255, 125, 0, ${0.75 * pointWeight})`); // Neon Orange
-          grad.addColorStop(0.55, `rgba(255, 235, 0, ${0.45 * pointWeight})`); // Yellow Glow
-          grad.addColorStop(0.85, `rgba(0, 240, 255, ${0.2 * pointWeight})`); // Soft Cyan Aura
-          grad.addColorStop(1, "rgba(0, 240, 255, 0)");
-
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          ctx.arc(containerPoint.x, containerPoint.y, radius, 0, Math.PI * 2);
-          ctx.fill();
-        });
-
-        ctx.restore();
-      };
-
-      map.on("move", renderHeatmap);
-      map.on("zoom", renderHeatmap);
-      map.on("resize", renderHeatmap);
-      renderHeatmap();
-    });
-  }, [mapLoaded, heatmapPoints, intensityMultiplier]);
-
-  // 3. Render Hotspot Markers
+  // 2. Render Native Radiant Zones & Blinking Hotspots
   useEffect(() => {
     const map = mapInstanceRef.current;
     const markersGroup = markersLayerGroupRef.current;
-    if (!map || !markersGroup || !mapLoaded) return;
+    const zonesGroup = zonesLayerGroupRef.current;
+    if (!map || !markersGroup || !zonesGroup || !mapLoaded) return;
 
     import("leaflet").then(({ default: L }) => {
       markersGroup.clearLayers();
+      zonesGroup.clearLayers();
+
       if (!showHotspotBadges) return;
 
       clusters.forEach((cluster) => {
@@ -246,14 +161,41 @@ export default function LocationMapCanvas({
         const isBlazing = cluster.intensityLevel === "blazing";
         const isHot = cluster.intensityLevel === "hot";
 
-        const pulseColor = isBlazing ? "#ff1a53" : isHot ? "#ff8800" : "#00f0ff";
+        // Distinct radiant colors for intensity tiers
+        const primaryColor = isBlazing ? "#ff184d" : isHot ? "#f59e0b" : "#06b6d4";
+        const fillColor = isBlazing ? "#ff184d" : isHot ? "#eab308" : "#00f0ff";
+        const fillOpacity = isSelected ? 0.25 : isBlazing ? 0.18 : isHot ? 0.14 : 0.1;
+
+        // 1) Smooth Native Radial Activity Circle on Map (Never drifts during zoom)
+        const radiusMeters = Math.max(1200, (cluster.radiusKm || 2.5) * 650);
+        const circle = L.circle([cluster.center.lat, cluster.center.lng], {
+          radius: radiusMeters,
+          color: primaryColor,
+          weight: isSelected ? 2.5 : 1.5,
+          opacity: isSelected ? 0.9 : 0.6,
+          fillColor: fillColor,
+          fillOpacity: fillOpacity,
+          dashArray: isSelected ? undefined : "4, 6",
+        });
+
+        circle.on("click", () => {
+          onSelectArea(cluster.name);
+          map.flyTo([cluster.center.lat, cluster.center.lng], 14, {
+            duration: 0.8,
+          });
+        });
+
+        circle.addTo(zonesGroup);
+
+        // 2) Snapchat-Style Pulsing / Blinking Radar Node
+        const pulseColor = isBlazing ? "#ff184d" : isHot ? "#fbbf24" : "#22d3ee";
         const badgeBg = isSelected
-          ? "background: #ff184d; color: #ffffff; border: 2px solid #ffffff; box-shadow: 0 0 20px rgba(255,24,77,0.7);"
+          ? "background: #ff184d; color: #ffffff; border: 2px solid #ffffff; box-shadow: 0 0 25px rgba(255,24,77,0.85);"
           : isBlazing
-          ? "background: rgba(9, 9, 11, 0.95); color: #fda4af; border: 1.5px solid rgba(244, 63, 94, 0.8); box-shadow: 0 0 15px rgba(244,63,94,0.4);"
+          ? "background: rgba(15, 15, 20, 0.95); color: #fda4af; border: 1.5px solid rgba(244, 63, 94, 0.9); box-shadow: 0 0 18px rgba(244,63,94,0.45);"
           : isHot
-          ? "background: rgba(9, 9, 11, 0.95); color: #fde047; border: 1.5px solid rgba(234, 179, 8, 0.8); box-shadow: 0 0 15px rgba(234,179,8,0.4);"
-          : "background: rgba(9, 9, 11, 0.95); color: #67e8f9; border: 1.5px solid rgba(6, 182, 212, 0.8); box-shadow: 0 0 15px rgba(6,182,212,0.4);";
+          ? "background: rgba(15, 15, 20, 0.95); color: #fde047; border: 1.5px solid rgba(234, 179, 8, 0.9); box-shadow: 0 0 18px rgba(234,179,8,0.45);"
+          : "background: rgba(15, 15, 20, 0.95); color: #67e8f9; border: 1.5px solid rgba(6, 182, 212, 0.9); box-shadow: 0 0 18px rgba(6,182,212,0.45);";
 
         const topSearchPreview = cluster.topSearches[0]?.query
           ? `🔍 &ldquo;${cluster.topSearches[0].query}&rdquo;`
@@ -261,23 +203,24 @@ export default function LocationMapCanvas({
 
         const iconHtml = `
           <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; transform: translate(-50%, -50%); pointer-events: auto;">
-            <!-- Pulsing Rings -->
-            <div style="position: absolute; top: -12px; left: -12px; width: 64px; height: 64px; pointer-events: none;">
-              <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.5; background-color: ${pulseColor}; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
+            <!-- Radiant Multi-Ring Pulsing Radar Waves -->
+            <div style="position: absolute; top: -16px; left: -16px; width: 80px; height: 80px; pointer-events: none;">
+              <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.6; background-color: ${pulseColor}; animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
+              <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.25; background-color: ${pulseColor}; transform: scale(1.3);"></span>
             </div>
 
-            <!-- Hotspot Bubble -->
-            <div style="position: relative; z-index: 10; display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 9999px; backdrop-filter: blur(8px); ${badgeBg}; transition: all 0.2s ease;">
-              <span style="display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background-color: ${pulseColor};"></span>
+            <!-- Hotspot Node Pill -->
+            <div style="position: relative; z-index: 10; display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 9999px; backdrop-filter: blur(10px); ${badgeBg}; transition: all 0.2s ease;">
+              <span style="display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background-color: ${pulseColor}; box-shadow: 0 0 8px ${pulseColor};"></span>
               <span style="font-size: 12px; font-weight: 700; white-space: nowrap;">${cluster.name}</span>
-              <span style="font-size: 10px; font-family: monospace; padding: 2px 6px; border-radius: 9999px; background: rgba(255,255,255,0.15); font-weight: 700;">
+              <span style="font-size: 10px; font-family: monospace; padding: 2px 6px; border-radius: 9999px; background: rgba(255,255,255,0.18); font-weight: 700;">
                 ${cluster.uniqueUsers} 👤
               </span>
               ${isBlazing ? `<span style="font-size: 12px;">🔥</span>` : ""}
             </div>
 
-            <!-- Query subtitle chip -->
-            <div style="margin-top: 4px; padding: 2px 8px; border-radius: 6px; background: rgba(9, 9, 11, 0.9); border: 1px solid rgba(39, 39, 42, 0.8); font-size: 10px; color: #e4e4e7; font-weight: 600; white-space: nowrap; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5);">
+            <!-- Top Search Bubble -->
+            <div style="margin-top: 4px; padding: 2px 8px; border-radius: 6px; background: rgba(10, 10, 14, 0.92); border: 1px solid rgba(63, 63, 70, 0.8); font-size: 10px; color: #f4f4f5; font-weight: 600; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.6);">
               ${topSearchPreview}
             </div>
           </div>
@@ -297,7 +240,7 @@ export default function LocationMapCanvas({
         marker.on("click", () => {
           onSelectArea(cluster.name);
           map.flyTo([cluster.center.lat, cluster.center.lng], 14, {
-            duration: 1.0,
+            duration: 0.8,
           });
         });
 
@@ -309,7 +252,7 @@ export default function LocationMapCanvas({
   const handleResetKarachi = () => {
     if (mapInstanceRef.current) {
       mapInstanceRef.current.flyTo(KARACHI_CENTER, DEFAULT_ZOOM, {
-        duration: 1.0,
+        duration: 0.8,
       });
     }
   };
@@ -321,7 +264,7 @@ export default function LocationMapCanvas({
       mapInstanceRef.current.flyTo(
         [hottest.center.lat, hottest.center.lng],
         14,
-        { duration: 1.0 }
+        { duration: 0.8 }
       );
     }
   };
@@ -350,7 +293,7 @@ export default function LocationMapCanvas({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
           </span>
-          Live Heatmap ({heatmapPoints.length} Pings)
+          Live Location Nodes ({heatmapPoints.length} Pings)
         </Badge>
 
         <Button
@@ -407,15 +350,24 @@ export default function LocationMapCanvas({
       {/* Bottom Map Legend */}
       <div className="absolute bottom-4 left-4 z-[400] bg-zinc-950/90 backdrop-blur-md border border-zinc-800 rounded-xl px-4 py-2.5 shadow-2xl pointer-events-auto">
         <div className="text-[10px] uppercase font-semibold text-zinc-400 tracking-wider mb-1.5 flex items-center justify-between">
-          <span>Activity Density</span>
-          <span className="text-zinc-500">Snapchat Thermal Spectrum</span>
+          <span>Hotspot Intensity</span>
+          <span className="text-zinc-500">Snapchat Radar Spectrum</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-medium text-cyan-400">Mild</span>
-          <div className="w-36 h-2 rounded-full bg-gradient-to-r from-cyan-400 via-amber-300 via-orange-500 to-rose-600 shadow-inner" />
-          <span className="text-[11px] font-medium text-rose-500 flex items-center gap-0.5">
-            Blazing <Flame className="w-3 h-3 inline" />
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+            <span className="text-[11px] font-medium text-cyan-300">Active</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+            <span className="text-[11px] font-medium text-amber-300">High Demand</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+            <span className="text-[11px] font-medium text-rose-400 flex items-center gap-0.5">
+              Blazing <Flame className="w-3 h-3 inline text-rose-500" />
+            </span>
+          </div>
         </div>
       </div>
     </div>
