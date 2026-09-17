@@ -30,6 +30,7 @@ import {
 import type {
   AreaDetailIntelligence,
   NeighborhoodCluster,
+  PinnedUserTarget,
 } from "@/lib/analytics/mobile-location";
 import type { DateRangeFilter } from "@/lib/analytics/mobile-events";
 
@@ -39,6 +40,7 @@ interface AreaDetailDrawerProps {
   dateRange: DateRangeFilter;
   isOpen: boolean;
   onClose: () => void;
+  onPinUser?: (user: PinnedUserTarget) => void;
 }
 
 function formatDwell(seconds: number): string {
@@ -65,6 +67,7 @@ export function AreaDetailDrawer({
   dateRange,
   isOpen,
   onClose,
+  onPinUser,
 }: AreaDetailDrawerProps) {
   const [data, setData] = useState<AreaDetailIntelligence | null>(null);
   const [loading, setLoading] = useState(false);
@@ -415,13 +418,47 @@ export function AreaDetailDrawer({
                               </div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-xs font-mono font-semibold text-foreground">
-                              {u.eventsCount} pings
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="text-right">
+                              <div className="text-xs font-mono font-semibold text-foreground">
+                                {u.eventsCount} pings
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">
+                                {formatRelativeTime(u.lastSeen)}
+                              </div>
                             </div>
-                            <div className="text-[10px] text-muted-foreground">
-                              {formatRelativeTime(u.lastSeen)}
-                            </div>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const targetLat =
+                                  u.lastLatitude ?? clusterData?.center.lat ?? 24.89;
+                                const targetLng =
+                                  u.lastLongitude ?? clusterData?.center.lng ?? 67.06;
+
+                                onPinUser?.({
+                                  lat: targetLat,
+                                  lng: targetLng,
+                                  name:
+                                    u.fullName ||
+                                    (u.username ? `@${u.username}` : "Anonymous Device"),
+                                  username: u.username,
+                                  avatarUrl: u.avatarUrl,
+                                  lastSeen: u.lastSeen,
+                                  platform: u.platform,
+                                  topScreen: u.topScreen,
+                                  lastEventName: u.lastEventName,
+                                  isSigned: !!u.userId,
+                                });
+                                onClose();
+                              }}
+                              className="h-7 px-2.5 text-xs border-border hover:border-primary hover:text-primary gap-1 shadow-sm bg-background font-medium"
+                              title="Pin this user's last location on map"
+                            >
+                              <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                              Pin Location
+                            </Button>
                           </div>
                         </div>
                       ))}

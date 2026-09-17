@@ -26,6 +26,7 @@ import type {
   LocationIntelligencePayload,
   HeatmapFilterType,
   NeighborhoodCluster,
+  PinnedUserTarget,
 } from "@/lib/analytics/mobile-location";
 import type { DateRangeFilter } from "@/lib/analytics/mobile-events";
 
@@ -51,6 +52,7 @@ export function LocationHeatmapTab({ dateRange }: LocationHeatmapTabProps) {
   const [filterType, setFilterType] = useState<HeatmapFilterType>("all");
   const [intensityMultiplier, setIntensityMultiplier] = useState(1.0);
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
+  const [pinnedUser, setPinnedUser] = useState<PinnedUserTarget | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const fetchLocationData = async () => {
@@ -271,6 +273,8 @@ export function LocationHeatmapTab({ dateRange }: LocationHeatmapTabProps) {
             heatmapPoints={data?.heatmapPoints || []}
             selectedArea={selectedArea}
             onSelectArea={handleSelectArea}
+            pinnedUser={pinnedUser}
+            onClearPinnedUser={() => setPinnedUser(null)}
             intensityMultiplier={intensityMultiplier}
             showHotspotBadges={true}
           />
@@ -383,6 +387,10 @@ export function LocationHeatmapTab({ dateRange }: LocationHeatmapTabProps) {
         dateRange={dateRange}
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
+        onPinUser={(userTarget) => {
+          setPinnedUser(userTarget);
+          setIsDrawerOpen(false);
+        }}
       />
     </div>
   );

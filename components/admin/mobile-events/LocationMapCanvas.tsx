@@ -13,10 +13,15 @@ import {
   MapPin,
   RefreshCw,
   Radio,
+  X,
+  User,
+  Smartphone,
+  Clock,
 } from "lucide-react";
 import type {
   HeatmapPoint,
   NeighborhoodCluster,
+  PinnedUserTarget,
 } from "@/lib/analytics/mobile-location";
 
 interface LocationMapCanvasProps {
@@ -24,6 +29,8 @@ interface LocationMapCanvasProps {
   heatmapPoints: HeatmapPoint[];
   selectedArea: string | null;
   onSelectArea: (neighborhood: string) => void;
+  pinnedUser?: PinnedUserTarget | null;
+  onClearPinnedUser?: () => void;
   intensityMultiplier?: number;
   showHotspotBadges?: boolean;
 }
@@ -31,17 +38,32 @@ interface LocationMapCanvasProps {
 const KARACHI_CENTER: [number, number] = [24.89, 67.06];
 const DEFAULT_ZOOM = 12;
 
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (diff < 60) return "just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function LocationMapCanvas({
   clusters,
   heatmapPoints,
   selectedArea,
   onSelectArea,
+  pinnedUser,
+  onClearPinnedUser,
   showHotspotBadges = true,
 }: LocationMapCanvasProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersLayerGroupRef = useRef<any>(null);
   const zonesLayerGroupRef = useRef<any>(null);
+  const userPinLayerGroupRef = useRef<any>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mapStyle, setMapStyle] = useState<"midnight" | "contrast">("midnight");
@@ -116,8 +138,11 @@ export default function LocationMapCanvas({
 
         const markersGroup = L.layerGroup().addTo(map);
         markersLayerGroupRef.current = markersGroup;
-        mapInstanceRef.current = map;
 
+        const userPinGroup = L.layerGroup().addTo(map);
+        userPinLayerGroupRef.current = userPinGroup;
+
+        mapInstanceRef.current = map;
         setMapLoaded(true);
 
         setTimeout(() => {
@@ -141,7 +166,7 @@ export default function LocationMapCanvas({
     };
   }, [mapStyle]);
 
-  // 2. Render Native Radiant Zones & Blinking Hotspots
+  // 2. Render Native Radiant Zones & Hotspot Nodes
   useEffect(() => {
     const map = mapInstanceRef.current;
     const markersGroup = markersLayerGroupRef.current;
@@ -161,12 +186,11 @@ export default function LocationMapCanvas({
         const isBlazing = cluster.intensityLevel === "blazing";
         const isHot = cluster.intensityLevel === "hot";
 
-        // Distinct radiant colors for intensity tiers
         const primaryColor = isBlazing ? "#ff184d" : isHot ? "#f59e0b" : "#06b6d4";
         const fillColor = isBlazing ? "#ff184d" : isHot ? "#eab308" : "#00f0ff";
         const fillOpacity = isSelected ? 0.25 : isBlazing ? 0.18 : isHot ? 0.14 : 0.1;
 
-        // 1) Smooth Native Radial Activity Circle on Map (Never drifts during zoom)
+        // Native Leaflet Radiant Area Circle
         const radiusMeters = Math.max(1200, (cluster.radiusKm || 2.5) * 650);
         const circle = L.circle([cluster.center.lat, cluster.center.lng], {
           radius: radiusMeters,
@@ -187,7 +211,7 @@ export default function LocationMapCanvas({
 
         circle.addTo(zonesGroup);
 
-        // 2) Snapchat-Style Pulsing / Blinking Radar Node
+        // Snapchat-Style Pulsing Radar Node
         const pulseColor = isBlazing ? "#ff184d" : isHot ? "#fbbf24" : "#22d3ee";
         const badgeBg = isSelected
           ? "background: #ff184d; color: #ffffff; border: 2px solid #ffffff; box-shadow: 0 0 25px rgba(255,24,77,0.85);"
@@ -203,7 +227,7 @@ export default function LocationMapCanvas({
 
         const iconHtml = `
           <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; transform: translate(-50%, -50%); pointer-events: auto;">
-            <!-- Radiant Multi-Ring Pulsing Radar Waves -->
+            <!-- Pulsing Radar Waves -->
             <div style="position: absolute; top: -16px; left: -16px; width: 80px; height: 80px; pointer-events: none;">
               <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.6; background-color: ${pulseColor}; animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
               <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.25; background-color: ${pulseColor}; transform: scale(1.3);"></span>
@@ -249,6 +273,78 @@ export default function LocationMapCanvas({
     });
   }, [mapLoaded, clusters, selectedArea, showHotspotBadges, onSelectArea]);
 
+  // 3. Render Dedicated Pinned User Avatar Location
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const userPinGroup = userPinLayerGroupRef.current;
+    if (!map || !userPinGroup || !mapLoaded) return;
+
+    userPinGroup.clearLayers();
+
+    if (!pinnedUser) return;
+
+    import("leaflet").then(({ default: L }) => {
+      // Smoothly pan to the user's coordinates with street-level zoom
+      map.flyTo([pinnedUser.lat, pinnedUser.lng], 15, { duration: 1.0 });
+
+      const initialLetter = pinnedUser.name ? pinnedUser.name[0].toUpperCase() : "U";
+      const relativeTime = formatRelativeTime(pinnedUser.lastSeen);
+
+      const userIconHtml = `
+        <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; transform: translate(-50%, -50%); pointer-events: auto; z-index: 999;">
+          <!-- Glowing Pulsing Ring Aura -->
+          <div style="position: absolute; top: -20px; left: -20px; width: 88px; height: 88px; pointer-events: none;">
+            <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.75; background-color: #ff184d; animation: ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
+            <span style="position: absolute; display: inline-flex; height: 100%; width: 100%; border-radius: 9999px; opacity: 0.35; background-color: #ff184d; transform: scale(1.4);"></span>
+          </div>
+
+          <!-- Avatar Pin Bubble -->
+          <div style="position: relative; z-index: 100; width: 48px; height: 48px; border-radius: 9999px; background: #ff184d; border: 3px solid #ffffff; box-shadow: 0 0 25px rgba(255,24,77,0.9); display: flex; align-items: center; justify-content: center; overflow: hidden;">
+            ${
+              pinnedUser.avatarUrl
+                ? `<img src="${pinnedUser.avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;" />`
+                : `<span style="font-size: 20px; font-weight: 800; color: #ffffff;">${initialLetter}</span>`
+            }
+          </div>
+
+          <!-- Detailed Info Card Floating Above Pin -->
+          <div style="margin-top: 8px; padding: 6px 12px; border-radius: 10px; background: rgba(9, 9, 11, 0.96); border: 1.5px solid #ff184d; box-shadow: 0 8px 25px rgba(0,0,0,0.8); text-align: center; white-space: nowrap; backdrop-filter: blur(12px);">
+            <div style="font-size: 12px; font-weight: 700; color: #ffffff; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <span>${pinnedUser.name}</span>
+              ${
+                pinnedUser.isSigned
+                  ? `<span style="font-size: 9px; padding: 1px 5px; border-radius: 9999px; background: rgba(255,24,77,0.3); color: #fda4af; font-weight: 600;">Signed In</span>`
+                  : ""
+              }
+            </div>
+            <div style="font-size: 10px; color: #fbbf24; font-weight: 600; margin-top: 2px;">
+              🕒 Last pinged: ${relativeTime}
+            </div>
+            <div style="font-size: 9px; color: #a1a1aa; margin-top: 1px;">
+              ${pinnedUser.platform ? `${pinnedUser.platform.toUpperCase()} • ` : ""}Screen: ${
+        pinnedUser.topScreen || "Home"
+      }
+            </div>
+          </div>
+        </div>
+      `;
+
+      const userCustomIcon = L.divIcon({
+        html: userIconHtml,
+        className: "snapchat-pinned-user-icon",
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      });
+
+      const userMarker = L.marker([pinnedUser.lat, pinnedUser.lng], {
+        icon: userCustomIcon,
+        zIndexOffset: 1000,
+      });
+
+      userMarker.addTo(userPinGroup);
+    });
+  }, [mapLoaded, pinnedUser]);
+
   const handleResetKarachi = () => {
     if (mapInstanceRef.current) {
       mapInstanceRef.current.flyTo(KARACHI_CENTER, DEFAULT_ZOOM, {
@@ -271,7 +367,7 @@ export default function LocationMapCanvas({
 
   return (
     <div
-      className={`relative w-full rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl bg-zinc-950 transition-all duration-300 ${
+      className={`relative w-full rounded-2xl overflow-hidden border border-border shadow-xl bg-card transition-all duration-300 ${
         isFullscreen ? "fixed inset-4 z-50 h-[calc(100vh-2rem)]" : "h-[620px]"
       }`}
       style={{ minHeight: "620px", height: isFullscreen ? "calc(100vh - 2rem)" : "620px" }}
@@ -285,22 +381,46 @@ export default function LocationMapCanvas({
 
       {/* Top Floating Controls Bar */}
       <div className="absolute top-4 left-4 z-[400] flex items-center gap-2 flex-wrap pointer-events-auto">
-        <Badge
-          variant="outline"
-          className="bg-zinc-950/90 backdrop-blur-md border-zinc-700 text-zinc-100 px-3 py-1.5 shadow-lg text-xs font-semibold flex items-center gap-1.5"
-        >
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
-          </span>
-          Live Location Nodes ({heatmapPoints.length} Pings)
-        </Badge>
+        {pinnedUser ? (
+          <Badge
+            variant="outline"
+            className="bg-background/95 backdrop-blur-md border-rose-500 text-foreground px-3 py-1.5 shadow-lg text-xs font-semibold flex items-center gap-2"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+            </span>
+            <span>
+              Pinned User: <strong className="text-rose-500">{pinnedUser.name}</strong>
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onClearPinnedUser}
+              className="h-5 w-5 p-0 hover:bg-muted ml-1 rounded-full text-muted-foreground hover:text-foreground"
+              title="Clear User Pin"
+            >
+              <X className="w-3.5 h-3.5" />
+            </Button>
+          </Badge>
+        ) : (
+          <Badge
+            variant="outline"
+            className="bg-background/90 backdrop-blur-md border-border text-foreground px-3 py-1.5 shadow-lg text-xs font-semibold flex items-center gap-1.5"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+            </span>
+            Live Location Nodes ({heatmapPoints.length} Pings)
+          </Badge>
+        )}
 
         <Button
           size="sm"
           variant="outline"
           onClick={handleFocusHottest}
-          className="bg-zinc-950/90 backdrop-blur-md border-zinc-700 hover:border-rose-500 text-zinc-100 hover:text-rose-400 text-xs shadow-lg h-8 gap-1.5"
+          className="bg-background/90 backdrop-blur-md border-border hover:border-rose-500 text-foreground hover:text-rose-500 text-xs shadow-lg h-8 gap-1.5"
         >
           <Flame className="w-3.5 h-3.5 text-rose-500" />
           Focus Hottest Zone
@@ -310,7 +430,7 @@ export default function LocationMapCanvas({
           size="sm"
           variant="outline"
           onClick={handleResetKarachi}
-          className="bg-zinc-950/90 backdrop-blur-md border-zinc-700 text-zinc-100 text-xs shadow-lg h-8 gap-1.5"
+          className="bg-background/90 backdrop-blur-md border-border text-foreground text-xs shadow-lg h-8 gap-1.5"
         >
           <Navigation className="w-3.5 h-3.5 text-primary" />
           Reset Karachi View
@@ -325,7 +445,7 @@ export default function LocationMapCanvas({
           onClick={() =>
             setMapStyle((s) => (s === "midnight" ? "contrast" : "midnight"))
           }
-          className="bg-zinc-950/90 backdrop-blur-md border-zinc-700 text-zinc-200 text-xs h-8 shadow-lg"
+          className="bg-background/90 backdrop-blur-md border-border text-foreground text-xs h-8 shadow-lg"
           title="Toggle Dark / Contrast Tiles"
         >
           <Layers className="w-3.5 h-3.5 mr-1" />
@@ -336,7 +456,7 @@ export default function LocationMapCanvas({
           size="sm"
           variant="outline"
           onClick={() => setIsFullscreen((f) => !f)}
-          className="bg-zinc-950/90 backdrop-blur-md border-zinc-700 text-zinc-200 text-xs h-8 shadow-lg"
+          className="bg-background/90 backdrop-blur-md border-border text-foreground text-xs h-8 shadow-lg"
           title="Toggle Fullscreen Map"
         >
           {isFullscreen ? (
@@ -348,23 +468,23 @@ export default function LocationMapCanvas({
       </div>
 
       {/* Bottom Map Legend */}
-      <div className="absolute bottom-4 left-4 z-[400] bg-zinc-950/90 backdrop-blur-md border border-zinc-800 rounded-xl px-4 py-2.5 shadow-2xl pointer-events-auto">
-        <div className="text-[10px] uppercase font-semibold text-zinc-400 tracking-wider mb-1.5 flex items-center justify-between">
+      <div className="absolute bottom-4 left-4 z-[400] bg-background/90 backdrop-blur-md border border-border rounded-xl px-4 py-2.5 shadow-xl pointer-events-auto">
+        <div className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mb-1.5 flex items-center justify-between">
           <span>Hotspot Intensity</span>
-          <span className="text-zinc-500">Snapchat Radar Spectrum</span>
+          <span className="text-muted-foreground">Snapchat Radar</span>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
-            <span className="text-[11px] font-medium text-cyan-300">Active</span>
+            <span className="text-[11px] font-medium text-cyan-600 dark:text-cyan-300">Active</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-            <span className="text-[11px] font-medium text-amber-300">High Demand</span>
+            <span className="text-[11px] font-medium text-amber-600 dark:text-amber-300">High Demand</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
-            <span className="text-[11px] font-medium text-rose-400 flex items-center gap-0.5">
+            <span className="text-[11px] font-medium text-rose-600 dark:text-rose-400 flex items-center gap-0.5">
               Blazing <Flame className="w-3 h-3 inline text-rose-500" />
             </span>
           </div>

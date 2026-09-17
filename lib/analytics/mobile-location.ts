@@ -64,6 +64,22 @@ export type AreaUser = {
   lastSeen: string;
   platform: string | null;
   topScreen: string | null;
+  lastLatitude: number | null;
+  lastLongitude: number | null;
+  lastEventName: string | null;
+};
+
+export type PinnedUserTarget = {
+  lat: number;
+  lng: number;
+  name: string;
+  username: string | null;
+  avatarUrl: string | null;
+  lastSeen: string;
+  platform: string | null;
+  topScreen: string | null;
+  lastEventName?: string | null;
+  isSigned: boolean;
 };
 
 export type AreaSearch = {
@@ -555,6 +571,9 @@ export async function getAreaDetailIntelligence(
     last_seen: string;
     platform: string | null;
     top_screen: string | null;
+    last_latitude: number | null;
+    last_longitude: number | null;
+    last_event_name: string | null;
   }>(
     `SELECT
        me.user_id,
@@ -565,6 +584,9 @@ export async function getAreaDetailIntelligence(
        COUNT(*)::text as events_count,
        MAX(me.occurred_at)::text as last_seen,
        MAX(me.platform) as platform,
+       (ARRAY_AGG(me.latitude ORDER BY me.occurred_at DESC))[1] as last_latitude,
+       (ARRAY_AGG(me.longitude ORDER BY me.occurred_at DESC))[1] as last_longitude,
+       (ARRAY_AGG(me.event_name ORDER BY me.occurred_at DESC))[1] as last_event_name,
        (
          SELECT sub.screen
          FROM public.mobile_events sub
@@ -573,8 +595,7 @@ export async function getAreaDetailIntelligence(
              (me.user_id IS NOT NULL AND sub.user_id = me.user_id) OR
              (me.user_id IS NULL AND sub.anon_id = me.anon_id)
            )
-         GROUP BY sub.screen
-         ORDER BY COUNT(*) DESC
+         ORDER BY sub.occurred_at DESC
          LIMIT 1
        ) as top_screen
      FROM public.mobile_events me
@@ -598,6 +619,9 @@ export async function getAreaDetailIntelligence(
     lastSeen: r.last_seen,
     platform: r.platform,
     topScreen: r.top_screen,
+    lastLatitude: r.last_latitude ? Number(r.last_latitude) : null,
+    lastLongitude: r.last_longitude ? Number(r.last_longitude) : null,
+    lastEventName: r.last_event_name,
   }));
 
   // 6. Hourly activity distribution
