@@ -8,7 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -76,6 +78,56 @@ export function ListingsManagementPage() {
     }>
   >([]);
   const [categoriesLoading, setCategoriesLoading] = React.useState(false);
+
+  // Group subcategories under their main categories for hierarchy
+  const categoryGroups = React.useMemo(() => {
+    const parents = categories.filter((c) => !c.parentId);
+    const groups: Array<{
+      parent: {
+        value: string;
+        label: string;
+        slug: string;
+        parentId: string | null;
+        iconName?: string | null;
+      };
+      subcategories: Array<{
+        value: string;
+        label: string;
+        slug: string;
+        parentId: string | null;
+        iconName?: string | null;
+      }>;
+    }> = [];
+
+    const processedSubIds = new Set<string>();
+
+    for (const parent of parents) {
+      const subs = categories.filter((c) => c.parentId === parent.value);
+      subs.forEach((s) => processedSubIds.add(s.value));
+      groups.push({
+        parent,
+        subcategories: subs,
+      });
+    }
+
+    const orphans = categories.filter(
+      (c) => c.parentId && !processedSubIds.has(c.value)
+    );
+    if (orphans.length > 0) {
+      groups.push({
+        parent: {
+          value: "other",
+          label: "Other Categories",
+          slug: "other",
+          parentId: null,
+          iconName: null,
+        },
+        subcategories: orphans,
+      });
+    }
+
+    return groups;
+  }, [categories]);
 
   // Track category dropdown open state to prevent layout shift
   const [filterDropdownOpen, setFilterDropdownOpen] = React.useState({
@@ -949,17 +1001,36 @@ export function ListingsManagementPage() {
               >
                 <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-80">
                 <SelectItem value="all">All Categories</SelectItem>
                 {categoriesLoading ? (
                   <SelectItem value="loading" disabled>
                     Loading...
                   </SelectItem>
                 ) : (
-                  categories.map((category) => (
-                    <SelectItem key={category.value} value={category.value}>
-                      {category.label}
-                    </SelectItem>
+                  categoryGroups.map(({ parent, subcategories }) => (
+                    <SelectGroup key={parent.value}>
+                      <SelectLabel className="text-xs font-semibold text-primary uppercase tracking-wider pl-3 py-1.5 bg-muted/40 mt-1 border-b border-border/40">
+                        {parent.label}
+                      </SelectLabel>
+                      {parent.value !== "other" && (
+                        <SelectItem
+                          value={parent.value}
+                          className="pl-5 font-medium text-xs"
+                        >
+                          All {parent.label}
+                        </SelectItem>
+                      )}
+                      {subcategories.map((category) => (
+                        <SelectItem
+                          key={category.value}
+                          value={category.value}
+                          className="pl-7 text-xs"
+                        >
+                          {category.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))
                 )}
               </SelectContent>
