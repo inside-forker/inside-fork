@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   parseGoogleMapsLink,
   isLikelyGoogleMapsHost,
@@ -71,6 +71,69 @@ export function DetailsTab({
   hideAdminFields = false,
 }: DetailsTabProps) {
   const [urlErrors, setUrlErrors] = useState<Record<string, string>>({});
+  const [categorySearch, setCategorySearch] = useState("");
+
+  // Group subcategories under their main categories
+  const categoryGroups = useMemo(() => {
+    const query = categorySearch.trim().toLowerCase();
+
+    // 1. Separate top-level / parent categories (parentId is null or empty)
+    const parents = categories.filter((c) => !c.parentId);
+
+    // 2. Build groups
+    const groups: Array<{
+      parent: Category;
+      subcategories: Category[];
+    }> = [];
+
+    const processedSubIds = new Set<string>();
+
+    for (const parent of parents) {
+      const subs = categories.filter((c) => c.parentId === parent.value);
+      subs.forEach((s) => processedSubIds.add(s.value));
+
+      const matchingSubs = query
+        ? subs.filter((s) => s.label.toLowerCase().includes(query))
+        : subs;
+
+      const parentMatches = query
+        ? parent.label.toLowerCase().includes(query)
+        : false;
+
+      // Include if no query, or if parent matches (show all subs), or if any subs match
+      if (!query || parentMatches || matchingSubs.length > 0) {
+        groups.push({
+          parent,
+          subcategories:
+            parentMatches && !matchingSubs.length ? subs : matchingSubs,
+        });
+      }
+    }
+
+    // 3. Catch any orphan subcategories whose parent wasn't in parents list
+    const orphans = categories.filter(
+      (c) => c.parentId && !processedSubIds.has(c.value)
+    );
+    if (orphans.length > 0) {
+      const matchingOrphans = query
+        ? orphans.filter((o) => o.label.toLowerCase().includes(query))
+        : orphans;
+      if (matchingOrphans.length > 0) {
+        groups.push({
+          parent: {
+            value: "other",
+            label: "Other Categories",
+            slug: "other",
+            parentId: null,
+            iconName: null,
+          },
+          subcategories: matchingOrphans,
+        });
+      }
+    }
+
+    return groups;
+  }, [categories, categorySearch]);
 
   // Check if location should be managed by primary branch
   const hasPrimaryBranch = branches?.some((b) => b.is_primary);
@@ -346,56 +409,144 @@ export function DetailsTab({
                 <span className="text-destructive text-sm">*</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Select one or more subcategories. The primary category is used
+                Select one or more subcategories under each main category. The primary category is used
                 for display cards and legacy fields.
               </p>
-              <div className="max-h-48 overflow-y-auto rounded-md border p-3 space-y-2">
+
+              {categories.length > 6 && (
+                <Input
+                  type="text"
+                  placeholder="Filter categories or subcategories..."
+                  value={categorySearch}
+                  onChange={(e) => setCategorySearch(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              )}
+
+              <div className="max-h-64 overflow-y-auto rounded-md border p-3 space-y-4 bg-background">
                 {categoriesLoading && (
                   <p className="text-sm text-muted-foreground">
                     Loading categories...
                   </p>
                 )}
+                {!categoriesLoading && categoryGroups.length === 0 && (
+                  <p className="text-xs text-muted-foreground italic py-2">
+                    No matching categories found.
+                  </p>
+                )}
                 {!categoriesLoading &&
-                  categories.map((category) => {
-                    const checked = selectedCategoryIds.includes(category.value);
-                    const isPrimary = formData.category_id === category.value;
-                    return (
-                      <div
-                        key={category.value}
-                        className="flex items-center justify-between gap-2"
-                      >
-                        <label className="flex items-center gap-2 text-sm cursor-pointer flex-1 min-w-0">
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={(value) =>
-                              toggleCategory(category.value, value === true)
-                            }
-                          />
-                          <span className="truncate">{category.label}</span>
-                        </label>
-                        {checked && (
-                          <button
-                            type="button"
-                            className="shrink-0"
-                            onClick={() => setPrimaryCategory(category.value)}
-                          >
-                            <Badge
-                              variant={isPrimary ? "default" : "outline"}
-                              className="text-[10px]"
-                            >
-                              {isPrimary ? "Primary" : "Make primary"}
-                            </Badge>
-                          </button>
+                  categoryGroups.map(({ parent, subcategories }) => (
+                    <div key={parent.value} className="space-y-2">
+                      {/* Main Category Header */}
+                      <div className="flex items-center justify-between pb-1 border-b border-border/60">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                          {parent.label}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {subcategories.length}{" "}
+                          {subcategories.length === 1
+                            ? "subcategory"
+                            : "subcategories"}
+                        </span>
+                      </div>
+
+                      {/* Subcategories list */}
+                      <div className="pl-2 space-y-1.5">
+                        {subcategories.length === 0 ? (
+                          <div className="flex items-center justify-between gap-2 py-0.5">
+                            <label className="flex items-center gap-2 text-sm cursor-pointer flex-1 min-w-0">
+                              <Checkbox
+                                checked={selectedCategoryIds.includes(
+                                  parent.value
+                                )}
+                                onCheckedChange={(value) =>
+                                  toggleCategory(parent.value, value === true)
+                                }
+                              />
+                              <span className="text-sm">{parent.label}</span>
+                            </label>
+                            {selectedCategoryIds.includes(parent.value) && (
+                              <button
+                                type="button"
+                                className="shrink-0"
+                                onClick={() => setPrimaryCategory(parent.value)}
+                              >
+                                <Badge
+                                  variant={
+                                    formData.category_id === parent.value
+                                      ? "default"
+                                      : "outline"
+                                  }
+                                  className="text-[10px]"
+                                >
+                                  {formData.category_id === parent.value
+                                    ? "Primary"
+                                    : "Make primary"}
+                                </Badge>
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          subcategories.map((subcategory) => {
+                            const checked = selectedCategoryIds.includes(
+                              subcategory.value
+                            );
+                            const isPrimary =
+                              formData.category_id === subcategory.value;
+                            return (
+                              <div
+                                key={subcategory.value}
+                                className="flex items-center justify-between gap-2 py-0.5 hover:bg-muted/40 px-1 rounded transition-colors"
+                              >
+                                <label className="flex items-center gap-2 text-sm cursor-pointer flex-1 min-w-0">
+                                  <Checkbox
+                                    checked={checked}
+                                    onCheckedChange={(value) =>
+                                      toggleCategory(
+                                        subcategory.value,
+                                        value === true
+                                      )
+                                    }
+                                  />
+                                  <span className="truncate text-sm">
+                                    {subcategory.label}
+                                  </span>
+                                </label>
+                                {checked && (
+                                  <button
+                                    type="button"
+                                    className="shrink-0"
+                                    onClick={() =>
+                                      setPrimaryCategory(subcategory.value)
+                                    }
+                                  >
+                                    <Badge
+                                      variant={
+                                        isPrimary ? "default" : "outline"
+                                      }
+                                      className="text-[10px]"
+                                    >
+                                      {isPrimary ? "Primary" : "Make primary"}
+                                    </Badge>
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })
                         )}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
               </div>
               {selectedCategoryIds.length > 0 && (
                 <p className="text-xs text-muted-foreground">
                   {selectedCategoryIds.length} selected
                   {formData.category_id
-                    ? ` · primary #${formData.category_id}`
+                    ? ` · primary: ${
+                        categories.find(
+                          (c) => c.value === formData.category_id
+                        )?.label || `#${formData.category_id}`
+                      }`
                     : ""}
                 </p>
               )}
