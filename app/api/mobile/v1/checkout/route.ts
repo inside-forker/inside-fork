@@ -11,6 +11,10 @@ import { MobileApiError } from "@/lib/mobile/errors";
 import { query } from "@/lib/db";
 import { computeBasketHash, type CheckoutItem } from "@/lib/mobile/commerce";
 import { hashCnic, cnicLast4 } from "@/lib/utils/cnic-server";
+import {
+  confirmBookingWithoutPayment,
+  isPaymentSkipEnabled,
+} from "@/lib/mobile/skip-payment";
 
 export const dynamic = "force-dynamic";
 
@@ -328,7 +332,19 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     }
   }
 
-  const paymentStatus = booking.payment_status ?? "awaiting_payment";
+  let paymentStatus = booking.payment_status ?? "awaiting_payment";
+
+  // Free orders never need a gateway; MOBILE_CHECKOUT_SKIP_PAYMENT is the
+  // temporary review-time switch (off by default). See lib/mobile/skip-payment.
+  const isFreeOrder = Number(booking.total_amount) === 0;
+  if (paymentStatus !== "paid" && (isFreeOrder || isPaymentSkipEnabled())) {
+    await confirmBookingWithoutPayment(
+      bookingId,
+      isFreeOrder ? "free_order" : "payment_skipped",
+    );
+    paymentStatus = "paid";
+  }
+
   const paymentStage =
     paymentStatus === "paid"
       ? "completed"
