@@ -103,7 +103,7 @@ export function PrivacyPolicyContent() {
         {
           title: "Third-Party Services",
           content:
-            "Sentry (crash and performance reporting), Google and Apple (sign-in), Expo's push notification service (notification delivery), and our hosting providers. Partner promotions shown in the app, such as Parchi, are links only — opening one takes you to the partner's own site, and we do not share your personal data with them.",
+            "Sentry (crash and performance reporting), Google and Apple (sign-in), Expo's push notification service (notification delivery), PayFast (payment processing for ticket purchases — card details are entered on PayFast's secure form and are not stored by us), and our hosting providers. Partner promotions shown in the app, such as Parchi, are links only — opening one takes you to the partner's own site, and we do not share your personal data with them.",
         },
       ],
     },
