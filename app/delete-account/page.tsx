@@ -3,9 +3,9 @@ import Link from "next/link";
 import { getOptionalSessionUser } from "@/lib/auth/require-session";
 
 export const metadata: Metadata = {
-  title: "Delete Your Account - Inside Karachi",
+  title: "Delete Your Account - Inside: The City Guide (Inside Karachi)",
   description:
-    "How to permanently delete your Inside Karachi account, on the web or in the app, and what happens to your data when you do.",
+    "How to permanently delete your Inside: The City Guide (Inside Karachi) account, on the web or in the app, and what happens to your data when you do.",
 };
 
 const RETURN_TO = "/dashboard/profile?openDelete=1";
@@ -23,8 +23,8 @@ export default async function DeleteAccountPage() {
           <span className="gradient-text-primary">Delete your account</span>
         </h1>
         <p className="text-muted-foreground text-lg mb-10">
-          You can permanently delete your Inside Karachi account at any
-          time, from the website or the mobile app. This page explains
+          You can permanently delete your Inside: The City Guide (Inside
+          Karachi) account at any time, from the website or the mobile app. This page explains
           exactly what happens when you do.
         </p>
 
