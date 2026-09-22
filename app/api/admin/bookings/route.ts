@@ -30,7 +30,13 @@ export async function GET(request: NextRequest) {
               b.created_at, b.customer_name, b.customer_email, b.customer_phone,
               b.cnic_last4, b.event_id, b.user_id,
               CASE WHEN e.id IS NULL THEN NULL
-                   ELSE json_build_object('id', e.id, 'name', e.name, 'slug', e.slug)
+                   ELSE json_build_object(
+                     'id', e.id,
+                     'name', e.name,
+                     'slug', e.slug,
+                     'start_time', e.start_time,
+                     'location_name', e.location_name
+                   )
               END AS events
        FROM bookings b
        LEFT JOIN events e ON e.id = b.event_id
@@ -81,13 +87,23 @@ export async function GET(request: NextRequest) {
     const { rows: ticketPasses } =
       bookingIds.length > 0
         ? await query(
-            `SELECT tp.booking_id, tp.guest_name, tp.cnic_last4, tp.code,
-                    tp.status, tp.checked_in_at,
+            `SELECT tp.id, tp.booking_id, tp.guest_name, tp.cnic_last4, tp.code,
+                    tp.status, tp.checked_in_at, tp.issued_at, tp.quantity_index,
+                    tp.ticket_type_id, tp.assigned_gate_index,
+                    COALESCE(
+                      edo.device_label,
+                      CASE WHEN tp.assigned_gate_index IS NOT NULL
+                        THEN 'Gate ' || (tp.assigned_gate_index + 1)
+                        ELSE NULL
+                      END
+                    ) AS gate_label,
                     CASE WHEN tt.id IS NULL THEN NULL
                          ELSE json_build_object('name', tt.name)
                     END AS ticket_type
              FROM ticket_passes tp
              LEFT JOIN ticket_types tt ON tt.id = tp.ticket_type_id
+             LEFT JOIN event_device_operators edo
+               ON edo.event_id = tp.event_id AND edo.device_index = tp.assigned_gate_index
              WHERE tp.booking_id = ANY($1::int[])`,
             [bookingIds]
           )
@@ -148,12 +164,21 @@ export async function GET(request: NextRequest) {
           const cnicLast4 = (pass.cnic_last4 as string | null) ?? null;
 
           return {
+            id: Number(pass.id),
             name: pass.guest_name,
             cnic: cnicLast4,
             ticket_type: (pass.ticket_type as { name?: string })?.name,
             code: pass.code,
             status: pass.status,
             checked_in_at: pass.checked_in_at,
+            issued_at: pass.issued_at,
+            quantity_index: pass.quantity_index != null ? Number(pass.quantity_index) : 0,
+            ticket_type_id: pass.ticket_type_id != null ? Number(pass.ticket_type_id) : null,
+            assigned_gate_index:
+              pass.assigned_gate_index !== null && pass.assigned_gate_index !== undefined
+                ? Number(pass.assigned_gate_index)
+                : null,
+            gate_label: (pass.gate_label as string | null) || null,
           };
         }),
       };
