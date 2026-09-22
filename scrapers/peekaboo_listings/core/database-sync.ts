@@ -18,6 +18,8 @@ type ListingInsert = Database["public"]["Tables"]["listings"]["Insert"];
 // TYPES
 // ============================================================================
 
+export type SyncMode = "deals_only" | "full";
+
 export interface SyncOptions {
   /**
    * If true, automatically publish listings (status = 'published')
@@ -35,6 +37,12 @@ export interface SyncOptions {
    * If true, create change requests for existing listings instead of direct updates
    */
   createChangeRequests?: boolean;
+
+  /**
+   * deals_only: refresh deals only; never create/overwrite listing rows or related tables.
+   * full: scrape-and-upsert listing metadata (with admin field protections).
+   */
+  syncMode?: SyncMode;
 }
 
 export interface ConflictInfo {
@@ -85,6 +93,7 @@ const PRESERVE_ON_UPDATE = [
   "is_featured",
   "show_member_badge",
   "display_order",
+  "category_id",
 ] as const;
 
 function listingValues(
@@ -110,6 +119,7 @@ export class DatabaseSync {
       autoPublish: options.autoPublish ?? false,
       preserveManualEdits: options.preserveManualEdits ?? true,
       createChangeRequests: options.createChangeRequests ?? false,
+      syncMode: options.syncMode ?? "deals_only",
     };
   }
 
@@ -137,6 +147,47 @@ export class DatabaseSync {
     try {
       // Step 1: Check if listing already exists
       const decision = await this.decideSyncAction(listing);
+
+      // deals_only: never create listings; only refresh deals on existing rows.
+      // Manual-edit conflicts are ignored here because listing metadata is not written.
+      if (this.options.syncMode === "deals_only") {
+        if (decision.action === "create" || !decision.listingId) {
+          console.log(
+            `[SYNC] deals_only: skipping create for peekaboo_id=${peekabooId}`,
+          );
+          return {
+            peekabooId,
+            action: "skip",
+            success: true,
+            details: {
+              imagesProcessed: 0,
+              branchesProcessed: 0,
+              categoryMapped: false,
+              dealsProcessed: 0,
+            },
+          };
+        }
+
+        const listingId = decision.listingId;
+        let dealsProcessed = 0;
+        if (deals && deals.length > 0) {
+          dealsProcessed = await this.syncDeals(listingId, deals);
+        }
+        await this.bumpPeekabooLastSync(listingId);
+
+        return {
+          peekabooId,
+          action: "update",
+          listingId,
+          success: true,
+          details: {
+            imagesProcessed: 0,
+            branchesProcessed: 0,
+            dealsProcessed,
+            categoryMapped: false,
+          },
+        };
+      }
 
       // skip = intentionally ignored; conflict = manual edits preserved (do not overwrite)
       if (decision.action === "skip" || decision.action === "conflict") {
@@ -410,12 +461,6 @@ export class DatabaseSync {
   ): Promise<number> {
     const now = new Date().toISOString();
 
-    // Add sync timestamp to custom_attributes
-    const customAttributes = {
-      ...listing.custom_attributes,
-      peekaboo_last_sync: now,
-    };
-
     // Prepare listing data - properly typed to match the listings table
     const shouldArchiveForMissingCategory =
       this.options.autoPublish && !listing.category_id;
@@ -449,7 +494,11 @@ export class DatabaseSync {
       parking_amenities:
         (listing.parking_amenities as Database["public"]["Tables"]["listings"]["Insert"]["parking_amenities"]) ||
         null,
-      custom_attributes: customAttributes,
+      // Default for create; update path merges with existing below
+      custom_attributes: {
+        ...listing.custom_attributes,
+        peekaboo_last_sync: now,
+      },
     };
 
     if (decision.action === "create") {
@@ -471,24 +520,21 @@ export class DatabaseSync {
 
         if (insertError.code === "23505") {
           const { rows: existingRows } = await query(
-            `SELECT id FROM listings WHERE peekaboo_id = $1 LIMIT 1`,
+            `SELECT id, custom_attributes FROM listings WHERE peekaboo_id = $1 LIMIT 1`,
             [listing.peekaboo_id],
           );
-          const existing = existingRows[0];
+          const existing = existingRows[0] as
+            | { id: number; custom_attributes: Record<string, unknown> | null }
+            | undefined;
 
           if (existing?.id) {
             try {
-              const updateColumns = LISTING_COLUMNS.filter((col) => {
-                if (
-                  (PRESERVE_ON_UPDATE as readonly string[]).includes(col)
-                ) {
-                  return false;
-                }
-                if (col === "status" && !this.options.autoPublish) {
-                  return false;
-                }
-                return true;
-              });
+              listingData.custom_attributes = {
+                ...(existing.custom_attributes || {}),
+                ...listing.custom_attributes,
+                peekaboo_last_sync: now,
+              };
+              const updateColumns = this.getUpdateColumns();
               await query(
                 `UPDATE listings SET ${updateColumns.map((col, i) => `${col} = $${i + 1}`).join(", ")}
                  WHERE id = $${updateColumns.length + 1}`,
@@ -500,10 +546,7 @@ export class DatabaseSync {
               );
             }
 
-            await this.syncListingCategoryJunction(
-              existing.id,
-              listing.category_id || null,
-            );
+            // Do not rewrite category junctions on update — preserve admin curation
             return existing.id;
           }
         }
@@ -514,17 +557,21 @@ export class DatabaseSync {
       // UPDATE existing listing — never clobber admin-controlled fields with
       // Peekaboo defaults. When autoPublish is off, also preserve status so a
       // sync cannot demote published listings back to draft.
-      const updateColumns = LISTING_COLUMNS.filter((col) => {
-        if (
-          (PRESERVE_ON_UPDATE as readonly string[]).includes(col)
-        ) {
-          return false;
-        }
-        if (col === "status" && !this.options.autoPublish) {
-          return false;
-        }
-        return true;
-      });
+      // Merge custom_attributes so admin keys are not wiped.
+      const { rows: existingRows } = await query(
+        `SELECT custom_attributes FROM listings WHERE id = $1 LIMIT 1`,
+        [decision.listingId!],
+      );
+      const existingAttrs =
+        (existingRows[0]?.custom_attributes as Record<string, unknown> | null) ||
+        {};
+      listingData.custom_attributes = {
+        ...existingAttrs,
+        ...listing.custom_attributes,
+        peekaboo_last_sync: now,
+      };
+
+      const updateColumns = this.getUpdateColumns();
 
       try {
         await query(
@@ -536,11 +583,42 @@ export class DatabaseSync {
         throw new Error(`Failed to update listing: ${(error as Error).message}`);
       }
 
-      await this.syncListingCategoryJunction(
-        decision.listingId!,
-        listing.category_id || null,
-      );
+      // Preserve existing listing_categories on update (admin may have multi-category)
       return decision.listingId!;
+    }
+  }
+
+  /** Columns written on UPDATE — excludes admin-preserved fields. */
+  private getUpdateColumns(): string[] {
+    return LISTING_COLUMNS.filter((col) => {
+      if ((PRESERVE_ON_UPDATE as readonly string[]).includes(col)) {
+        return false;
+      }
+      if (col === "status" && !this.options.autoPublish) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  /**
+   * Shallow-merge peekaboo_last_sync into custom_attributes without replacing other keys.
+   */
+  private async bumpPeekabooLastSync(listingId: number): Promise<void> {
+    const now = new Date().toISOString();
+    try {
+      await query(
+        `UPDATE listings
+         SET custom_attributes =
+           COALESCE(custom_attributes, '{}'::jsonb) || $1::jsonb
+         WHERE id = $2`,
+        [JSON.stringify({ peekaboo_last_sync: now }), listingId],
+      );
+    } catch (error) {
+      console.warn(
+        `[SYNC] Failed to bump peekaboo_last_sync for listing ${listingId}:`,
+        error,
+      );
     }
   }
 

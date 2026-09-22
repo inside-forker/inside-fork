@@ -23,6 +23,7 @@ const WorkerStartSchema = z.object({
     limitEntities: z.boolean(),
     entityLimit: z.number().min(1).max(1000).optional(),
     specificEntityId: z.string().optional(),
+    syncMode: z.enum(["deals_only", "full"]).default("deals_only"),
   }),
 });
 
@@ -34,6 +35,7 @@ const WorkerAutomationSchema = z.object({
     maxConcurrent: z.number().min(1).max(10).default(5),
     autoPublish: z.boolean().default(false),
     preserveManualEdits: z.boolean().default(true),
+    syncMode: z.enum(["deals_only", "full"]).default("deals_only"),
   }),
   canary: z.object({
     enabled: z.boolean().default(false),
@@ -278,6 +280,7 @@ async function runAutomationTick(lastRunAt: number): Promise<number> {
       maxConcurrent: workerConfig.syncDefaults.maxConcurrent,
       autoPublish: workerConfig.syncDefaults.autoPublish,
       preserveManualEdits: workerConfig.syncDefaults.preserveManualEdits,
+      syncMode: workerConfig.syncDefaults.syncMode ?? "deals_only",
       limitEntities: false,
     };
 
@@ -287,6 +290,7 @@ async function runAutomationTick(lastRunAt: number): Promise<number> {
         maxConcurrent: Math.min(workerConfig.syncDefaults.maxConcurrent, 3),
         autoPublish: false,
         preserveManualEdits: workerConfig.syncDefaults.preserveManualEdits,
+        syncMode: workerConfig.syncDefaults.syncMode ?? "deals_only",
         limitEntities: true,
         entityLimit: workerConfig.canary.entityLimit,
       };

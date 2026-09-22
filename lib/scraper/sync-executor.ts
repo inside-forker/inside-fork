@@ -24,6 +24,8 @@ export interface SyncConfig {
   specificEntityId?: string;
   /** When true, clear processed IDs and re-sync all entities from scratch. */
   fullResync?: boolean;
+  /** deals_only (default) refreshes deals only; full upserts listing metadata. */
+  syncMode?: "deals_only" | "full";
 }
 
 export interface SyncExecutionResult {
@@ -282,6 +284,7 @@ export async function executeSyncOperation(
       maxConcurrent: config.maxConcurrent,
       autoPublish: config.autoPublish,
       preserveManualEdits: config.preserveManualEdits,
+      syncMode: config.syncMode ?? "deals_only",
       onProgress: async (current, total, result) => {
         assertLockStillOwned();
         const entityName =

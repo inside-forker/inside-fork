@@ -17,6 +17,13 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -45,6 +52,7 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
       maxConcurrent: 5,
       autoPublish: false,
       preserveManualEdits: true,
+      syncMode: "deals_only" as "deals_only" | "full",
     },
     canary: {
       enabled: false,
@@ -58,6 +66,7 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
     maxConcurrent: 5,
     autoPublish: false,
     preserveManualEdits: true,
+    syncMode: "deals_only" as "deals_only" | "full",
     limitEntities: false,
     entityLimit: 10,
     specificEntityId: "",
@@ -160,7 +169,13 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
           config?: typeof workerConfig;
         };
         if (data.config) {
-          setWorkerConfig(data.config);
+          setWorkerConfig({
+            ...data.config,
+            syncDefaults: {
+              ...data.config.syncDefaults,
+              syncMode: data.config.syncDefaults.syncMode ?? "deals_only",
+            },
+          });
         }
       } catch (error) {
         console.error("Failed to load worker config:", error);
@@ -273,6 +288,32 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
               </p>
             </div>
 
+            {/* Sync Mode */}
+            <div className="space-y-2">
+              <Label htmlFor="syncMode">Sync Mode</Label>
+              <Select
+                value={config.syncMode}
+                onValueChange={(value: "deals_only" | "full") =>
+                  setConfig({ ...config, syncMode: value })
+                }
+                disabled={isLoading}
+              >
+                <SelectTrigger id="syncMode" className="max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="deals_only">
+                    Deals only (safe)
+                  </SelectItem>
+                  <SelectItem value="full">Full listing sync</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Deals only updates card discounts without changing categories,
+                status, address, or other listing fields.
+              </p>
+            </div>
+
             {/* Auto Publish */}
             <div className="flex items-center justify-between space-x-2">
               <div className="space-y-0.5">
@@ -288,7 +329,7 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
                 onCheckedChange={(checked) =>
                   setConfig({ ...config, autoPublish: checked })
                 }
-                disabled={isLoading}
+                disabled={isLoading || config.syncMode === "deals_only"}
               />
             </div>
 
@@ -395,7 +436,19 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
       </motion.div>
 
       {/* Warnings */}
-      {config.autoPublish && (
+      {config.syncMode === "full" && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Full sync will update listing metadata from Peekaboo (name, address,
+            contacts, etc.). Categories, status (when auto-publish is off),
+            featured flags, and price/capacity fields are preserved — but prefer
+            Deals only unless you intentionally need a metadata refresh.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {config.autoPublish && config.syncMode === "full" && (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
@@ -478,7 +531,7 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="space-y-2">
               <Label htmlFor="workerDefaultConcurrent">Default Concurrency</Label>
               <Input
@@ -498,6 +551,27 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
                 }
                 disabled={isSavingWorkerConfig}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="workerDefaultSyncMode">Default Sync Mode</Label>
+              <Select
+                value={workerConfig.syncDefaults.syncMode}
+                onValueChange={(value: "deals_only" | "full") =>
+                  setWorkerConfig((prev) => ({
+                    ...prev,
+                    syncDefaults: { ...prev.syncDefaults, syncMode: value },
+                  }))
+                }
+                disabled={isSavingWorkerConfig}
+              >
+                <SelectTrigger id="workerDefaultSyncMode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="deals_only">Deals only</SelectItem>
+                  <SelectItem value="full">Full</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-end">
               <div className="flex items-center justify-between w-full rounded-md border px-3 py-2">
