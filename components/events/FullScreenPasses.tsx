@@ -355,43 +355,43 @@ function FullTicketView({
       </div>
 
       {/* Ticket Content - Scrollable */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div ref={ticketRef}>
-          <div className="mobile-ticket bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-xl">
+          <div className="ticket relative bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-2xl max-w-xl mx-auto">
             {/* Header */}
-            <div className="ticket-header bg-gradient-to-r from-primary to-primary/85 text-white px-6 py-5 flex justify-between items-center">
+            <div className="ticket-header relative z-10 bg-gradient-to-r from-primary to-[#c91140] text-white px-6 py-5 flex justify-between items-center">
               <div className="brand-container">
-                <div className="brand-sub text-[10px] uppercase tracking-[3px] opacity-90 mb-0.5">
+                <div className="brand-sub text-[10px] uppercase tracking-[3px] font-bold opacity-90 mb-0.5">
                   Inside
                 </div>
-                <div className="brand text-2xl font-extrabold tracking-tight">
+                <div className="brand text-2xl font-black tracking-tight">
                   karachi
                 </div>
               </div>
-              <div className="ticket-type bg-white/25 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+              <div className="ticket-type bg-white/20 backdrop-blur-sm border border-white/30 px-3.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
                 Event Ticket
               </div>
             </div>
 
-            {/* Body - Stack on mobile */}
-            <div className="ticket-body flex flex-col">
+            {/* Body */}
+            <div className="ticket-body relative flex flex-col bg-white">
               {/* Main Content */}
-              <div className="ticket-main p-5">
-                <h2 className="event-name text-lg font-extrabold text-gray-900 mb-4 leading-tight">
+              <div className="ticket-main p-6">
+                <h2 className="event-name text-xl font-black text-gray-900 mb-4 leading-tight tracking-tight">
                   {eventName || "Event"}
                 </h2>
 
-                <div className="details-grid space-y-3">
+                <div className="details-grid space-y-3.5">
                   {formattedDate && (
                     <div className="detail-row flex items-center gap-3">
-                      <div className="detail-icon w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Calendar className="w-4 h-4 text-gray-600" />
+                      <div className="detail-icon w-8 h-8 bg-gray-100/90 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <Calendar className="w-4 h-4 text-gray-700" />
                       </div>
                       <div className="detail-content">
-                        <div className="detail-label text-[9px] uppercase tracking-wider text-gray-400 font-semibold mb-0.5">
+                        <div className="detail-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
                           Date
                         </div>
-                        <div className="detail-value text-sm text-gray-900 font-semibold">
+                        <div className="detail-value text-sm text-gray-900 font-bold">
                           {formattedDate}
                         </div>
                       </div>
@@ -400,16 +400,16 @@ function FullTicketView({
 
                   {formattedTime && (
                     <div className="detail-row flex items-center gap-3">
-                      <div className="detail-icon w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div className="detail-icon w-8 h-8 bg-gray-100/90 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
                       <div className="detail-content">
-                        <div className="detail-label text-[9px] uppercase tracking-wider text-gray-400 font-semibold mb-0.5">
+                        <div className="detail-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
                           Time
                         </div>
-                        <div className="detail-value text-sm text-gray-900 font-semibold">
+                        <div className="detail-value text-sm text-gray-900 font-bold">
                           {formattedTime}
                         </div>
                       </div>
@@ -418,14 +418,14 @@ function FullTicketView({
 
                   {venueName && (
                     <div className="detail-row flex items-center gap-3">
-                      <div className="detail-icon w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <MapPin className="w-4 h-4 text-gray-600" />
+                      <div className="detail-icon w-8 h-8 bg-gray-100/90 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-4 h-4 text-gray-700" />
                       </div>
                       <div className="detail-content">
-                        <div className="detail-label text-[9px] uppercase tracking-wider text-gray-400 font-semibold mb-0.5">
+                        <div className="detail-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
                           Venue
                         </div>
-                        <div className="detail-value text-sm text-gray-900 font-semibold">
+                        <div className="detail-value text-sm text-gray-900 font-bold">
                           {venueName}
                         </div>
                       </div>
@@ -434,14 +434,14 @@ function FullTicketView({
 
                   {pass.gate_label && (
                     <div className="detail-row flex items-center gap-3">
-                      <div className="detail-icon w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <div className="detail-icon w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Ticket className="w-4 h-4 text-primary" />
                       </div>
                       <div className="detail-content">
-                        <div className="detail-label text-[9px] uppercase tracking-wider text-primary font-bold mb-0.5">
-                          Enter at
+                        <div className="detail-label text-[9px] uppercase tracking-wider text-primary font-black mb-0.5">
+                          Gate / Entrance
                         </div>
-                        <div className="detail-value text-sm text-primary font-extrabold tracking-wide">
+                        <div className="detail-value text-sm text-primary font-black tracking-wide">
                           {pass.gate_label}
                         </div>
                       </div>
@@ -449,25 +449,25 @@ function FullTicketView({
                   )}
                 </div>
 
-                {/* Guest Info */}
+                {/* Attendee Info */}
                 {(pass.guest_name || pass.cnic_last4) && (
-                  <div className="guest-section mt-4 pt-4 border-t border-gray-100">
+                  <div className="guest-section mt-5 pt-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-4">
                     {pass.guest_name && (
-                      <div className="mb-2">
-                        <div className="guest-label text-[9px] uppercase tracking-wider text-gray-400 font-semibold mb-1">
+                      <div>
+                        <div className="guest-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
                           Attendee
                         </div>
-                        <div className="guest-name text-base font-extrabold text-gray-900">
+                        <div className="guest-name text-base font-black text-gray-900">
                           {pass.guest_name}
                         </div>
                       </div>
                     )}
                     {pass.cnic_last4 && (
                       <div>
-                        <div className="guest-label text-[9px] uppercase tracking-wider text-gray-400 font-semibold mb-1">
+                        <div className="guest-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
                           CNIC
                         </div>
-                        <div className="text-sm font-mono font-semibold text-gray-900">
+                        <div className="text-sm font-mono font-bold text-gray-800">
                           *****-*******-{pass.cnic_last4}
                         </div>
                       </div>
@@ -476,24 +476,34 @@ function FullTicketView({
                 )}
               </div>
 
+              {/* Perforation Line & Notches */}
+              <div className="relative flex items-center justify-between w-full h-[1px]">
+                {/* Left Notch */}
+                <div className="absolute -left-3 -top-3 w-6 h-6 rounded-full bg-neutral-900 z-20" />
+                {/* Horizontal Dashed Line */}
+                <div className="w-full border-t-2 border-dashed border-gray-300 mx-3" />
+                {/* Right Notch */}
+                <div className="absolute -right-3 -top-3 w-6 h-6 rounded-full bg-neutral-900 z-20" />
+              </div>
+
               {/* QR Code Section */}
-              <div className="ticket-qr p-5 flex flex-col items-center justify-center bg-gray-50 border-t-2 border-dashed border-gray-200">
+              <div className="ticket-qr p-6 flex flex-col items-center justify-center bg-gray-50/70">
                 {pass.code ? (
                   <>
-                    <div className="qr-code bg-white p-3 rounded-xl shadow-sm">
+                    <div className="qr-code bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
                       <QRCodeSVG
                         id={`mobile-qr-${pass.id}`}
                         value={pass.code}
-                        size={140}
+                        size={150}
                         level="H"
                         bgColor="#FFFFFF"
                         fgColor="#000000"
                       />
                     </div>
-                    <div className="ticket-code mt-3 font-mono text-sm font-bold tracking-widest text-gray-800">
+                    <div className="ticket-code mt-3 font-mono text-sm font-black tracking-widest text-gray-900">
                       {pass.code}
                     </div>
-                    <div className="scan-text mt-1.5 text-[9px] text-gray-500 uppercase tracking-wider text-center">
+                    <div className="scan-text mt-1 text-[9px] text-gray-500 font-bold uppercase tracking-widest text-center">
                       Scan at Entry
                     </div>
                   </>
@@ -507,8 +517,8 @@ function FullTicketView({
             </div>
 
             {/* Footer */}
-            <div className="ticket-footer bg-gray-100 px-5 py-2.5 text-center border-t border-gray-200">
-              <p className="text-[9px] text-gray-500">
+            <div className="ticket-footer bg-gray-50/90 px-6 py-3 text-center border-t border-gray-200">
+              <p className="text-[10px] text-gray-500 font-medium leading-relaxed">
                 This ticket is non-transferable. Present a valid ID at check-in.
                 <br />© {new Date().getFullYear()} Inside Karachi • insidekarachi.com
               </p>
