@@ -360,15 +360,15 @@ function FullTicketView({
         <div ref={ticketRef}>
           <div className="ticket relative bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-2xl max-w-xl mx-auto">
             {/* Header */}
-            <div className="ticket-header relative z-10 bg-gradient-to-r from-primary to-[#c91140] text-white px-6 py-4 flex justify-between items-center">
+            <div className="ticket-header relative z-10 bg-gradient-to-r from-primary to-[#c91140] text-white px-6 py-4 flex items-center justify-between min-h-[60px]">
               <div className="brand-container flex items-center">
                 <img
-                  src="/assets/logo-white.png"
+                  src="/assets/logo-pure-white.png"
                   alt="Inside Karachi"
-                  className="h-7 w-auto object-contain"
+                  className="h-7 w-auto object-contain block"
                 />
               </div>
-              <div className="ticket-type bg-white/20 backdrop-blur-sm border border-white/30 px-3.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
+              <div className="ticket-type bg-white/20 border border-white/30 px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider text-white shadow-sm flex items-center justify-center leading-none">
                 Event Ticket
               </div>
             </div>
