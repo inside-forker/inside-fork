@@ -53,31 +53,75 @@ export function PrintableTicket({
     };
   }, []);
 
+  const buildPdfInput = React.useCallback(() => {
+    let dateLabel = eventDate;
+    try {
+      dateLabel = format(new Date(eventDate), "EEEE, MMMM d, yyyy");
+    } catch {
+      // keep raw
+    }
+
+    let timeLabel: string | null = null;
+    if (eventTime) {
+      try {
+        timeLabel = format(new Date(eventTime), "h:mm a");
+      } catch {
+        timeLabel = eventTime;
+      }
+    } else {
+      try {
+        const date = new Date(eventDate);
+        if (date.getHours() !== 0 || date.getMinutes() !== 0) {
+          timeLabel = format(date, "h:mm a");
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return {
+      code: pass.code || "",
+      eventName,
+      eventDate: dateLabel,
+      eventTime: timeLabel,
+      venueName: venueName || null,
+      ticketType: ticketType || null,
+      guestName: pass.guest_name || null,
+      cnicLast4: pass.cnic_last4 || null,
+      gateLabel: pass.gate_label || null,
+      filename: `ticket-${pass.code || pass.id}`,
+    };
+  }, [
+    eventDate,
+    eventName,
+    eventTime,
+    pass.code,
+    pass.cnic_last4,
+    pass.gate_label,
+    pass.guest_name,
+    pass.id,
+    ticketType,
+    venueName,
+  ]);
+
   React.useEffect(() => {
     if (!mounted || !autoDownloadPdf || autoDownloadFired.current) return;
     if (!pass.code) return;
 
     const timer = window.setTimeout(async () => {
-      const ticketElement = ticketRef.current?.querySelector(
-        ".ticket",
-      ) as HTMLElement | null;
-      if (!ticketElement) return;
       autoDownloadFired.current = true;
       try {
-        const { downloadTicketPdfFromElement } = await import(
+        const { downloadTicketPdf } = await import(
           "@/lib/ticketing/download-ticket-pdf"
         );
-        await downloadTicketPdfFromElement(
-          ticketElement,
-          `ticket-${pass.code || pass.id}`,
-        );
+        await downloadTicketPdf(buildPdfInput());
       } catch (error) {
         console.error("Error auto-downloading ticket PDF:", error);
       }
     }, 350);
 
     return () => window.clearTimeout(timer);
-  }, [mounted, autoDownloadPdf, pass.code, pass.id]);
+  }, [mounted, autoDownloadPdf, pass.code, buildPdfInput]);
 
   const handlePrint = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -172,18 +216,16 @@ export function PrintableTicket({
     e.stopPropagation();
     e.preventDefault();
 
-    if (!ticketRef.current) return;
-    const ticketElement = ticketRef.current.querySelector(".ticket") as HTMLElement;
-    if (!ticketElement) return;
+    if (!pass.code) {
+      alert("This pass doesn't have a ticket code yet.");
+      return;
+    }
 
     try {
-      const { downloadTicketPdfFromElement } = await import(
+      const { downloadTicketPdf } = await import(
         "@/lib/ticketing/download-ticket-pdf"
       );
-      await downloadTicketPdfFromElement(
-        ticketElement,
-        `ticket-${pass.code || pass.id}`,
-      );
+      await downloadTicketPdf(buildPdfInput());
     } catch (error) {
       console.error("Error saving ticket PDF:", error);
       alert("Couldn't create the PDF. Please try again.");
@@ -310,17 +352,25 @@ export function PrintableTicket({
               onTouchMove={(e) => e.stopPropagation()} // Stop touch propagation too
             >
               <div ref={ticketRef}>
-                <div className="ticket relative bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-2xl max-w-3xl mx-auto">
-                  {/* Header */}
-                  <div className="ticket-header relative z-10 bg-gradient-to-r from-primary to-[#c91140] text-white px-7 py-4 flex items-center justify-between min-h-[64px]">
-                    <div className="brand-container flex items-center">
-                      <img
-                        src="/assets/logo-pure-white.png"
-                        alt="Inside Karachi"
-                        className="h-8 w-auto object-contain block"
-                      />
-                    </div>
-                    <div className="ticket-type bg-white/20 border border-white/30 px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider text-white shadow-sm flex items-center justify-center leading-none">
+                <div
+                  className="ticket relative bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-2xl max-w-3xl mx-auto"
+                  style={{ backgroundColor: "#ffffff" }}
+                >
+                  {/* Header — matches ticket preview: solid brand red + centered type pill */}
+                  <div
+                    className="ticket-header relative z-10 text-white px-7 py-4 flex items-center justify-center min-h-[64px]"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #F42354 0%, #c91140 100%)",
+                    }}
+                  >
+                    <div
+                      className="ticket-type px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider text-white leading-none"
+                      style={{
+                        backgroundColor: "rgba(255,255,255,0.2)",
+                        border: "1px solid rgba(255,255,255,0.35)",
+                      }}
+                    >
                       {ticketType || "Event Ticket"}
                     </div>
                   </div>
