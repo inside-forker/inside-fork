@@ -195,7 +195,8 @@ function FullTicketView({
 
   const handleDownload = async () => {
     if (!ticketRef.current) return;
-    const ticketElement = ticketRef.current.querySelector(".mobile-ticket") as HTMLElement;
+    const ticketElement = (ticketRef.current.querySelector(".ticket") ||
+      ticketRef.current.querySelector(".mobile-ticket")) as HTMLElement | null;
     if (!ticketElement) return;
 
     try {
@@ -359,14 +360,13 @@ function FullTicketView({
         <div ref={ticketRef}>
           <div className="ticket relative bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-2xl max-w-xl mx-auto">
             {/* Header */}
-            <div className="ticket-header relative z-10 bg-gradient-to-r from-primary to-[#c91140] text-white px-6 py-5 flex justify-between items-center">
-              <div className="brand-container">
-                <div className="brand-sub text-[10px] uppercase tracking-[3px] font-bold opacity-90 mb-0.5">
-                  Inside
-                </div>
-                <div className="brand text-2xl font-black tracking-tight">
-                  karachi
-                </div>
+            <div className="ticket-header relative z-10 bg-gradient-to-r from-primary to-[#c91140] text-white px-6 py-4 flex justify-between items-center">
+              <div className="brand-container flex items-center">
+                <img
+                  src="/assets/logo-white.png"
+                  alt="Inside Karachi"
+                  className="h-7 w-auto object-contain"
+                />
               </div>
               <div className="ticket-type bg-white/20 backdrop-blur-sm border border-white/30 px-3.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
                 Event Ticket

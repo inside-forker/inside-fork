@@ -312,14 +312,13 @@ export function PrintableTicket({
               <div ref={ticketRef}>
                 <div className="ticket relative bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-2xl max-w-3xl mx-auto">
                   {/* Header */}
-                  <div className="ticket-header relative z-10 bg-gradient-to-r from-primary to-[#c91140] text-white px-8 py-5 flex justify-between items-center">
-                    <div className="brand-container">
-                      <div className="brand-sub text-[10px] uppercase tracking-[3px] font-bold opacity-90 mb-0.5">
-                        Inside
-                      </div>
-                      <div className="brand text-2xl font-black tracking-tight">
-                        karachi
-                      </div>
+                  <div className="ticket-header relative z-10 bg-gradient-to-r from-primary to-[#c91140] text-white px-8 py-4 flex justify-between items-center">
+                    <div className="brand-container flex items-center">
+                      <img
+                        src="/assets/logo-white.png"
+                        alt="Inside Karachi"
+                        className="h-8 w-auto object-contain"
+                      />
                     </div>
                     <div className="ticket-type bg-white/20 backdrop-blur-sm border border-white/30 px-3.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
                       Event Ticket
@@ -330,7 +329,7 @@ export function PrintableTicket({
                   <div className="ticket-body relative flex flex-col sm:flex-row bg-white">
                     {/* Main Content */}
                     <div className="ticket-main flex-1 p-6 sm:p-7">
-                      <h2 className="event-name text-xl sm:text-2xl font-black text-gray-900 mb-5 leading-tight tracking-tight">
+                      <h2 className="event-name text-xl sm:text-2xl font-bold text-gray-900 mb-5 leading-snug">
                         {eventName}
                       </h2>
 
@@ -340,10 +339,10 @@ export function PrintableTicket({
                             <Calendar className="w-4 h-4 text-gray-700" />
                           </div>
                           <div className="detail-content">
-                            <div className="detail-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
+                            <div className="detail-label text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
                               Date
                             </div>
-                            <div className="detail-value text-sm text-gray-900 font-bold">
+                            <div className="detail-value text-sm text-gray-900 font-semibold">
                               {formattedDate}
                             </div>
                           </div>
@@ -355,10 +354,10 @@ export function PrintableTicket({
                               <Clock className="w-4 h-4 text-gray-700" />
                             </div>
                             <div className="detail-content">
-                              <div className="detail-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
+                              <div className="detail-label text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
                                 Time
                               </div>
-                              <div className="detail-value text-sm text-gray-900 font-bold">
+                              <div className="detail-value text-sm text-gray-900 font-semibold">
                                 {formattedTime}
                               </div>
                             </div>
@@ -371,10 +370,10 @@ export function PrintableTicket({
                               <MapPin className="w-4 h-4 text-gray-700" />
                             </div>
                             <div className="detail-content">
-                              <div className="detail-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
+                              <div className="detail-label text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
                                 Venue
                               </div>
-                              <div className="detail-value text-sm text-gray-900 font-bold">
+                              <div className="detail-value text-sm text-gray-900 font-semibold">
                                 {venueName}
                               </div>
                             </div>
@@ -387,10 +386,10 @@ export function PrintableTicket({
                               <Ticket className="w-4 h-4 text-gray-700" />
                             </div>
                             <div className="detail-content">
-                              <div className="detail-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
+                              <div className="detail-label text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
                                 Ticket Type
                               </div>
-                              <div className="detail-value text-sm text-gray-900 font-bold">
+                              <div className="detail-value text-sm text-gray-900 font-semibold">
                                 {ticketType}
                               </div>
                             </div>
@@ -403,10 +402,10 @@ export function PrintableTicket({
                               <Ticket className="w-4 h-4 text-primary" />
                             </div>
                             <div className="detail-content">
-                              <div className="detail-label text-[9px] uppercase tracking-wider text-primary font-black mb-0.5">
+                              <div className="detail-label text-[10px] uppercase tracking-wider text-primary font-bold mb-0.5">
                                 Gate / Entrance
                               </div>
-                              <div className="detail-value text-sm text-primary font-black tracking-wide">
+                              <div className="detail-value text-sm text-primary font-bold">
                                 {pass.gate_label}
                               </div>
                             </div>
@@ -419,20 +418,20 @@ export function PrintableTicket({
                         <div className="guest-section mt-5 pt-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-4">
                           {pass.guest_name && (
                             <div>
-                              <div className="guest-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
+                              <div className="guest-label text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
                                 Attendee
                               </div>
-                              <div className="guest-name text-base sm:text-lg font-black text-gray-900">
+                              <div className="guest-name text-base sm:text-lg font-bold text-gray-900">
                                 {pass.guest_name}
                               </div>
                             </div>
                           )}
                           {pass.cnic_last4 && (
                             <div>
-                              <div className="guest-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
+                              <div className="guest-label text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
                                 CNIC
                               </div>
-                              <div className="text-sm font-mono font-bold text-gray-800">
+                              <div className="text-sm font-mono font-medium text-gray-700">
                                 *****-*******-{pass.cnic_last4}
                               </div>
                             </div>
@@ -441,44 +440,34 @@ export function PrintableTicket({
                       )}
                     </div>
 
-                    {/* Perforation Line & Notches for Desktop */}
+                    {/* Perforation Line for Desktop */}
                     <div className="hidden sm:flex relative items-stretch">
-                      {/* Top Notch */}
-                      <div className="absolute -top-3 -left-3 w-6 h-6 rounded-full bg-neutral-900 z-20" />
-                      {/* Dashed Perforation Line */}
-                      <div className="w-[1px] border-r-2 border-dashed border-gray-300 my-3" />
-                      {/* Bottom Notch */}
-                      <div className="absolute -bottom-3 -left-3 w-6 h-6 rounded-full bg-neutral-900 z-20" />
+                      <div className="w-[1px] border-r-2 border-dashed border-gray-200 my-4" />
                     </div>
 
-                    {/* Perforation Line & Notches for Mobile */}
+                    {/* Perforation Line for Mobile */}
                     <div className="sm:hidden relative flex items-center justify-between w-full h-[1px]">
-                      {/* Left Notch */}
-                      <div className="absolute -left-3 -top-3 w-6 h-6 rounded-full bg-neutral-900 z-20" />
-                      {/* Horizontal Dashed Line */}
-                      <div className="w-full border-t-2 border-dashed border-gray-300 mx-3" />
-                      {/* Right Notch */}
-                      <div className="absolute -right-3 -top-3 w-6 h-6 rounded-full bg-neutral-900 z-20" />
+                      <div className="w-full border-t-2 border-dashed border-gray-200 mx-4" />
                     </div>
 
                     {/* QR Code Section */}
-                    <div className="ticket-qr relative w-full sm:w-60 p-6 flex flex-col items-center justify-center bg-gray-50/70">
+                    <div className="ticket-qr relative w-full sm:w-64 p-6 flex flex-col items-center justify-center bg-gray-50/70 border-l border-gray-100/50">
                       {pass.code ? (
                         <>
                           <div className="qr-code bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
                             <QRCodeSVG
                               id={`printable-qr-${pass.id}`}
                               value={pass.code}
-                              size={130}
+                              size={140}
                               level="H"
                               bgColor="#FFFFFF"
                               fgColor="#000000"
                             />
                           </div>
-                          <div className="ticket-code mt-3 font-mono text-sm font-black tracking-widest text-gray-900">
+                          <div className="ticket-code mt-3 font-mono text-base font-bold tracking-wider text-gray-900">
                             {pass.code}
                           </div>
-                          <div className="scan-text mt-1 text-[9px] text-gray-500 font-bold uppercase tracking-widest text-center">
+                          <div className="scan-text mt-1 text-[10px] text-gray-400 font-semibold uppercase tracking-wider text-center">
                             Scan at Entry
                           </div>
                         </>

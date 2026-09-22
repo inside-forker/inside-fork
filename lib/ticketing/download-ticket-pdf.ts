@@ -13,6 +13,27 @@ export async function downloadTicketPdfFromElement(
     import("jspdf"),
   ]);
 
+  // Ensure all web fonts are fully ready before canvas rasterization
+  if (typeof document !== "undefined" && "fonts" in document) {
+    try {
+      await document.fonts.ready;
+    } catch {
+      // Ignore font readiness timeout
+    }
+  }
+
+  // Ensure images within the ticket are fully loaded
+  const images = Array.from(element.querySelectorAll("img"));
+  await Promise.all(
+    images.map((img) => {
+      if (img.complete) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+      });
+    })
+  );
+
   const scale = 3; // 3x rendering scale for crisp typography and scannable QR code
   const canvas = await html2canvas(element, {
     scale,
@@ -20,6 +41,15 @@ export async function downloadTicketPdfFromElement(
     useCORS: true,
     logging: false,
     allowTaint: true,
+    imageTimeout: 15000,
+    onclone: (clonedDoc) => {
+      // Ensure clean typography and remove any harsh negative tracking that collides in html2canvas
+      const ticketCard = clonedDoc.querySelector(".ticket") as HTMLElement | null;
+      if (ticketCard) {
+        ticketCard.style.boxShadow = "none";
+        ticketCard.style.transform = "none";
+      }
+    },
   });
 
   const imgData = canvas.toDataURL("image/png");
@@ -28,7 +58,7 @@ export async function downloadTicketPdfFromElement(
   const elementWidth = element.offsetWidth || canvas.width / scale;
   const elementHeight = element.offsetHeight || canvas.height / scale;
 
-  // Add neat border padding around the ticket card so edges and shadows render cleanly
+  // Add clean border padding around the ticket card so edges render cleanly
   const padding = 16;
   const pdfWidth = elementWidth + padding * 2;
   const pdfHeight = elementHeight + padding * 2;
@@ -42,7 +72,7 @@ export async function downloadTicketPdfFromElement(
     hotfixes: ["px_scaling"],
   });
 
-  // White clean page background
+  // Clean white page background
   pdf.setFillColor(255, 255, 255);
   pdf.rect(0, 0, pdfWidth, pdfHeight, "F");
 
