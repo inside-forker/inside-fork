@@ -205,12 +205,17 @@ export async function executeSyncOperation(
 
     // Incremental sync: skip entities that were already processed in previous
     // runs. Full resync clears the set first so everything gets re-evaluated.
+    // report + create_missing must see the full Peekaboo list (not the
+    // processed-ID skip set), otherwise they report "nothing to sync".
+    const skipIncrementalFilter =
+      config.syncMode === "report" || config.syncMode === "create_missing";
+
     if (config.fullResync) {
       console.log(
         `[SYNC ${syncId}] Full resync requested - clearing processed IDs`,
       );
       await syncStateManager.clearProcessedIds();
-    } else if (!config.specificEntityId) {
+    } else if (!config.specificEntityId && !skipIncrementalFilter) {
       const totalBefore = entityList.length;
       const processedIds = await syncStateManager.getProcessedIds();
       if (processedIds.size > 0) {
@@ -247,6 +252,10 @@ export async function executeSyncOperation(
           `[SYNC ${syncId}] Incremental mode: skipped ${totalBefore - entityList.length} already-processed entities, ${entityList.length} remaining (${staleIds.size} stale re-queued)`,
         );
       }
+    } else if (skipIncrementalFilter) {
+      console.log(
+        `[SYNC ${syncId}] Mode=${config.syncMode}: skipping incremental processed-ID filter`,
+      );
     }
 
     const totalEntities = entityList.length;
@@ -256,12 +265,40 @@ export async function executeSyncOperation(
       console.log(
         `[SYNC ${syncId}] All entities already processed - nothing to sync`,
       );
-      await createSyncHistoryRecord(syncId, userId, config, 0);
+      const emptyReport: SyncReport = {
+        summary: {
+          entitiesProcessed: 0,
+          entitiesCreated: 0,
+          entitiesUpdated: 0,
+          entitiesSkipped: 0,
+          imagesSynced: 0,
+          branchesSynced: 0,
+          errors: 0,
+          startTime: new Date(startTime),
+          endTime: new Date(),
+          entitiesSeen: 0,
+          missingInInside: 0,
+          existingUnchanged: 0,
+          existingWouldUpdate: 0,
+          dealsWouldCreate: 0,
+          dealsWouldUpdate: 0,
+          skippedConflicts: 0,
+        },
+        results: [],
+        conflicts: [],
+        errors: [],
+      };
+      const duration = Date.now() - startTime;
+      // Record was already inserted at sync start — complete it, don't re-insert.
+      await updateSyncTotalEntities(syncId, 0, entityListWarning);
+      await syncStateManager.completeSync(emptyReport, duration, ownerToken);
+      await completeSyncHistory(syncId, emptyReport, duration, "completed");
       return {
         success: true,
         syncId,
         totalEntities: 0,
-        duration: Date.now() - startTime,
+        report: emptyReport,
+        duration,
       };
     }
 
@@ -465,7 +502,11 @@ async function createSyncHistoryRecord(
          id, started_at, config, entities_processed, entities_created,
          entities_updated, entities_skipped, images_synced, branches_synced,
          errors_count, status, triggered_by
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       ON CONFLICT (id) DO UPDATE SET
+         config = EXCLUDED.config,
+         status = EXCLUDED.status,
+         updated_at = NOW()`,
       [
         syncId,
         new Date().toISOString(),
