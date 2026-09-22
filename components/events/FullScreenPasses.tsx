@@ -39,10 +39,12 @@ function PassCard({
   pass,
   index,
   onViewQR,
+  onDownloadPdf,
 }: {
   pass: PublicPass;
   index: number;
   onViewQR: () => void;
+  onDownloadPdf: () => void;
 }) {
   const statusLabel = (pass.status ?? "")
     .toString()
@@ -58,11 +60,17 @@ function PassCard({
       transition={{ delay: index * 0.1 }}
       className="relative rounded-2xl border border-border/60 bg-gradient-to-br from-background via-background to-primary/5 backdrop-blur overflow-hidden shadow-lg shadow-primary/5"
     >
-      {/* Pass Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-primary/10 to-transparent border-b border-border/40">
-        <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-          Pass #{index + 1}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
+            Pass #{index + 1}
+          </span>
+          {pass.gate_label && (
+            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-primary/15 text-primary border border-primary/30">
+              Enter: {pass.gate_label}
+            </span>
+          )}
+        </div>
         <div
           className={cn(
             "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider",
@@ -76,8 +84,8 @@ function PassCard({
         </div>
       </div>
 
-      {/* Pass Body - Tappable QR Preview */}
       <button
+        type="button"
         onClick={pass.code ? onViewQR : undefined}
         disabled={!pass.code}
         className="w-full p-4 flex items-center gap-4 hover:bg-white/5 transition-colors"
@@ -102,12 +110,30 @@ function PassCard({
             {pass.code || "Payment required"}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            {pass.code ? "Tap to view full QR code →" : "Complete payment to view ticket code"}
+            {pass.code
+              ? pass.gate_label
+                ? `Enter at ${pass.gate_label} · Tap to view ticket`
+                : "Tap to view full ticket & download PDF →"
+              : "Complete payment to view ticket code"}
           </p>
         </div>
       </button>
 
-      {/* Issue date */}
+      {pass.code && (
+        <div className="px-4 pb-4">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onDownloadPdf}
+            className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/5"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Download PDF ticket
+          </Button>
+        </div>
+      )}
+
       {pass.issued_at && (
         <div className="flex items-center justify-between text-[11px] text-muted-foreground px-4 pb-3 pt-2 border-t border-border/30">
           <span>Issued {new Date(pass.issued_at).toLocaleDateString()}</span>
@@ -173,19 +199,16 @@ function FullTicketView({
     if (!ticketElement) return;
 
     try {
-      const { default: html2canvas } = await import("html2canvas");
-      const canvas = await html2canvas(ticketElement, {
-        scale: 3,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-        logging: false,
-      });
-      const link = document.createElement("a");
-      link.href = canvas.toDataURL("image/png");
-      link.download = `ticket-${pass.code || pass.id}.png`;
-      link.click();
+      const { downloadTicketPdfFromElement } = await import(
+        "@/lib/ticketing/download-ticket-pdf"
+      );
+      await downloadTicketPdfFromElement(
+        ticketElement,
+        `ticket-${pass.code || pass.id}`,
+      );
     } catch (error) {
-      console.error("Error saving ticket:", error);
+      console.error("Error saving ticket PDF:", error);
+      alert("Couldn't create the PDF. Please try again.");
     }
   };
 
@@ -408,6 +431,22 @@ function FullTicketView({
                       </div>
                     </div>
                   )}
+
+                  {pass.gate_label && (
+                    <div className="detail-row flex items-center gap-3">
+                      <div className="detail-icon w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Ticket className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="detail-content">
+                        <div className="detail-label text-[9px] uppercase tracking-wider text-primary font-bold mb-0.5">
+                          Enter at
+                        </div>
+                        <div className="detail-value text-sm text-primary font-extrabold tracking-wide">
+                          {pass.gate_label}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Guest Info */}
@@ -483,7 +522,7 @@ function FullTicketView({
         <div className="flex gap-3">
           <Button variant="outline" className="flex-1" onClick={handleDownload}>
             <Download className="w-4 h-4 mr-2" />
-            Save
+            Download PDF
           </Button>
           <Button variant="outline" className="flex-1" onClick={handlePrint}>
             <Printer className="w-4 h-4 mr-2" />
@@ -649,6 +688,7 @@ export function FullScreenPasses({
                             pass={pass}
                             index={index}
                             onViewQR={() => setSelectedPass(pass)}
+                            onDownloadPdf={() => setSelectedPass(pass)}
                           />
                         ))}
                       </div>

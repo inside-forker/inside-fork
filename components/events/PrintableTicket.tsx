@@ -26,6 +26,8 @@ interface PrintableTicketProps {
   eventTime?: string;
   venueName?: string;
   ticketType?: string;
+  /** When true, trigger a PDF download once the ticket is mounted. */
+  autoDownloadPdf?: boolean;
   onClose: () => void;
 }
 
@@ -36,10 +38,12 @@ export function PrintableTicket({
   eventTime,
   venueName,
   ticketType,
+  autoDownloadPdf = false,
   onClose,
 }: PrintableTicketProps) {
   const ticketRef = React.useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = React.useState(false);
+  const autoDownloadFired = React.useRef(false);
 
   React.useEffect(() => {
     setMounted(true);
@@ -48,6 +52,32 @@ export function PrintableTicket({
       document.body.style.overflow = "";
     };
   }, []);
+
+  React.useEffect(() => {
+    if (!mounted || !autoDownloadPdf || autoDownloadFired.current) return;
+    if (!pass.code) return;
+
+    const timer = window.setTimeout(async () => {
+      const ticketElement = ticketRef.current?.querySelector(
+        ".ticket",
+      ) as HTMLElement | null;
+      if (!ticketElement) return;
+      autoDownloadFired.current = true;
+      try {
+        const { downloadTicketPdfFromElement } = await import(
+          "@/lib/ticketing/download-ticket-pdf"
+        );
+        await downloadTicketPdfFromElement(
+          ticketElement,
+          `ticket-${pass.code || pass.id}`,
+        );
+      } catch (error) {
+        console.error("Error auto-downloading ticket PDF:", error);
+      }
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [mounted, autoDownloadPdf, pass.code, pass.id]);
 
   const handlePrint = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -147,20 +177,16 @@ export function PrintableTicket({
     if (!ticketElement) return;
 
     try {
-      const canvas = await html2canvas(ticketElement, {
-        scale: 3, // Higher resolution for better quality
-        backgroundColor: "#ffffff",
-        useCORS: true,
-        logging: false,
-      });
-
-      // For download
-      const link = document.createElement("a");
-      link.href = canvas.toDataURL("image/png");
-      link.download = `ticket-${pass.code || pass.id}.png`;
-      link.click();
+      const { downloadTicketPdfFromElement } = await import(
+        "@/lib/ticketing/download-ticket-pdf"
+      );
+      await downloadTicketPdfFromElement(
+        ticketElement,
+        `ticket-${pass.code || pass.id}`,
+      );
     } catch (error) {
-      console.error("Error saving ticket:", error);
+      console.error("Error saving ticket PDF:", error);
+      alert("Couldn't create the PDF. Please try again.");
     }
   };
 
@@ -468,7 +494,7 @@ export function PrintableTicket({
                 className="gap-2 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white"
               >
                 <Download className="w-4 h-4" />
-                Save
+                Download PDF
               </Button>
               <Button
                 size="sm"
