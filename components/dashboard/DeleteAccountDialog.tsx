@@ -127,7 +127,7 @@ export function DeleteAccountDialog({ isOpen, onClose }: DeleteAccountDialogProp
                 <ul className="list-disc pl-9 space-y-1 text-muted-foreground">
                   <li>
                     Your name, profile photo, phone number, and bio —
-                    replaced with &quot;Inside Karachi User&quot;
+                    replaced with &quot;Insider&quot;
                   </li>
                   <li>
                     Your email address — freed up right away; you won&apos;t
@@ -139,7 +139,7 @@ export function DeleteAccountDialog({ isOpen, onClose }: DeleteAccountDialogProp
               <div>
                 <p className="font-medium text-foreground flex items-center gap-2 mb-2">
                   <CheckCircle2 className="h-4 w-4 text-primary" />
-                  Kept (shown under &quot;Inside Karachi User&quot;)
+                  Kept (shown under &quot;Insider&quot;)
                 </p>
                 <ul className="list-disc pl-9 space-y-1 text-muted-foreground">
                   <li>Reviews and comments you&apos;ve written</li>

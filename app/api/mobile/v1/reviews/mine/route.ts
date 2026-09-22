@@ -14,7 +14,7 @@ const REVIEW_SQL_COLUMNS =
   "to_json(r.created_at) #>> '{}' AS created_at, " +
   "to_json(r.updated_at) #>> '{}' AS updated_at, " +
   "CASE WHEN p.id IS NOT NULL " +
-  "THEN json_build_object('username', CASE WHEN p.deleted_at IS NOT NULL THEN 'Inside Karachi User' ELSE p.username END, 'avatar_url', p.avatar_url) " +
+  "THEN json_build_object('username', CASE WHEN p.deleted_at IS NOT NULL THEN 'Insider' ELSE p.username END, 'avatar_url', p.avatar_url) " +
   "ELSE NULL END AS profiles, " +
   "l.name AS listing_name, l.slug AS listing_slug, l.address AS listing_address, " +
   "(SELECT li.url FROM listing_images li WHERE li.listing_id = l.id " +
