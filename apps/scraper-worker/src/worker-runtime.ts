@@ -215,6 +215,26 @@ async function handleStop(req: IncomingMessage, res: ServerResponse) {
   });
 }
 
+/** Clears orphaned Redis sync lock so a new /sync/start can proceed. */
+async function handleForceUnlock(req: IncomingMessage, res: ServerResponse) {
+  if (!isAuthorized(req)) {
+    json(res, 401, { error: "Unauthorized" });
+    return;
+  }
+
+  const wasRunning = await syncStateManager.isSyncRunning();
+  const activeSyncId = await syncStateManager.getActiveSyncId();
+  await syncStateManager.clearActiveSyncLock();
+
+  json(res, 200, {
+    success: true,
+    cleared: true,
+    wasRunning,
+    previousSyncId: activeSyncId,
+    message: "Sync lock cleared. You can start a new sync.",
+  });
+}
+
 async function markSyncAsStopping(syncId: string) {
   try {
     await query(
@@ -422,6 +442,11 @@ export async function startScraperWorker(port: number): Promise<void> {
 
       if (method === "POST" && path === "/sync/stop") {
         await handleStop(req, res);
+        return;
+      }
+
+      if (method === "POST" && path === "/sync/force-unlock") {
+        await handleForceUnlock(req, res);
         return;
       }
 

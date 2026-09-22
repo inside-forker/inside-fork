@@ -94,7 +94,9 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to start sync");
+        throw new Error(
+          data.message || data.error || "Failed to start sync",
+        );
       }
 
       toast({

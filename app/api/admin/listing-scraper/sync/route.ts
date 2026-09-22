@@ -92,12 +92,29 @@ export async function POST(request: NextRequest) {
 
     if (!workerResponse.ok) {
       const workerBody = await workerResponse.text();
+      let message =
+        workerBody || `Worker responded with ${workerResponse.status}`;
+      try {
+        const parsed = JSON.parse(workerBody) as {
+          message?: string;
+          error?: string;
+        };
+        message = parsed.message || parsed.error || message;
+      } catch {
+        // keep raw body
+      }
+      // Surface worker conflicts (e.g. sync lock) as-is; other failures stay 502
+      const status =
+        workerResponse.status === 409 || workerResponse.status === 401
+          ? workerResponse.status
+          : 502;
       return NextResponse.json(
         {
           error: "Worker request failed",
-          message: workerBody || `Worker responded with ${workerResponse.status}`,
+          message,
+          workerStatus: workerResponse.status,
         },
-        { status: 502 },
+        { status },
       );
     }
 
