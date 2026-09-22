@@ -134,7 +134,8 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
     query(
       `SELECT r.id, r.listing_id, r.branch_id, r.user_id, r.rating, r.comment,
               r.status, r.helpful_count, r.created_at, r.updated_at,
-              p.username, p.avatar_url
+              CASE WHEN p.deleted_at IS NOT NULL THEN 'Insider' ELSE p.username END AS username,
+              p.avatar_url
        FROM reviews r
        LEFT JOIN profiles p ON p.id = r.user_id
        WHERE r.listing_id = $1 AND r.status = 'approved'

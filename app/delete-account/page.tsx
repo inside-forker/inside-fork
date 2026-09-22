@@ -38,13 +38,13 @@ export default async function DeleteAccountPage() {
             <div>
               <h3 className="font-semibold text-foreground mb-2">Removed or anonymized</h3>
               <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                <li>Your name, profile photo, phone number, and bio — replaced with &quot;Inside Karachi User&quot;</li>
+                <li>Your name, profile photo, phone number, and bio — replaced with &quot;Insider&quot;</li>
                 <li>Your email address — freed up immediately for reuse</li>
                 <li>Your password — disabled permanently</li>
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold text-foreground mb-2">Kept (under &quot;Inside Karachi User&quot;)</h3>
+              <h3 className="font-semibold text-foreground mb-2">Kept (under &quot;Insider&quot;)</h3>
               <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
                 <li>Reviews and comments you&apos;ve written</li>
                 <li>Listings or events you&apos;ve created</li>

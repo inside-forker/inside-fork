@@ -19,6 +19,7 @@ interface HistoryRow {
   status: string;
   config: unknown;
   error_message: string | null;
+  report: unknown;
 }
 
 /**
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
       const { rows } = await query(
         `SELECT id, started_at, completed_at, duration_ms, entities_processed,
                 entities_created, entities_updated, entities_skipped, errors_count,
-                status, config, error_message
+                status, config, error_message, report
          FROM listing_sync_history
          ORDER BY started_at DESC
          LIMIT 50`,
@@ -79,6 +80,18 @@ export async function GET(request: NextRequest) {
         totalDiscovered - offsetDiscovered,
       );
 
+      const reportObj =
+        record.report && typeof record.report === "object"
+          ? (record.report as Record<string, unknown>)
+          : null;
+      const summary =
+        reportObj?.summary && typeof reportObj.summary === "object"
+          ? (reportObj.summary as Record<string, unknown>)
+          : null;
+
+      const syncMode =
+        typeof cfg.syncMode === "string" ? cfg.syncMode : null;
+
       const staleRunning =
         record.status === "running" && activeSyncId !== record.id;
 
@@ -99,6 +112,35 @@ export async function GET(request: NextRequest) {
         warningMessage:
           typeof warning?.message === "string" ? warning.message : null,
         errorMessage: record.error_message,
+        syncMode,
+        reportSummary: summary
+          ? {
+              missingInInside:
+                typeof summary.missingInInside === "number"
+                  ? summary.missingInInside
+                  : null,
+              existingWouldUpdate:
+                typeof summary.existingWouldUpdate === "number"
+                  ? summary.existingWouldUpdate
+                  : null,
+              existingUnchanged:
+                typeof summary.existingUnchanged === "number"
+                  ? summary.existingUnchanged
+                  : null,
+              dealsWouldCreate:
+                typeof summary.dealsWouldCreate === "number"
+                  ? summary.dealsWouldCreate
+                  : null,
+              dealsWouldUpdate:
+                typeof summary.dealsWouldUpdate === "number"
+                  ? summary.dealsWouldUpdate
+                  : null,
+              skippedConflicts:
+                typeof summary.skippedConflicts === "number"
+                  ? summary.skippedConflicts
+                  : null,
+            }
+          : null,
       };
     });
 

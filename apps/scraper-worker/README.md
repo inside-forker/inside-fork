@@ -4,7 +4,7 @@ Listing scraper HTTP service (Peekaboo sync). Runs separately from the Next.js a
 
 Uses shared code under repo root (`lib/`, `scrapers/`, …) via the `@/*` alias. Dependencies are installed from the **monorepo root** (`package-lock.json` at repo root).
 
-**Default sync mode is `deals_only`**: refreshes Peekaboo deals/discounts without overwriting listing categories, status, address, or other admin-curated fields. Use `full` only when you intentionally want metadata upserts.
+**Default sync mode is `report`**: compares Peekaboo vs Inside with no database writes. Use `create_missing` to add draft listings for venues you lack, `deals_only` for discounts, and `full` for metadata upserts. Interval automation defaults to `report`.
 
 ---
 

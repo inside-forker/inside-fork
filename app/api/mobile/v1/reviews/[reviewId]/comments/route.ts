@@ -17,7 +17,7 @@ const COMMENT_SQL_COLUMNS =
   "to_json(c.created_at) #>> '{}' AS created_at, " +
   "to_json(c.updated_at) #>> '{}' AS updated_at, " +
   "CASE WHEN p.id IS NOT NULL " +
-  "THEN json_build_object('username', CASE WHEN p.deleted_at IS NOT NULL THEN 'Inside Karachi User' ELSE p.username END, 'avatar_url', p.avatar_url) " +
+  "THEN json_build_object('username', CASE WHEN p.deleted_at IS NOT NULL THEN 'Insider' ELSE p.username END, 'avatar_url', p.avatar_url) " +
   "ELSE NULL END AS profiles";
 
 const COMMENT_FROM_JOIN =

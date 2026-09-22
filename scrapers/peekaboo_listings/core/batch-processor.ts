@@ -86,7 +86,7 @@ export class BatchProcessor {
       maxConcurrent: options.maxConcurrent ?? 5,
       autoPublish: options.autoPublish ?? false,
       preserveManualEdits: options.preserveManualEdits ?? true,
-      syncMode: options.syncMode ?? "deals_only",
+      syncMode: options.syncMode ?? "report",
     };
     this.onProgress = options.onProgress;
     this.onError = options.onError;
@@ -184,12 +184,23 @@ export class BatchProcessor {
             await this.onProgress(processed, entities.length, result.value);
           }
 
-          // Track conflicts
+          // Track conflicts with field diffs when available
           if (result.value.action === "conflict") {
             conflicts.push({
               peekabooId: entity.id,
               listingId: result.value.listingId!,
-              changes: {}, // Would need to implement detailed diff
+              changes: result.value.details.changes || {},
+            });
+          }
+          if (
+            result.value.action === "would_update" &&
+            result.value.details.changes &&
+            result.value.listingId
+          ) {
+            conflicts.push({
+              peekabooId: entity.id,
+              listingId: result.value.listingId,
+              changes: result.value.details.changes,
             });
           }
         } else {
@@ -240,7 +251,7 @@ export class BatchProcessor {
         entitiesProcessed: results.length,
         entitiesCreated: results.filter((r) => r.action === "create").length,
         entitiesUpdated: results.filter(
-          (r) => r.action === "update" || r.action === "conflict",
+          (r) => r.action === "update",
         ).length,
         entitiesSkipped: results.filter((r) => r.action === "skip").length,
         imagesSynced: results.reduce(
@@ -254,6 +265,22 @@ export class BatchProcessor {
         errors: errors.length,
         startTime: new Date(startTime),
         endTime: new Date(),
+        entitiesSeen: results.length,
+        missingInInside: results.filter((r) => r.action === "would_create")
+          .length,
+        existingUnchanged: results.filter((r) => r.action === "unchanged")
+          .length,
+        existingWouldUpdate: results.filter((r) => r.action === "would_update")
+          .length,
+        dealsWouldCreate: results.reduce(
+          (sum, r) => sum + (r.details.dealsWouldCreate || 0),
+          0,
+        ),
+        dealsWouldUpdate: results.reduce(
+          (sum, r) => sum + (r.details.dealsWouldUpdate || 0),
+          0,
+        ),
+        skippedConflicts: results.filter((r) => r.action === "conflict").length,
       },
       results,
       conflicts,
@@ -262,9 +289,19 @@ export class BatchProcessor {
 
     console.log(`\n[BATCH] Batch processing complete!`);
     console.log(`[BATCH] Duration: ${(duration / 1000).toFixed(2)}s`);
+    console.log(`[BATCH] Mode: ${this.options.syncMode}`);
     console.log(`[BATCH] Created: ${report.summary.entitiesCreated}`);
     console.log(`[BATCH] Updated: ${report.summary.entitiesUpdated}`);
     console.log(`[BATCH] Skipped: ${report.summary.entitiesSkipped}`);
+    console.log(
+      `[BATCH] Would create: ${report.summary.missingInInside ?? 0}`,
+    );
+    console.log(
+      `[BATCH] Would update: ${report.summary.existingWouldUpdate ?? 0}`,
+    );
+    console.log(
+      `[BATCH] Unchanged: ${report.summary.existingUnchanged ?? 0}`,
+    );
     console.log(`[BATCH] Errors: ${report.summary.errors}`);
     console.log(`[BATCH] Conflicts: ${conflicts.length}`);
 

@@ -36,6 +36,12 @@ interface WorkerScraperStats {
   entitiesUpdated: number;
   entitiesSkipped: number;
   errors: number;
+  missingInInside?: number;
+  existingWouldUpdate?: number;
+  existingUnchanged?: number;
+  dealsWouldCreate?: number;
+  dealsWouldUpdate?: number;
+  skippedConflicts?: number;
 }
 
 interface WorkerStatusResponse {
@@ -69,6 +75,11 @@ export function ProgressMonitor({
     chunkIndex?: number;
     chunkTotal?: number;
     chunkProgress?: string;
+    missingInInside?: number;
+    existingWouldUpdate?: number;
+    existingUnchanged?: number;
+    dealsWouldCreate?: number;
+    dealsWouldUpdate?: number;
   } | null>(null);
   const [syncStatus, setSyncStatus] = React.useState<
     "idle" | "running" | "completed" | "failed" | "partial" | "stopping" | "cancelled"
@@ -149,6 +160,11 @@ export function ProgressMonitor({
           created: s.entitiesCreated,
           updated: s.entitiesUpdated,
           errors: s.errors,
+          missingInInside: s.missingInInside,
+          existingWouldUpdate: s.existingWouldUpdate,
+          existingUnchanged: s.existingUnchanged,
+          dealsWouldCreate: s.dealsWouldCreate,
+          dealsWouldUpdate: s.dealsWouldUpdate,
         });
       } else if (newStatus === "idle") {
         setProgress(null);
@@ -380,6 +396,56 @@ export function ProgressMonitor({
                 <p className="text-xs text-muted-foreground">Errors</p>
               </div>
             </div>
+
+            {(progress.missingInInside != null ||
+              progress.existingWouldUpdate != null ||
+              progress.existingUnchanged != null) && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 border-t">
+                <div className="text-center rounded-lg bg-muted/40 p-2">
+                  <div className="text-lg font-semibold">
+                    {progress.missingInInside ?? 0}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Missing in Inside
+                  </p>
+                </div>
+                <div className="text-center rounded-lg bg-muted/40 p-2">
+                  <div className="text-lg font-semibold">
+                    {progress.existingWouldUpdate ?? 0}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Would update
+                  </p>
+                </div>
+                <div className="text-center rounded-lg bg-muted/40 p-2">
+                  <div className="text-lg font-semibold">
+                    {progress.existingUnchanged ?? 0}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Unchanged</p>
+                </div>
+                {(progress.dealsWouldCreate != null ||
+                  progress.dealsWouldUpdate != null) && (
+                  <>
+                    <div className="text-center rounded-lg bg-muted/40 p-2">
+                      <div className="text-lg font-semibold">
+                        {progress.dealsWouldCreate ?? 0}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Deals would create
+                      </p>
+                    </div>
+                    <div className="text-center rounded-lg bg-muted/40 p-2">
+                      <div className="text-lg font-semibold">
+                        {progress.dealsWouldUpdate ?? 0}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Deals would update
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Status Message */}
             <div

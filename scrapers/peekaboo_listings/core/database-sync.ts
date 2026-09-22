@@ -11,6 +11,10 @@ import type {
   SyncAction,
 } from "@/types/peekaboo-scraper.types";
 import type { ListingBranch } from "@/types/listing.types";
+import {
+  diffMappedListing,
+  type ListingDiffRow,
+} from "./listing-diff";
 
 type ListingInsert = Database["public"]["Tables"]["listings"]["Insert"];
 
@@ -18,7 +22,7 @@ type ListingInsert = Database["public"]["Tables"]["listings"]["Insert"];
 // TYPES
 // ============================================================================
 
-export type SyncMode = "deals_only" | "full";
+export type SyncMode = "report" | "create_missing" | "full" | "deals_only";
 
 export interface SyncOptions {
   /**
@@ -39,8 +43,10 @@ export interface SyncOptions {
   createChangeRequests?: boolean;
 
   /**
-   * deals_only: refresh deals only; never create/overwrite listing rows or related tables.
-   * full: scrape-and-upsert listing metadata (with admin field protections).
+   * report: scrape + compare only (no writes)
+   * create_missing: create drafts for unknown peekaboo_id only
+   * deals_only: refresh deals only on existing listings
+   * full: scrape-and-upsert listing metadata (with admin field protections)
    */
   syncMode?: SyncMode;
 }
@@ -119,7 +125,7 @@ export class DatabaseSync {
       autoPublish: options.autoPublish ?? false,
       preserveManualEdits: options.preserveManualEdits ?? true,
       createChangeRequests: options.createChangeRequests ?? false,
-      syncMode: options.syncMode ?? "deals_only",
+      syncMode: options.syncMode ?? "report",
     };
   }
 
@@ -147,6 +153,55 @@ export class DatabaseSync {
     try {
       // Step 1: Check if listing already exists
       const decision = await this.decideSyncAction(listing);
+
+      // report: scrape + compare only — never write
+      if (this.options.syncMode === "report") {
+        return this.buildReportResult(listing, decision, deals);
+      }
+
+      // create_missing: only insert unknown peekaboo_id as drafts; skip existing
+      if (this.options.syncMode === "create_missing") {
+        if (decision.action !== "create") {
+          return {
+            peekabooId,
+            action: "skip",
+            listingId: decision.listingId,
+            success: true,
+            details: {
+              imagesProcessed: 0,
+              branchesProcessed: 0,
+              categoryMapped: false,
+              dealsProcessed: 0,
+            },
+          };
+        }
+
+        const listingId = await this.upsertListing(listing, decision);
+        const imagesProcessed = await this.uploadAndLinkImages(
+          listingId,
+          pendingImages,
+          listing.peekaboo_id,
+        );
+        const branchIdMap = await this.syncBranches(listingId, branches);
+        await this.syncOpeningHours(listingId, listing, branches, branchIdMap);
+        let dealsProcessed = 0;
+        if (deals && deals.length > 0) {
+          dealsProcessed = await this.syncDeals(listingId, deals);
+        }
+        this.uploadedImageUrls = [];
+        return {
+          peekabooId,
+          action: "create",
+          listingId,
+          success: true,
+          details: {
+            imagesProcessed,
+            branchesProcessed: branchIdMap.size,
+            dealsProcessed,
+            categoryMapped: listing.category_id !== null,
+          },
+        };
+      }
 
       // deals_only: never create listings; only refresh deals on existing rows.
       // Manual-edit conflicts are ignored here because listing metadata is not written.
@@ -259,6 +314,126 @@ export class DatabaseSync {
           categoryMapped: false,
         },
       };
+    }
+  }
+
+  /**
+   * Report-mode result: no DB writes. Compare mapped Peekaboo data to Inside.
+   */
+  private async buildReportResult(
+    listing: MappedListing,
+    decision: SyncDecisionResult,
+    deals?: MappedListing["deals"],
+  ): Promise<SyncResult> {
+    const peekabooId = listing.peekaboo_id;
+
+    if (decision.action === "create" || !decision.listingId) {
+      return {
+        peekabooId,
+        action: "would_create",
+        success: true,
+        details: {
+          imagesProcessed: 0,
+          branchesProcessed: 0,
+          categoryMapped: listing.category_id !== null,
+          dealsWouldCreate: deals?.length ?? 0,
+          dealsWouldUpdate: 0,
+        },
+      };
+    }
+
+    if (decision.action === "conflict") {
+      return {
+        peekabooId,
+        action: "conflict",
+        listingId: decision.listingId,
+        success: true,
+        details: {
+          imagesProcessed: 0,
+          branchesProcessed: 0,
+          categoryMapped: false,
+        },
+      };
+    }
+
+    const existing = await this.loadListingForDiff(decision.listingId);
+    const changes = existing
+      ? diffMappedListing(existing, listing)
+      : {};
+
+    const existingDeals = await this.loadExistingDealKeys(decision.listingId);
+    let wouldCreate = 0;
+    let wouldUpdate = 0;
+    const existingKeySet = new Set(
+      existingDeals.map(
+        (d) =>
+          `${(d.title || "").trim().toLowerCase()}::${d.bank_id ?? "null"}`,
+      ),
+    );
+    for (const deal of deals ?? []) {
+      const bankId = await this.getBankId(deal.bankName);
+      const key = `${(deal.title || "").trim().toLowerCase()}::${bankId ?? "null"}`;
+      if (existingKeySet.has(key)) wouldUpdate += 1;
+      else wouldCreate += 1;
+    }
+
+    if (
+      wouldCreate > 0 ||
+      wouldUpdate > 0 ||
+      (deals?.length ?? 0) !== existingDeals.length
+    ) {
+      changes.dealCount = {
+        old: existingDeals.length,
+        new: deals?.length ?? 0,
+      };
+    }
+
+    const hasChanges = Object.keys(changes).length > 0;
+    return {
+      peekabooId,
+      action: hasChanges ? "would_update" : "unchanged",
+      listingId: decision.listingId,
+      success: true,
+      details: {
+        imagesProcessed: 0,
+        branchesProcessed: 0,
+        categoryMapped: false,
+        changes: hasChanges ? changes : undefined,
+        dealsWouldCreate: wouldCreate,
+        dealsWouldUpdate: wouldUpdate,
+      },
+    };
+  }
+
+  private async loadListingForDiff(
+    listingId: number,
+  ): Promise<ListingDiffRow | null> {
+    try {
+      const { rows } = await query(
+        `SELECT name, description, address, phone_number, website, email,
+                facebook_url, instagram_url, whatsapp_number, youtube_url
+         FROM listings WHERE id = $1 LIMIT 1`,
+        [listingId],
+      );
+      return (rows[0] as ListingDiffRow) || null;
+    } catch (error) {
+      console.warn(`[SYNC] Failed to load listing ${listingId} for diff:`, error);
+      return null;
+    }
+  }
+
+  private async loadExistingDealKeys(
+    listingId: number,
+  ): Promise<Array<{ title: string; bank_id: number | null }>> {
+    try {
+      const { rows } = await query(
+        `SELECT title, bank_id FROM deals WHERE listing_id = $1`,
+        [listingId],
+      );
+      return rows as Array<{ title: string; bank_id: number | null }>;
+    } catch (error) {
+      console.warn(`[SYNC] Failed to load deals for listing ${listingId}:`, error);
+      return [];
     }
   }
 
@@ -482,11 +657,14 @@ export class DatabaseSync {
       whatsapp_number: listing.whatsapp_number || null,
       youtube_url: listing.youtube_url || null,
       google_maps_url: listing.google_maps_url || null,
-      status: shouldArchiveForMissingCategory
-        ? "archived"
-        : this.options.autoPublish
-          ? "published"
-          : listing.status,
+      status:
+        this.options.syncMode === "create_missing"
+          ? "draft"
+          : shouldArchiveForMissingCategory
+            ? "archived"
+            : this.options.autoPublish
+              ? "published"
+              : listing.status,
       is_featured: listing.is_featured,
       show_member_badge: listing.show_member_badge,
       display_order: listing.display_order,

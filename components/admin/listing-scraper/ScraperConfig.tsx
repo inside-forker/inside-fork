@@ -52,7 +52,11 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
       maxConcurrent: 5,
       autoPublish: false,
       preserveManualEdits: true,
-      syncMode: "deals_only" as "deals_only" | "full",
+      syncMode: "report" as
+        | "report"
+        | "create_missing"
+        | "full"
+        | "deals_only",
     },
     canary: {
       enabled: false,
@@ -66,7 +70,11 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
     maxConcurrent: 5,
     autoPublish: false,
     preserveManualEdits: true,
-    syncMode: "deals_only" as "deals_only" | "full",
+    syncMode: "report" as
+      | "report"
+      | "create_missing"
+      | "full"
+      | "deals_only",
     limitEntities: false,
     entityLimit: 10,
     specificEntityId: "",
@@ -173,7 +181,7 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
             ...data.config,
             syncDefaults: {
               ...data.config.syncDefaults,
-              syncMode: data.config.syncDefaults.syncMode ?? "deals_only",
+              syncMode: data.config.syncDefaults.syncMode ?? "report",
             },
           });
         }
@@ -293,24 +301,29 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
               <Label htmlFor="syncMode">Sync Mode</Label>
               <Select
                 value={config.syncMode}
-                onValueChange={(value: "deals_only" | "full") =>
-                  setConfig({ ...config, syncMode: value })
-                }
+                onValueChange={(
+                  value: "report" | "create_missing" | "full" | "deals_only",
+                ) => setConfig({ ...config, syncMode: value })}
                 disabled={isLoading}
               >
-                <SelectTrigger id="syncMode" className="max-w-xs">
+                <SelectTrigger id="syncMode" className="max-w-md">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="deals_only">
-                    Deals only (safe)
+                  <SelectItem value="report">
+                    Report only (safe preview)
                   </SelectItem>
+                  <SelectItem value="create_missing">
+                    Create missing drafts
+                  </SelectItem>
+                  <SelectItem value="deals_only">Deals only</SelectItem>
                   <SelectItem value="full">Full listing sync</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground">
-                Deals only updates card discounts without changing categories,
-                status, address, or other listing fields.
+                Report compares Peekaboo vs Inside with no writes. Create missing
+                adds drafts for Peekaboo venues you lack. Deals only refreshes
+                discounts. Full upserts listing metadata (not prices/capacity).
               </p>
             </div>
 
@@ -320,7 +333,7 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
                 <Label htmlFor="autoPublish">Auto-Publish Listings</Label>
                 <p className="text-sm text-muted-foreground">
                   Automatically set status to &quot;published&quot; instead of
-                  &quot;draft&quot;
+                  &quot;draft&quot; (Full mode only)
                 </p>
               </div>
               <Switch
@@ -329,7 +342,12 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
                 onCheckedChange={(checked) =>
                   setConfig({ ...config, autoPublish: checked })
                 }
-                disabled={isLoading || config.syncMode === "deals_only"}
+                disabled={
+                  isLoading ||
+                  config.syncMode === "deals_only" ||
+                  config.syncMode === "report" ||
+                  config.syncMode === "create_missing"
+                }
               />
             </div>
 
@@ -436,6 +454,29 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
       </motion.div>
 
       {/* Warnings */}
+      {config.syncMode === "report" && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Report mode scrapes and compares only — no database writes. Use this
+            to see what is missing or would change before Create missing / Full /
+            Deals.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {config.syncMode === "create_missing" && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Create missing will insert new <strong>draft</strong> listings for
+            Peekaboo venues not already in Inside. Existing listings are left
+            untouched. Categories are assigned from existing tags only — no new
+            category rows.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {config.syncMode === "full" && (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
@@ -443,7 +484,8 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
             Full sync will update listing metadata from Peekaboo (name, address,
             contacts, etc.). Categories, status (when auto-publish is off),
             featured flags, and price/capacity fields are preserved — but prefer
-            Deals only unless you intentionally need a metadata refresh.
+            Report or Deals only unless you intentionally need a metadata
+            refresh.
           </AlertDescription>
         </Alert>
       )}
@@ -556,7 +598,9 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
               <Label htmlFor="workerDefaultSyncMode">Default Sync Mode</Label>
               <Select
                 value={workerConfig.syncDefaults.syncMode}
-                onValueChange={(value: "deals_only" | "full") =>
+                onValueChange={(
+                  value: "report" | "create_missing" | "full" | "deals_only",
+                ) =>
                   setWorkerConfig((prev) => ({
                     ...prev,
                     syncDefaults: { ...prev.syncDefaults, syncMode: value },
@@ -568,10 +612,16 @@ export function ScraperConfig({ onRunningChange }: ScraperConfigProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="report">Report only</SelectItem>
+                  <SelectItem value="create_missing">Create missing</SelectItem>
                   <SelectItem value="deals_only">Deals only</SelectItem>
                   <SelectItem value="full">Full</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Interval automation defaults to Report only. Change only if you
+                intentionally want auto writes.
+              </p>
             </div>
             <div className="flex items-end">
               <div className="flex items-center justify-between w-full rounded-md border px-3 py-2">
