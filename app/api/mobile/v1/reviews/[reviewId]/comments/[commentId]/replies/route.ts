@@ -68,20 +68,41 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
   const currentUserId = user?.id ?? null;
   await assertApprovedParent(reviewId, commentId);
 
+  // Hide replies from users the caller has blocked (same pattern as the
+  // top-level comments route).
+  const blockedClause = (paramIndex: number) =>
+    `NOT EXISTS (SELECT 1 FROM blocked_users bu WHERE bu.blocker_id = $${paramIndex} AND bu.blocked_id = c.user_id)`;
+  const countBlockedClause = (paramIndex: number) =>
+    `NOT EXISTS (SELECT 1 FROM blocked_users bu WHERE bu.blocker_id = $${paramIndex} AND bu.blocked_id = user_id)`;
+
+  const rowsParams: unknown[] = [commentId, limit, offset];
+  let rowsBlockedSql = "";
+  if (currentUserId) {
+    rowsParams.push(currentUserId);
+    rowsBlockedSql = ` AND ${blockedClause(rowsParams.length)}`;
+  }
+
+  const countParams: unknown[] = [commentId];
+  let countBlockedSql = "";
+  if (currentUserId) {
+    countParams.push(currentUserId);
+    countBlockedSql = ` AND ${countBlockedClause(countParams.length)}`;
+  }
+
   let rows: Record<string, unknown>[];
   let total: number;
   try {
     const [rowsRes, countRes] = await Promise.all([
       query(
         `SELECT ${COMMENT_SQL_COLUMNS} ${COMMENT_FROM_JOIN}
-         WHERE c.parent_id = $1 AND c.status = 'approved'
+         WHERE c.parent_id = $1 AND c.status = 'approved'${rowsBlockedSql}
          ORDER BY c.created_at ASC
          LIMIT $2 OFFSET $3`,
-        [commentId, limit, offset],
+        rowsParams,
       ),
       query(
-        `SELECT COUNT(*) FROM review_comments WHERE parent_id = $1 AND status = 'approved'`,
-        [commentId],
+        `SELECT COUNT(*) FROM review_comments WHERE parent_id = $1 AND status = 'approved'${countBlockedSql}`,
+        countParams,
       ),
     ]);
     rows = rowsRes.rows;

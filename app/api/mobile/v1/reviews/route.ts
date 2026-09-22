@@ -72,9 +72,29 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     isStaff = role != null && STAFF_ROLES.includes(role);
   }
 
-  const whereClauses = ["r.listing_id = $1"];
-  if (!isStaff) whereClauses.push("r.status = 'approved'");
-  const whereSql = whereClauses.join(" AND ");
+  // Hide reviews from users the caller has blocked. The blocked-clause
+  // placeholder index differs between the two queries below (they don't
+  // share a param list), so each builds its own WHERE + params.
+  const blockedClause = (paramIndex: number) =>
+    `NOT EXISTS (SELECT 1 FROM blocked_users bu WHERE bu.blocker_id = $${paramIndex} AND bu.blocked_id = r.user_id)`;
+
+  const rowsWhereClauses = ["r.listing_id = $1"];
+  if (!isStaff) rowsWhereClauses.push("r.status = 'approved'");
+  const rowsParams: unknown[] = [listingId, limit, offset];
+  if (currentUserId) {
+    rowsParams.push(currentUserId);
+    rowsWhereClauses.push(blockedClause(rowsParams.length));
+  }
+  const rowsWhereSql = rowsWhereClauses.join(" AND ");
+
+  const countWhereClauses = ["r.listing_id = $1"];
+  if (!isStaff) countWhereClauses.push("r.status = 'approved'");
+  const countParams: unknown[] = [listingId];
+  if (currentUserId) {
+    countParams.push(currentUserId);
+    countWhereClauses.push(blockedClause(countParams.length));
+  }
+  const countWhereSql = countWhereClauses.join(" AND ");
 
   let rows: Record<string, unknown>[];
   let total: number;
@@ -82,14 +102,14 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     const [rowsRes, countRes] = await Promise.all([
       query(
         `SELECT ${REVIEW_SQL_COLUMNS} ${REVIEW_FROM_JOIN}
-         WHERE ${whereSql}
+         WHERE ${rowsWhereSql}
          ORDER BY r.created_at DESC
          LIMIT $2 OFFSET $3`,
-        [listingId, limit, offset],
+        rowsParams,
       ),
       query(
-        `SELECT COUNT(*) FROM reviews r WHERE ${whereSql}`,
-        [listingId],
+        `SELECT COUNT(*) FROM reviews r WHERE ${countWhereSql}`,
+        countParams,
       ),
     ]);
     rows = rowsRes.rows;
