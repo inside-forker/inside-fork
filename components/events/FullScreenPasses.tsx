@@ -194,19 +194,26 @@ function FullTicketView({
   }, [eventTime, eventDate]);
 
   const handleDownload = async () => {
-    if (!ticketRef.current) return;
-    const ticketElement = (ticketRef.current.querySelector(".ticket") ||
-      ticketRef.current.querySelector(".mobile-ticket")) as HTMLElement | null;
-    if (!ticketElement) return;
+    if (!pass.code) {
+      alert("This pass doesn't have a ticket code yet.");
+      return;
+    }
 
     try {
-      const { downloadTicketPdfFromElement } = await import(
+      const { downloadTicketPdf } = await import(
         "@/lib/ticketing/download-ticket-pdf"
       );
-      await downloadTicketPdfFromElement(
-        ticketElement,
-        `ticket-${pass.code || pass.id}`,
-      );
+      await downloadTicketPdf({
+        code: pass.code,
+        eventName: eventName || "Event",
+        eventDate: formattedDate || "",
+        eventTime: formattedTime,
+        venueName: venueName || null,
+        guestName: pass.guest_name || null,
+        cnicLast4: pass.cnic_last4 || null,
+        gateLabel: pass.gate_label || null,
+        filename: `ticket-${pass.code || pass.id}`,
+      });
     } catch (error) {
       console.error("Error saving ticket PDF:", error);
       alert("Couldn't create the PDF. Please try again.");
@@ -358,17 +365,24 @@ function FullTicketView({
       {/* Ticket Content - Scrollable */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div ref={ticketRef}>
-          <div className="ticket relative bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-2xl max-w-xl mx-auto">
-            {/* Header */}
-            <div className="ticket-header relative z-10 bg-gradient-to-r from-primary to-[#c91140] text-white px-6 py-4 flex items-center justify-between min-h-[60px]">
-              <div className="brand-container flex items-center">
-                <img
-                  src="/assets/logo-pure-white.png"
-                  alt="Inside Karachi"
-                  className="h-7 w-auto object-contain block"
-                />
-              </div>
-              <div className="ticket-type bg-white/20 border border-white/30 px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider text-white shadow-sm flex items-center justify-center leading-none">
+          <div
+            className="ticket relative bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-2xl max-w-xl mx-auto"
+            style={{ backgroundColor: "#ffffff" }}
+          >
+            {/* Header — centered type pill matching ticket preview */}
+            <div
+              className="ticket-header relative z-10 text-white px-6 py-4 flex items-center justify-center min-h-[60px]"
+              style={{
+                background: "linear-gradient(135deg, #F42354 0%, #c91140 100%)",
+              }}
+            >
+              <div
+                className="ticket-type px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider text-white leading-none"
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                  border: "1px solid rgba(255,255,255,0.35)",
+                }}
+              >
                 Event Ticket
               </div>
             </div>
