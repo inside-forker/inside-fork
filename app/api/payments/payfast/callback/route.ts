@@ -7,6 +7,7 @@ import {
 } from "@/lib/payments/payfast";
 import { createNotification } from "@/lib/notifications/service";
 import { captureRouteError } from "@/lib/sentry/captureRouteError";
+import { resolveAssignedGateIndex } from "@/lib/ticketing/resolve-gate-assignment";
 import crypto from "crypto";
 
 // PayFast payment webhook: validates the callback signature, updates booking payment_status,
@@ -278,43 +279,12 @@ export async function POST(request: NextRequest) {
           }
 
           if (passesToCreate.length > 0) {
-            // Determine smart gate allocation if event is multi_gate
             let assignedGateIndex: number | null = null;
             if (booking.event_id) {
               try {
-                const { rows: eventModeRows } = await query(
-                  `SELECT scanning_mode, total_gates FROM public.events WHERE id = $1 LIMIT 1`,
-                  [booking.event_id],
+                assignedGateIndex = await resolveAssignedGateIndex(
+                  Number(booking.event_id),
                 );
-                if (
-                  eventModeRows.length > 0 &&
-                  eventModeRows[0].scanning_mode === "multi_gate" &&
-                  Number(eventModeRows[0].total_gates) > 1
-                ) {
-                  const totalGates = Number(eventModeRows[0].total_gates);
-                  const { rows: gateLoadRows } = await query(
-                    `SELECT assigned_gate_index, COUNT(*)::int AS count
-                     FROM public.ticket_passes
-                     WHERE event_id = $1 AND status != 'revoked' AND assigned_gate_index IS NOT NULL
-                     GROUP BY assigned_gate_index`,
-                    [booking.event_id],
-                  );
-                  const loadMap: Record<number, number> = {};
-                  for (let g = 0; g < totalGates; g++) loadMap[g] = 0;
-                  gateLoadRows.forEach((r) => {
-                    const idx = Number(r.assigned_gate_index);
-                    if (idx >= 0 && idx < totalGates) loadMap[idx] = Number(r.count);
-                  });
-                  let minG = 0;
-                  let minC = loadMap[0];
-                  for (let g = 1; g < totalGates; g++) {
-                    if (loadMap[g] < minC) {
-                      minC = loadMap[g];
-                      minG = g;
-                    }
-                  }
-                  assignedGateIndex = minG;
-                }
               } catch (e) {
                 console.error("[PayFast Webhook] Error determining gate index:", e);
               }

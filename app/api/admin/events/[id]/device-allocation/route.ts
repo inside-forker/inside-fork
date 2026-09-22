@@ -36,6 +36,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         e.organizer_id, 
         e.scanning_mode, 
         e.total_gates,
+        COALESCE(e.gate_assignment_mode, 'manual') AS gate_assignment_mode,
         p.full_name AS organizer_name,
         u.email AS organizer_email,
         p.organizer_company
@@ -229,6 +230,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           organizerCompany: event.organizer_company,
           scanningMode,
           totalDevices,
+          gateAssignmentMode:
+            event.gate_assignment_mode === "auto" ? "auto" : "manual",
         },
         deviceSlots,
         summary: {
@@ -306,6 +309,25 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         success: true,
         message: "Device architecture updated successfully",
         data: { scanning_mode: validMode, total_devices: totalDevs },
+      });
+    }
+
+    // 1b. Action: Manual vs Auto gate assignment on purchase
+    if (action === "update_assignment_mode") {
+      const mode = body.gate_assignment_mode === "auto" ? "auto" : "manual";
+      await query(
+        `UPDATE public.events
+         SET gate_assignment_mode = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [mode, eventId],
+      );
+      return NextResponse.json({
+        success: true,
+        message:
+          mode === "auto"
+            ? "New ticket purchases will auto-assign to the least-loaded gate"
+            : "New ticket purchases will stay unassigned until you allocate them",
+        data: { gate_assignment_mode: mode },
       });
     }
 
@@ -626,6 +648,22 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
                        updated_at = NOW()`,
         [eventId, devIndex, operator_id, device_label || `Device ${devIndex + 1}`],
       );
+
+      // Keep linked_organizer_id in sync with this event's EO so mobile
+      // organizer APIs (and legacy checks) resolve the right event set.
+      const { rows: eventOrgRows } = await query(
+        `SELECT organizer_id FROM public.events WHERE id = $1 LIMIT 1`,
+        [eventId],
+      );
+      const eventOrganizerId = eventOrgRows[0]?.organizer_id as string | undefined;
+      if (eventOrganizerId) {
+        await query(
+          `UPDATE public.profiles
+           SET linked_organizer_id = $1, updated_at = NOW()
+           WHERE id = $2 AND role = 'eo_gate_pass'`,
+          [eventOrganizerId, operator_id],
+        );
+      }
 
       return NextResponse.json({
         success: true,

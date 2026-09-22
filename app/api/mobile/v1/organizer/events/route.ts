@@ -20,6 +20,8 @@ interface EventRecord {
   address?: string | null;
   scanning_mode?: "single" | "multi_gate";
   total_gates?: number;
+  assigned_device_index?: number | null;
+  assigned_device_label?: string | null;
 }
 
 interface BookingRecord {
@@ -60,29 +62,92 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   const { searchParams } = new URL(request.url);
   const eventId = searchParams.get("eventId");
+  const eventIdNum = eventId ? parseInt(eventId, 10) : null;
 
-  const targetOrganizerId =
-    isGatePass && linkedOrganizerId ? linkedOrganizerId : user.id;
+  // Gate pass operators see events they're assigned to via event_device_operators
+  // (primary). Also include linked-organizer events so they see the EO roster
+  // when not yet slotted onto a lane.
+  let eventsSql: string;
+  const eventParams: unknown[] = [];
 
-  const eventParams: unknown[] = [targetOrganizerId];
-  let eventsSql = `SELECT id, name, slug, description,
-      to_json(start_time) #>> '{}' AS start_time,
-      to_json(end_time) #>> '{}' AS end_time,
-      max_capacity, status, location_name, address,
-      scanning_mode, total_gates
-    FROM events WHERE organizer_id = $1`;
-  if (eventId) {
-    eventParams.push(parseInt(eventId, 10));
-    eventsSql += ` AND id = $${eventParams.length}`;
+  if (isGatePass) {
+    eventParams.push(user.id);
+    const linkedParam = linkedOrganizerId
+      ? (eventParams.push(linkedOrganizerId), `$${eventParams.length}`)
+      : null;
+    const eventFilterParam = eventIdNum
+      ? (eventParams.push(eventIdNum), `$${eventParams.length}`)
+      : null;
+
+    eventsSql = `
+      SELECT
+        e.id, e.name, e.slug, e.description,
+        to_json(e.start_time) #>> '{}' AS start_time,
+        to_json(e.end_time) #>> '{}' AS end_time,
+        e.max_capacity, e.status, e.location_name, e.address,
+        e.scanning_mode, e.total_gates,
+        edo.device_index AS assigned_device_index,
+        COALESCE(edo.device_label, 'Gate ' || (edo.device_index + 1)) AS assigned_device_label
+      FROM events e
+      INNER JOIN event_device_operators edo
+        ON edo.event_id = e.id AND edo.operator_id = $1
+      WHERE 1=1
+        ${eventFilterParam ? `AND e.id = ${eventFilterParam}` : ""}
+    `;
+
+    if (linkedParam) {
+      eventsSql += `
+      UNION
+      SELECT
+        e.id, e.name, e.slug, e.description,
+        to_json(e.start_time) #>> '{}' AS start_time,
+        to_json(e.end_time) #>> '{}' AS end_time,
+        e.max_capacity, e.status, e.location_name, e.address,
+        e.scanning_mode, e.total_gates,
+        NULL::smallint AS assigned_device_index,
+        NULL::text AS assigned_device_label
+      FROM events e
+      WHERE e.organizer_id = ${linkedParam}
+        AND NOT EXISTS (
+          SELECT 1 FROM event_device_operators edo2
+          WHERE edo2.event_id = e.id AND edo2.operator_id = $1
+        )
+        ${eventFilterParam ? `AND e.id = ${eventFilterParam}` : ""}
+      `;
+    }
+
+    eventsSql = `SELECT * FROM (${eventsSql}) gate_events ORDER BY start_time DESC`;
+  } else {
+    eventParams.push(user.id);
+    eventsSql = `SELECT id, name, slug, description,
+        to_json(start_time) #>> '{}' AS start_time,
+        to_json(end_time) #>> '{}' AS end_time,
+        max_capacity, status, location_name, address,
+        scanning_mode, total_gates,
+        NULL::smallint AS assigned_device_index,
+        NULL::text AS assigned_device_label
+      FROM events WHERE organizer_id = $1`;
+    if (eventIdNum) {
+      eventParams.push(eventIdNum);
+      eventsSql += ` AND id = $${eventParams.length}`;
+    }
+    eventsSql += ` ORDER BY start_time DESC`;
   }
-  eventsSql += ` ORDER BY start_time DESC`;
 
   const { rows: eventRows } = await query(eventsSql, eventParams);
   const events: EventRecord[] = eventRows.map((row) => ({
     ...row,
     id: Number(row.id),
-    total_gates: row.total_gates !== null && row.total_gates !== undefined ? Number(row.total_gates) : 1,
+    total_gates:
+      row.total_gates !== null && row.total_gates !== undefined
+        ? Number(row.total_gates)
+        : 1,
     scanning_mode: row.scanning_mode || "single",
+    assigned_device_index:
+      row.assigned_device_index !== null && row.assigned_device_index !== undefined
+        ? Number(row.assigned_device_index)
+        : null,
+    assigned_device_label: row.assigned_device_label || null,
   }));
 
   if (events.length === 0) {

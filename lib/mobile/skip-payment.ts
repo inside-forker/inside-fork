@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { query } from "@/lib/db";
 import { MobileApiError } from "@/lib/mobile/errors";
+import { resolveAssignedGateIndex } from "@/lib/ticketing/resolve-gate-assignment";
 
 /**
  * Confirming a booking without a PayFast round trip.
@@ -18,8 +19,8 @@ import { MobileApiError } from "@/lib/mobile/errors";
  *
  * This deliberately does NOT touch the PayFast callback route. It mirrors the
  * callback's paid path minimum: booking -> paid/confirmed, ticket passes
- * issued (same code + HMAC signature format), status history row. It does not
- * do gate allocation for multi_gate events, email, or organizer notifications.
+ * issued (same code + HMAC signature format), status history row, and gate
+ * assignment when the event is in auto mode.
  */
 
 export type SkipPaymentReason = "free_order" | "payment_skipped";
@@ -52,6 +53,15 @@ export async function confirmBookingWithoutPayment(
     process.env.TICKET_SIGNING_SECRET ||
     process.env.NEXTAUTH_SECRET ||
     "ik_ticket_signing_secret_fallback_key";
+
+  let assignedGateIndex: number | null = null;
+  if (booking.event_id) {
+    try {
+      assignedGateIndex = await resolveAssignedGateIndex(Number(booking.event_id));
+    } catch (e) {
+      console.error("[skip-payment] Failed to resolve gate assignment:", e);
+    }
+  }
 
   // Passes first: if this fails the booking stays awaiting_payment rather than
   // ending up "paid" with no tickets.
@@ -94,7 +104,7 @@ export async function confirmBookingWithoutPayment(
       const values: unknown[] = [];
       const placeholders = passes
         .map((p, idx) => {
-          const base = idx * 8;
+          const base = idx * 9;
           values.push(
             bookingId,
             booking.event_id,
@@ -104,17 +114,25 @@ export async function confirmBookingWithoutPayment(
             "issued",
             p.index,
             p.guestName,
+            assignedGateIndex,
           );
-          return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8})`;
+          return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9})`;
         })
         .join(", ");
       await query(
         `INSERT INTO ticket_passes
-           (booking_id, event_id, ticket_type_id, code, signature, status, quantity_index, guest_name)
+           (booking_id, event_id, ticket_type_id, code, signature, status, quantity_index, guest_name, assigned_gate_index)
          VALUES ${placeholders}`,
         values,
       );
     }
+  } else if (assignedGateIndex !== null) {
+    await query(
+      `UPDATE ticket_passes
+       SET assigned_gate_index = $1
+       WHERE booking_id = $2 AND assigned_gate_index IS NULL`,
+      [assignedGateIndex, bookingId],
+    );
   }
 
   await query(

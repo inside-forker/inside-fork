@@ -128,6 +128,7 @@ interface EventData {
   organizerCompany: string | null;
   scanningMode: "single" | "multi_gate";
   totalDevices: number;
+  gateAssignmentMode: "manual" | "auto";
 }
 
 interface OperatorOption {
@@ -186,6 +187,7 @@ export function AccountCreationHub({
   const [configMode, setConfigMode] = useState<"single" | "multi_gate">("single");
   const [configDevices, setConfigDevices] = useState<string>("2");
   const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [isSavingAssignmentMode, setIsSavingAssignmentMode] = useState(false);
 
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [labelForm, setLabelForm] = useState({ deviceIndex: 0, deviceLabel: "" });
@@ -291,12 +293,16 @@ export function AccountCreationHub({
         const res = await fetch(`/api/admin/events/${eventId}/device-allocation`);
         const result = await res.json();
         if (result.success) {
-          setEventData(result.data.event);
+          const event = result.data.event;
+          setEventData({
+            ...event,
+            gateAssignmentMode: event.gateAssignmentMode === "auto" ? "auto" : "manual",
+          });
           setDeviceSlots(result.data.deviceSlots);
           setTickets(result.data.tickets);
           setAllocationSummary(result.data.summary);
-          setConfigMode(result.data.event.scanningMode);
-          setConfigDevices(result.data.event.totalDevices.toString());
+          setConfigMode(event.scanningMode);
+          setConfigDevices(event.totalDevices.toString());
         } else {
           toast({
             title: "Error loading event",
@@ -656,6 +662,47 @@ export function AccountCreationHub({
       });
     } finally {
       setIsSavingConfig(false);
+    }
+  };
+
+  // Toggle Manual vs Auto lane assignment on purchase
+  const handleToggleAssignmentMode = async (mode: "manual" | "auto") => {
+    if (!selectedEventId || !eventData || eventData.gateAssignmentMode === mode) return;
+    try {
+      setIsSavingAssignmentMode(true);
+      const res = await fetch(`/api/admin/events/${selectedEventId}/device-allocation`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update_assignment_mode",
+          gate_assignment_mode: mode,
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setEventData((prev) =>
+          prev ? { ...prev, gateAssignmentMode: mode } : prev,
+        );
+        toast({
+          title: mode === "auto" ? "Auto-assign enabled" : "Manual assign enabled",
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: "Could not update setting",
+          description: result.error,
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Network error",
+        description: "Failed to update assignment mode",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingAssignmentMode(false);
     }
   };
 
@@ -1282,39 +1329,99 @@ export function AccountCreationHub({
                       </CardDescription>
                     </div>
 
-                    {/* Quick Bulk Distribution Actions */}
-                    {isMultiDevice && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="default"
-                          onClick={() => handleAutoDistribute(false)}
-                          className="text-xs shadow-sm bg-primary text-primary-foreground font-medium"
-                        >
-                          ⚡ Auto-Distribute Evenly
-                        </Button>
-                        {allocationSummary.unassignedCount > 0 && (
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      {/* Manual / Auto purchase assignment toggle */}
+                      <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-background p-1.5 shadow-xs">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2">
+                          On purchase
+                        </span>
+                        <div className="flex rounded-lg bg-muted/60 p-0.5">
+                          <button
+                            type="button"
+                            disabled={isSavingAssignmentMode}
+                            onClick={() => handleToggleAssignmentMode("manual")}
+                            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                              eventData.gateAssignmentMode === "manual"
+                                ? "bg-background text-foreground shadow-xs"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            Manual
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSavingAssignmentMode}
+                            onClick={() => handleToggleAssignmentMode("auto")}
+                            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                              eventData.gateAssignmentMode === "auto"
+                                ? "bg-primary text-primary-foreground shadow-xs"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            Auto Assign
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Quick Bulk Distribution Actions */}
+                      {isMultiDevice ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => handleAutoDistribute(false)}
+                            className="text-xs shadow-sm bg-primary text-primary-foreground font-medium"
+                          >
+                            ⚡ Auto-Distribute Evenly
+                          </Button>
+                          {allocationSummary.unassignedCount > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleAutoDistribute(true)}
+                              className="text-xs border-primary/30 text-primary hover:bg-primary/5"
+                            >
+                              Assign Unassigned ({allocationSummary.unassignedCount})
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={handleClearAllAssignments}
+                            className="text-xs text-muted-foreground hover:text-red-600"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />
+                            Reset
+                          </Button>
+                        </div>
+                      ) : (
+                        allocationSummary.unassignedCount > 0 && (
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleAutoDistribute(true)}
                             className="text-xs border-primary/30 text-primary hover:bg-primary/5"
                           >
-                            Assign Unassigned ({allocationSummary.unassignedCount})
+                            Assign to {deviceSlots[0]?.label || "Device 1"} ({allocationSummary.unassignedCount})
                           </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={handleClearAllAssignments}
-                          className="text-xs text-muted-foreground hover:text-red-600"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-1" />
-                          Reset
-                        </Button>
-                      </div>
-                    )}
+                        )
+                      )}
+                    </div>
                   </div>
+
+                  {eventData.gateAssignmentMode === "auto" ? (
+                    <p className="mt-3 text-[11px] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+                      Auto Assign is on — new ticket purchases get the least-loaded lane
+                      {deviceSlots.length === 1
+                        ? ` (${deviceSlots[0].label})`
+                        : ` across ${deviceSlots.map((d) => d.label).join(", ")}`}
+                      . Existing unassigned attendees stay unassigned until you distribute them.
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                      Manual mode — new purchases stay unassigned until you allocate them here.
+                    </p>
+                  )}
 
                   {/* Allocation Breakdown Progress */}
                   <div className="mt-4 pt-3 border-t border-border/40 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
