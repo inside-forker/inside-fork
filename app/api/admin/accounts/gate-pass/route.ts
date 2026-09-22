@@ -143,17 +143,15 @@ export async function POST(request: NextRequest) {
       cleanUsername = `gate_${base}_${suffix}`.slice(0, 30);
     }
 
-    // Check if email already exists
+    // Check if email already exists (incl. orphans from trigger-created stub profiles)
     const { rows: existingEmailRows } = await query(
-      "SELECT id FROM auth.users WHERE LOWER(email) = LOWER($1) LIMIT 1",
+      `SELECT u.id, p.role
+       FROM auth.users u
+       LEFT JOIN public.profiles p ON p.id = u.id
+       WHERE LOWER(u.email) = LOWER($1)
+       LIMIT 1`,
       [cleanEmail],
     );
-    if (existingEmailRows.length > 0) {
-      return NextResponse.json(
-        { success: false, error: "An account with this email already exists" },
-        { status: 409 },
-      );
-    }
 
     // Password generation
     const tempPassword = custom_password?.trim() || (crypto.randomBytes(6).toString("hex") + "Gp!");
@@ -165,30 +163,43 @@ export async function POST(request: NextRequest) {
     }
 
     const encryptedPassword = await hashPassword(tempPassword);
-    const newUserId = uuidv4();
     const now = new Date().toISOString();
+    let newUserId: string;
 
-    // 1. Insert into auth.users
-    await query(
-      `INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, role, aud)
-       VALUES ($1, $2, $3, $4, $5, $6, 'authenticated', 'authenticated')`,
-      [newUserId, cleanEmail, encryptedPassword, now, now, now],
-    );
+    if (existingEmailRows.length > 0) {
+      const existing = existingEmailRows[0];
+      const existingRole = existing.role as string | null;
+      const reclaimable =
+        !existingRole ||
+        existingRole === "public_user" ||
+        existingRole === "eo_gate_pass";
 
-    // 2. Insert / Upsert into profiles
-    const { rows: existingProfileRows } = await query(
-      "SELECT id FROM public.profiles WHERE id = $1 LIMIT 1",
-      [newUserId],
-    );
+      if (!reclaimable) {
+        return NextResponse.json(
+          { success: false, error: "An account with this email already exists" },
+          { status: 409 },
+        );
+      }
 
-    if (existingProfileRows.length > 0) {
+      newUserId = existing.id as string;
+
       await query(
-        `UPDATE public.profiles SET 
-          full_name = $1, 
-          username = $2, 
-          role = 'eo_gate_pass', 
+        `UPDATE auth.users
+         SET encrypted_password = $1, email_confirmed_at = COALESCE(email_confirmed_at, $2), updated_at = $2
+         WHERE id = $3`,
+        [encryptedPassword, now, newUserId],
+      );
+
+      await query(
+        `UPDATE public.profiles SET
+          full_name = $1,
+          username = CASE
+            WHEN username IS NULL OR username LIKE 'user_%' THEN $2
+            ELSE COALESCE($2, username)
+          END,
+          role = 'eo_gate_pass',
           active_role = 'eo_gate_pass',
-          phone = $3,
+          phone = COALESCE($3, phone),
           linked_organizer_id = $4,
           updated_at = $5
          WHERE id = $6`,
@@ -202,11 +213,29 @@ export async function POST(request: NextRequest) {
         ],
       );
     } else {
+      newUserId = uuidv4();
+
+      // 1. Insert into auth.users (trigger creates a stub profiles row)
+      await query(
+        `INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, role, aud)
+         VALUES ($1, $2, $3, $4, $5, $6, 'authenticated', 'authenticated')`,
+        [newUserId, cleanEmail, encryptedPassword, now, now, now],
+      );
+
+      // 2. Upsert profile over the trigger stub
       await query(
         `INSERT INTO public.profiles (
           id, full_name, username, role, active_role, phone,
           linked_organizer_id, membership_plan, created_at, updated_at
-        ) VALUES ($1, $2, $3, 'eo_gate_pass', 'eo_gate_pass', $4, $5, 'free', $6, $7)`,
+        ) VALUES ($1, $2, $3, 'eo_gate_pass', 'eo_gate_pass', $4, $5, 'free', $6, $7)
+        ON CONFLICT (id) DO UPDATE SET
+          full_name = EXCLUDED.full_name,
+          username = EXCLUDED.username,
+          role = 'eo_gate_pass',
+          active_role = 'eo_gate_pass',
+          phone = EXCLUDED.phone,
+          linked_organizer_id = EXCLUDED.linked_organizer_id,
+          updated_at = EXCLUDED.updated_at`,
         [
           newUserId,
           full_name.trim(),

@@ -18,26 +18,24 @@ function parseEventId(eventId: string): number {
 /**
  * GET /api/mobile/v1/organizer/events/[eventId]/manifest
  *
- * Downloads the full offline ticket manifest for an event.
- * Accessible to event organizers, linked gate pass operators, and admins.
- * Returns all valid/paid tickets with their signatures and check-in statuses.
+ * Downloads the offline ticket manifest for an event.
+ * Gate-pass operators are locked to their assigned lane in event_device_operators
+ * (client gateIndex overrides are ignored) so they only ever receive their slice.
  */
 export const GET = mobileRoute(async (request: NextRequest, context) => {
   await enforceMobileRateLimit(request);
   const { eventId } = await context.params;
   const eventIdNum = parseEventId(eventId);
 
-  // Authorize with allowGatePass = true (organizer, linked gate pass, admin)
-  const { user } = await requireMobileOrganizer(request, {
+  const { user, isGatePass } = await requireMobileOrganizer(request, {
     eventId: eventIdNum,
     allowGatePass: true,
   });
   await enforceMobileRateLimit(request, user.id);
 
-  // 1. Fetch Event Header Info
   const { rows: eventRows } = await query(
-    `SELECT id, name, location_name, start_time, end_time, organizer_id, scanning_mode, total_gates 
-     FROM public.events 
+    `SELECT id, name, location_name, start_time, end_time, organizer_id, scanning_mode, total_gates
+     FROM public.events
      WHERE id = $1 LIMIT 1`,
     [eventIdNum],
   );
@@ -51,22 +49,66 @@ export const GET = mobileRoute(async (request: NextRequest, context) => {
       ? Number(event.total_gates)
       : 1;
 
-  // Parse gate allocation query params (fallback to event's configured default if not overridden)
+  // Gate-pass operators: lock to their assigned device/lane (ignore client override)
+  let forcedGateIndex: number | null = null;
+  let deviceLabel: string | null = null;
+  if (isGatePass) {
+    const { rows: assignmentRows } = await query(
+      `SELECT device_index, device_label
+       FROM public.event_device_operators
+       WHERE event_id = $1 AND operator_id = $2
+       LIMIT 1`,
+      [eventIdNum, user.id],
+    );
+    if (assignmentRows.length > 0) {
+      forcedGateIndex = Number(assignmentRows[0].device_index);
+      deviceLabel =
+        assignmentRows[0].device_label ||
+        `Gate ${forcedGateIndex + 1}`;
+    }
+  }
+
   const url = new URL(request.url);
   const rawTotalGates = url.searchParams.has("totalGates")
     ? parseInt(url.searchParams.get("totalGates") || "1", 10)
     : defaultTotalGates;
-  const rawGateIndex = parseInt(url.searchParams.get("gateIndex") || "0", 10);
+  const rawGateIndex = url.searchParams.has("gateIndex")
+    ? parseInt(url.searchParams.get("gateIndex") || "0", 10)
+    : 0;
 
-  const totalGates = Number.isFinite(rawTotalGates) && rawTotalGates >= 1 ? Math.min(rawTotalGates, 50) : 1;
+  const totalGates =
+    forcedGateIndex !== null
+      ? Math.max(defaultTotalGates, forcedGateIndex + 1, 1)
+      : Number.isFinite(rawTotalGates) && rawTotalGates >= 1
+        ? Math.min(rawTotalGates, 50)
+        : 1;
+
   const gateIndex =
-    Number.isFinite(rawGateIndex) && rawGateIndex >= 0 && rawGateIndex < totalGates
-      ? rawGateIndex
-      : 0;
+    forcedGateIndex !== null
+      ? Math.min(forcedGateIndex, totalGates - 1)
+      : Number.isFinite(rawGateIndex) && rawGateIndex >= 0 && rawGateIndex < totalGates
+        ? rawGateIndex
+        : 0;
 
-  // 2. Fetch all valid tickets for this event
+  if (!deviceLabel) {
+    deviceLabel =
+      totalGates > 1 ? `Gate ${gateIndex + 1}` : `Gate ${gateIndex + 1}`;
+  }
+
+  // Prefer custom device labels from event_device_operators when available
+  if (!isGatePass || forcedGateIndex === null) {
+    const { rows: labelRows } = await query(
+      `SELECT device_label FROM public.event_device_operators
+       WHERE event_id = $1 AND device_index = $2 LIMIT 1`,
+      [eventIdNum, gateIndex],
+    );
+    if (labelRows[0]?.device_label) {
+      deviceLabel = labelRows[0].device_label;
+    }
+  }
+
   const { rows: tickets } = await query(
-    `SELECT 
+    `SELECT
       tp.id,
       tp.code,
       tp.signature,
@@ -81,7 +123,7 @@ export const GET = mobileRoute(async (request: NextRequest, context) => {
      FROM public.ticket_passes tp
      INNER JOIN public.bookings b ON b.id = tp.booking_id
      LEFT JOIN public.ticket_types tt ON tt.id = tp.ticket_type_id
-     WHERE tp.event_id = $1 
+     WHERE tp.event_id = $1
        AND tp.status != 'revoked'
        AND b.payment_status = 'paid'
      ORDER BY tp.id ASC`,
@@ -113,12 +155,10 @@ export const GET = mobileRoute(async (request: NextRequest, context) => {
     );
 
     if (hasExplicitAssignments) {
-      // Filter directly by explicit assigned device index
       gateTickets = allFormattedTickets.filter(
         (t) => t.assignedGateIndex === gateIndex,
       );
     } else {
-      // Deterministic slice fallback
       const startIndex = Math.floor((gateIndex * totalTickets) / totalGates);
       const endIndex = Math.floor(((gateIndex + 1) * totalTickets) / totalGates);
       gateTickets = allFormattedTickets.slice(startIndex, endIndex);
@@ -130,7 +170,9 @@ export const GET = mobileRoute(async (request: NextRequest, context) => {
 
   const manifestVersion = crypto
     .createHash("sha256")
-    .update(`${eventIdNum}:${totalTickets}:${totalGates}:${gateIndex}:${checkedInCount}:${Date.now()}`)
+    .update(
+      `${eventIdNum}:${totalTickets}:${totalGates}:${gateIndex}:${totalAssignedTickets}:${checkedInCount}:${Date.now()}`,
+    )
     .digest("hex")
     .substring(0, 16);
 
@@ -149,6 +191,7 @@ export const GET = mobileRoute(async (request: NextRequest, context) => {
     totalGates,
     gateIndex,
     deviceIndex: gateIndex,
+    deviceLabel,
     totalDevices: totalGates,
     totalTickets,
     assignedTicketsCount: totalAssignedTickets,

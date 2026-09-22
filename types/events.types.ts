@@ -19,6 +19,7 @@ export type AdminEvent = {
   is_featured: boolean;
   scanning_mode?: "single" | "multi_gate";
   total_gates?: number;
+  gate_assignment_mode?: "manual" | "auto";
   created_at: string;
   updated_at: string;
   images?: EventImage[];
@@ -48,6 +49,7 @@ export type Event = {
   longitude: number | null;
   scanning_mode?: "single" | "multi_gate";
   total_gates?: number;
+  gate_assignment_mode?: "manual" | "auto";
   // Editorial feature flags exposed from events_with_details
   is_featured?: boolean | null;
   featured_rank?: number | null;

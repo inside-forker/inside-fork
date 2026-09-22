@@ -61,9 +61,25 @@ export async function requireMobileOrganizer(
     }
 
     const isOwner = event.organizer_id === user.id;
-    const isLinkedGatePass = isGatePass && linkedOrganizerId && event.organizer_id === linkedOrganizerId;
+    const isLinkedGatePass =
+      isGatePass &&
+      linkedOrganizerId &&
+      event.organizer_id === linkedOrganizerId;
 
-    if (!isAdmin && !isOwner && !isLinkedGatePass) {
+    // Also allow operators assigned to a specific device/lane on this event
+    // (linked_organizer_id can be stale or point at a different EO)
+    let isAssignedDeviceOperator = false;
+    if (isGatePass && !isLinkedGatePass && !isOwner && !isAdmin) {
+      const { rows: assignmentRows } = await query(
+        `SELECT 1 FROM event_device_operators
+         WHERE event_id = $1 AND operator_id = $2
+         LIMIT 1`,
+        [opts.eventId, user.id],
+      );
+      isAssignedDeviceOperator = assignmentRows.length > 0;
+    }
+
+    if (!isAdmin && !isOwner && !isLinkedGatePass && !isAssignedDeviceOperator) {
       throw new MobileApiError(
         "forbidden",
         "You do not have access to this event.",

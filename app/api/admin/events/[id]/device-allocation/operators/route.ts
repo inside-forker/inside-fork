@@ -4,7 +4,6 @@ import { requireAdmin } from "@/lib/auth/admin";
 import { captureRouteError } from "@/lib/sentry/captureRouteError";
 import { hashPassword } from "@/lib/auth/password";
 import { v4 as uuidv4 } from "uuid";
-import crypto from "crypto";
 
 const ROUTE = "/api/admin/events/[id]/device-allocation/operators";
 
@@ -139,50 +138,109 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .slice(0, 15);
     const cleanUsername = `${baseUsername || "scanner"}_${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // Check if email already exists
-    const { rows: existingUserRows } = await query(
-      "SELECT id FROM auth.users WHERE LOWER(email) = $1 LIMIT 1",
-      [cleanEmail],
-    );
-    if (existingUserRows.length > 0) {
-      return NextResponse.json(
-        { success: false, error: "An account with this email already exists" },
-        { status: 409 },
-      );
-    }
-
     // Password resolution
     const plainPassword =
       password?.trim() || `Scanner${Math.floor(100000 + Math.random() * 900000)}!`;
     const encryptedPassword = await hashPassword(plainPassword);
-    const newUserId = uuidv4();
     const now = new Date().toISOString();
 
-    // 2. Insert into auth.users
-    await query(
-      `INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, role, aud)
-       VALUES ($1, $2, $3, $4, $5, $6, 'authenticated', 'authenticated')`,
-      [newUserId, cleanEmail, encryptedPassword, now, now, now],
+    // Check if email already exists (including orphans from a prior failed create —
+    // auth.users insert fires handle_new_user() which creates profiles before our upsert)
+    const { rows: existingUserRows } = await query(
+      `SELECT u.id, p.role
+       FROM auth.users u
+       LEFT JOIN public.profiles p ON p.id = u.id
+       WHERE LOWER(u.email) = $1
+       LIMIT 1`,
+      [cleanEmail],
     );
 
-    // 3. Insert into public.profiles
-    await query(
-      `INSERT INTO public.profiles (
-        id, full_name, username, role, active_role, phone,
-        linked_organizer_id, membership_plan, created_at, updated_at
-      ) VALUES ($1, $2, $3, 'eo_gate_pass', 'eo_gate_pass', $4, $5, 'free', $6, $7)`,
-      [
-        newUserId,
-        cleanFullName,
-        cleanUsername,
-        phone?.trim() || null,
-        organizerId,
-        now,
-        now,
-      ],
-    );
+    let operatorId: string;
 
-    // 4. If device_index is provided, link to event_device_operators immediately
+    if (existingUserRows.length > 0) {
+      const existing = existingUserRows[0];
+      const existingRole = existing.role as string | null;
+      // Reclaim half-created rows (trigger left public_user) or refresh an existing gate pass
+      const reclaimable =
+        !existingRole ||
+        existingRole === "public_user" ||
+        existingRole === "eo_gate_pass";
+
+      if (!reclaimable) {
+        return NextResponse.json(
+          { success: false, error: "An account with this email already exists" },
+          { status: 409 },
+        );
+      }
+
+      operatorId = existing.id as string;
+
+      await query(
+        `UPDATE auth.users
+         SET encrypted_password = $1, email_confirmed_at = COALESCE(email_confirmed_at, $2), updated_at = $2
+         WHERE id = $3`,
+        [encryptedPassword, now, operatorId],
+      );
+
+      await query(
+        `UPDATE public.profiles SET
+           full_name = $1,
+           username = CASE
+             WHEN username IS NULL OR username LIKE 'user_%' THEN $2
+             ELSE username
+           END,
+           role = 'eo_gate_pass',
+           active_role = 'eo_gate_pass',
+           phone = COALESCE($3, phone),
+           linked_organizer_id = $4,
+           updated_at = $5
+         WHERE id = $6`,
+        [
+          cleanFullName,
+          cleanUsername,
+          phone?.trim() || null,
+          organizerId,
+          now,
+          operatorId,
+        ],
+      );
+    } else {
+      operatorId = uuidv4();
+
+      // Insert auth.users — trigger on_auth_user_created creates a stub profiles row
+      await query(
+        `INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, role, aud)
+         VALUES ($1, $2, $3, $4, $5, $6, 'authenticated', 'authenticated')`,
+        [operatorId, cleanEmail, encryptedPassword, now, now, now],
+      );
+
+      // Upsert profile (trigger almost always wins the race on INSERT)
+      await query(
+        `INSERT INTO public.profiles (
+          id, full_name, username, role, active_role, phone,
+          linked_organizer_id, membership_plan, created_at, updated_at
+        ) VALUES ($1, $2, $3, 'eo_gate_pass', 'eo_gate_pass', $4, $5, 'free', $6, $7)
+        ON CONFLICT (id) DO UPDATE SET
+          full_name = EXCLUDED.full_name,
+          username = EXCLUDED.username,
+          role = 'eo_gate_pass',
+          active_role = 'eo_gate_pass',
+          phone = EXCLUDED.phone,
+          linked_organizer_id = EXCLUDED.linked_organizer_id,
+          updated_at = EXCLUDED.updated_at`,
+        [
+          operatorId,
+          cleanFullName,
+          cleanUsername,
+          phone?.trim() || null,
+          organizerId,
+          now,
+          now,
+        ],
+      );
+    }
+
+    // Link to event_device_operators when a device slot was requested
     if (device_index !== undefined && device_index !== null) {
       const devIndex = Number(device_index);
       await query(
@@ -190,19 +248,26 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
          VALUES ($1, $2, $3, $4, NOW())
          ON CONFLICT (event_id, device_index)
          DO UPDATE SET operator_id = EXCLUDED.operator_id, device_label = EXCLUDED.device_label, updated_at = NOW()`,
-        [eventId, devIndex, newUserId, device_label || `Device ${devIndex + 1}`],
+        [eventId, devIndex, operatorId, device_label || `Device ${devIndex + 1}`],
       );
     }
+
+    // Resolve final username for credentials card
+    const { rows: profileRows } = await query(
+      `SELECT username FROM public.profiles WHERE id = $1 LIMIT 1`,
+      [operatorId],
+    );
+    const finalUsername = (profileRows[0]?.username as string) || cleanUsername;
 
     return NextResponse.json({
       success: true,
       message: "Scanner operator account created and assigned successfully",
       data: {
         operator: {
-          id: newUserId,
+          id: operatorId,
           name: cleanFullName,
           email: cleanEmail,
-          username: cleanUsername,
+          username: finalUsername,
           phone: phone?.trim() || null,
           role: "eo_gate_pass",
           deviceIndex: device_index !== undefined ? Number(device_index) : null,
@@ -210,7 +275,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         credentials: {
           email: cleanEmail,
           password: plainPassword,
-          username: cleanUsername,
+          username: finalUsername,
         },
       },
     });
