@@ -3,10 +3,11 @@
 import * as React from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { motion } from "framer-motion";
-import { CheckCircle2, Lock } from "lucide-react";
+import { CheckCircle2, Download, Lock } from "lucide-react";
 import { PublicPass } from "@/types/ticketing.types";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { PrintableTicket } from "./PrintableTicket";
 
 interface Props {
@@ -19,19 +20,18 @@ interface Props {
   ticketType?: string;
 }
 
-// Ticket card component with QR code
 function TicketCard({
   pass,
   index,
   variant,
-  eventName: _eventName,
   onViewQR,
+  onDownloadPdf,
 }: {
   pass: PublicPass;
   index: number;
   variant: "default" | "dashboard";
-  eventName?: string;
   onViewQR: () => void;
+  onDownloadPdf: () => void;
 }) {
   const statusLabel = (pass.status ?? "")
     .toString()
@@ -53,20 +53,19 @@ function TicketCard({
       transition={{ delay: index * 0.1 }}
       className={itemClassName}
     >
-      {/* Ticket Header */}
       <div
         className={cn(
           "flex items-center justify-between px-4 py-3",
           variant === "dashboard"
             ? "bg-gradient-to-r from-primary/10 to-transparent border-b border-border/40"
-            : "bg-neutral-700/50 border-b border-neutral-600/40"
+            : "bg-neutral-700/50 border-b border-neutral-600/40",
         )}
       >
         <div className="flex items-center gap-2">
           <span
             className={cn(
               "text-xs font-bold uppercase tracking-[0.2em]",
-              variant === "dashboard" ? "text-primary" : "text-white/80"
+              variant === "dashboard" ? "text-primary" : "text-white/80",
             )}
           >
             Pass #{index + 1}
@@ -77,10 +76,10 @@ function TicketCard({
                 "px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider",
                 variant === "dashboard"
                   ? "bg-primary/15 text-primary border border-primary/30"
-                  : "bg-white/10 text-white border border-white/20"
+                  : "bg-white/10 text-white border border-white/20",
               )}
             >
-              🚪 {pass.gate_label}
+              Enter: {pass.gate_label}
             </span>
           )}
         </div>
@@ -89,7 +88,7 @@ function TicketCard({
             "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider",
             isCheckedIn
               ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-              : "bg-primary/20 text-primary border border-primary/30"
+              : "bg-primary/20 text-primary border border-primary/30",
           )}
         >
           {isCheckedIn && <CheckCircle2 className="w-3 h-3" />}
@@ -97,10 +96,9 @@ function TicketCard({
         </div>
       </div>
 
-      {/* Ticket Body */}
-      <div className="p-4 space-y-4">
-        {/* QR Code Preview (Thumbnail) */}
+      <div className="p-4 space-y-3">
         <button
+          type="button"
           onClick={pass.code ? onViewQR : undefined}
           disabled={!pass.code}
           className="group w-full flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-border/30 hover:border-primary/40 transition-all cursor-pointer"
@@ -124,7 +122,7 @@ function TicketCard({
             <p
               className={cn(
                 "font-mono text-sm font-semibold",
-                variant === "dashboard" ? "text-foreground" : "text-white"
+                variant === "dashboard" ? "text-foreground" : "text-white",
               )}
             >
               {pass.code || "Payment required"}
@@ -134,30 +132,36 @@ function TicketCard({
                 "text-xs mt-1",
                 variant === "dashboard"
                   ? "text-muted-foreground"
-                  : "text-white/50"
+                  : "text-white/50",
               )}
             >
-              {pass.code ? "Tap to view full QR code" : "Complete payment to view ticket code"}
+              {pass.code
+                ? pass.gate_label
+                  ? `Enter at ${pass.gate_label} · Tap to view ticket`
+                  : "Tap to view full ticket & download PDF"
+                : "Complete payment to view ticket code"}
             </p>
-          </div>
-          <div className="text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
           </div>
         </button>
 
-        {/* Ticket Info */}
+        {pass.code && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onDownloadPdf}
+            className={cn(
+              "w-full gap-2",
+              variant === "dashboard"
+                ? "border-primary/30 text-primary hover:bg-primary/5"
+                : "border-white/20 text-white hover:bg-white/10",
+            )}
+          >
+            <Download className="w-3.5 h-3.5" />
+            Download PDF ticket
+          </Button>
+        )}
+
         {variant === "dashboard" && pass.issued_at && (
           <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-2 border-t border-border/30">
             <span>Issued {new Date(pass.issued_at).toLocaleDateString()}</span>
@@ -168,7 +172,6 @@ function TicketCard({
         )}
       </div>
 
-      {/* Decorative perforation line */}
       <div className="absolute left-0 right-0 top-14 flex items-center pointer-events-none">
         <div className="w-2 h-4 bg-background rounded-r-full -ml-1" />
         <div className="flex-1 border-t-2 border-dashed border-border/30" />
@@ -177,8 +180,6 @@ function TicketCard({
     </motion.li>
   );
 }
-
-
 
 export function BookingPassList({
   passes,
@@ -190,8 +191,9 @@ export function BookingPassList({
   ticketType,
 }: Props) {
   const [selectedPass, setSelectedPass] = React.useState<PublicPass | null>(
-    null
+    null,
   );
+  const [autoDownloadPdf, setAutoDownloadPdf] = React.useState(false);
 
   if (!passes.length) return null;
 
@@ -216,14 +218,19 @@ export function BookingPassList({
               pass={p}
               index={index}
               variant={variant}
-              eventName={eventName}
-              onViewQR={() => setSelectedPass(p)}
+              onViewQR={() => {
+                setAutoDownloadPdf(false);
+                setSelectedPass(p);
+              }}
+              onDownloadPdf={() => {
+                setAutoDownloadPdf(true);
+                setSelectedPass(p);
+              }}
             />
           ))}
         </ul>
       </div>
 
-      {/* Printable Ticket Modal (Direct View) */}
       {selectedPass && (
         <PrintableTicket
           pass={selectedPass}
@@ -232,7 +239,11 @@ export function BookingPassList({
           eventTime={eventTime}
           venueName={venueName}
           ticketType={ticketType}
-          onClose={() => setSelectedPass(null)}
+          autoDownloadPdf={autoDownloadPdf}
+          onClose={() => {
+            setSelectedPass(null);
+            setAutoDownloadPdf(false);
+          }}
         />
       )}
     </>
