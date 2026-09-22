@@ -62,4 +62,5 @@ export const SYNC_CONFIG = {
   autoPublish: false, // Require manual review
   preserveManualEdits: true,
   createChangeRequests: true, // Create change requests for conflicts
+  syncMode: "deals_only" as const,
 };

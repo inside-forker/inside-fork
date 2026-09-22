@@ -4,6 +4,8 @@ Listing scraper HTTP service (Peekaboo sync). Runs separately from the Next.js a
 
 Uses shared code under repo root (`lib/`, `scrapers/`, …) via the `@/*` alias. Dependencies are installed from the **monorepo root** (`package-lock.json` at repo root).
 
+**Default sync mode is `deals_only`**: refreshes Peekaboo deals/discounts without overwriting listing categories, status, address, or other admin-curated fields. Use `full` only when you intentionally want metadata upserts.
+
 ---
 
 ## Local run
@@ -16,6 +18,35 @@ npm run scraper:worker
 ```
 
 Optional: copy env into `.env.local` at the **repo root** (the worker loads that path).
+
+---
+
+## Hostinger VPS (production)
+
+The live worker runs on Hostinger under PM2 (hostname historically `srv1915006`). Confirm the current IP in Hostinger hPanel → VPS → SSH Access.
+
+```bash
+ssh root@<VPS_IP>
+cd /opt/scraper-worker
+pm2 status
+curl -s http://localhost:8787/live
+```
+
+### Deploy code updates (required before running sync after scraper changes)
+
+```bash
+cd /opt/scraper-worker
+git pull
+npm ci
+# only if Playwright deps changed:
+# npx playwright install chromium
+pm2 restart scraper-worker
+pm2 logs scraper-worker --lines 50
+```
+
+Env lives at `/opt/scraper-worker/.env.local`. Vercel should set `SCRAPER_WORKER_URL=http://<VPS_IP>:8787` and the same `SCRAPER_WORKER_SECRET` as on the VPS.
+
+**Do not start an admin sync until this box has pulled the latest code** — the Vercel UI alone cannot protect you if the worker is still on old sync logic.
 
 ---
 

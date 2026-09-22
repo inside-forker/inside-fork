@@ -11,7 +11,11 @@
  */
 
 import { EntityScraper } from "../scrapers/entity-scraper";
-import { DatabaseSync, createDatabaseSync } from "../core/database-sync";
+import {
+  DatabaseSync,
+  createDatabaseSync,
+  type SyncMode,
+} from "../core/database-sync";
 import { syncStateManager } from "@/lib/scraper/redis-state-manager";
 import type { SyncResult, SyncReport } from "@/types/peekaboo-scraper.types";
 
@@ -35,6 +39,11 @@ export interface BatchProcessorOptions {
    * Preserve manual edits
    */
   preserveManualEdits?: boolean;
+
+  /**
+   * deals_only (default) or full listing upsert
+   */
+  syncMode?: SyncMode;
 
   /**
    * Callback for progress updates
@@ -77,6 +86,7 @@ export class BatchProcessor {
       maxConcurrent: options.maxConcurrent ?? 5,
       autoPublish: options.autoPublish ?? false,
       preserveManualEdits: options.preserveManualEdits ?? true,
+      syncMode: options.syncMode ?? "deals_only",
     };
     this.onProgress = options.onProgress;
     this.onError = options.onError;
@@ -98,6 +108,7 @@ export class BatchProcessor {
     this.dbSync = await createDatabaseSync({
       autoPublish: this.options.autoPublish,
       preserveManualEdits: this.options.preserveManualEdits,
+      syncMode: this.options.syncMode,
     });
   }
 
@@ -120,6 +131,9 @@ export class BatchProcessor {
       `\n[BATCH] Starting batch processing of ${entities.length} entities...`,
     );
     console.log(`[BATCH] Concurrency: ${this.options.maxConcurrent}`);
+    console.log(
+      `[BATCH] Sync mode: ${this.options.syncMode}`,
+    );
     console.log(
       `[BATCH] Auto-publish: ${this.options.autoPublish ? "Yes" : "No"}`,
     );

@@ -13,6 +13,7 @@ const WorkerAutomationSchema = z.object({
     maxConcurrent: z.number().min(1).max(10).default(5),
     autoPublish: z.boolean().default(false),
     preserveManualEdits: z.boolean().default(true),
+    syncMode: z.enum(["deals_only", "full"]).default("deals_only"),
   }),
   canary: z.object({
     enabled: z.boolean().default(false),
@@ -31,6 +32,7 @@ const DEFAULT_CONFIG: WorkerAutomationConfig = {
     maxConcurrent: 5,
     autoPublish: false,
     preserveManualEdits: true,
+    syncMode: "deals_only",
   },
   canary: {
     enabled: false,
