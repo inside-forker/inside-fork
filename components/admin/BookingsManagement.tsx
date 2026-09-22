@@ -21,6 +21,7 @@ import {
   Users,
   Hash,
   QrCode,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { PrintableTicket } from "@/components/events/PrintableTicket";
+import type { PublicPass } from "@/types/ticketing.types";
 
 interface BookingItem {
   quantity: number;
@@ -58,12 +61,18 @@ interface BookingItem {
 }
 
 interface BookingGuest {
+  id?: number;
   name: string | null;
   cnic: string | null;
   ticket_type: string | null;
   code: string;
   status: string;
   checked_in_at: string | null;
+  issued_at?: string | null;
+  quantity_index?: number;
+  ticket_type_id?: number | null;
+  assigned_gate_index?: number | null;
+  gate_label?: string | null;
 }
 
 interface Booking {
@@ -81,6 +90,8 @@ interface Booking {
     id: number;
     name: string;
     slug: string;
+    start_time?: string | null;
+    location_name?: string | null;
   } | null;
   user: {
     id: string;
@@ -130,6 +141,8 @@ export function AdminBookingsManagement() {
   const [selectedBooking, setSelectedBooking] = React.useState<Booking | null>(
     null,
   );
+  const [pdfPass, setPdfPass] = React.useState<PublicPass | null>(null);
+  const [autoDownloadPdf, setAutoDownloadPdf] = React.useState(false);
   const [isMarkingPaid, setIsMarkingPaid] = React.useState(false);
   const [userRole, setUserRole] = React.useState<string | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -815,15 +828,15 @@ export function AdminBookingsManagement() {
                     <Users className="w-4 h-4" />
                     Guest Details ({selectedBooking.guests.length})
                   </h4>
-                  <ScrollArea className="max-h-[200px]">
+                  <ScrollArea className="max-h-[280px]">
                     <div className="space-y-2">
                       {selectedBooking.guests.map((guest, idx) => (
                         <div
-                          key={idx}
-                          className="flex items-center justify-between p-3 rounded-lg bg-muted/30"
+                          key={guest.id ?? idx}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-muted/30"
                         >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <div className="font-medium">
                                 {guest.name || "Guest " + (idx + 1)}
                               </div>
@@ -832,33 +845,74 @@ export function AdminBookingsManagement() {
                                   CNIC: ****{guest.cnic}
                                 </span>
                               )}
+                              {guest.gate_label && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] border-primary/30 text-primary"
+                                >
+                                  Enter: {guest.gate_label}
+                                </Badge>
+                              )}
                             </div>
-                            <div className="text-sm text-muted-foreground flex items-center gap-2">
+                            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
                               <span>{guest.ticket_type}</span>
                               <span className="font-mono text-xs">
                                 {guest.code}
                               </span>
                             </div>
                           </div>
-                          <Badge
-                            className={
-                              guest.status === "checked_in"
-                                ? "bg-emerald-500/20 text-emerald-600"
-                                : "bg-amber-500/20 text-amber-600"
-                            }
-                          >
-                            {guest.status === "checked_in" ? (
-                              <>
-                                <CheckCircle className="w-3 h-3 mr-1" />
-                                Checked In
-                              </>
-                            ) : (
-                              <>
-                                <QrCode className="w-3 h-3 mr-1" />
-                                Issued
-                              </>
-                            )}
-                          </Badge>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {guest.code &&
+                              selectedBooking.payment_status === "paid" && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
+                                  onClick={() => {
+                                    setPdfPass({
+                                      id: guest.id ?? idx + 1,
+                                      booking_id: selectedBooking.id,
+                                      code: guest.code,
+                                      status: guest.status as PublicPass["status"],
+                                      quantity_index: guest.quantity_index ?? idx,
+                                      issued_at:
+                                        guest.issued_at ||
+                                        selectedBooking.created_at,
+                                      ticket_type_id: guest.ticket_type_id ?? 0,
+                                      guest_name: guest.name,
+                                      cnic_last4: guest.cnic,
+                                      assigned_gate_index:
+                                        guest.assigned_gate_index ?? null,
+                                      gate_label: guest.gate_label ?? null,
+                                    });
+                                    setAutoDownloadPdf(true);
+                                  }}
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  PDF
+                                </Button>
+                              )}
+                            <Badge
+                              className={
+                                guest.status === "checked_in"
+                                  ? "bg-emerald-500/20 text-emerald-600"
+                                  : "bg-amber-500/20 text-amber-600"
+                              }
+                            >
+                              {guest.status === "checked_in" ? (
+                                <>
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Checked In
+                                </>
+                              ) : (
+                                <>
+                                  <QrCode className="w-3 h-3 mr-1" />
+                                  Issued
+                                </>
+                              )}
+                            </Badge>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -914,6 +968,26 @@ export function AdminBookingsManagement() {
           )}
         </DialogContent>
       </Dialog>
+
+      {pdfPass && selectedBooking && (
+        <PrintableTicket
+          pass={pdfPass}
+          eventName={selectedBooking.event?.name || "Event"}
+          eventDate={
+            selectedBooking.event?.start_time || selectedBooking.created_at
+          }
+          venueName={selectedBooking.event?.location_name || undefined}
+          ticketType={
+            selectedBooking.guests.find((g) => g.code === pdfPass.code)
+              ?.ticket_type || undefined
+          }
+          autoDownloadPdf={autoDownloadPdf}
+          onClose={() => {
+            setPdfPass(null);
+            setAutoDownloadPdf(false);
+          }}
+        />
+      )}
     </motion.div>
   );
 }
