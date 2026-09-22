@@ -50,6 +50,15 @@ interface SyncRecord {
   staleMessage?: string | null;
   discoverySummary?: string | null;
   warningMessage?: string | null;
+  syncMode?: string | null;
+  reportSummary?: {
+    missingInInside: number | null;
+    existingWouldUpdate: number | null;
+    existingUnchanged: number | null;
+    dealsWouldCreate: number | null;
+    dealsWouldUpdate: number | null;
+    skippedConflicts: number | null;
+  } | null;
 }
 
 interface SyncError {
@@ -244,11 +253,47 @@ export function SyncHistory() {
                       <TableCell className="text-center">
                         <div className="space-y-1">
                           <div>{record.entitiesProcessed}</div>
+                          {record.syncMode && (
+                            <div className="text-[10px] text-muted-foreground">
+                              mode: {record.syncMode}
+                            </div>
+                          )}
                           {record.discoverySummary && (
                             <div className="text-[10px] text-muted-foreground">
                               {record.discoverySummary}
                             </div>
                           )}
+                          {record.reportSummary &&
+                            (record.reportSummary.missingInInside != null ||
+                              record.reportSummary.existingWouldUpdate !=
+                                null) && (
+                              <div className="text-[10px] text-muted-foreground space-y-0.5">
+                                {record.reportSummary.missingInInside !=
+                                  null && (
+                                  <div>
+                                    missing:{" "}
+                                    {record.reportSummary.missingInInside}
+                                  </div>
+                                )}
+                                {record.reportSummary.existingWouldUpdate !=
+                                  null && (
+                                  <div>
+                                    would update:{" "}
+                                    {
+                                      record.reportSummary
+                                        .existingWouldUpdate
+                                    }
+                                  </div>
+                                )}
+                                {record.reportSummary.existingUnchanged !=
+                                  null && (
+                                  <div>
+                                    unchanged:{" "}
+                                    {record.reportSummary.existingUnchanged}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                         </div>
                       </TableCell>
                       <TableCell className="text-center">

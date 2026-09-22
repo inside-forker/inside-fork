@@ -230,6 +230,20 @@ export interface ScraperStats {
   errors: number;
   startTime: Date;
   endTime?: Date;
+  /** Report-mode: entities considered in this run */
+  entitiesSeen?: number;
+  /** Report-mode: Peekaboo entities with no Inside listing */
+  missingInInside?: number;
+  /** Report-mode: existing listings with no tracked field/deal diffs */
+  existingUnchanged?: number;
+  /** Report-mode: existing listings that would change under full sync */
+  existingWouldUpdate?: number;
+  /** Report-mode: deal rows that would be inserted */
+  dealsWouldCreate?: number;
+  /** Report-mode: deal rows that would be updated */
+  dealsWouldUpdate?: number;
+  /** Report-mode: skipped due to manual-edit conflict */
+  skippedConflicts?: number;
 }
 
 // ============================================================================
@@ -383,7 +397,14 @@ export interface PendingImage {
 // SYNC ENGINE TYPES
 // ============================================================================
 
-export type SyncAction = "create" | "update" | "skip" | "conflict";
+export type SyncAction =
+  | "create"
+  | "update"
+  | "skip"
+  | "conflict"
+  | "would_create"
+  | "would_update"
+  | "unchanged";
 
 export interface SyncDecision {
   action: SyncAction;
@@ -403,6 +424,10 @@ export interface SyncResult {
     branchesProcessed?: number;
     dealsProcessed?: number; // Add deals count
     categoryMapped?: boolean;
+    /** Field-level diffs for report mode (and conflict tracking) */
+    changes?: Record<string, { old: unknown; new: unknown }>;
+    dealsWouldCreate?: number;
+    dealsWouldUpdate?: number;
   };
 }
 

@@ -17,7 +17,7 @@ const SyncRequestSchema = z.object({
   entityLimit: z.number().min(1).max(1000).optional(),
   specificEntityId: z.string().optional(),
   fullResync: z.boolean().default(false),
-  syncMode: z.enum(["deals_only", "full"]).default("deals_only"),
+  syncMode: z.enum(["report", "create_missing", "full", "deals_only"]).default("report"),
 });
 
 /**
