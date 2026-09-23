@@ -14,8 +14,18 @@ export const dynamic = "force-dynamic";
 // requireMobileOrganizer's built-in admin bypass (admin/super_admin only), so
 // ownership is checked manually here instead of via the `eventId` option.
 const IMAGE_ADMIN_ROLES = ["admin", "super_admin", "lister"];
-const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-const MAX_SIZE = 5 * 1024 * 1024;
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
+];
+const ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp", "heic", "heif"];
+const MAX_SIZE = 10 * 1024 * 1024;
 
 const EVENT_IMAGE_COLUMNS =
   "id, event_id, url, alt_text, is_primary, display_order, " +
@@ -77,16 +87,21 @@ export const POST = mobileRoute(async (request: NextRequest, context) => {
   const file = formData.get("file") as File | null;
   if (!file) throw MobileErrors.badRequest("No file provided.", "file");
 
-  if (!ALLOWED_TYPES.includes(file.type)) {
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  const isAllowed =
+    ALLOWED_TYPES.includes((file.type || "").toLowerCase()) ||
+    ALLOWED_EXTS.includes(ext);
+
+  if (!isAllowed) {
     throw new MobileApiError(
       "invalid_file_type",
-      "Only JPEG, PNG, and WebP images are allowed.",
+      "Only JPEG, PNG, WebP, and HEIC images are allowed.",
       400,
       "file",
     );
   }
   if (file.size > MAX_SIZE) {
-    throw new MobileApiError("file_too_large", "Maximum file size is 5MB.", 400, "file");
+    throw new MobileApiError("file_too_large", "Maximum file size is 10MB.", 400, "file");
   }
 
   const { rows: countRows } = await query(
