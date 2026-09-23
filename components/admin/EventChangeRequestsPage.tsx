@@ -56,6 +56,7 @@ import type {
   EventChangeDiff,
   EventProposedData,
 } from "@/types/event-change-request.types";
+import { eventFieldValuesEqual } from "@/lib/events/mergeEventUpdateProposed";
 import { format } from "date-fns";
 import { OptimizedImage } from "@/components/ui/optimized-image";
 
@@ -271,13 +272,21 @@ function CompactDiffViewer({
   const diffs: EventChangeDiff[] = fieldsToShow.map((field) => {
     const oldValue = original ? original[field.key] : null;
     const newValue = proposed ? proposed[field.key] : null;
+    const changed =
+      actionType === "update"
+        ? !eventFieldValuesEqual(field.key, oldValue, newValue)
+        : !original || !eventFieldValuesEqual(field.key, oldValue, newValue);
 
     return {
       field: field.key,
       label: field.label,
       old_value: oldValue as string | number | boolean | null,
-      new_value: newValue as string | number | boolean | null,
-      changed: !original || oldValue !== newValue,
+      new_value: (newValue === undefined ? oldValue : newValue) as
+        | string
+        | number
+        | boolean
+        | null,
+      changed,
     };
   });
 
@@ -844,13 +853,19 @@ function EventDetailsDialog({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {allFields.map((field) => {
                 const oldVal = originalData ? originalData[field.key] : null;
-                const newVal = proposedData
+                const rawNewVal = proposedData
                   ? (proposedData as unknown as Record<string, unknown>)[
                       field.key
                     ]
                   : null;
                 const hasChanged =
-                  request.action_type === "update" && oldVal !== newVal;
+                  request.action_type === "update" &&
+                  !eventFieldValuesEqual(field.key, oldVal, rawNewVal);
+                // Missing keys on update mean "unchanged" — show the current value.
+                const newVal =
+                  request.action_type === "update" && rawNewVal === undefined
+                    ? oldVal
+                    : rawNewVal;
 
                 if (
                   request.action_type === "create" &&
@@ -881,7 +896,7 @@ function EventDetailsDialog({
                       )}
                     </div>
                     <div className="text-sm">
-                      {hasChanged && oldVal !== null && (
+                      {hasChanged && oldVal !== null && oldVal !== undefined && (
                         <div className="text-rose-600 dark:text-rose-400 line-through text-xs mb-0.5">
                           {formatValue(oldVal)}
                         </div>
