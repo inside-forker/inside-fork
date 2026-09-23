@@ -6,7 +6,13 @@ import { query } from "@/lib/db";
  * Roles allowed to use the mobile organizer surface.
  */
 export const ORGANIZER_ROLES = ["organizer", "lister", "admin", "super_admin"];
-export const SCANNER_ROLES = ["organizer", "eo_gate_pass", "lister", "admin", "super_admin"];
+export const SCANNER_ROLES = [
+  "organizer",
+  "eo_gate_pass",
+  "lister",
+  "admin",
+  "super_admin",
+];
 const ADMIN_ROLES = ["admin", "super_admin"];
 
 export type MobileOrganizerContext = {
@@ -19,9 +25,9 @@ export type MobileOrganizerContext = {
 /**
  * Requires a Bearer-authenticated user whose current `profiles.role` (read
  * fresh from the DB, not the JWT claim, since a role change must take effect
- * immediately) has organizer or gate pass permissions. When `eventId` is passed, additionally
- * requires the user to own that event (or be a linked gate pass operator for the event's organizer)
- * unless they're an admin.
+ * immediately) has organizer or gate pass permissions. When `eventId` is passed,
+ * additionally requires the user to own that event, be a linked gate-pass
+ * operator for its organizer, or be assigned a lane in event_device_operators.
  */
 export async function requireMobileOrganizer(
   request: Request,
@@ -29,10 +35,11 @@ export async function requireMobileOrganizer(
 ): Promise<MobileOrganizerContext> {
   const { user } = await requireMobileUser(request);
   const allowGatePass = opts?.allowGatePass ?? true;
+  const userId = String(user.id);
 
   const { rows } = await query(
     `SELECT role, linked_organizer_id FROM profiles WHERE id = $1`,
-    [user.id],
+    [userId],
   );
   const role: string | undefined = rows[0]?.role;
   const linkedOrganizerId: string | null = rows[0]?.linked_organizer_id
@@ -52,36 +59,40 @@ export async function requireMobileOrganizer(
   const isAdmin = ADMIN_ROLES.includes(role);
   const isGatePass = role === "eo_gate_pass";
 
-  if (opts?.eventId !== undefined) {
-    const { rows: eventRows } = await query(
-      `SELECT organizer_id FROM events WHERE id = $1`,
-      [opts.eventId],
+  if (opts?.eventId !== undefined && !isAdmin) {
+    // Single access check aligned with GET /organizer/events visibility:
+    // owner, lane-assigned operator, or linked EO gate-pass for this event's organizer.
+    const { rows: accessRows } = await query(
+      `SELECT 1
+       FROM public.events e
+       WHERE e.id = $1
+         AND (
+           e.organizer_id::text = $2
+           OR EXISTS (
+             SELECT 1 FROM public.event_device_operators edo
+             WHERE edo.event_id = e.id AND edo.operator_id::text = $2
+           )
+           OR (
+             $3::text IS NOT NULL
+             AND e.organizer_id::text = $3
+           )
+         )
+       LIMIT 1`,
+      [opts.eventId, userId, isGatePass ? linkedOrganizerId : null],
     );
-    const event = eventRows[0];
-    if (!event) {
-      throw new MobileApiError("not_found", "Event not found.", 404);
-    }
 
-    const organizerId = String(event.organizer_id);
-    const userId = String(user.id);
-    const isOwner = organizerId === userId;
-    const isLinkedGatePass =
-      isGatePass && !!linkedOrganizerId && organizerId === linkedOrganizerId;
-
-    // Always check lane assignment for gate-pass users — linked_organizer_id can
-    // be stale/null, and assignment is the source of truth for scanner access.
-    let isAssignedDeviceOperator = false;
-    if (isGatePass && !isOwner && !isAdmin) {
-      const { rows: assignmentRows } = await query(
-        `SELECT 1 FROM event_device_operators
-         WHERE event_id = $1 AND operator_id = $2::uuid
-         LIMIT 1`,
-        [opts.eventId, userId],
+    if (accessRows.length === 0) {
+      // Distinguish missing event vs forbidden for clearer client handling
+      const { rows: existsRows } = await query(
+        `SELECT 1 FROM public.events WHERE id = $1 LIMIT 1`,
+        [opts.eventId],
       );
-      isAssignedDeviceOperator = assignmentRows.length > 0;
-    }
-
-    if (!isAdmin && !isOwner && !isLinkedGatePass && !isAssignedDeviceOperator) {
+      if (existsRows.length === 0) {
+        throw new MobileApiError("not_found", "Event not found.", 404);
+      }
+      console.warn(
+        `[mobile-api] organizer access denied user=${userId} event=${opts.eventId} role=${role} linked=${linkedOrganizerId}`,
+      );
       throw new MobileApiError(
         "forbidden",
         "You do not have access to this event.",
@@ -91,7 +102,7 @@ export async function requireMobileOrganizer(
   }
 
   return {
-    user: { ...user, role },
+    user: { ...user, id: userId, role },
     isAdmin,
     isGatePass,
     linkedOrganizerId,
