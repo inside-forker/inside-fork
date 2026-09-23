@@ -44,28 +44,39 @@ export const GET = mobileRoute(async (request: NextRequest, context) => {
     throw MobileErrors.notFound("Event not found.");
   }
 
-  const defaultTotalGates =
-    event.scanning_mode === "multi_gate" && event.total_gates && event.total_gates > 1
-      ? Number(event.total_gates)
-      : 1;
+  // Check event_device_operators to find device count and operator assignment
+  const { rows: devOpRows } = await query(
+    `SELECT device_index, device_label, operator_id
+     FROM public.event_device_operators
+     WHERE event_id = $1
+     ORDER BY device_index ASC`,
+    [eventIdNum],
+  );
 
-  // Gate-pass operators: lock to their assigned device/lane (ignore client override)
+  const maxDevIndexInTable = devOpRows.reduce(
+    (max, r) => Math.max(max, Number(r.device_index ?? 0)),
+    0,
+  );
+  const totalDevsInTable = devOpRows.length > 0 ? maxDevIndexInTable + 1 : 1;
+
+  const defaultTotalGates = Math.max(
+    event.scanning_mode === "multi_gate" && event.total_gates
+      ? Number(event.total_gates)
+      : 1,
+    totalDevsInTable,
+    1,
+  );
+
+  // Check if current user is directly assigned to a lane in event_device_operators
   let forcedGateIndex: number | null = null;
   let deviceLabel: string | null = null;
-  if (isGatePass) {
-    const { rows: assignmentRows } = await query(
-      `SELECT device_index, device_label
-       FROM public.event_device_operators
-       WHERE event_id = $1 AND operator_id = $2
-       LIMIT 1`,
-      [eventIdNum, user.id],
-    );
-    if (assignmentRows.length > 0) {
-      forcedGateIndex = Number(assignmentRows[0].device_index);
-      deviceLabel =
-        assignmentRows[0].device_label ||
-        `Gate ${forcedGateIndex + 1}`;
-    }
+
+  const userDevOp = devOpRows.find(
+    (r) => String(r.operator_id) === String(user.id),
+  );
+  if (userDevOp) {
+    forcedGateIndex = Number(userDevOp.device_index);
+    deviceLabel = userDevOp.device_label || `Gate ${forcedGateIndex + 1}`;
   }
 
   const url = new URL(request.url);
@@ -76,35 +87,26 @@ export const GET = mobileRoute(async (request: NextRequest, context) => {
     ? parseInt(url.searchParams.get("gateIndex") || "0", 10)
     : 0;
 
+  // When the operator is lane-locked, never clamp their gate away — bump totalGates instead
   const totalGates =
     forcedGateIndex !== null
       ? Math.max(defaultTotalGates, forcedGateIndex + 1, 1)
       : Number.isFinite(rawTotalGates) && rawTotalGates >= 1
-        ? Math.min(rawTotalGates, 50)
-        : 1;
+        ? Math.min(Math.max(rawTotalGates, Number.isFinite(rawGateIndex) ? rawGateIndex + 1 : 1), 50)
+        : defaultTotalGates;
 
   const gateIndex =
     forcedGateIndex !== null
-      ? Math.min(forcedGateIndex, totalGates - 1)
+      ? forcedGateIndex
       : Number.isFinite(rawGateIndex) && rawGateIndex >= 0 && rawGateIndex < totalGates
         ? rawGateIndex
         : 0;
 
   if (!deviceLabel) {
+    const matchedLabel = devOpRows.find((r) => Number(r.device_index) === gateIndex);
     deviceLabel =
-      totalGates > 1 ? `Gate ${gateIndex + 1}` : `Gate ${gateIndex + 1}`;
-  }
-
-  // Prefer custom device labels from event_device_operators when available
-  if (!isGatePass || forcedGateIndex === null) {
-    const { rows: labelRows } = await query(
-      `SELECT device_label FROM public.event_device_operators
-       WHERE event_id = $1 AND device_index = $2 LIMIT 1`,
-      [eventIdNum, gateIndex],
-    );
-    if (labelRows[0]?.device_label) {
-      deviceLabel = labelRows[0].device_label;
-    }
+      matchedLabel?.device_label ||
+      (totalGates > 1 ? `Gate ${gateIndex + 1}` : "Gate 1");
   }
 
   const { rows: tickets } = await query(

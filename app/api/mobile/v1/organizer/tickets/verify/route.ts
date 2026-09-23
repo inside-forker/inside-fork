@@ -97,12 +97,25 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     ? { name: ticketPass.ticket_type_name as string }
     : null;
 
-  // Authorization check: Owner OR Linked Gate Pass OR Admin
-  const isOwner = event.organizer_id === user.id;
+  // Authorization: owner, linked gate pass, lane-assigned operator, or admin
+  const organizerId = String(event.organizer_id);
+  const userId = String(user.id);
+  const isOwner = organizerId === userId;
   const isLinkedGatePass =
-    isGatePass && linkedOrganizerId && event.organizer_id === linkedOrganizerId;
+    isGatePass && !!linkedOrganizerId && organizerId === String(linkedOrganizerId);
 
-  if (!isOwner && !isLinkedGatePass && !isAdmin) {
+  let isAssignedDeviceOperator = false;
+  if (isGatePass && !isOwner && !isAdmin) {
+    const { rows: assignmentRows } = await query(
+      `SELECT 1 FROM event_device_operators
+       WHERE event_id = $1 AND operator_id = $2::uuid
+       LIMIT 1`,
+      [event.id, userId],
+    );
+    isAssignedDeviceOperator = assignmentRows.length > 0;
+  }
+
+  if (!isOwner && !isLinkedGatePass && !isAssignedDeviceOperator && !isAdmin) {
     throw new MobileApiError(
       "forbidden",
       "You are not authorized to verify tickets for this event.",

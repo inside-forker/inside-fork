@@ -35,7 +35,9 @@ export async function requireMobileOrganizer(
     [user.id],
   );
   const role: string | undefined = rows[0]?.role;
-  const linkedOrganizerId: string | null = rows[0]?.linked_organizer_id || null;
+  const linkedOrganizerId: string | null = rows[0]?.linked_organizer_id
+    ? String(rows[0].linked_organizer_id)
+    : null;
 
   const allowedRoles = allowGatePass ? SCANNER_ROLES : ORGANIZER_ROLES;
 
@@ -60,21 +62,21 @@ export async function requireMobileOrganizer(
       throw new MobileApiError("not_found", "Event not found.", 404);
     }
 
-    const isOwner = event.organizer_id === user.id;
+    const organizerId = String(event.organizer_id);
+    const userId = String(user.id);
+    const isOwner = organizerId === userId;
     const isLinkedGatePass =
-      isGatePass &&
-      linkedOrganizerId &&
-      event.organizer_id === linkedOrganizerId;
+      isGatePass && !!linkedOrganizerId && organizerId === linkedOrganizerId;
 
-    // Also allow operators assigned to a specific device/lane on this event
-    // (linked_organizer_id can be stale or point at a different EO)
+    // Always check lane assignment for gate-pass users — linked_organizer_id can
+    // be stale/null, and assignment is the source of truth for scanner access.
     let isAssignedDeviceOperator = false;
-    if (isGatePass && !isLinkedGatePass && !isOwner && !isAdmin) {
+    if (isGatePass && !isOwner && !isAdmin) {
       const { rows: assignmentRows } = await query(
         `SELECT 1 FROM event_device_operators
-         WHERE event_id = $1 AND operator_id = $2
+         WHERE event_id = $1 AND operator_id = $2::uuid
          LIMIT 1`,
-        [opts.eventId, user.id],
+        [opts.eventId, userId],
       );
       isAssignedDeviceOperator = assignmentRows.length > 0;
     }
