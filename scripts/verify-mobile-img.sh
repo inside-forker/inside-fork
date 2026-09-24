@@ -28,21 +28,34 @@ echo "== 3) Second fetch should be a CDN HIT (or at least 200 + small) =="
 HDR2=$(mktemp)
 CODE2=$(curl -sS -D "$HDR2" -o /dev/null -w '%{http_code}' "$PROXY")
 test "$CODE2" = "200"
-# Vercel may expose x-vercel-cache: HIT
 if grep -qiE '^x-vercel-cache:[[:space:]]*HIT' "$HDR2"; then
   echo "x-vercel-cache: HIT"
 else
   echo "(no x-vercel-cache HIT yet — cold or non-Vercel edge; body still OK)"
-  cat "$HDR2" | tr -d '\r' | grep -iE 'cache|age|x-vercel' || true
+  tr -d '\r' < "$HDR2" | grep -iE 'cache|age|x-vercel' || true
 fi
 
-echo "== 4) Proxyman / TestFlight checklist =="
+echo "== 4) Device / Proxyman measure checklist =="
 cat <<'EOF'
-On a Release/TestFlight build after /img is live:
-  - Scroll Home ~15 minutes
-  - Proxyman: feed photos should be GET .../api/mobile/v1/img?w=...
-  - Bodies small (~tens of KB); no multi-MB digitaloceanspaces.com GETs for rails
-  - Failures show blank/initials — never a second request to the Spaces original
+Release / TestFlight after /img is live — per surface:
+
+  Home 15m scroll
+    - Proxyman: feed photos = GET .../api/mobile/v1/img?w=
+    - Small bodies; no multi-MB digitaloceanspaces.com for rails
+    - Failures = blank/initials, never a second Spaces original
+
+  Events / Deals / listing detail + lightbox
+    - Same /img pattern; ads also /img or expo-image sized
+
+  Organizer-scan 30m gate
+    - Background app: camera inactive; no 15s/60s network while inactive
+    - Sync only when pending queue > 0
+
+  Checkout payment
+    - Leave screen / background: WebView unloaded (no continuous gateway traffic)
+
+  Redeem / payment status
+    - Background: polling paused; foreground resumes with backoff
 EOF
 
 rm -f "$HDR" "$BODY" "$HDR2"
