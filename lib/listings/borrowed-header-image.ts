@@ -31,6 +31,7 @@ export async function getBorrowedHeaderImageUrl(
        FROM listings l
        INNER JOIN listing_images li ON li.listing_id = l.id
          AND li.url NOT LIKE '%/menu/%'
+         AND (li.availability IS NULL OR li.availability IS DISTINCT FROM 'dead')
        LEFT JOIN LATERAL (
          SELECT COUNT(*)::int AS branch_count
          FROM listing_branches lb
@@ -41,6 +42,7 @@ export async function getBorrowedHeaderImageUrl(
          FROM listing_images gi
          WHERE gi.listing_id = l.id
            AND gi.url NOT LIKE '%/menu/%'
+           AND (gi.availability IS NULL OR gi.availability IS DISTINCT FROM 'dead')
        ) g ON true
        WHERE l.status IN ('published', 'archived')
          AND l.id <> $1
@@ -93,6 +95,7 @@ export async function getBorrowedHeaderImageUrls(
            FROM listings l
            INNER JOIN listing_images li ON li.listing_id = l.id
              AND li.url NOT LIKE '%/menu/%'
+             AND (li.availability IS NULL OR li.availability IS DISTINCT FROM 'dead')
            LEFT JOIN LATERAL (
              SELECT COUNT(*)::int AS branch_count
              FROM listing_branches lb
@@ -103,6 +106,7 @@ export async function getBorrowedHeaderImageUrls(
              FROM listing_images gi
              WHERE gi.listing_id = l.id
                AND gi.url NOT LIKE '%/menu/%'
+               AND (gi.availability IS NULL OR gi.availability IS DISTINCT FROM 'dead')
            ) g ON true
            WHERE l.status IN ('published', 'archived')
              AND NOT (l.id = ANY($1::int[]))

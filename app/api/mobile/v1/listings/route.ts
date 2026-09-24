@@ -7,7 +7,6 @@ import { parsePagination, buildPaginationMeta } from "@/lib/mobile/pagination";
 import { MobileApiError } from "@/lib/mobile/errors";
 import {
   toListingCard,
-  toListingImage,
   type ListingImageDTO,
   type ListingRowLike,
 } from "@/lib/mobile/mappers";
@@ -18,6 +17,10 @@ import {
   resolveCategoryIdScope,
   listingCategoriesExistsClause,
 } from "@/lib/listings/category-scope";
+import {
+  LISTING_COVER_CANDIDATE_CAP,
+  resolveListingCovers,
+} from "@/lib/mobile/listing-covers";
 
 /** Explicit column list for `listings_with_details` - never use `*`. */
 const LISTING_CARD_SQL_COLUMNS =
@@ -234,20 +237,23 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   // alongside its images rather than left to a per-card follow-up request.
   let dealsByListing: Record<number, ListingDeals> = {};
   if (listingIds.length > 0) {
-    const [{ rows: images }, deals] = await Promise.all([
-      query(
-        `SELECT id, listing_id, url, alt_text, display_order, is_primary
-       FROM listing_images
-       WHERE listing_id = ANY($1::int[])
-       ORDER BY display_order ASC`,
-        [listingIds],
-      ),
+    const coverInputs = rows
+      .filter((r): r is ListingRowLike & { id: number } => typeof r.id === "number")
+      .map((r) => ({
+        id: r.id,
+        name: typeof r.name === "string" ? r.name : null,
+      }));
+
+    const [covers, deals] = await Promise.all([
+      resolveListingCovers(coverInputs, {
+        candidateCap: LISTING_COVER_CANDIDATE_CAP,
+      }),
       fetchBestDealsByListing(listingIds),
     ]);
     dealsByListing = deals;
 
-    for (const img of images) {
-      (imagesByListing[img.listing_id] ??= []).push(toListingImage(img));
+    for (const [id, cover] of covers) {
+      imagesByListing[id] = cover.images;
     }
   }
 

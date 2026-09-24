@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
+import { spacesUrlAlternates } from "@/lib/storage/spaces-url-alternates";
 
 export const runtime = "nodejs";
 // Cacheable by CDN via Cache-Control / Vercel-CDN-Cache-Control on the response.
@@ -87,6 +88,35 @@ async function readBodyCapped(
   return Buffer.concat(chunks.map((c) => Buffer.from(c)));
 }
 
+async function fetchUpstreamImage(
+  targetUrl: string,
+  signal: AbortSignal,
+): Promise<{ ok: true; buf: Buffer } | { ok: false; status: number }> {
+  const upstream = await fetch(targetUrl, {
+    signal,
+    headers: { Accept: "image/*,*/*" },
+    cache: "no-store",
+    redirect: "manual",
+  });
+
+  if (upstream.status >= 300 && upstream.status < 400) {
+    return { ok: false, status: 502 };
+  }
+  if (!upstream.ok) {
+    return { ok: false, status: upstream.status };
+  }
+
+  const contentType = upstream.headers.get("content-type") ?? "";
+  if (!isAcceptableUpstreamType(contentType)) {
+    return { ok: false, status: 415 };
+  }
+
+  const buf = await readBodyCapped(upstream, MAX_INPUT_BYTES);
+  if (!buf) return { ok: false, status: 413 };
+  if (buf.byteLength === 0) return { ok: false, status: 422 };
+  return { ok: true, buf };
+}
+
 /**
  * GET /api/mobile/v1/img?url=&w=
  *
@@ -131,48 +161,58 @@ export async function GET(request: NextRequest) {
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const upstream = await fetch(target.toString(), {
-      signal: controller.signal,
-      headers: { Accept: "image/*,*/*" },
-      cache: "no-store",
-      redirect: "manual",
+    const candidates = spacesUrlAlternates(target).filter((u) => {
+      try {
+        return isAllowedImageHost(new URL(u).hostname);
+      } catch {
+        return false;
+      }
     });
+    let buf: Buffer | null = null;
+    let lastFailStatus = 502;
 
-    // Do not follow redirects — a Spaces object that 302s off-allowlist
-    // would otherwise become an open proxy (SSRF).
-    if (upstream.status >= 300 && upstream.status < 400) {
-      return NextResponse.json(
-        { error: { code: "redirect_forbidden", message: "Redirects not allowed." } },
-        { status: 502 },
-      );
+    for (const candidate of candidates) {
+      try {
+        const result = await fetchUpstreamImage(candidate, controller.signal);
+        if (result.ok) {
+          buf = result.buf;
+          break;
+        }
+        lastFailStatus = result.status;
+        // Wrong MIME — no alternate will help.
+        if (result.status === 415) {
+          return NextResponse.json(
+            { error: { code: "invalid_type", message: "Not an image." } },
+            { status: 415 },
+          );
+        }
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          (err.name === "AbortError" || /aborted/i.test(err.message))
+        ) {
+          throw err;
+        }
+        // Try next alternate.
+      }
     }
 
-    if (!upstream.ok) {
+    if (!buf) {
+      if (lastFailStatus === 413) {
+        return NextResponse.json(
+          { error: { code: "invalid_image", message: "Image too large." } },
+          { status: 413 },
+        );
+      }
+      if (lastFailStatus === 422) {
+        return NextResponse.json(
+          { error: { code: "invalid_image", message: "Empty image." } },
+          { status: 422 },
+        );
+      }
       return NextResponse.json(
         { error: { code: "upstream_error", message: "Image fetch failed." } },
         { status: 502 },
-      );
-    }
-
-    const contentType = upstream.headers.get("content-type") ?? "";
-    if (!isAcceptableUpstreamType(contentType)) {
-      return NextResponse.json(
-        { error: { code: "invalid_type", message: "Not an image." } },
-        { status: 415 },
-      );
-    }
-
-    const buf = await readBodyCapped(upstream, MAX_INPUT_BYTES);
-    if (!buf) {
-      return NextResponse.json(
-        { error: { code: "invalid_image", message: "Image too large." } },
-        { status: 413 },
-      );
-    }
-    if (buf.byteLength === 0) {
-      return NextResponse.json(
-        { error: { code: "invalid_image", message: "Empty image." } },
-        { status: 422 },
       );
     }
 

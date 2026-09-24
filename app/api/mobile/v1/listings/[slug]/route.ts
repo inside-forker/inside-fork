@@ -15,7 +15,7 @@ import {
 } from "@/lib/mobile/mappers";
 import { isRestaurantCategory } from "@/lib/utils/category-helpers";
 import { getListingCategoryIds } from "@/lib/listings/sync-listing-categories";
-import { getBorrowedHeaderImageUrl } from "@/lib/listings/borrowed-header-image";
+import { resolveListingHeaderImage } from "@/lib/mobile/listing-covers";
 
 export const dynamic = "force-dynamic";
 
@@ -98,7 +98,7 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
     favRes,
   ] = await Promise.all([
     query(
-      `SELECT id, listing_id, url, alt_text, display_order, is_primary
+      `SELECT id, listing_id, url, alt_text, display_order, is_primary, availability
        FROM listing_images WHERE listing_id = $1
        ORDER BY display_order ASC LIMIT 50`,
       [listingId],
@@ -199,36 +199,30 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
     alt_text: string | null;
     display_order: number | null;
     is_primary: boolean | null;
+    availability?: string | null;
   }>;
 
   const gallery: ListingImageDTO[] = allImages
-    .filter((img) => !img.url.includes("/menu/"))
+    .filter(
+      (img) =>
+        !img.url.includes("/menu/") &&
+        img.availability !== "dead",
+    )
     .slice(0, MAX_GALLERY_IMAGES)
     .map(toListingImage);
 
-  // Own primary cover, else borrow one cover from a same-brand multi-branch
-  // sibling, else Peekaboo logo. Never push borrowed/logo into `gallery` so
-  // the photo carousel stays empty unless this listing owns real shots.
-  let headerImage: string | null = null;
-  if (gallery.length > 0) {
-    const primary =
-      [...gallery].sort(
-        (a, b) =>
-          Number(b.is_primary) - Number(a.is_primary) ||
-          (a.display_order ?? 0) - (b.display_order ?? 0),
-      )[0] ?? null;
-    headerImage = primary?.url ?? null;
-  } else {
-    headerImage = await getBorrowedHeaderImageUrl(listingId, row.name);
-    if (!headerImage) {
-      const attrs = row.custom_attributes as Record<string, unknown> | null;
-      const logoUrl =
-        typeof attrs?.peekaboo_logo_url === "string" && attrs.peekaboo_logo_url.trim()
-          ? attrs.peekaboo_logo_url.trim()
-          : null;
-      headerImage = logoUrl;
-    }
-  }
+  // Own healthy cover → borrow → Peekaboo logo (shared with browse).
+  // Never push borrowed/logo into `gallery`.
+  const attrs = row.custom_attributes as Record<string, unknown> | null;
+  const logoUrl =
+    typeof attrs?.peekaboo_logo_url === "string" && attrs.peekaboo_logo_url.trim()
+      ? attrs.peekaboo_logo_url.trim()
+      : null;
+  const headerImage = await resolveListingHeaderImage({
+    id: listingId,
+    name: row.name,
+    peekabooLogoUrl: logoUrl,
+  });
 
   const menuImages = allImages
     .filter((img) => img.url.includes("/menu/"))

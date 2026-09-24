@@ -181,8 +181,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         let imageRecord;
         try {
           const { rows } = await query(
-            `INSERT INTO listing_images (listing_id, url, is_primary, display_order)
-             VALUES ($1, $2, false, $3)
+            `INSERT INTO listing_images (listing_id, url, is_primary, display_order, availability, last_checked_at)
+             VALUES ($1, $2, false, $3, 'ok', NOW())
              RETURNING *`,
             [listingId, publicUrl, currentImageCount + uploadedImages.length],
           );
