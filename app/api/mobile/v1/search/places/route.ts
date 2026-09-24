@@ -11,6 +11,7 @@ import {
   TAG_ONLY_CAP,
   tokenizeQuery,
 } from "@/lib/utils/places-search";
+import { getBorrowedHeaderImageUrls } from "@/lib/listings/borrowed-header-image";
 
 export const dynamic = "force-dynamic";
 
@@ -351,20 +352,79 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     ? listingRows.slice(0, limit)
     : listingRows;
 
-  const listings = listingSlice.map((row) => ({
-    type: "listing" as const,
-    id: Number(row.id),
-    name: row.name as string | null,
-    slug: row.slug as string | null,
-    address: row.address as string | null,
-    category: row.category_name as string | null,
-    avg_rating: row.avg_rating !== null ? Number(row.avg_rating) : null,
-    review_count: row.review_count !== null ? Number(row.review_count) : null,
-    distance_meters:
-      row.distance_meters !== null && row.distance_meters !== undefined
-        ? Number(row.distance_meters)
-        : null,
-  }));
+  // Primary non-menu thumbnail per hit. Kept as a follow-up query so the
+  // ranking CTE stays lean; empty map → client keeps text-only rows.
+  const imageByListing = new Map<number, string>();
+  const listingIds = listingSlice.map((row) => Number(row.id));
+  if (listingIds.length > 0) {
+    try {
+      const { rows: imageRows } = await query(
+        `SELECT DISTINCT ON (listing_id)
+           listing_id,
+           url
+         FROM listing_images
+         WHERE listing_id = ANY($1::int[])
+           AND url NOT LIKE '%/menu/%'
+         ORDER BY listing_id,
+           is_primary DESC NULLS LAST,
+           display_order ASC NULLS LAST,
+           id ASC`,
+        [listingIds],
+      );
+      for (const img of imageRows) {
+        imageByListing.set(Number(img.listing_id), img.url as string);
+      }
+
+      // Own gallery first, then same-brand sibling cover (incl. archived
+      // Peekaboo parents like Melbrew Coffee), then Peekaboo logo.
+      const stillMissing = listingSlice
+        .map((row) => ({ id: Number(row.id), name: row.name as string | null }))
+        .filter((l) => !imageByListing.has(l.id));
+      if (stillMissing.length > 0) {
+        const borrowed = await getBorrowedHeaderImageUrls(stillMissing);
+        for (const [id, url] of borrowed) {
+          imageByListing.set(id, url);
+        }
+      }
+
+      const missingIds = listingIds.filter((id) => !imageByListing.has(id));
+      if (missingIds.length > 0) {
+        const { rows: logoRows } = await query(
+          `SELECT id, custom_attributes->>'peekaboo_logo_url' AS logo_url
+           FROM listings
+           WHERE id = ANY($1::int[])
+             AND NULLIF(custom_attributes->>'peekaboo_logo_url', '') IS NOT NULL`,
+          [missingIds],
+        );
+        for (const row of logoRows) {
+          if (row.logo_url) {
+            imageByListing.set(Number(row.id), row.logo_url as string);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("[mobile-api] places search image lookup failed:", error);
+    }
+  }
+
+  const listings = listingSlice.map((row) => {
+    const id = Number(row.id);
+    return {
+      type: "listing" as const,
+      id,
+      name: row.name as string | null,
+      slug: row.slug as string | null,
+      address: row.address as string | null,
+      category: row.category_name as string | null,
+      avg_rating: row.avg_rating !== null ? Number(row.avg_rating) : null,
+      review_count: row.review_count !== null ? Number(row.review_count) : null,
+      distance_meters:
+        row.distance_meters !== null && row.distance_meters !== undefined
+          ? Number(row.distance_meters)
+          : null,
+      image_url: imageByListing.get(id) ?? null,
+    };
+  });
 
   return ok({
     query: rawQuery,
