@@ -11,7 +11,6 @@ import {
   TAG_ONLY_CAP,
   tokenizeQuery,
 } from "@/lib/utils/places-search";
-
 export const dynamic = "force-dynamic";
 
 const DEFAULT_LIMIT = 20;
@@ -351,20 +350,27 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     ? listingRows.slice(0, limit)
     : listingRows;
 
-  const listings = listingSlice.map((row) => ({
-    type: "listing" as const,
-    id: Number(row.id),
-    name: row.name as string | null,
-    slug: row.slug as string | null,
-    address: row.address as string | null,
-    category: row.category_name as string | null,
-    avg_rating: row.avg_rating !== null ? Number(row.avg_rating) : null,
-    review_count: row.review_count !== null ? Number(row.review_count) : null,
-    distance_meters:
-      row.distance_meters !== null && row.distance_meters !== undefined
-        ? Number(row.distance_meters)
-        : null,
-  }));
+  // No thumbnails in places search — borrowed/logo covers repeat across every
+  // same-brand branch (e.g. all KFCs showing one burger). Detail still borrows
+  // a header; search stays text-only.
+  const listings = listingSlice.map((row) => {
+    const id = Number(row.id);
+    return {
+      type: "listing" as const,
+      id,
+      name: row.name as string | null,
+      slug: row.slug as string | null,
+      address: row.address as string | null,
+      category: row.category_name as string | null,
+      avg_rating: row.avg_rating !== null ? Number(row.avg_rating) : null,
+      review_count: row.review_count !== null ? Number(row.review_count) : null,
+      distance_meters:
+        row.distance_meters !== null && row.distance_meters !== undefined
+          ? Number(row.distance_meters)
+          : null,
+      image_url: null,
+    };
+  });
 
   return ok({
     query: rawQuery,

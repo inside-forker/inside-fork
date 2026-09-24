@@ -15,6 +15,7 @@ import {
 } from "@/lib/mobile/mappers";
 import { isRestaurantCategory } from "@/lib/utils/category-helpers";
 import { getListingCategoryIds } from "@/lib/listings/sync-listing-categories";
+import { getBorrowedHeaderImageUrl } from "@/lib/listings/borrowed-header-image";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ function toNumericListingRow<T extends Record<string, unknown>>(
 
 /** Explicit column list for `listings_with_details` - never use `*`. */
 const LISTING_DETAIL_SQL_COLUMNS =
-  "id, name, slug, description, address, category_id, category_name, latitude, longitude, avg_rating, review_count, is_featured, status, menu_pdf_url, google_maps_url, place_id, phone_number, email, website";
+  "id, name, slug, description, address, category_id, category_name, latitude, longitude, avg_rating, review_count, is_featured, status, menu_pdf_url, google_maps_url, place_id, phone_number, email, website, custom_attributes";
 
 /**
  * GET /api/mobile/v1/listings/{slug}
@@ -76,6 +77,7 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
       phone_number: string | null;
       email: string | null;
       website: string | null;
+      custom_attributes: Record<string, unknown> | null;
     },
   );
   const listingId = row.id;
@@ -203,6 +205,30 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
     .filter((img) => !img.url.includes("/menu/"))
     .slice(0, MAX_GALLERY_IMAGES)
     .map(toListingImage);
+
+  // Own primary cover, else borrow one cover from a same-brand multi-branch
+  // sibling, else Peekaboo logo. Never push borrowed/logo into `gallery` so
+  // the photo carousel stays empty unless this listing owns real shots.
+  let headerImage: string | null = null;
+  if (gallery.length > 0) {
+    const primary =
+      [...gallery].sort(
+        (a, b) =>
+          Number(b.is_primary) - Number(a.is_primary) ||
+          (a.display_order ?? 0) - (b.display_order ?? 0),
+      )[0] ?? null;
+    headerImage = primary?.url ?? null;
+  } else {
+    headerImage = await getBorrowedHeaderImageUrl(listingId, row.name);
+    if (!headerImage) {
+      const attrs = row.custom_attributes as Record<string, unknown> | null;
+      const logoUrl =
+        typeof attrs?.peekaboo_logo_url === "string" && attrs.peekaboo_logo_url.trim()
+          ? attrs.peekaboo_logo_url.trim()
+          : null;
+      headerImage = logoUrl;
+    }
+  }
 
   const menuImages = allImages
     .filter((img) => img.url.includes("/menu/"))
@@ -345,6 +371,7 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
 
   return ok({
     listing,
+    header_image: headerImage,
     menu_images: menuImages,
     menu,
     deals,
