@@ -131,7 +131,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
         `INSERT INTO public.scan_audit_log (
           ticket_code, ticket_pass_id, event_id, scanned_by, device_id, scanned_at, synced_at,
           is_duplicate, status, gate_index, total_gates
-        ) VALUES ($1, $2, $3, $4, $5, NOW(), false, 'revoked', $6, $7)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), false, 'revoked', $7, $8)`,
         [normalizedCode, ticket.id, eventId, user.id, scanDeviceId, validDeviceDate, scanGateIndex, scanTotalGates],
       );
       results.push({
@@ -153,7 +153,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
         `INSERT INTO public.scan_audit_log (
           ticket_code, ticket_pass_id, event_id, scanned_by, device_id, scanned_at, synced_at,
           is_duplicate, status, gate_index, total_gates
-        ) VALUES ($1, $2, $3, $4, $5, NOW(), false, 'unpaid', $6, $7)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), false, 'unpaid', $7, $8)`,
         [normalizedCode, ticket.id, eventId, user.id, scanDeviceId, validDeviceDate, scanGateIndex, scanTotalGates],
       );
       results.push({
@@ -187,7 +187,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
         `INSERT INTO public.scan_audit_log (
           ticket_code, ticket_pass_id, event_id, scanned_by, device_id, scanned_at, synced_at,
           is_duplicate, status, gate_index, total_gates
-        ) VALUES ($1, $2, $3, $4, $5, NOW(), false, 'invalid_signature', $6, $7)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), false, 'invalid_signature', $7, $8)`,
         [normalizedCode, ticket.id, eventId, user.id, scanDeviceId, validDeviceDate, scanGateIndex, scanTotalGates],
       );
       results.push({
@@ -222,7 +222,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
           `INSERT INTO public.scan_audit_log (
             ticket_code, ticket_pass_id, event_id, scanned_by, device_id, scanned_at, synced_at,
             is_duplicate, status, gate_index, total_gates
-          ) VALUES ($1, $2, $3, $4, $5, NOW(), false, 'valid', $6, $7)`,
+          ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), false, 'valid', $7, $8)`,
           [normalizedCode, ticket.id, eventId, user.id, scanDeviceId, validDeviceDate, scanGateIndex, scanTotalGates],
         );
 
@@ -272,7 +272,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
         `INSERT INTO public.scan_audit_log (
           ticket_code, ticket_pass_id, event_id, scanned_by, device_id, scanned_at, synced_at,
           is_duplicate, status, gate_index, total_gates
-        ) VALUES ($1, $2, $3, $4, $5, NOW(), false, 'valid', $6, $7)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), false, 'valid', $7, $8)`,
         [normalizedCode, ticket.id, eventId, user.id, scanDeviceId, validDeviceDate, scanGateIndex, scanTotalGates],
       );
 
@@ -294,7 +294,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
         `INSERT INTO public.scan_audit_log (
           ticket_code, ticket_pass_id, event_id, scanned_by, device_id, scanned_at, synced_at,
           is_duplicate, status, gate_index, total_gates
-        ) VALUES ($1, $2, $3, $4, $5, NOW(), true, 'already_used', $6, $7)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), true, 'already_used', $7, $8)`,
         [normalizedCode, ticket.id, eventId, user.id, scanDeviceId, validDeviceDate, scanGateIndex, scanTotalGates],
       );
 

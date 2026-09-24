@@ -119,6 +119,7 @@ export interface OrganizerManagedEvent {
   max_capacity: number | null;
   location_name: string | null;
   address: string | null;
+  category_id: number | null;
   created_at: string;
   updated_at: string;
   pending_request_id: number | null;

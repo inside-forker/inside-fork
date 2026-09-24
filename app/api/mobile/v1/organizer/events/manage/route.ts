@@ -9,6 +9,7 @@ import type {
   EventFormData,
   SubmitEventChangeResponse,
 } from "@/types/event-change-request.types";
+import { mergeEventUpdateProposed } from "@/lib/events/mergeEventUpdateProposed";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
        e.description AS event_description, e.status AS event_status,
        to_json(e.start_time) #>> '{}' AS start_time,
        to_json(e.end_time) #>> '{}' AS end_time,
-       e.is_featured, e.max_capacity, e.location_name, e.address,
+       e.is_featured, e.max_capacity, e.location_name, e.address, e.category_id,
        to_json(e.created_at) #>> '{}' AS created_at,
        to_json(e.updated_at) #>> '{}' AS updated_at,
        ecr.id AS pending_request_id, ecr.action_type AS pending_action_type,
@@ -53,6 +54,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const events = eventRows.map((row) => ({
     ...row,
     event_id: Number(row.event_id),
+    category_id: row.category_id !== null ? Number(row.category_id) : null,
     pending_request_id:
       row.pending_request_id !== null ? Number(row.pending_request_id) : null,
   }));
@@ -233,7 +235,12 @@ export const POST = mobileRoute(async (request: NextRequest) => {
       }
 
       const proposedData = event_data
-        ? (event_data as unknown as Record<string, unknown>)
+        ? action_type === "update" && originalData
+          ? mergeEventUpdateProposed(
+              originalData,
+              event_data as unknown as Record<string, unknown>,
+            )
+          : (event_data as unknown as Record<string, unknown>)
         : null;
 
       if (INSTANT_APPLY_ROLES.includes(user.role)) {
@@ -272,10 +279,42 @@ export const POST = mobileRoute(async (request: NextRequest) => {
               proposedData?.require_guest_details ?? false,
             ],
           );
+          const newEventId = Number(insertedRows[0].id);
+
+          const tempTickets = (proposedData?.temp_tickets ?? []) as Array<{
+            name: string;
+            description?: string | null;
+            price: number;
+            quantity_available: number | null;
+            sale_starts_at: string;
+            sale_ends_at: string;
+            max_per_person?: number;
+          }>;
+          if (Array.isArray(tempTickets) && tempTickets.length > 0) {
+            for (const t of tempTickets) {
+              if (t.name && t.price !== undefined && t.quantity_available !== undefined) {
+                await client.query(
+                  `INSERT INTO ticket_types (event_id, name, description, price, quantity_available, sale_starts_at, sale_ends_at, max_per_person)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                  [
+                    newEventId,
+                    t.name,
+                    t.description ?? null,
+                    Number(t.price),
+                    t.quantity_available !== null ? Number(t.quantity_available) : null,
+                    t.sale_starts_at || null,
+                    t.sale_ends_at || null,
+                    t.max_per_person ? Number(t.max_per_person) : 10,
+                  ],
+                );
+              }
+            }
+          }
+
           await client.query("COMMIT");
           response = {
             success: true,
-            event_id: Number(insertedRows[0].id),
+            event_id: newEventId,
             message: "Event created successfully",
             requires_approval: false,
           };

@@ -9,8 +9,18 @@ import { uploadFile } from "@/lib/storage/spaces";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-const MAX_SIZE = 5 * 1024 * 1024;
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
+];
+const ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp", "heic", "heif"];
+const MAX_SIZE = 10 * 1024 * 1024; // 10MB to accommodate high-res mobile photos
 
 /**
  * POST /api/mobile/v1/organizer/events/temp-images
@@ -38,10 +48,15 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     );
   }
 
-  if (!ALLOWED_TYPES.includes(file.type)) {
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  const isAllowed =
+    ALLOWED_TYPES.includes((file.type || "").toLowerCase()) ||
+    ALLOWED_EXTS.includes(ext);
+
+  if (!isAllowed) {
     throw new MobileApiError(
       "invalid_file_type",
-      "Only JPEG, PNG, and WebP images are allowed.",
+      "Only JPEG, PNG, WebP, and HEIC images are allowed.",
       400,
       "file",
     );
@@ -50,14 +65,13 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   if (file.size > MAX_SIZE) {
     throw new MobileApiError(
       "file_too_large",
-      "Maximum file size is 5MB.",
+      "Maximum file size is 10MB.",
       400,
       "file",
     );
   }
 
-  const ext = file.name.split(".").pop();
-  const filename = `${uuidv4()}.${ext}`;
+  const filename = `${uuidv4()}.${ext || "jpg"}`;
   const path = `event-images/temp/${tempSessionId}/${filename}`;
 
   let publicUrl: string;
