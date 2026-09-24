@@ -37,21 +37,9 @@ type CompiledCatalog = {
 };
 
 const CATALOG_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-let compiledCache: CompiledCatalog | null = null;
-let inflightCompilePromise: Promise<CompiledCatalog> | null = null;
-
-async function compileFullCatalog(): Promise<CompiledCatalog> {
-  const where: string[] = [
-    "d.is_active = true",
-    "l.status = 'published'",
-    "(d.start_date IS NULL OR d.start_date <= NOW())",
-    "(d.end_date IS NULL OR d.end_date >= NOW())",
-  ];
-
-  let dealRows: DealSqlRow[];
-  try {
-    const { rows } = await query(
-      `SELECT
+/** Cap for ending-soon SQL — Home asks for 8; 200 is plenty after merchant grouping. */
+const ENDING_SOON_SQL_CAP = 200;
+const DEAL_SELECT = `
          d.id,
          d.listing_id,
          d.title,
@@ -68,25 +56,16 @@ async function compileFullCatalog(): Promise<CompiledCatalog> {
          l.longitude,
          l.category_name,
          l.address,
-         c.slug AS category_slug
-       FROM deals d
-       INNER JOIN listings_with_details l ON l.id = d.listing_id
-       LEFT JOIN banks b ON b.id = d.bank_id
-       LEFT JOIN categories c ON c.id = l.category_id
-       WHERE ${where.join(" AND ")}
-       ORDER BY d.created_at DESC
-       LIMIT 3000`,
-      [],
-    );
-    dealRows = rows as DealSqlRow[];
-  } catch (error) {
-    console.error(
-      "[mobile-api] deals feed compilation query failed:",
-      error instanceof Error ? error.message : error,
-    );
-    throw new MobileApiError("internal_error", "Failed to load deals.", 500);
-  }
+         c.slug AS category_slug`;
 
+let compiledCache: CompiledCatalog | null = null;
+let inflightCompilePromise: Promise<CompiledCatalog> | null = null;
+const endingSoonCache = new Map<number, CompiledCatalog>();
+const endingSoonInflight = new Map<number, Promise<CompiledCatalog>>();
+
+async function enrichAndGroupDeals(
+  dealRows: DealSqlRow[],
+): Promise<MobileDealPreviewDTO[]> {
   const variantIdSet = new Set<number>();
   const bankIdSet = new Set<number>();
   const listingIds: number[] = [];
@@ -197,7 +176,8 @@ async function compileFullCatalog(): Promise<CompiledCatalog> {
 
   const dealsByListing = new Map<string, MobileDealPreviewDTO[]>();
   for (const dto of mapped) {
-    const key = dto.listingId != null ? `listing:${dto.listingId}` : `merchant:${dto.merchant}`;
+    const key =
+      dto.listingId != null ? `listing:${dto.listingId}` : `merchant:${dto.merchant}`;
     const group = dealsByListing.get(key);
     if (group) {
       group.push(dto);
@@ -221,27 +201,115 @@ async function compileFullCatalog(): Promise<CompiledCatalog> {
     groupedDeals.push(primary);
   }
 
+  return groupedDeals;
+}
+
+function etagForDeals(groupedDeals: MobileDealPreviewDTO[], prefix: string): string {
   // Bump when the serialized shape changes, not just the data: the hash below
   // only covers ids/labels, so without this a client holding a body from an
   // older shape would revalidate into a 304 and keep it.
   const PAYLOAD_SHAPE_VERSION = "v3-location-name";
 
   const hashContent =
-    `${PAYLOAD_SHAPE_VERSION}|` +
+    `${PAYLOAD_SHAPE_VERSION}|${prefix}|` +
     groupedDeals
       .slice(0, 50)
       .map((d) => `${d.id}:${d.discountLabel}`)
-      .join("|") + `:${groupedDeals.length}`;
-  const etag = `W/"deals-${createHash("md5").update(hashContent).digest("hex")}"`;
+      .join("|") +
+    `:${groupedDeals.length}`;
+  return `W/"deals-${createHash("md5").update(hashContent).digest("hex")}"`;
+}
 
+async function compileFullCatalog(): Promise<CompiledCatalog> {
+  const where: string[] = [
+    "d.is_active = true",
+    "l.status = 'published'",
+    "(d.start_date IS NULL OR d.start_date <= NOW())",
+    "(d.end_date IS NULL OR d.end_date >= NOW())",
+  ];
+
+  let dealRows: DealSqlRow[];
+  try {
+    const { rows } = await query(
+      `SELECT ${DEAL_SELECT}
+       FROM deals d
+       INNER JOIN listings_with_details l ON l.id = d.listing_id
+       LEFT JOIN banks b ON b.id = d.bank_id
+       LEFT JOIN categories c ON c.id = l.category_id
+       WHERE ${where.join(" AND ")}
+       ORDER BY d.created_at DESC
+       LIMIT 3000`,
+      [],
+    );
+    dealRows = rows as DealSqlRow[];
+  } catch (error) {
+    console.error(
+      "[mobile-api] deals feed compilation query failed:",
+      error instanceof Error ? error.message : error,
+    );
+    throw new MobileApiError("internal_error", "Failed to load deals.", 500);
+  }
+
+  const groupedDeals = await enrichAndGroupDeals(dealRows);
   const result: CompiledCatalog = {
     deals: groupedDeals,
-    etag,
+    etag: etagForDeals(groupedDeals, "full"),
     compiledAt: Date.now(),
   };
 
   compiledCache = result;
   return result;
+}
+
+/**
+ * Home "Ending soon" rail only needs ~8 rows. Compiling the full LIMIT 3000
+ * catalog just to filter by expiry is the dominant deals-API cost on Home.
+ */
+async function compileEndingSoonCatalog(days: number): Promise<CompiledCatalog> {
+  let dealRows: DealSqlRow[];
+  try {
+    const { rows } = await query(
+      `SELECT ${DEAL_SELECT}
+       FROM deals d
+       INNER JOIN listings_with_details l ON l.id = d.listing_id
+       LEFT JOIN banks b ON b.id = d.bank_id
+       LEFT JOIN categories c ON c.id = l.category_id
+       WHERE d.is_active = true
+         AND l.status = 'published'
+         AND (d.start_date IS NULL OR d.start_date <= NOW())
+         AND d.end_date IS NOT NULL
+         AND d.end_date >= NOW()
+         AND d.end_date <= NOW() + make_interval(days => $1::int)
+       ORDER BY d.end_date ASC
+       LIMIT $2`,
+      [days, ENDING_SOON_SQL_CAP],
+    );
+    dealRows = rows as DealSqlRow[];
+  } catch (error) {
+    console.error(
+      "[mobile-api] ending-soon deals query failed:",
+      error instanceof Error ? error.message : error,
+    );
+    throw new MobileApiError("internal_error", "Failed to load deals.", 500);
+  }
+
+  const groupedDeals = await enrichAndGroupDeals(dealRows);
+  // Keep SQL order (soonest first) after merchant grouping.
+  const byIdOrder = new Map(
+    dealRows.map((r, i) => [String(r.id), i]),
+  );
+  groupedDeals.sort((a, b) => {
+    const daysA = a.expiryDaysLeft ?? Number.POSITIVE_INFINITY;
+    const daysB = b.expiryDaysLeft ?? Number.POSITIVE_INFINITY;
+    if (daysA !== daysB) return daysA - daysB;
+    return (byIdOrder.get(a.id) ?? 0) - (byIdOrder.get(b.id) ?? 0);
+  });
+
+  return {
+    deals: groupedDeals,
+    etag: etagForDeals(groupedDeals, `ending-${days}`),
+    compiledAt: Date.now(),
+  };
 }
 
 async function getCompiledCatalog(): Promise<CompiledCatalog> {
@@ -261,6 +329,28 @@ async function getCompiledCatalog(): Promise<CompiledCatalog> {
   return inflightCompilePromise;
 }
 
+async function getEndingSoonCatalog(days: number): Promise<CompiledCatalog> {
+  const cached = endingSoonCache.get(days);
+  if (cached && Date.now() - cached.compiledAt < CATALOG_CACHE_TTL_MS) {
+    return cached;
+  }
+
+  let inflight = endingSoonInflight.get(days);
+  if (!inflight) {
+    inflight = compileEndingSoonCatalog(days)
+      .then((result) => {
+        endingSoonCache.set(days, result);
+        return result;
+      })
+      .finally(() => {
+        endingSoonInflight.delete(days);
+      });
+    endingSoonInflight.set(days, inflight);
+  }
+
+  return inflight;
+}
+
 /**
  * GET /api/mobile/v1/deals
  *
@@ -273,8 +363,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   const { searchParams } = new URL(request.url);
   const { page, limit, offset } = parsePagination(searchParams, {
-    defaultLimit: 200,
-    maxLimit: 2000,
+    defaultLimit: 100,
+    maxLimit: 100,
   });
 
   const bankIdRaw = searchParams.get("bankId");
@@ -300,7 +390,17 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       ? Math.min(parseInt(endingSoonRaw, 10), 90)
       : null;
 
-  const catalog = await getCompiledCatalog();
+  // Pure ending-soon (Home rail): skip LIMIT 3000 catalog compile.
+  const endingSoonOnly =
+    endingSoonDays != null &&
+    !sanitizedSearch &&
+    bankId === null &&
+    cardVariantId === null &&
+    categoryFilter === null;
+
+  const catalog = endingSoonOnly
+    ? await getEndingSoonCatalog(endingSoonDays)
+    : await getCompiledCatalog();
 
   // Fast-path: Unfiltered request with matching ETag -> 304 Not Modified
   const ifNoneMatch = request.headers.get("if-none-match");
@@ -353,7 +453,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     );
   }
 
-  if (endingSoonDays != null) {
+  // endingSoonOnly already filtered + sorted in SQL; skip re-filter.
+  if (endingSoonDays != null && !endingSoonOnly) {
     deals = deals
       .filter(
         (d) =>
