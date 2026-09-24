@@ -280,6 +280,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const bankIdRaw = searchParams.get("bankId");
   const cardVariantIdRaw = searchParams.get("cardVariantId");
   const categoryRaw = searchParams.get("category");
+  const endingSoonRaw = searchParams.get("endingSoonDays");
   const rawSearch = searchParams.get("search");
   const sanitizedSearch =
     rawSearch && rawSearch.trim() ? sanitizeSearchTerm(rawSearch) : "";
@@ -294,13 +295,22 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     categoryRaw && DEAL_CATEGORIES.has(categoryRaw as MobileDealCategory)
       ? (categoryRaw as MobileDealCategory)
       : null;
+  const endingSoonDays =
+    endingSoonRaw && /^\d+$/.test(endingSoonRaw)
+      ? Math.min(parseInt(endingSoonRaw, 10), 90)
+      : null;
 
   const catalog = await getCompiledCatalog();
 
   // Fast-path: Unfiltered request with matching ETag -> 304 Not Modified
   const ifNoneMatch = request.headers.get("if-none-match");
   const isUnfiltered =
-    !sanitizedSearch && bankId === null && cardVariantId === null && categoryFilter === null && page === 1;
+    !sanitizedSearch &&
+    bankId === null &&
+    cardVariantId === null &&
+    categoryFilter === null &&
+    endingSoonDays === null &&
+    page === 1;
 
   if (isUnfiltered && ifNoneMatch && ifNoneMatch === catalog.etag) {
     return new NextResponse(null, {
@@ -341,6 +351,19 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       (d) =>
         d.bankId === bankId || d.cardMatches.some((m) => m.bankId === bankId),
     );
+  }
+
+  if (endingSoonDays != null) {
+    deals = deals
+      .filter(
+        (d) =>
+          d.expiryDaysLeft !== null &&
+          d.expiryDaysLeft >= 0 &&
+          d.expiryDaysLeft <= endingSoonDays,
+      )
+      .sort(
+        (a, b) => (a.expiryDaysLeft ?? 0) - (b.expiryDaysLeft ?? 0),
+      );
   }
 
   const totalItems = deals.length;
