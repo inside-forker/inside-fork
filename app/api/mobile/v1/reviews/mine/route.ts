@@ -48,18 +48,34 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     maxLimit: 50,
   });
 
+  const listingIdParam = searchParams.get("listing_id");
+  const listingId = listingIdParam ? parseInt(listingIdParam, 10) : null;
+  const hasListingFilter = listingId !== null && !Number.isNaN(listingId);
+
+  const whereClauses = ["r.user_id = $1"];
+  const params: unknown[] = [user.id];
+
+  if (hasListingFilter) {
+    params.push(listingId);
+    whereClauses.push(`r.listing_id = $${params.length}`);
+  }
+
+  const whereSql = whereClauses.join(" AND ");
+  const queryParams = [...params, limit, offset];
+  const countParams = [...params];
+
   const [rowsRes, countRes] = await Promise.all([
     query(
       `SELECT ${REVIEW_SQL_COLUMNS}
        FROM reviews r
        LEFT JOIN profiles p ON p.id = r.user_id
        LEFT JOIN listings_with_details l ON l.id = r.listing_id
-       WHERE r.user_id = $1
+       WHERE ${whereSql}
        ORDER BY r.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [user.id, limit, offset],
+       LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}`,
+      queryParams,
     ),
-    query(`SELECT COUNT(*) FROM reviews WHERE user_id = $1`, [user.id]),
+    query(`SELECT COUNT(*) FROM reviews r WHERE ${whereSql}`, countParams),
   ]);
 
   const reviews = rowsRes.rows.map((row) => ({
