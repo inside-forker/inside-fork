@@ -25,6 +25,10 @@
       "schedule": "50 21 * * *"
     },
     {
+      "path": "/api/cron/audit-listing-images",
+      "schedule": "20 22 * * *"
+    },
+    {
       "path": "/api/cron/event-reminders",
       "schedule": "0 3 * * *"
     }

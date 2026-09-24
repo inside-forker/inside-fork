@@ -1048,14 +1048,22 @@ export class DatabaseSync {
         "display_order",
         "is_primary",
         "alt_text",
+        "availability",
+        "last_checked_at",
       ] as const;
 
       const values: unknown[] = [];
       const valuePlaceholders = imagesToInsert
         .map((image) => {
-          const row = imageColumns.map(
-            (col) => (image as Record<string, unknown>)[col],
-          );
+          const row = [
+            image.listing_id,
+            image.url,
+            image.display_order,
+            image.is_primary,
+            image.alt_text,
+            "unknown",
+            null,
+          ];
           const placeholders = row.map(
             (_, j) => `$${values.length + j + 1}`,
           );

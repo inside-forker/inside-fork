@@ -154,8 +154,8 @@ export async function POST(
     let imageData;
     try {
       const { rows } = await query(
-        `INSERT INTO listing_images (listing_id, url, alt_text, display_order, is_primary)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO listing_images (listing_id, url, alt_text, display_order, is_primary, availability, last_checked_at)
+         VALUES ($1, $2, $3, $4, $5, 'ok', NOW())
          RETURNING *`,
         [listingId, publicUrl, file.name, nextOrder, !primaryImage],
       );

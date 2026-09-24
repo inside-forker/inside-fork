@@ -102,8 +102,8 @@ export async function POST(request: NextRequest) {
       try {
         await query(
           `INSERT INTO listing_images
-             (listing_id, url, alt_text, display_order, is_primary)
-           VALUES ($1, $2, $3, $4, $5)`,
+             (listing_id, url, alt_text, display_order, is_primary, availability, last_checked_at)
+           VALUES ($1, $2, $3, $4, $5, 'ok', NOW())`,
           [
             Number(listingId),
             publicUrl,

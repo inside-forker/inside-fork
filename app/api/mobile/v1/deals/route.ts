@@ -6,7 +6,6 @@ import { query } from "@/lib/db";
 import { enforceMobileRateLimit } from "@/lib/mobile/rate-limit";
 import { parsePagination, buildPaginationMeta } from "@/lib/mobile/pagination";
 import { MobileApiError } from "@/lib/mobile/errors";
-import { toListingImage } from "@/lib/mobile/mappers";
 import { sanitizeSearchTerm } from "@/lib/utils/search-sanitization";
 import {
   normalizeCardName,
@@ -16,6 +15,7 @@ import {
   type MobileDealPreviewDTO,
 } from "@/lib/mobile/deals-feed";
 import type { MobileDealCategory } from "@/lib/mobile/deal-category";
+import { resolveListingCovers } from "@/lib/mobile/listing-covers";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +90,7 @@ async function enrichAndGroupDeals(
   const cardsByBankName = new Map<string, CardVariantLookup>();
   const imageByListingId = new Map<number, string>();
 
-  const [cardsResult, imagesResult] = await Promise.all([
+  const [cardsResult, covers] = await Promise.all([
     bankIds.length > 0 || variantIdSet.size > 0
       ? query(
           `SELECT id, bank_id, card_name
@@ -110,25 +110,33 @@ async function enrichAndGroupDeals(
         })
       : Promise.resolve({ rows: [] }),
     uniqueListingIds.length > 0
-      ? query(
-          `SELECT DISTINCT ON (listing_id)
-             listing_id, id, url, alt_text, display_order, is_primary
-           FROM listing_images
-           WHERE listing_id = ANY($1::bigint[])
-             AND url NOT LIKE '%/menu/%'
-           ORDER BY listing_id,
-             CASE WHEN is_primary THEN 0 ELSE 1 END,
-             display_order ASC NULLS LAST,
-             id ASC`,
-          [uniqueListingIds],
-        ).catch((error) => {
-          console.error(
-            "[mobile-api] deals images lookup failed:",
-            error instanceof Error ? error.message : error,
-          );
-          return { rows: [] };
-        })
-      : Promise.resolve({ rows: [] }),
+      ? (async () => {
+          const nameById = new Map<number, string | null>();
+          for (const row of dealRows) {
+            const id = Number(row.listing_id);
+            if (!Number.isFinite(id) || nameById.has(id)) continue;
+            nameById.set(
+              id,
+              typeof row.merchant === "string" ? row.merchant : null,
+            );
+          }
+          try {
+            return await resolveListingCovers(
+              uniqueListingIds.map((id) => ({
+                id,
+                name: nameById.get(id) ?? null,
+              })),
+              { candidateCap: 1 },
+            );
+          } catch (error) {
+            console.error(
+              "[mobile-api] deals covers lookup failed:",
+              error instanceof Error ? error.message : error,
+            );
+            return new Map();
+          }
+        })()
+      : Promise.resolve(new Map()),
   ]);
 
   for (const c of cardsResult.rows) {
@@ -145,16 +153,8 @@ async function enrichAndGroupDeals(
     );
   }
 
-  for (const img of imagesResult.rows) {
-    const dto = toListingImage({
-      id: Number(img.id),
-      url: String(img.url),
-      alt_text: (img.alt_text as string | null) ?? null,
-      display_order:
-        img.display_order !== null ? Number(img.display_order) : null,
-      is_primary: Boolean(img.is_primary),
-    });
-    imageByListingId.set(Number(img.listing_id), dto.url);
+  for (const [listingId, cover] of covers) {
+    if (cover.headerUrl) imageByListingId.set(listingId, cover.headerUrl);
   }
 
   const now = new Date();
