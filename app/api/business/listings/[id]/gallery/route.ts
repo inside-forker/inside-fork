@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { query } from "@/lib/db";
-import { uploadListingImage, deleteFile } from "@/lib/storage/spaces";
+import { deleteFile } from "@/lib/storage/spaces";
+import { uploadListingImageWithFeedVariants } from "@/lib/storage/feed-image-variants";
 import {
   verifyBusinessOwner,
   verifyListingOwnership,
@@ -163,11 +164,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         const filename = `listings/${listingId}/${timestamp}-${randomSuffix}-${sanitizedName}`;
 
         // Upload to DigitalOcean Spaces (default bucket, listing-images/ prefix)
+        // + feed _w400/_w800 siblings for mobile CDN hits.
         let uploadData;
         try {
-          uploadData = await uploadListingImage(filename, processedBuffer, {
-            contentType: "image/jpeg",
-          });
+          uploadData = await uploadListingImageWithFeedVariants(
+            filename,
+            processedBuffer,
+            {
+              contentType: "image/jpeg",
+            },
+          );
         } catch (uploadError) {
           errors.push(
             `File ${i + 1}: Upload failed - ${uploadError instanceof Error ? uploadError.message : "Unknown error"}`,

@@ -9,20 +9,20 @@
  *   npx tsx scripts/audit-listing-image-health.ts
  *   npx tsx scripts/audit-listing-image-health.ts --primary-only
  *   npx tsx scripts/audit-listing-image-health.ts --limit=500
+ *   npx tsx scripts/audit-listing-image-health.ts --unchecked-only
  *   npx tsx scripts/audit-listing-image-health.ts --apply
  *   npx tsx scripts/audit-listing-image-health.ts --csv=tmp/listing-image-health.csv
  *
+ * DB is released while HEADing Spaces so long probes don't idle-timeout the
+ * connection. --apply writes in batches (not one giant transaction).
+ *
  * --apply requires availability/last_checked_at columns (run the migration first).
- * It rewrites ok_via_alternate URLs, marks availability, and reassigns primary
- * when the current primary is dead and another image is ok.
  */
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import { Client } from "pg";
-import {
-  brandStemFromListingName,
-} from "../lib/listings/borrowed-header-image";
+import { brandStemFromListingName } from "../lib/listings/borrowed-header-image";
 import {
   mapProbeToAvailability,
   probeListingImageUrl,
@@ -31,6 +31,7 @@ import {
 
 const APPLY = process.argv.includes("--apply");
 const PRIMARY_ONLY = process.argv.includes("--primary-only");
+const UNCHECKED_ONLY = process.argv.includes("--unchecked-only");
 const LIMIT = (() => {
   const arg = process.argv.find((a) => a.startsWith("--limit="));
   if (!arg) return null;
@@ -47,6 +48,7 @@ const CONCURRENCY = (() => {
   const n = Number(arg.slice("--concurrency=".length));
   return Number.isFinite(n) && n > 0 ? Math.min(32, Math.floor(n)) : 12;
 })();
+const APPLY_BATCH = 200;
 
 type ImageRow = {
   id: number;
@@ -65,6 +67,11 @@ type CsvRow = {
   listing_name: string;
 };
 
+type ProbePair = {
+  img: ImageRow;
+  result: Awaited<ReturnType<typeof probeListingImageUrl>>;
+};
+
 async function createDbClient() {
   const raw = process.env.DATABASE_URL;
   if (!raw) throw new Error("DATABASE_URL is required");
@@ -73,6 +80,10 @@ async function createDbClient() {
     ssl: raw.includes("sslmode=require")
       ? { rejectUnauthorized: false }
       : undefined,
+    connectionTimeoutMillis: 30_000,
+  });
+  client.on("error", (err) => {
+    console.error("[audit] pg client error:", err.message);
   });
   await client.connect();
   return client;
@@ -93,7 +104,9 @@ async function mapPool<T, R>(
     }
   }
   await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
+    Array.from({ length: Math.min(concurrency, items.length || 1) }, () =>
+      worker(),
+    ),
   );
   return results;
 }
@@ -104,11 +117,50 @@ function csvEscape(value: string | number): string {
   return s;
 }
 
+async function applyProbeBatch(db: Client, batch: ProbePair[]) {
+  let rewritten = 0;
+  await db.query("BEGIN");
+  try {
+    for (const { img, result } of batch) {
+      const availability = mapProbeToAvailability(result.status);
+      if (
+        result.status === "ok_via_alternate" &&
+        result.workingUrl &&
+        result.workingUrl !== img.url
+      ) {
+        await db.query(
+          `UPDATE listing_images
+           SET url = $1,
+               availability = $2,
+               last_checked_at = NOW()
+           WHERE id = $3`,
+          [result.workingUrl, availability, img.id],
+        );
+        rewritten += 1;
+      } else {
+        await db.query(
+          `UPDATE listing_images
+           SET availability = $1,
+               last_checked_at = NOW()
+           WHERE id = $2`,
+          [availability, img.id],
+        );
+      }
+    }
+    await db.query("COMMIT");
+  } catch (error) {
+    await db.query("ROLLBACK").catch(() => {});
+    throw error;
+  }
+  return rewritten;
+}
+
 async function main() {
-  const db = await createDbClient();
   console.log(
-    `[audit-listing-image-health] mode=${APPLY ? "APPLY" : "DRY-RUN"} primaryOnly=${PRIMARY_ONLY} limit=${LIMIT ?? "none"} concurrency=${CONCURRENCY}`,
+    `[audit-listing-image-health] mode=${APPLY ? "APPLY" : "DRY-RUN"} primaryOnly=${PRIMARY_ONLY} uncheckedOnly=${UNCHECKED_ONLY} limit=${LIMIT ?? "none"} concurrency=${CONCURRENCY}`,
   );
+
+  let db = await createDbClient();
 
   const imageSql = `
     SELECT li.id,
@@ -120,15 +172,28 @@ async function main() {
     INNER JOIN listings l ON l.id = li.listing_id AND l.status = 'published'
     WHERE li.url NOT LIKE '%/menu/%'
       ${PRIMARY_ONLY ? "AND COALESCE(li.is_primary, false) = true" : ""}
+      ${
+        UNCHECKED_ONLY
+          ? "AND (li.last_checked_at IS NULL OR li.availability = 'unknown')"
+          : ""
+      }
     ORDER BY li.listing_id ASC, li.is_primary DESC NULLS LAST, li.display_order ASC NULLS LAST, li.id ASC
     ${LIMIT != null ? `LIMIT ${LIMIT}` : ""}
   `;
 
   const { rows: images } = await db.query<ImageRow>(imageSql);
-  console.log(`[audit] probing ${images.length} images…`);
+  await db.end();
+  db = null as unknown as Client;
 
+  console.log(`[audit] probing ${images.length} images (DB released)…`);
+
+  let done = 0;
   const probes = await mapPool(images, CONCURRENCY, async (img) => {
     const result = await probeListingImageUrl(img.url);
+    done += 1;
+    if (done % 500 === 0 || done === images.length) {
+      console.log(`[audit] probed ${done}/${images.length}`);
+    }
     return { img, result };
   });
 
@@ -163,7 +228,8 @@ async function main() {
     });
   }
 
-  // Empty galleries on published listings.
+  db = await createDbClient();
+
   const { rows: emptyListings } = await db.query<{
     id: number;
     name: string | null;
@@ -181,8 +247,6 @@ async function main() {
 
   let emptyWithSibling = 0;
   if (emptyListings.length > 0) {
-    // getBorrowedHeaderImageUrls uses the app `query` pool — fall back to
-    // inline stem check so this script stays self-contained on one client.
     for (const listing of emptyListings) {
       csvRows.push({
         listing_id: listing.id,
@@ -194,28 +258,34 @@ async function main() {
       });
     }
 
-    const stems = emptyListings
+    // One query for all stems that have any donor (avoids N+1).
+    const stemRows = emptyListings
       .map((l) => ({
         id: l.id,
-        name: l.name,
         stem: brandStemFromListingName(l.name),
       }))
-      .filter((l) => l.stem);
+      .filter((l): l is { id: number; stem: string } => Boolean(l.stem));
 
-    for (const row of stems) {
+    const uniqueStems = [...new Set(stemRows.map((s) => s.stem.toLowerCase()))];
+    const stemsWithDonor = new Set<string>();
+    for (const stemKey of uniqueStems) {
+      const sample = stemRows.find((s) => s.stem.toLowerCase() === stemKey);
+      if (!sample) continue;
       const { rows: donors } = await db.query<{ n: string }>(
-        `SELECT COUNT(*)::text AS n
+        `SELECT 1::text AS n
          FROM listings d
          INNER JOIN listing_images di ON di.listing_id = d.id
            AND di.url NOT LIKE '%/menu/%'
-         WHERE d.id <> $1
-           AND d.status IN ('published', 'archived')
-           AND d.name ILIKE $2 || '%'
+         WHERE d.status IN ('published', 'archived')
+           AND d.name ILIKE $1 || '%'
          LIMIT 1`,
-        [row.id, row.stem],
+        [sample.stem],
       );
-      if (Number(donors[0]?.n ?? 0) > 0) emptyWithSibling += 1;
+      if (donors[0]) stemsWithDonor.add(stemKey);
     }
+    emptyWithSibling = stemRows.filter((s) =>
+      stemsWithDonor.has(s.stem.toLowerCase()),
+    ).length;
   }
 
   const summary = {
@@ -258,7 +328,6 @@ async function main() {
     return;
   }
 
-  // Ensure columns exist (migration should have run; fail clearly if not).
   const colCheck = await db.query<{ exists: boolean }>(`
     SELECT EXISTS (
       SELECT 1 FROM information_schema.columns
@@ -268,94 +337,77 @@ async function main() {
     ) AS exists
   `);
   if (!colCheck.rows[0]?.exists) {
+    await db.end();
     throw new Error(
       "listing_images.availability missing — run sql/migrations/20260925_listing_image_availability.sql first",
     );
   }
 
-  await db.query("BEGIN");
-  try {
-    let rewritten = 0;
-    let marked = 0;
-
-    for (const { img, result } of probes) {
-      const availability = mapProbeToAvailability(result.status);
-      if (
-        result.status === "ok_via_alternate" &&
-        result.workingUrl &&
-        result.workingUrl !== img.url
-      ) {
-        await db.query(
-          `UPDATE listing_images
-           SET url = $1,
-               availability = $2,
-               last_checked_at = NOW()
-           WHERE id = $3`,
-          [result.workingUrl, availability, img.id],
-        );
-        rewritten += 1;
-      } else {
-        await db.query(
-          `UPDATE listing_images
-           SET availability = $1,
-               last_checked_at = NOW()
-           WHERE id = $2`,
-          [availability, img.id],
-        );
-      }
-      marked += 1;
+  let rewritten = 0;
+  let marked = 0;
+  for (let i = 0; i < probes.length; i += APPLY_BATCH) {
+    const batch = probes.slice(i, i + APPLY_BATCH);
+    try {
+      rewritten += await applyProbeBatch(db, batch);
+      marked += batch.length;
+    } catch (error) {
+      console.error(
+        `[audit] batch apply failed at offset ${i}; reconnecting…`,
+        error instanceof Error ? error.message : error,
+      );
+      await db.end().catch(() => {});
+      db = await createDbClient();
+      rewritten += await applyProbeBatch(db, batch);
+      marked += batch.length;
     }
-
-    // Reassign primary when primary is dead and another non-menu image is ok.
-    const primaryFix = await db.query(`
-      WITH dead_primary AS (
-        SELECT li.listing_id, li.id AS dead_id
-        FROM listing_images li
-        WHERE COALESCE(li.is_primary, false) = true
-          AND li.availability = 'dead'
-          AND li.url NOT LIKE '%/menu/%'
-      ),
-      healthy AS (
-        SELECT DISTINCT ON (li.listing_id)
-               li.listing_id, li.id AS healthy_id
-        FROM listing_images li
-        INNER JOIN dead_primary dp ON dp.listing_id = li.listing_id
-        WHERE li.availability = 'ok'
-          AND li.url NOT LIKE '%/menu/%'
-        ORDER BY li.listing_id,
-          li.display_order ASC NULLS LAST,
-          li.id ASC
-      )
-      UPDATE listing_images li
-      SET is_primary = CASE
-        WHEN li.id = h.healthy_id THEN true
-        WHEN li.id = dp.dead_id THEN false
-        ELSE li.is_primary
-      END
-      FROM dead_primary dp
-      INNER JOIN healthy h ON h.listing_id = dp.listing_id
-      WHERE li.listing_id = dp.listing_id
-        AND li.id IN (dp.dead_id, h.healthy_id)
-    `);
-
-    await db.query("COMMIT");
-    console.log(
-      JSON.stringify(
-        {
-          marked,
-          rewritten,
-          primary_reassigned_rows: primaryFix.rowCount ?? 0,
-        },
-        null,
-        2,
-      ),
-    );
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
-  } finally {
-    await db.end();
+    if ((i + APPLY_BATCH) % 1000 < APPLY_BATCH || i + APPLY_BATCH >= probes.length) {
+      console.log(`[audit] applied ${Math.min(i + APPLY_BATCH, probes.length)}/${probes.length}`);
+    }
   }
+
+  const primaryFix = await db.query(`
+    WITH dead_primary AS (
+      SELECT li.listing_id, li.id AS dead_id
+      FROM listing_images li
+      WHERE COALESCE(li.is_primary, false) = true
+        AND li.availability = 'dead'
+        AND li.url NOT LIKE '%/menu/%'
+    ),
+    healthy AS (
+      SELECT DISTINCT ON (li.listing_id)
+             li.listing_id, li.id AS healthy_id
+      FROM listing_images li
+      INNER JOIN dead_primary dp ON dp.listing_id = li.listing_id
+      WHERE li.availability = 'ok'
+        AND li.url NOT LIKE '%/menu/%'
+      ORDER BY li.listing_id,
+        li.display_order ASC NULLS LAST,
+        li.id ASC
+    )
+    UPDATE listing_images li
+    SET is_primary = CASE
+      WHEN li.id = h.healthy_id THEN true
+      WHEN li.id = dp.dead_id THEN false
+      ELSE li.is_primary
+    END
+    FROM dead_primary dp
+    INNER JOIN healthy h ON h.listing_id = dp.listing_id
+    WHERE li.listing_id = dp.listing_id
+      AND li.id IN (dp.dead_id, h.healthy_id)
+  `);
+
+  await db.end();
+  console.log(
+    JSON.stringify(
+      {
+        marked,
+        rewritten,
+        primary_reassigned_rows: primaryFix.rowCount ?? 0,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 main().catch((error) => {

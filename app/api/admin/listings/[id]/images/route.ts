@@ -4,7 +4,8 @@ import {
   toListingAccessResponse,
 } from "@/lib/listings/route-access";
 import { query } from "@/lib/db";
-import { uploadListingImage, deleteFile } from "@/lib/storage/spaces";
+import { deleteFile } from "@/lib/storage/spaces";
+import { uploadListingImageWithFeedVariants } from "@/lib/storage/feed-image-variants";
 
 export async function GET(
   request: NextRequest,
@@ -123,9 +124,13 @@ export async function POST(
     let uploadedPath: string;
     try {
       const buffer = Buffer.from(await file.arrayBuffer());
-      const uploadResult = await uploadListingImage(fileName, buffer, {
-        contentType: file.type,
-      });
+      const uploadResult = await uploadListingImageWithFeedVariants(
+        fileName,
+        buffer,
+        {
+          contentType: file.type,
+        },
+      );
       publicUrl = uploadResult.publicUrl;
       uploadedPath = uploadResult.path;
     } catch {

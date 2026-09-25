@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import {
-  uploadListingImage,
   deleteFile,
   listListingImages,
   getListingImageKeyFromUrl,
 } from "@/lib/storage/spaces";
+import { uploadListingImageWithFeedVariants } from "@/lib/storage/feed-image-variants";
 
 import { v4 as uuidv4 } from "uuid";
 
@@ -33,14 +33,13 @@ export async function POST(request: NextRequest) {
     const filename = `${uuidv4()}.${ext}`;
     const relativePath = `temp/${tempSessionId}/${filename}`;
 
-    // Upload to DO Spaces under listing-images/temp/...
+    // Upload to DO Spaces under listing-images/temp/... + feed variants
     const arrayBuffer = await file.arrayBuffer();
-    const uploadResult = await uploadListingImage(
+    const uploadResult = await uploadListingImageWithFeedVariants(
       relativePath,
       Buffer.from(arrayBuffer),
       {
         contentType: file.type,
-        isPublic: true,
       }
     );
 

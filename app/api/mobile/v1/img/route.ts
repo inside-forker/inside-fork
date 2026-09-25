@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 /** Cap decode work — feed cards ask for ~200–800 CSS px @2×. */
 const MIN_W = 32;
 const MAX_W = 1600;
+/** Snap to buckets so CDN keys collide across devices/layouts. */
+const WIDTH_BUCKETS = [400, 800, 1200] as const;
 const FETCH_TIMEOUT_MS = 12_000;
 const MAX_INPUT_BYTES = 12 * 1024 * 1024;
 const MAX_INPUT_PIXELS = 40_000_000;
@@ -16,6 +18,20 @@ const MAX_INPUT_PIXELS = 40_000_000;
 sharp.cache(false);
 /** Modest parallelism so Home scroll storms don't all serialize into timeouts. */
 sharp.concurrency(2);
+
+function snapFeedImageWidth(px: number): number {
+  const w = Math.min(MAX_W, Math.max(MIN_W, Math.round(px) || 400));
+  let best: number = WIDTH_BUCKETS[0];
+  let bestDist = Math.abs(w - best);
+  for (const bucket of WIDTH_BUCKETS) {
+    const dist = Math.abs(w - bucket);
+    if (dist < bestDist) {
+      best = bucket;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
 
 /**
  * Hosts we will fetch and resize. Anything else is rejected to avoid SSRF
@@ -152,10 +168,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const width = Math.min(
-    MAX_W,
-    Math.max(MIN_W, Math.round(Number(wRaw) || 400)),
-  );
+  const width = snapFeedImageWidth(Number(wRaw) || 400);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -231,10 +244,10 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "image/jpeg",
-        // Browser + Vercel edge — url+w is immutable for a day.
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
-        "CDN-Cache-Control": "max-age=86400",
-        "Vercel-CDN-Cache-Control": "max-age=86400",
+        // Browser + Vercel edge — url+w is immutable for a week.
+        "Cache-Control": "public, max-age=604800, stale-while-revalidate=604800",
+        "CDN-Cache-Control": "max-age=604800",
+        "Vercel-CDN-Cache-Control": "max-age=604800",
       },
     });
   } catch (err) {

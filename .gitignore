@@ -32,6 +32,9 @@ yarn-error.log*
 # local CSV exports (listing categorization, etc.)
 /exports/
 
+# local audit/probe artifacts (logs, CSVs)
+/tmp/
+
 # vercel
 .vercel
 

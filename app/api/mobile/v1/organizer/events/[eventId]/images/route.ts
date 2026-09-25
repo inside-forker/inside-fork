@@ -6,6 +6,7 @@ import { enforceMobileRateLimit } from "@/lib/mobile/rate-limit";
 import { MobileApiError, MobileErrors } from "@/lib/mobile/errors";
 import { query } from "@/lib/db";
 import { deleteFile, getKeyFromPublicUrl, uploadFile } from "@/lib/storage/spaces";
+import { uploadObjectFeedVariants } from "@/lib/storage/feed-image-variants";
 
 export const dynamic = "force-dynamic";
 
@@ -122,10 +123,12 @@ export const POST = mobileRoute(async (request: NextRequest, context) => {
   let publicUrl: string;
   try {
     const arrayBuffer = await file.arrayBuffer();
-    const uploaded = await uploadFile(fileName, Buffer.from(arrayBuffer), {
+    const buffer = Buffer.from(arrayBuffer);
+    const uploaded = await uploadFile(fileName, buffer, {
       contentType: file.type,
     });
     publicUrl = uploaded.publicUrl;
+    await uploadObjectFeedVariants(fileName, buffer);
   } catch (uploadError) {
     console.error("[mobile-api] event image upload failed:", uploadError);
     throw new MobileApiError("upload_failed", "Failed to upload image.", 500);

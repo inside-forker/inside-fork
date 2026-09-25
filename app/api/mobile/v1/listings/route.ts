@@ -275,7 +275,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     { pagination: buildPaginationMeta(page, limit, count ?? 0) },
     {
       headers: {
-        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+        "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300",
       },
     },
   );

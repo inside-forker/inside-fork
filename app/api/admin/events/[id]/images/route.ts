@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { deleteFile, uploadFile } from "@/lib/storage/spaces";
+import { uploadObjectFeedVariants } from "@/lib/storage/feed-image-variants";
 
 const ADMIN_ROLES = ["admin", "super_admin", "lister"];
 
@@ -203,14 +204,16 @@ export async function POST(
     const fileExt = file.name.split(".").pop();
     const fileName = `event-images/event-${eventId}-${Date.now()}.${fileExt}`;
 
-    // Upload to DigitalOcean Spaces
+    // Upload to DigitalOcean Spaces + feed _w400/_w800 siblings
     let publicUrl: string;
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const uploaded = await uploadFile(fileName, Buffer.from(arrayBuffer), {
+      const buffer = Buffer.from(arrayBuffer);
+      const uploaded = await uploadFile(fileName, buffer, {
         contentType: file.type,
       });
       publicUrl = uploaded.publicUrl;
+      await uploadObjectFeedVariants(fileName, buffer);
     } catch (uploadError) {
       console.error("Error uploading to storage:", uploadError);
       return NextResponse.json(
