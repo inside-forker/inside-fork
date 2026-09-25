@@ -11,7 +11,6 @@ import { ListingPageWrapper } from "@/components/listing/ListingPageWrapper";
 import { QuickNavigation } from "@/components/listing/QuickNavigation";
 import { MenuImagesViewer } from "@/components/listing/MenuImagesViewer";
 import { getListingHeroImages } from "@/lib/utils/listing-images";
-import { getFavoritedListingIdsForUser } from "@/lib/utils/favorites-server";
 import { isRestaurantCategory } from "@/lib/utils/category-helpers";
 import { getListingCategoryIds } from "@/lib/listings/sync-listing-categories";
 import { MessageSquare } from "lucide-react";
@@ -19,6 +18,9 @@ import { Badge } from "@/components/ui/badge";
 import { PremiumHeading } from "@/components/brand/Typography";
 import { ReportIssueButton } from "@/components/shared/ReportIssueButton";
 import { Suspense } from "react";
+
+/** Public listing shell is cacheable; favorites live in client islands. */
+export const revalidate = 300;
 
 // Container Components
 import { ReviewsContainer } from "@/components/listing/containers/ReviewsContainer";
@@ -84,7 +86,6 @@ export default async function ListingPage({ params }: ListingPageProps) {
 
   const [
     imagesResult,
-    favSet,
     menuCountResult,
     dealsCountResult,
     hoursCountResult,
@@ -102,7 +103,6 @@ export default async function ListingPage({ params }: ListingPageProps) {
       console.error("[listing-page] images query error:", err);
       return { rows: [] };
     }),
-    getFavoritedListingIdsForUser(null, [listingId]).catch(() => new Set<number>()),
     query(
       `SELECT COUNT(*)::integer AS count FROM menu_sections WHERE listing_id = $1`,
       [listingId],
@@ -192,11 +192,6 @@ export default async function ListingPage({ params }: ListingPageProps) {
     ...listing,
     images: galleryImages,
   };
-
-  // Set favorite flag
-  (listing as unknown as { favorited?: boolean }).favorited = favSet.has(
-    listingId,
-  );
 
   const isRestaurant = await isRestaurantCategory(
     listingCategoryIds.length > 0
@@ -564,8 +559,6 @@ export async function generateMetadata({ params }: ListingPageProps) {
   }
 }
 
-// This page reads cookies (session/favorites via getFavoritedListingIdsForUser),
-// so it can never be statically cached — it bails to dynamic rendering at runtime
-// regardless. Render it on demand and skip the wasteful build-time prerender that
-// hammered the DB and crashed the build under connection exhaustion.
-export const dynamic = "force-dynamic";
+// Favorites / session are client-side. Unpublished preview still calls
+// getOptionalSessionUser() (cookies) for that request only — published pages
+// stay on the revalidate window above.

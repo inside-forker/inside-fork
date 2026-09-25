@@ -139,21 +139,29 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       ? (byKey.get("mobile.ios_store_url") as string)
       : "https://apps.apple.com/app/inside-karachi/id6470000000";
 
-  return ok({
-    maintenance: {
-      enabled: maintenanceEnabled,
-      title: maintenanceTitle,
-      message: maintenanceMessage,
-      estimated_end: maintenanceEstimatedEnd,
+  return ok(
+    {
+      maintenance: {
+        enabled: maintenanceEnabled,
+        title: maintenanceTitle,
+        message: maintenanceMessage,
+        estimated_end: maintenanceEstimatedEnd,
+      },
+      update: {
+        min_version: minVersion,
+        latest_version: latestVersion,
+        force_update_enabled: forceUpdateEnabled,
+        title: updateTitle,
+        message: updateMessage,
+        android_store_url: androidStoreUrl,
+        ios_store_url: iosStoreUrl,
+      },
     },
-    update: {
-      min_version: minVersion,
-      latest_version: latestVersion,
-      force_update_enabled: forceUpdateEnabled,
-      title: updateTitle,
-      message: updateMessage,
-      android_store_url: androidStoreUrl,
-      ios_store_url: iosStoreUrl,
+    undefined,
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+      },
     },
-  });
+  );
 });

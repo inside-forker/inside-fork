@@ -417,7 +417,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       status: 304,
       headers: {
         ETag: catalog.etag,
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        "Cache-Control": "public, s-maxage=600, stale-while-revalidate=1200",
       },
     });
   }
@@ -478,7 +478,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     {
       headers: {
         ETag: catalog.etag,
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        "Cache-Control": "public, s-maxage=600, stale-while-revalidate=1200",
       },
     },
   );
