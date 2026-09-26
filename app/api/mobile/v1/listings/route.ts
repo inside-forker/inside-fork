@@ -15,6 +15,7 @@ import { sanitizeSearchTerm } from "@/lib/utils/search-sanitization";
 import { sortFetchedListingsBySearchRelevance } from "@/lib/listings/search-relevance";
 import {
   resolveCategoryIdScope,
+  resolveCategoryBySlugWithScope,
   listingCategoriesExistsClause,
 } from "@/lib/listings/category-scope";
 import {
@@ -115,6 +116,11 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     const categoryId = Number(categoryParam);
     if (Number.isInteger(categoryId) && categoryId > 0) {
       categoryIds = await resolveCategoryIdScope(categoryId);
+    } else {
+      const resolved = await resolveCategoryBySlugWithScope(categoryParam);
+      if (resolved) {
+        categoryIds = resolved.categoryIds;
+      }
     }
   }
 

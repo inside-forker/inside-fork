@@ -7,8 +7,17 @@
 
 export const PAGE_SECTIONS_CONFIG_KEY = "mobile.page_sections";
 
+export type HomeChipsItems = {
+  tonight: boolean;
+  weekend: boolean;
+  free: boolean;
+  cheap: boolean;
+  near: boolean;
+};
+
 export type HomePageSections = {
   chips: boolean;
+  chips_items?: HomeChipsItems;
   opener: boolean;
   categories: boolean;
   spine: boolean;
@@ -51,9 +60,18 @@ export type PageSectionsConfig = {
   deals: DealsPageSections;
 };
 
+export const DEFAULT_HOME_CHIPS_ITEMS: HomeChipsItems = {
+  tonight: true,
+  weekend: true,
+  free: true,
+  cheap: true,
+  near: true,
+};
+
 export const DEFAULT_PAGE_SECTIONS_CONFIG: PageSectionsConfig = {
   home: {
     chips: true,
+    chips_items: { ...DEFAULT_HOME_CHIPS_ITEMS },
     opener: true,
     categories: true,
     spine: true,
@@ -119,10 +137,20 @@ export function parsePageSectionsConfig(raw: unknown): PageSectionsConfig {
   const dealsRaw = (typeof obj.deals === "object" && obj.deals !== null ? obj.deals : {}) as Record<string, unknown>;
 
   const def = DEFAULT_PAGE_SECTIONS_CONFIG;
+  const chipsItemsRaw = (typeof homeRaw.chips_items === "object" && homeRaw.chips_items !== null
+    ? homeRaw.chips_items
+    : {}) as Record<string, unknown>;
 
   return {
     home: {
       chips: parseBoolean(homeRaw.chips ?? homeRaw.intent_chips, def.home.chips),
+      chips_items: {
+        tonight: parseBoolean(chipsItemsRaw.tonight, DEFAULT_HOME_CHIPS_ITEMS.tonight),
+        weekend: parseBoolean(chipsItemsRaw.weekend, DEFAULT_HOME_CHIPS_ITEMS.weekend),
+        free: parseBoolean(chipsItemsRaw.free, DEFAULT_HOME_CHIPS_ITEMS.free),
+        cheap: parseBoolean(chipsItemsRaw.cheap, DEFAULT_HOME_CHIPS_ITEMS.cheap),
+        near: parseBoolean(chipsItemsRaw.near, DEFAULT_HOME_CHIPS_ITEMS.near),
+      },
       opener: parseBoolean(homeRaw.opener, def.home.opener),
       categories: parseBoolean(homeRaw.categories, def.home.categories),
       spine: parseBoolean(homeRaw.spine, def.home.spine),

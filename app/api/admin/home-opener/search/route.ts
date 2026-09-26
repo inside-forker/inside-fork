@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, getAdminAuthErrorStatus } from "@/lib/auth/admin";
 import { query } from "@/lib/db";
+import { fetchPrimaryImagesByEventId } from "@/lib/mobile/event-images";
 
 export const dynamic = "force-dynamic";
 
@@ -40,21 +41,28 @@ export async function GET(request: NextRequest) {
          LIMIT $${params.length}`,
         params,
       );
+      const eventIds = rows.map((r) => Number(r.event_id));
+      const imageMap = await fetchPrimaryImagesByEventId(eventIds);
+
       return NextResponse.json({
         success: true,
-        data: rows.map((r) => ({
-          kind: "event" as const,
-          id: Number(r.event_id),
-          title: String(r.event_name ?? ""),
-          subtitle: r.start_time
-            ? new Date(String(r.start_time)).toLocaleString("en-PK", {
-                dateStyle: "medium",
-                timeStyle: "short",
-              })
-            : null,
-          status: r.event_status as string | null,
-          is_featured: Boolean(r.is_featured),
-        })),
+        data: rows.map((r) => {
+          const id = Number(r.event_id);
+          return {
+            kind: "event" as const,
+            id,
+            title: String(r.event_name ?? ""),
+            image_url: imageMap.get(id) ?? null,
+            subtitle: r.start_time
+              ? new Date(String(r.start_time)).toLocaleString("en-PK", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })
+              : null,
+            status: r.event_status as string | null,
+            is_featured: Boolean(r.is_featured),
+          };
+        }),
       });
     }
 
