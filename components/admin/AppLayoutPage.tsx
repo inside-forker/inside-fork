@@ -6,8 +6,11 @@ import {
   ArrowDown,
   ArrowUp,
   Calendar,
+  CalendarRange,
+  Clock,
   Compass,
   Home as HomeIcon,
+  Info,
   Layers,
   Loader2,
   MapPin,
@@ -16,8 +19,11 @@ import {
   Save,
   Search,
   Sparkles,
+  Tag,
   Trash2,
+  Wallet,
 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,7 +34,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
+  DEFAULT_HOME_CHIPS_ITEMS,
   DEFAULT_PAGE_SECTIONS_CONFIG,
+  type HomeChipsItems,
   type PageSectionsConfig,
 } from "@/lib/page-sections/types";
 
@@ -50,9 +58,26 @@ type SearchHit = {
   kind: SlideKind;
   id: number;
   title: string;
+  image_url?: string | null;
   subtitle: string | null;
   status: string | null;
   is_featured: boolean;
+};
+
+type FeaturedEvent = {
+  id: number;
+  title: string;
+  slug: string;
+  status: string;
+  start_time: string | null;
+  end_time: string | null;
+  subtitle: string | null;
+  location_name: string | null;
+  address: string | null;
+  image_url: string | null;
+  is_featured: boolean;
+  featured_rank: number;
+  is_expired?: boolean;
 };
 
 type HeroPayload = {
@@ -68,7 +93,52 @@ type SectionItem<K extends string = string> = {
   note?: string;
 };
 
-const HOME_SECTIONS: SectionItem<keyof PageSectionsConfig["home"]>[] = [
+type HomeSectionKey = Exclude<keyof PageSectionsConfig["home"], "chips_items">;
+
+type ChipItem = {
+  key: keyof HomeChipsItems;
+  label: string;
+  description: string;
+  icon: typeof Clock;
+  note?: string;
+};
+
+const HOME_CHIP_ITEMS: ChipItem[] = [
+  {
+    key: "tonight",
+    label: "Tonight",
+    description: "Saved search for events happening tonight",
+    icon: Clock,
+  },
+  {
+    key: "weekend",
+    label: "This weekend",
+    description: "Saved search for events happening this weekend",
+    icon: CalendarRange,
+  },
+  {
+    key: "free",
+    label: "Free",
+    description: "Filter for free events",
+    icon: Tag,
+    note: "Also requires the ticket sales feature flag",
+  },
+  {
+    key: "cheap",
+    label: "Under PKR 1,000",
+    description: "Budget filter for events under PKR 1,000",
+    icon: Wallet,
+    note: "Also requires the ticket sales feature flag",
+  },
+  {
+    key: "near",
+    label: "Near me",
+    description: "Saved search routing to top-rated places near the user",
+    icon: MapPin,
+  },
+];
+
+const HOME_SECTIONS: SectionItem<HomeSectionKey>[] = [
   {
     key: "chips",
     label: "Quick filter chips",
@@ -137,6 +207,14 @@ export function AppLayoutPage() {
     JSON.parse(JSON.stringify(DEFAULT_PAGE_SECTIONS_CONFIG)),
   );
 
+  // Featured Events state
+  const [featuredEvents, setFeaturedEvents] = useState<FeaturedEvent[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [featuredSaving, setFeaturedSaving] = useState(false);
+  const [eventSearchQuery, setEventSearchQuery] = useState("");
+  const [eventSearching, setEventSearching] = useState(false);
+  const [eventSearchHits, setEventSearchHits] = useState<SearchHit[]>([]);
+
   const applyHeroPayload = useCallback((data: HeroPayload) => {
     setSlides(data.config.slides);
     setFillRemaining(data.config.fill_remaining);
@@ -182,10 +260,29 @@ export function AppLayoutPage() {
     }
   }, [toast]);
 
+  const loadFeaturedEvents = useCallback(async () => {
+    setFeaturedLoading(true);
+    try {
+      const res = await fetch("/api/admin/events/featured");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to load featured events");
+      setFeaturedEvents((json.data as FeaturedEvent[]) ?? []);
+    } catch (error) {
+      toast({
+        title: "Couldn’t load featured events",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setFeaturedLoading(false);
+    }
+  }, [toast]);
+
   useEffect(() => {
     loadHero();
     loadSections();
-  }, [loadHero, loadSections]);
+    loadFeaturedEvents();
+  }, [loadHero, loadSections, loadFeaturedEvents]);
 
   const previewByKey = useMemo(() => {
     const map = new Map<string, Preview>();
@@ -317,6 +414,19 @@ export function AppLayoutPage() {
     }));
   };
 
+  const updateHomeChipToggle = (chipKey: keyof HomeChipsItems, value: boolean) => {
+    setSectionsConfig((prev) => ({
+      ...prev,
+      home: {
+        ...prev.home,
+        chips_items: {
+          ...(prev.home.chips_items ?? DEFAULT_HOME_CHIPS_ITEMS),
+          [chipKey]: value,
+        },
+      },
+    }));
+  };
+
   const saveSections = async () => {
     setSectionsSaving(true);
     try {
@@ -345,7 +455,102 @@ export function AppLayoutPage() {
     }
   };
 
-  const isLoading = heroLoading || sectionsLoading;
+  const runEventSearch = useCallback(async () => {
+    setEventSearching(true);
+    try {
+      const params = new URLSearchParams({ kind: "event" });
+      if (eventSearchQuery.trim()) params.set("q", eventSearchQuery.trim());
+      const res = await fetch(`/api/admin/home-opener/search?${params}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Search failed");
+      setEventSearchHits((json.data as SearchHit[]) ?? []);
+    } catch (error) {
+      toast({
+        title: "Search failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setEventSearching(false);
+    }
+  }, [eventSearchQuery, toast]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void runEventSearch();
+    }, 250);
+    return () => clearTimeout(t);
+  }, [runEventSearch]);
+
+  const addFeaturedEvent = (hit: SearchHit) => {
+    if (featuredEvents.some((e) => e.id === hit.id)) {
+      toast({ title: "Already featured", description: hit.title });
+      return;
+    }
+    const newFeatured: FeaturedEvent = {
+      id: hit.id,
+      title: hit.title,
+      slug: "",
+      status: hit.status ?? "published",
+      start_time: null,
+      end_time: null,
+      subtitle: hit.subtitle,
+      location_name: null,
+      address: null,
+      image_url: hit.image_url ?? null,
+      is_featured: true,
+      featured_rank: 0,
+    };
+    setFeaturedEvents((prev) => [...prev, newFeatured]);
+    toast({
+      title: "Event added to Featured list",
+      description: "Click 'Save featured events' to persist changes to the app.",
+    });
+  };
+
+  const removeFeaturedEvent = (id: number) => {
+    setFeaturedEvents((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  const moveFeaturedEvent = (from: number, to: number) => {
+    if (to < 0 || to >= featuredEvents.length) return;
+    setFeaturedEvents((prev) => {
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  };
+
+  const saveFeaturedEvents = async () => {
+    setFeaturedSaving(true);
+    try {
+      const res = await fetch("/api/admin/events/featured", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event_ids: featuredEvents.map((e) => e.id) }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to save featured events");
+      if (json.data) {
+        setFeaturedEvents(json.data as FeaturedEvent[]);
+      }
+      toast({
+        title: "Featured events saved",
+        description: `Successfully updated featured events carousel (${featuredEvents.length} event${featuredEvents.length === 1 ? "" : "s"}).`,
+      });
+    } catch (error) {
+      toast({
+        title: "Save failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setFeaturedSaving(false);
+    }
+  };
+
+  const isLoading = heroLoading || sectionsLoading || featuredLoading;
 
   if (isLoading) {
     return (
@@ -379,6 +584,30 @@ export function AppLayoutPage() {
               )}
               Save hero
             </Button>
+          ) : activeTab === "events" ? (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={saveFeaturedEvents}
+                disabled={featuredSaving}
+                variant="secondary"
+                className="gap-2"
+              >
+                {featuredSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 text-primary" />
+                )}
+                Save featured events
+              </Button>
+              <Button onClick={saveSections} disabled={sectionsSaving} className="gap-2">
+                {sectionsSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Save sections
+              </Button>
+            </div>
           ) : (
             <Button onClick={saveSections} disabled={sectionsSaving} className="gap-2">
               {sectionsSaving ? (
@@ -391,6 +620,21 @@ export function AppLayoutPage() {
           )}
         </div>
       </div>
+
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Mobile API host must match this admin</AlertTitle>
+        <AlertDescription>
+          These toggles save to this server&apos;s database. The Expo app only
+          hides sections when{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            EXPO_PUBLIC_API_URL
+          </code>{" "}
+          points at the same host (for local Next, use your LAN IP — not
+          production). Pull to refresh on Home after saving, or kill and reopen
+          the app.
+        </AlertDescription>
+      </Alert>
 
       <Tabs
         value={activeTab}
@@ -649,31 +893,102 @@ export function AppLayoutPage() {
             <CardContent>
               <div className="divide-y rounded-lg border">
                 {HOME_SECTIONS.map((sec) => {
-                  const enabled = sectionsConfig.home[sec.key];
+                  const enabled = Boolean(sectionsConfig.home[sec.key]);
+                  const isChips = sec.key === "chips";
+                  const chipsItems = sectionsConfig.home.chips_items ?? DEFAULT_HOME_CHIPS_ITEMS;
+
                   return (
-                    <div
-                      key={sec.key}
-                      className="flex items-center justify-between gap-4 p-4 hover:bg-muted/40 transition-colors"
-                    >
-                      <div className="space-y-0.5 min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor={`home-${sec.key}`} className="text-sm font-medium cursor-pointer">
-                            {sec.label}
-                          </Label>
-                          <Badge variant={enabled ? "default" : "outline"} className="text-xs">
-                            {enabled ? "Visible" : "Hidden"}
-                          </Badge>
+                    <div key={sec.key} className="divide-y">
+                      <div className="flex items-center justify-between gap-4 p-4 hover:bg-muted/40 transition-colors">
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor={`home-${sec.key}`} className="text-sm font-medium cursor-pointer">
+                              {sec.label}
+                            </Label>
+                            <Badge variant={enabled ? "default" : "outline"} className="text-xs">
+                              {enabled ? "Visible" : "Hidden"}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{sec.description}</p>
+                          {sec.note ? (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">{sec.note}</p>
+                          ) : null}
                         </div>
-                        <p className="text-sm text-muted-foreground">{sec.description}</p>
-                        {sec.note ? (
-                          <p className="text-xs text-amber-600 dark:text-amber-400">{sec.note}</p>
-                        ) : null}
+                        <Switch
+                          id={`home-${sec.key}`}
+                          checked={enabled}
+                          onCheckedChange={(val) => updateSectionToggle("home", sec.key, val)}
+                        />
                       </div>
-                      <Switch
-                        id={`home-${sec.key}`}
-                        checked={enabled}
-                        onCheckedChange={(val) => updateSectionToggle("home", sec.key, val)}
-                      />
+
+                      {/* Nested individual chips controls */}
+                      {isChips && (
+                        <div className="bg-muted/20 border-t px-4 py-3 sm:pl-8 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                              Individual Filter Chips
+                            </span>
+                            {!enabled && (
+                              <span className="text-xs text-muted-foreground italic">
+                                Master chips row is disabled
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid gap-2">
+                            {HOME_CHIP_ITEMS.map((chip) => {
+                              const ChipIcon = chip.icon;
+                              const chipEnabled = chipsItems[chip.key] !== false;
+                              const effectivelyVisible = enabled && chipEnabled;
+
+                              return (
+                                <div
+                                  key={chip.key}
+                                  className={cn(
+                                    "flex items-center justify-between gap-3 rounded-md border bg-background/90 p-3 transition-opacity",
+                                    !enabled && "opacity-50",
+                                  )}
+                                >
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                                      <ChipIcon className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0 flex-1 space-y-0.5">
+                                      <div className="flex items-center gap-2">
+                                        <Label
+                                          htmlFor={`chip-${chip.key}`}
+                                          className="text-sm font-medium cursor-pointer"
+                                        >
+                                          {chip.label}
+                                        </Label>
+                                        <Badge
+                                          variant={effectivelyVisible ? "default" : "outline"}
+                                          className="text-[10px] px-1.5 py-0 h-4"
+                                        >
+                                          {effectivelyVisible ? "Visible" : "Hidden"}
+                                        </Badge>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground truncate">
+                                        {chip.description}
+                                      </p>
+                                      {chip.note ? (
+                                        <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                                          {chip.note}
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                  <Switch
+                                    id={`chip-${chip.key}`}
+                                    checked={chipEnabled}
+                                    disabled={!enabled}
+                                    onCheckedChange={(val) => updateHomeChipToggle(chip.key, val)}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -734,6 +1049,213 @@ export function AppLayoutPage() {
 
         {/* ── Tab: Events ── */}
         <TabsContent value="events" className="space-y-6">
+          {/* Card: Featured Events Selection */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      Featured Events Carousel
+                    </CardTitle>
+                    <Badge variant={featuredEvents.length > 0 ? "default" : "outline"} className="text-xs">
+                      {featuredEvents.length} {featuredEvents.length === 1 ? "Event" : "Events"}
+                    </Badge>
+                  </div>
+                  <CardDescription className="mt-1">
+                    Select which events appear in the Featured carousel at the top of the mobile Events tab. Selecting 1 event shows a single hero poster card; selecting multiple events turns it into a swipable carousel in this exact order.
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={saveFeaturedEvents}
+                  disabled={featuredSaving}
+                  size="sm"
+                  className="gap-2 shrink-0"
+                >
+                  {featuredSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save featured events
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Selected featured events list */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Featured Carousel Order ({featuredEvents.length})
+                  </span>
+                  {featuredEvents.length > 1 && (
+                    <span className="text-xs text-muted-foreground">
+                      Use arrows to set display order
+                    </span>
+                  )}
+                </div>
+
+                {featuredEvents.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                    No events currently featured. Search published events below and click &quot;+ Feature&quot; to add them to the carousel.
+                  </div>
+                ) : (
+                  <ul className="divide-y rounded-lg border">
+                    {featuredEvents.map((event, idx) => (
+                      <li key={event.id} className="flex items-center gap-3 p-3">
+                        <span className="text-xs font-bold text-muted-foreground w-6 text-center shrink-0">
+                          #{idx + 1}
+                        </span>
+
+                        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border bg-muted">
+                          {event.image_url ? (
+                            <Image
+                              src={event.image_url}
+                              alt={event.title}
+                              fill
+                              sizes="48px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                              <Calendar className="h-5 w-5" />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate font-medium">{event.title}</p>
+                            {event.is_expired ? (
+                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4">
+                                Expired
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                                {event.status}
+                              </Badge>
+                            )}
+                          </div>
+                          {event.subtitle ? (
+                            <p className="truncate text-xs text-muted-foreground">{event.subtitle}</p>
+                          ) : null}
+                          {event.location_name ? (
+                            <p className="truncate text-[11px] text-muted-foreground/80">{event.location_name}</p>
+                          ) : null}
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            disabled={idx === 0}
+                            onClick={() => moveFeaturedEvent(idx, idx - 1)}
+                            title="Move up"
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            disabled={idx === featuredEvents.length - 1}
+                            onClick={() => moveFeaturedEvent(idx, idx + 1)}
+                            title="Move down"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                            onClick={() => removeFeaturedEvent(event.id)}
+                            title="Remove from featured"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Search & Add */}
+              <div className="space-y-3 pt-2 border-t">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Find & Feature Events
+                </span>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    className="pl-9"
+                    placeholder="Search published upcoming events to feature…"
+                    value={eventSearchQuery}
+                    onChange={(e) => setEventSearchQuery(e.target.value)}
+                  />
+                </div>
+
+                {eventSearching ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Searching events…
+                  </div>
+                ) : eventSearchHits.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2">No matching events found.</p>
+                ) : (
+                  <ul className="divide-y rounded-lg border max-h-72 overflow-y-auto">
+                    {eventSearchHits.map((hit) => {
+                      const isAlreadyFeatured = featuredEvents.some((e) => e.id === hit.id);
+                      return (
+                        <li key={hit.id} className="flex items-center gap-3 p-3">
+                          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md border bg-muted">
+                            {hit.image_url ? (
+                              <Image
+                                src={hit.image_url}
+                                alt={hit.title}
+                                fill
+                                sizes="40px"
+                                className="object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                                <Calendar className="h-4 w-4" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium text-sm">{hit.title}</p>
+                            {hit.subtitle ? (
+                              <p className="truncate text-xs text-muted-foreground">{hit.subtitle}</p>
+                            ) : null}
+                          </div>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={isAlreadyFeatured ? "outline" : "default"}
+                            onClick={() => {
+                              if (isAlreadyFeatured) {
+                                removeFeaturedEvent(hit.id);
+                              } else {
+                                addFeaturedEvent(hit);
+                              }
+                            }}
+                          >
+                            {isAlreadyFeatured ? "Featured" : "+ Feature"}
+                          </Button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card: Events Feed Sections */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -745,7 +1267,7 @@ export function AppLayoutPage() {
                 </div>
                 <Button onClick={saveSections} disabled={sectionsSaving} size="sm" className="gap-2">
                   {sectionsSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Save Events
+                  Save Section Toggles
                 </Button>
               </div>
             </CardHeader>

@@ -15,12 +15,14 @@ import { sanitizeSearchTerm } from "@/lib/utils/search-sanitization";
 import { sortFetchedListingsBySearchRelevance } from "@/lib/listings/search-relevance";
 import {
   resolveCategoryIdScope,
+  resolveCategoryBySlugWithScope,
   listingCategoriesExistsClause,
 } from "@/lib/listings/category-scope";
 import {
   LISTING_COVER_CANDIDATE_CAP,
   resolveListingCovers,
 } from "@/lib/mobile/listing-covers";
+import { OPEN_NOW_EXISTS_CLAUSE } from "@/lib/listings/query-paginated-listings";
 
 /** Explicit column list for `listings_with_details` - never use `*`. */
 const LISTING_CARD_SQL_COLUMNS =
@@ -39,13 +41,15 @@ function toNumericListingRow(row: Record<string, unknown>): ListingRowLike {
 
 export const dynamic = "force-dynamic";
 
-/** Sorts supported in this version. Deal/distance-ranked sorts are not yet wired. */
+/** Sorts supported in this version. */
 const SUPPORTED_SORTS = new Set([
   "featured",
   "rating",
   "top-rated",
   "newest",
   "name",
+  "nearest",
+  "distance",
 ]);
 
 /**
@@ -92,6 +96,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   }
   const minRating = searchParams.get("rating");
   const excludeFeatured = searchParams.get("exclude_featured") === "true";
+  const openNowParam = searchParams.get("open_now");
+  const openNow = openNowParam === "true" || openNowParam === "1";
   // Client-generated once per screen visit (not per request) - keeps the
   // shuffle stable across pagination within one visit, but different on the
   // next visit. Bound as a query param below, never concatenated into SQL.
@@ -113,6 +119,11 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     const categoryId = Number(categoryParam);
     if (Number.isInteger(categoryId) && categoryId > 0) {
       categoryIds = await resolveCategoryIdScope(categoryId);
+    } else {
+      const resolved = await resolveCategoryBySlugWithScope(categoryParam);
+      if (resolved) {
+        categoryIds = resolved.categoryIds;
+      }
     }
   }
 
@@ -148,6 +159,34 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     whereClauses.push(`is_featured = false`);
   }
 
+  if (openNow) {
+    whereClauses.push(OPEN_NOW_EXISTS_CLAUSE);
+  }
+
+  const latStr = searchParams.get("lat") ?? searchParams.get("latitude");
+  const lngStr = searchParams.get("lng") ?? searchParams.get("longitude");
+  const parsedLat = latStr ? parseFloat(latStr) : NaN;
+  const parsedLng = lngStr ? parseFloat(lngStr) : NaN;
+  const hasUserLocation =
+    !Number.isNaN(parsedLat) &&
+    !Number.isNaN(parsedLng) &&
+    parsedLat >= -90 &&
+    parsedLat <= 90 &&
+    parsedLng >= -180 &&
+    parsedLng <= 180;
+
+  const haversineDistanceExpr = hasUserLocation
+    ? `(
+        6371 * acos(
+          least(1.0, greatest(-1.0,
+            cos(radians(${parsedLat})) * cos(radians(latitude)) *
+            cos(radians(longitude) - radians(${parsedLng})) +
+            sin(radians(${parsedLat})) * sin(radians(latitude))
+          ))
+        )
+      )`
+    : null;
+
   // Placeholder swapped for the real $N once dataParams is finalized below -
   // kept out of the shared `params` array so the COUNT query (which doesn't
   // need it) never sees it.
@@ -158,7 +197,15 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   switch (sort) {
     case "rating":
     case "top-rated":
-      orderBySql = `avg_rating DESC NULLS LAST, id ASC`;
+      orderBySql = hasUserLocation
+        ? `(avg_rating IS NOT NULL AND avg_rating > 0) DESC, avg_rating DESC NULLS LAST, review_count DESC NULLS LAST, ${haversineDistanceExpr} ASC NULLS LAST, id ASC`
+        : `(avg_rating IS NOT NULL AND avg_rating > 0) DESC, avg_rating DESC NULLS LAST, review_count DESC NULLS LAST, id ASC`;
+      break;
+    case "nearest":
+    case "distance":
+      orderBySql = hasUserLocation
+        ? `${haversineDistanceExpr} ASC NULLS LAST, (avg_rating IS NOT NULL AND avg_rating > 0) DESC, avg_rating DESC NULLS LAST, id ASC`
+        : `(avg_rating IS NOT NULL AND avg_rating > 0) DESC, avg_rating DESC NULLS LAST, review_count DESC NULLS LAST, id ASC`;
       break;
     case "newest":
       orderBySql = `created_at DESC, id ASC`;
