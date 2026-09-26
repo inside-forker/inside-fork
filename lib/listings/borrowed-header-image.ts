@@ -22,51 +22,18 @@ export async function getBorrowedHeaderImageUrl(
   listingId: number,
   listingName: string | null | undefined,
 ): Promise<string | null> {
-  const stem = brandStemFromListingName(listingName);
-  if (!stem) return null;
-
-  try {
-    const { rows } = await query(
-      `SELECT li.url
-       FROM listings l
-       INNER JOIN listing_images li ON li.listing_id = l.id
-         AND li.url NOT LIKE '%/menu/%'
-         AND (li.availability IS NULL OR li.availability IS DISTINCT FROM 'dead')
-       LEFT JOIN LATERAL (
-         SELECT COUNT(*)::int AS branch_count
-         FROM listing_branches lb
-         WHERE lb.listing_id = l.id
-       ) b ON true
-       LEFT JOIN LATERAL (
-         SELECT COUNT(*)::int AS gallery_count
-         FROM listing_images gi
-         WHERE gi.listing_id = l.id
-           AND gi.url NOT LIKE '%/menu/%'
-           AND (gi.availability IS NULL OR gi.availability IS DISTINCT FROM 'dead')
-       ) g ON true
-       WHERE l.status IN ('published', 'archived')
-         AND l.id <> $1
-         AND l.name ILIKE $2 || '%'
-       ORDER BY
-         (l.status = 'published') DESC,
-         (COALESCE(b.branch_count, 0) >= 2) DESC,
-         COALESCE(g.gallery_count, 0) DESC,
-         li.is_primary DESC NULLS LAST,
-         li.display_order ASC NULLS LAST,
-         li.id ASC
-       LIMIT 1`,
-      [listingId, stem],
-    );
-    const url = rows[0]?.url;
-    return typeof url === "string" && url.trim() ? url.trim() : null;
-  } catch (error) {
-    console.error("[listings] borrowed header lookup failed:", error);
-    return null;
-  }
+  const map = await getBorrowedHeaderImageUrls([
+    { id: listingId, name: listingName ?? null },
+  ]);
+  return map.get(listingId) ?? null;
 }
 
 /**
- * Batch variant for search results — one donor lookup per distinct brand stem.
+ * Batch variant — one SQL round-trip for every distinct brand stem.
+ *
+ * Do not Promise.all per-stem queries: local/dev pools are tiny (often max:2)
+ * and a deals catalog can have hundreds of stems, which saturates the pool,
+ * times out, retries, and floods the logs.
  */
 export async function getBorrowedHeaderImageUrls(
   listings: Array<{ id: number; name: string | null }>,
@@ -74,62 +41,108 @@ export async function getBorrowedHeaderImageUrls(
   const result = new Map<number, string>();
   if (listings.length === 0) return result;
 
-  const byStem = new Map<string, number[]>();
+  const byStem = new Map<string, { stem: string; ids: number[] }>();
   for (const listing of listings) {
     const stem = brandStemFromListingName(listing.name);
     if (!stem) continue;
     const key = stem.toLowerCase();
-    const ids = byStem.get(key);
-    if (ids) ids.push(listing.id);
-    else byStem.set(key, [listing.id]);
+    const entry = byStem.get(key);
+    if (entry) entry.ids.push(listing.id);
+    else byStem.set(key, { stem, ids: [listing.id] });
   }
 
-  await Promise.all(
-    [...byStem.entries()].map(async ([stemKey, ids]) => {
-      // Recover original casing from the first matching name for the ILIKE prefix.
-      const sample = listings.find((l) => brandStemFromListingName(l.name)?.toLowerCase() === stemKey);
-      const stem = brandStemFromListingName(sample?.name) ?? stemKey;
-      try {
-        const { rows } = await query(
-          `SELECT li.url
-           FROM listings l
-           INNER JOIN listing_images li ON li.listing_id = l.id
-             AND li.url NOT LIKE '%/menu/%'
-             AND (li.availability IS NULL OR li.availability IS DISTINCT FROM 'dead')
-           LEFT JOIN LATERAL (
-             SELECT COUNT(*)::int AS branch_count
-             FROM listing_branches lb
-             WHERE lb.listing_id = l.id
-           ) b ON true
-           LEFT JOIN LATERAL (
-             SELECT COUNT(*)::int AS gallery_count
-             FROM listing_images gi
-             WHERE gi.listing_id = l.id
-               AND gi.url NOT LIKE '%/menu/%'
-               AND (gi.availability IS NULL OR gi.availability IS DISTINCT FROM 'dead')
-           ) g ON true
-           WHERE l.status IN ('published', 'archived')
-             AND NOT (l.id = ANY($1::int[]))
-             AND l.name ILIKE $2 || '%'
-           ORDER BY
-             (l.status = 'published') DESC,
-             (COALESCE(b.branch_count, 0) >= 2) DESC,
-             COALESCE(g.gallery_count, 0) DESC,
-             li.is_primary DESC NULLS LAST,
-             li.display_order ASC NULLS LAST,
-             li.id ASC
-           LIMIT 1`,
-          [ids, stem],
-        );
-        const url = rows[0]?.url;
-        if (typeof url === "string" && url.trim()) {
-          for (const id of ids) result.set(id, url.trim());
-        }
-      } catch (error) {
-        console.error("[listings] batch borrowed header lookup failed:", error);
-      }
-    }),
-  );
+  if (byStem.size === 0) return result;
+
+  const stemLabels: string[] = [];
+  const stemKeys: string[] = [];
+  const excludeStemIdx: number[] = [];
+  const excludeIds: number[] = [];
+
+  let idx = 0;
+  for (const [key, { stem, ids }] of byStem) {
+    stemKeys.push(key);
+    stemLabels.push(stem);
+    for (const id of ids) {
+      excludeStemIdx.push(idx);
+      excludeIds.push(id);
+    }
+    idx += 1;
+  }
+
+  try {
+    const { rows } = await query<{ idx: number; url: string }>(
+      `WITH stems AS (
+         SELECT stem, (ordinality - 1)::int AS idx
+         FROM unnest($1::text[]) WITH ORDINALITY AS t(stem, ordinality)
+       ),
+       excludes AS (
+         SELECT stem_idx, exclude_id
+         FROM unnest($2::int[], $3::int[]) AS t(stem_idx, exclude_id)
+       ),
+       ranked AS (
+         SELECT
+           s.idx,
+           li.url,
+           ROW_NUMBER() OVER (
+             PARTITION BY s.idx
+             ORDER BY
+               (l.status = 'published') DESC,
+               (COALESCE(b.branch_count, 0) >= 2) DESC,
+               COALESCE(g.gallery_count, 0) DESC,
+               li.is_primary DESC NULLS LAST,
+               li.display_order ASC NULLS LAST,
+               li.id ASC
+           ) AS rn
+         FROM stems s
+         INNER JOIN listings l
+           ON l.status IN ('published', 'archived')
+          AND l.name ILIKE s.stem || '%'
+          AND NOT EXISTS (
+            SELECT 1
+            FROM excludes e
+            WHERE e.stem_idx = s.idx
+              AND e.exclude_id = l.id
+          )
+         INNER JOIN listing_images li
+           ON li.listing_id = l.id
+          AND li.url NOT LIKE '%/menu/%'
+          AND (li.availability IS NULL OR li.availability IS DISTINCT FROM 'dead')
+         LEFT JOIN LATERAL (
+           SELECT COUNT(*)::int AS branch_count
+           FROM listing_branches lb
+           WHERE lb.listing_id = l.id
+         ) b ON true
+         LEFT JOIN LATERAL (
+           SELECT COUNT(*)::int AS gallery_count
+           FROM listing_images gi
+           WHERE gi.listing_id = l.id
+             AND gi.url NOT LIKE '%/menu/%'
+             AND (gi.availability IS NULL OR gi.availability IS DISTINCT FROM 'dead')
+         ) g ON true
+       )
+       SELECT idx, url
+       FROM ranked
+       WHERE rn = 1`,
+      [stemLabels, excludeStemIdx, excludeIds],
+    );
+
+    const urlByIdx = new Map<number, string>();
+    for (const row of rows) {
+      const url = typeof row.url === "string" ? row.url.trim() : "";
+      if (!url) continue;
+      urlByIdx.set(Number(row.idx), url);
+    }
+
+    for (let i = 0; i < stemKeys.length; i++) {
+      const url = urlByIdx.get(i);
+      if (!url) continue;
+      const ids = byStem.get(stemKeys[i])?.ids;
+      if (!ids) continue;
+      for (const id of ids) result.set(id, url);
+    }
+  } catch (error) {
+    console.error("[listings] batch borrowed header lookup failed:", error);
+  }
 
   return result;
 }
