@@ -10,6 +10,7 @@ import {
   Clock,
   Compass,
   Home as HomeIcon,
+  Info,
   Layers,
   Loader2,
   MapPin,
@@ -22,6 +23,7 @@ import {
   Trash2,
   Wallet,
 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -618,6 +620,21 @@ export function AppLayoutPage() {
           )}
         </div>
       </div>
+
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Mobile API host must match this admin</AlertTitle>
+        <AlertDescription>
+          These toggles save to this server&apos;s database. The Expo app only
+          hides sections when{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            EXPO_PUBLIC_API_URL
+          </code>{" "}
+          points at the same host (for local Next, use your LAN IP — not
+          production). Pull to refresh on Home after saving, or kill and reopen
+          the app.
+        </AlertDescription>
+      </Alert>
 
       <Tabs
         value={activeTab}

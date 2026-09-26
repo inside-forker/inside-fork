@@ -169,7 +169,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     undefined,
     {
       headers: {
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        "Cache-Control": "private, max-age=0, s-maxage=60",
       },
     },
   );
