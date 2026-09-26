@@ -74,7 +74,10 @@ export async function resolveListingCovers(
 
   const needingBorrow = listings.filter((l) => {
     const n = out.get(l.id)?.images.length ?? 0;
-    return n < 2;
+    // Only borrow when we still need cover slots. Deals pass candidateCap:1 —
+    // previously this was hard-coded `< 2`, so a full catalog fired hundreds of
+    // stem lookups even when every listing already had its one cover.
+    return n < Math.min(2, cap);
   });
 
   if (needingBorrow.length > 0) {

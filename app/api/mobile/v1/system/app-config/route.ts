@@ -4,6 +4,10 @@ import { ok } from "@/lib/mobile/response";
 import { enforceMobileRateLimit } from "@/lib/mobile/rate-limit";
 import { MobileApiError } from "@/lib/mobile/errors";
 import { query } from "@/lib/db";
+import {
+  PAGE_SECTIONS_CONFIG_KEY,
+  parsePageSectionsConfig,
+} from "@/lib/page-sections/types";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +44,8 @@ const CONFIG_KEYS = [
   "mobile.update_message",
   "mobile.android_store_url",
   "mobile.ios_store_url",
+  // Feed sections toggle key
+  PAGE_SECTIONS_CONFIG_KEY,
 ];
 
 /**
@@ -139,6 +145,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       ? (byKey.get("mobile.ios_store_url") as string)
       : "https://apps.apple.com/app/inside-karachi/id6470000000";
 
+  const sections = parsePageSectionsConfig(byKey.get(PAGE_SECTIONS_CONFIG_KEY));
+
   return ok(
     {
       maintenance: {
@@ -156,6 +164,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
         android_store_url: androidStoreUrl,
         ios_store_url: iosStoreUrl,
       },
+      sections,
     },
     undefined,
     {
