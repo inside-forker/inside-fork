@@ -126,7 +126,7 @@ export const adminNavigation: RoleNavItem[] = [
   { name: "Blog Categories", href: "/admin/blog-categories", icon: FileText, description: "Manage blog categories" },
   { name: "Gamification", href: "/admin/gamification", icon: Trophy, description: "Manage ranks & badges" },
   { name: "Analytics", href: "/admin/analytics", icon: BarChart3, description: "Platform-wide analytics" },
-  { name: "Home Hero", href: "/admin/home-hero", icon: Sparkles, description: "Curate the mobile Home opener slides" },
+  { name: "App Layout", href: "/admin/app-layout", icon: Sparkles, description: "Hero slides and which feed sections appear in the app" },
   { name: "Mobile Events", href: "/admin/mobile-events", icon: Smartphone, description: "Screen views & search activity" },
   { name: "Offer Redemptions", href: "/admin/redemptions", icon: Ticket, description: "Platform redemption GMV & validate codes" },
   { name: "Segments", href: "/admin/segments", icon: Layers, description: "Segment membership counts" },
