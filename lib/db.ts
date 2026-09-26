@@ -43,8 +43,8 @@ function resolvePoolMax(): number {
   if (isProductionBuildPhase()) return 1;
   // Serverless production: one connection per isolate.
   if (process.env.VERCEL || process.env.NODE_ENV === "production") return 1;
-  // Default to 2 in local dev to avoid exhausting PostgreSQL max_connections (DO Postgres limit ~22).
-  return 2;
+  // Use 5 in local dev so concurrent requests from mobile & web don't deadlock (DO Postgres limit ~22).
+  return 5;
 }
 
 function createPool() {
@@ -63,11 +63,11 @@ function createPool() {
     keepAlive: true,
     keepAliveInitialDelayMillis: 10_000,
 
-    // Release idle connections quickly so slots aren't held by warm lambdas or fast-refresh processes.
-    idleTimeoutMillis: 5_000,
+    // Release idle connections quickly in prod; keep warm longer in dev to avoid constant SSL handshakes.
+    idleTimeoutMillis: isProd ? 5_000 : 30_000,
 
     // How long (ms) to wait when acquiring a connection from the pool.
-    connectionTimeoutMillis: building ? 10_000 : 10_000,
+    connectionTimeoutMillis: isProd ? 10_000 : 25_000,
 
     // Recycle connections after 7500 uses to prevent long-lived connection
     // memory leaks on the DO managed Postgres side.
