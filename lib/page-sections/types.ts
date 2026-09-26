@@ -8,6 +8,7 @@
 export const PAGE_SECTIONS_CONFIG_KEY = "mobile.page_sections";
 
 export type HomePageSections = {
+  chips: boolean;
   opener: boolean;
   categories: boolean;
   spine: boolean;
@@ -52,6 +53,7 @@ export type PageSectionsConfig = {
 
 export const DEFAULT_PAGE_SECTIONS_CONFIG: PageSectionsConfig = {
   home: {
+    chips: true,
     opener: true,
     categories: true,
     spine: true,
@@ -120,6 +122,7 @@ export function parsePageSectionsConfig(raw: unknown): PageSectionsConfig {
 
   return {
     home: {
+      chips: parseBoolean(homeRaw.chips ?? homeRaw.intent_chips, def.home.chips),
       opener: parseBoolean(homeRaw.opener, def.home.opener),
       categories: parseBoolean(homeRaw.categories, def.home.categories),
       spine: parseBoolean(homeRaw.spine, def.home.spine),

@@ -69,6 +69,11 @@ type SectionItem<K extends string = string> = {
 };
 
 const HOME_SECTIONS: SectionItem<keyof PageSectionsConfig["home"]>[] = [
+  {
+    key: "chips",
+    label: "Quick filter chips",
+    description: "Saved-search intent pills ('Tonight', 'This weekend', 'Free', 'Under PKR 1,000', 'Near me') under the search bar",
+  },
   { key: "opener", label: "This week opener", description: "Hero carousel at the top of Home" },
   { key: "categories", label: "Explore Categories", description: "Pills linking directly to core categories" },
   { key: "spine", label: "What's on", description: "Chronological event timeline" },
