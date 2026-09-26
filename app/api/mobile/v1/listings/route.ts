@@ -22,6 +22,7 @@ import {
   LISTING_COVER_CANDIDATE_CAP,
   resolveListingCovers,
 } from "@/lib/mobile/listing-covers";
+import { OPEN_NOW_EXISTS_CLAUSE } from "@/lib/listings/query-paginated-listings";
 
 /** Explicit column list for `listings_with_details` - never use `*`. */
 const LISTING_CARD_SQL_COLUMNS =
@@ -95,6 +96,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   }
   const minRating = searchParams.get("rating");
   const excludeFeatured = searchParams.get("exclude_featured") === "true";
+  const openNowParam = searchParams.get("open_now");
+  const openNow = openNowParam === "true" || openNowParam === "1";
   // Client-generated once per screen visit (not per request) - keeps the
   // shuffle stable across pagination within one visit, but different on the
   // next visit. Bound as a query param below, never concatenated into SQL.
@@ -154,6 +157,10 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   if (excludeFeatured) {
     whereClauses.push(`is_featured = false`);
+  }
+
+  if (openNow) {
+    whereClauses.push(OPEN_NOW_EXISTS_CLAUSE);
   }
 
   const latStr = searchParams.get("lat") ?? searchParams.get("latitude");
