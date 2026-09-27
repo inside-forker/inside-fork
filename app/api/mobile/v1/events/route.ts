@@ -27,21 +27,12 @@ const EVENT_CARD_SQL_COLUMNS =
   "events_with_details.location_name, events_with_details.address, " +
   "events_with_details.latitude, events_with_details.longitude, " +
   "events_with_details.category_id, c.name AS category_name, c.slug AS category_slug, c.icon_name AS category_icon_name, " +
-  "mp.min_price, e.venue_id, v.name AS venue_name, v.rating AS venue_rating";
+  "e.venue_id, v.name AS venue_name, v.rating AS venue_rating";
 
-/** Joined so the row select can surface category display fields, the
- * cheapest ticket price, and the linked venue's display fields. Price
- * *filtering* (below) deliberately uses a standalone correlated subquery
- * instead of referencing `mp.min_price`, so the same WHERE clause also works
- * unmodified against the count query, which selects from `events_with_details`
- * alone without this join. `venue_id` isn't on the (untracked) view, so it's
- * reached by joining back to `events` by id rather than editing the view. */
+/** Joined so the row select can surface category display fields, and the linked venue's display fields. */
 const EVENTS_FROM_SQL =
   "events_with_details " +
   "LEFT JOIN categories c ON c.id = events_with_details.category_id " +
-  "LEFT JOIN LATERAL (" +
-  "SELECT MIN(price) AS min_price FROM ticket_types tt WHERE tt.event_id = events_with_details.event_id" +
-  ") mp ON true " +
   "LEFT JOIN events e ON e.id = events_with_details.event_id " +
   "LEFT JOIN venues v ON v.id = e.venue_id";
 
@@ -226,27 +217,26 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   let count: number;
   try {
     // Sequential, NOT Promise.all. The production pool is capped at `max: 1`
-    // connection per serverless instance (see lib/db.ts), so these two can
-    // never actually overlap - firing them together only makes the second one
-    // sit in the pool's queue racing `connectionTimeoutMillis` (10s) while the
-    // first holds the sole connection. That queue timeout is what intermittently
-    // turned this route into a 500 ("Failed to load events.") while unrelated
-    // screens loaded fine. Awaiting in order costs no extra wall-clock time and
-    // removes the failure mode entirely.
     const rowsRes = await query(
-      `SELECT ${EVENT_CARD_SQL_COLUMNS}, ${distanceSelectSql}
+      `SELECT ${EVENT_CARD_SQL_COLUMNS}, ${distanceSelectSql}, COUNT(*) OVER() AS total_count
        FROM ${EVENTS_FROM_SQL}
        WHERE ${whereSql}
        ORDER BY ${orderBy}
        LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
       params,
     );
-    const countRes = await query(
-      `SELECT COUNT(*) AS count FROM events_with_details WHERE ${whereSql}`,
-      countParams,
-    );
     rows = rowsRes.rows;
-    count = Number(countRes.rows[0]?.count ?? 0);
+    if (rows.length > 0) {
+      count = Number(rows[0].total_count ?? 0);
+    } else if (offset === 0) {
+      count = 0;
+    } else {
+      const countRes = await query(
+        `SELECT COUNT(*) AS count FROM events_with_details WHERE ${whereSql}`,
+        countParams,
+      );
+      count = Number(countRes.rows[0]?.count ?? 0);
+    }
   } catch (error) {
     console.error("[mobile-api] events query failed:", error);
     throw new MobileApiError("internal_error", "Failed to load events.", 500);
@@ -261,22 +251,16 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   let primaryImageByEvent = new Map<number, string>();
   let priceRangeByEvent = new Map<number, EventPriceRange>();
   try {
-    // Sequential for the same reason as the count query above - a `max: 1`
-    // pool turns concurrent queries into queued ones racing a 10s acquisition
-    // timeout. This block already fails soft (the catch below only logs), so a
-    // timeout here silently stripped attendee avatars and cover images off
-    // every card rather than 500ing - the same root cause showing up as
-    // "sometimes the events have images, sometimes they don't".
-    const attendeesResult = await getAttendeesPreviewByEvent(eventIds);
-    // Shared helper, so "which image is the cover" is decided the same way on
-    // every event list. The old inline query also required `is_primary` or
-    // `display_order = 1`, which left an event whose images are merely ordered
-    // from 0 (or 2 up) with no cover at all.
-    const imagesByEvent = await fetchPrimaryImagesByEventId(eventIds);
-    const pricesByEvent = await fetchPriceRangeByEventId(eventIds);
-    attendeesPreviewByEvent = attendeesResult;
-    primaryImageByEvent = imagesByEvent;
-    priceRangeByEvent = pricesByEvent;
+    if (eventIds.length > 0) {
+      const [attendeesResult, imagesByEvent, pricesByEvent] = await Promise.all([
+        getAttendeesPreviewByEvent(eventIds),
+        fetchPrimaryImagesByEventId(eventIds),
+        fetchPriceRangeByEventId(eventIds),
+      ]);
+      attendeesPreviewByEvent = attendeesResult;
+      primaryImageByEvent = imagesByEvent;
+      priceRangeByEvent = pricesByEvent;
+    }
   } catch (error) {
     console.error(
       "[mobile-api] attendees preview / image / price query failed:",

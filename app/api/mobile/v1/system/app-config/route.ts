@@ -56,8 +56,19 @@ const CONFIG_KEYS = [
  * - Version requirements & force update parameters
  * - Store URLs for updates
  */
+let appConfigCache: { timestamp: number; data: any } | null = null;
+const APP_CONFIG_CACHE_TTL_MS = 15_000;
+
 export const GET = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
+
+  if (appConfigCache && Date.now() - appConfigCache.timestamp < APP_CONFIG_CACHE_TTL_MS) {
+    return ok(appConfigCache.data, undefined, {
+      headers: {
+        "Cache-Control": "private, max-age=0, s-maxage=60",
+      },
+    });
+  }
 
   let rows;
   try {
@@ -147,30 +158,30 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   const sections = parsePageSectionsConfig(byKey.get(PAGE_SECTIONS_CONFIG_KEY));
 
-  return ok(
-    {
-      maintenance: {
-        enabled: maintenanceEnabled,
-        title: maintenanceTitle,
-        message: maintenanceMessage,
-        estimated_end: maintenanceEstimatedEnd,
-      },
-      update: {
-        min_version: minVersion,
-        latest_version: latestVersion,
-        force_update_enabled: forceUpdateEnabled,
-        title: updateTitle,
-        message: updateMessage,
-        android_store_url: androidStoreUrl,
-        ios_store_url: iosStoreUrl,
-      },
-      sections,
+  const payload = {
+    maintenance: {
+      enabled: maintenanceEnabled,
+      title: maintenanceTitle,
+      message: maintenanceMessage,
+      estimated_end: maintenanceEstimatedEnd,
     },
-    undefined,
-    {
-      headers: {
-        "Cache-Control": "private, max-age=0, s-maxage=60",
-      },
+    update: {
+      min_version: minVersion,
+      latest_version: latestVersion,
+      force_update_enabled: forceUpdateEnabled,
+      title: updateTitle,
+      message: updateMessage,
+      android_store_url: androidStoreUrl,
+      ios_store_url: iosStoreUrl,
     },
-  );
+    sections,
+  };
+
+  appConfigCache = { timestamp: Date.now(), data: payload };
+
+  return ok(payload, undefined, {
+    headers: {
+      "Cache-Control": "private, max-age=0, s-maxage=60",
+    },
+  });
 });

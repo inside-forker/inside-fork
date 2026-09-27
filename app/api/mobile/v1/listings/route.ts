@@ -308,6 +308,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     const [covers, deals] = await Promise.all([
       resolveListingCovers(coverInputs, {
         candidateCap: LISTING_COVER_CANDIDATE_CAP,
+        3        skipBorrow: true,
       }),
       fetchBestDealsByListing(listingIds),
     ]);

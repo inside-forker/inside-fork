@@ -39,19 +39,6 @@ const CARD_COLUMNS_QUALIFIED = LISTING_CARD_COLUMNS.split(", ")
   .map((column) => `ld.${column}`)
   .join(", ");
 
-const FAVORITES_CTE = `
-  WITH all_time_favorites AS (
-    SELECT listing_id, COUNT(*) AS cnt
-    FROM favorite_listings
-    GROUP BY listing_id
-  ),
-  published_rating_mean AS (
-    SELECT AVG(avg_rating) AS mean_rating
-    FROM listings_with_details
-    WHERE status = 'published' AND review_count > 0
-  )
-`;
-
 const ORGANIC_ELIGIBILITY_SQL = `
   ld.status = 'published'
   AND l.hidden_gem_hidden = false
@@ -59,7 +46,7 @@ const ORGANIC_ELIGIBILITY_SQL = `
   AND ld.is_featured = false
   AND ld.avg_rating >= $1
   AND ld.review_count BETWEEN $2 AND $3
-  AND COALESCE(f.cnt, 0) <= $4
+  AND (SELECT COUNT(*) FROM favorite_listings fl WHERE fl.listing_id = ld.id) <= $4
 `;
 
 function buildHiddenGemCard(
@@ -121,24 +108,20 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     // instead of as two sequential round trips.
     const [{ rows: pinned }, { rows: countRows }] = await Promise.all([
       query(
-        `${FAVORITES_CTE}
-         SELECT ${CARD_COLUMNS_QUALIFIED},
-                COALESCE(f.cnt, 0) AS favorite_count,
+        `SELECT ${CARD_COLUMNS_QUALIFIED},
+                (SELECT COUNT(*) FROM favorite_listings fl WHERE fl.listing_id = ld.id)::int AS favorite_count,
                 NULL::numeric AS discovery_score
          FROM listings_with_details ld
          JOIN listings l ON l.id = ld.id
-         LEFT JOIN all_time_favorites f ON f.listing_id = ld.id
          WHERE ld.status = 'published'
            AND l.hidden_gem_pinned = true
            AND l.hidden_gem_hidden = false
          ORDER BY l.hidden_gem_pinned_at DESC NULLS LAST, ld.id ASC`,
       ),
       query(
-        `${FAVORITES_CTE}
-         SELECT COUNT(*)::integer AS total
+        `SELECT COUNT(*)::integer AS total
          FROM listings_with_details ld
          JOIN listings l ON l.id = ld.id
-         LEFT JOIN all_time_favorites f ON f.listing_id = ld.id
          WHERE ${ORGANIC_ELIGIBILITY_SQL}`,
         [MIN_RATING, MIN_REVIEWS, MAX_REVIEWS, MAX_FAVORITES],
       ),
@@ -153,25 +136,22 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     if (organicNeeded > 0) {
       const fetchLimit = hasTaste ? Math.max(organicNeeded * 3, 20) : organicNeeded;
       const { rows: organic } = await query(
-        `${FAVORITES_CTE}
-         SELECT ${CARD_COLUMNS_QUALIFIED},
-                COALESCE(f.cnt, 0) AS favorite_count,
+        `SELECT ${CARD_COLUMNS_QUALIFIED},
+                (SELECT COUNT(*) FROM favorite_listings fl WHERE fl.listing_id = ld.id)::int AS favorite_count,
                 (
                   (ld.review_count::numeric / (ld.review_count + $1)) * ld.avg_rating
-                  + ($1::numeric / (ld.review_count + $1))
-                    * COALESCE((SELECT mean_rating FROM published_rating_mean), $2)
-                  - (LEAST(COALESCE(f.cnt, 0), $3) * 0.02)
+                  + ($1::numeric / (ld.review_count + $1)) * $2
+                  - (LEAST((SELECT COUNT(*) FROM favorite_listings fl WHERE fl.listing_id = ld.id), $3) * 0.02)
                 ) AS discovery_score
          FROM listings_with_details ld
          JOIN listings l ON l.id = ld.id
-         LEFT JOIN all_time_favorites f ON f.listing_id = ld.id
          WHERE ld.status = 'published'
            AND l.hidden_gem_hidden = false
            AND l.hidden_gem_pinned = false
            AND ld.is_featured = false
            AND ld.avg_rating >= $4
            AND ld.review_count BETWEEN $5 AND $6
-           AND COALESCE(f.cnt, 0) <= $7
+           AND (SELECT COUNT(*) FROM favorite_listings fl WHERE fl.listing_id = ld.id) <= $7
          ORDER BY discovery_score DESC, ld.review_count DESC, ld.id ASC
          LIMIT $8 OFFSET $9`,
         [
@@ -208,13 +188,11 @@ export const GET = mobileRoute(async (request: NextRequest) => {
         );
         const backfillLimit = hasTaste ? Math.max(shortBy * 4, 30) : shortBy;
         const { rows: backfill } = await query(
-          `${FAVORITES_CTE}
-           SELECT ${CARD_COLUMNS_QUALIFIED},
-                  COALESCE(f.cnt, 0) AS favorite_count,
+          `SELECT ${CARD_COLUMNS_QUALIFIED},
+                  (SELECT COUNT(*) FROM favorite_listings fl WHERE fl.listing_id = ld.id)::int AS favorite_count,
                   NULL::numeric AS discovery_score
            FROM listings_with_details ld
            JOIN listings l ON l.id = ld.id
-           LEFT JOIN all_time_favorites f ON f.listing_id = ld.id
            WHERE ld.status = 'published'
              AND l.hidden_gem_hidden = false
              AND ld.is_featured = false

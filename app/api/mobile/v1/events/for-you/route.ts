@@ -24,16 +24,16 @@ const LNG_BOUNDS = { min: 66.9, max: 67.4 };
 const CANDIDATE_POOL_SIZE = 30;
 
 const EVENT_CARD_SQL_COLUMNS =
-  "events_with_details.event_id, event_name, event_slug, event_description, event_status, " +
-  "to_json(events_with_details.start_time) #>> '{}' AS start_time, " +
-  "to_json(events_with_details.end_time) #>> '{}' AS end_time, " +
-  "events_with_details.is_featured, organizer_name, organizer_avatar, " +
-  "events_with_details.location_name, events_with_details.address, " +
-  "events_with_details.latitude, events_with_details.longitude, " +
-  "events_with_details.category_id, c.name AS category_name";
+  "e.id AS event_id, e.name AS event_name, e.slug AS event_slug, e.description AS event_description, e.status AS event_status, " +
+  "to_json(e.start_time) #>> '{}' AS start_time, " +
+  "to_json(e.end_time) #>> '{}' AS end_time, " +
+  "e.is_featured, p.full_name AS organizer_name, p.avatar_url AS organizer_avatar, " +
+  "e.location_name, e.address, " +
+  "e.latitude, e.longitude, " +
+  "e.category_id, c.name AS category_name";
 
 const EVENTS_FROM_SQL =
-  "events_with_details LEFT JOIN categories c ON c.id = events_with_details.category_id";
+  "events e LEFT JOIN profiles p ON p.id = e.organizer_id LEFT JOIN categories c ON c.id = e.category_id";
 
 type ForYouEventRow = Record<string, unknown> & {
   event_id: number | string;
@@ -129,10 +129,10 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       query(
         `SELECT ${EVENT_CARD_SQL_COLUMNS}
          FROM ${EVENTS_FROM_SQL}
-         WHERE event_status = 'published'
-           AND events_with_details.end_time >= NOW()
-           AND events_with_details.is_featured IS NOT TRUE
-         ORDER BY events_with_details.start_time ASC
+         WHERE e.status = 'published'
+           AND e.end_time >= NOW()
+           AND e.is_featured IS NOT TRUE
+         ORDER BY e.start_time ASC
          LIMIT $1`,
         [CANDIDATE_POOL_SIZE],
       ),
@@ -186,12 +186,16 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   let primaryImageByEvent = new Map<number, string>();
   let priceRangeByEvent = new Map<number, EventPriceRange>();
   try {
-    // Sequential, not Promise.all - same max:1 connection-pool reasoning as
-    // the generic events list route, and this only enriches the final
-    // (already-ranked, already-sliced) handful, not the whole candidate pool.
-    attendeesPreviewByEvent = await getAttendeesPreviewByEvent(orderedIds);
-    primaryImageByEvent = await fetchPrimaryImagesByEventId(orderedIds);
-    priceRangeByEvent = await fetchPriceRangeByEventId(orderedIds);
+    if (orderedIds.length > 0) {
+      const [attendees, images, prices] = await Promise.all([
+        getAttendeesPreviewByEvent(orderedIds),
+        fetchPrimaryImagesByEventId(orderedIds),
+        fetchPriceRangeByEventId(orderedIds),
+      ]);
+      attendeesPreviewByEvent = attendees;
+      primaryImageByEvent = images;
+      priceRangeByEvent = prices;
+    }
   } catch (error) {
     console.error("[mobile-api] events/for-you attendees / image / price query failed:", error);
   }
