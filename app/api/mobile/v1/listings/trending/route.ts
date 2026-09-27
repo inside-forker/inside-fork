@@ -19,6 +19,18 @@ type TrendingSource = "pinned" | "organic" | "backfilled";
 
 type TrendingRow = Record<string, unknown> & { id: number | string };
 
+/** Process-local page cache — weekly CTEs are expensive; 60s is fine for a feed. */
+const TRENDING_CACHE_TTL_MS = 60_000;
+const trendingPageCache = new Map<
+  string,
+  {
+    listings: unknown[];
+    pagination: ReturnType<typeof buildPaginationMeta>;
+    expiresAt: number;
+  }
+>();
+const trendingInflight = new Map<string, Promise<void>>();
+
 // `listings_with_details` is a DB-defined view; the trending-override columns
 // live on the base `listings` table (added after the view existed), so every
 // query below joins back to `listings` for them rather than assuming the view
@@ -106,39 +118,64 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     maxLimit: 50,
   });
 
+  const cacheKey = `${page}:${limit}`;
+  const cached = trendingPageCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return ok(cached.listings, { pagination: cached.pagination }, {
+      headers: {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+        "X-Cache": "HIT",
+      },
+    });
+  }
+
+  // Singleflight: concurrent identical page requests share one CTE rebuild.
+  const pending = trendingInflight.get(cacheKey);
+  if (pending) {
+    await pending;
+    const again = trendingPageCache.get(cacheKey);
+    if (again && again.expiresAt > Date.now()) {
+      return ok(again.listings, { pagination: again.pagination }, {
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+          "X-Cache": "HIT",
+        },
+      });
+    }
+  }
+
+  let resolveInflight!: () => void;
+  const inflightGate = new Promise<void>((resolve) => {
+    resolveInflight = resolve;
+  });
+  trendingInflight.set(cacheKey, inflightGate);
+
   let pinnedRows: TrendingRow[] = [];
   let organicRows: TrendingRow[] = [];
   let organicTotal = 0;
   let backfillRows: TrendingRow[] = [];
 
   try {
-    // Tier 1 (pinned) and the organic eligibility count don't depend on each
-    // other - only the pagination math below needs both - so they run
-    // concurrently rather than as two sequential round trips.
-    const [{ rows: pinned }, { rows: countRows }] = await Promise.all([
-      // Admin-curated and expected to be a handful of rows, so fetched whole
-      // (unpaginated) and sliced in JS alongside the organic tier below.
-      query(
-        `SELECT ${CARD_COLUMNS_QUALIFIED}
-         FROM listings_with_details ld
-         JOIN listings l ON l.id = ld.id
-         WHERE ld.status = 'published'
-           AND l.trending_pinned = true
-           AND l.trending_hidden = false
-         ORDER BY l.trending_pinned_at DESC NULLS LAST, ld.id ASC`,
-      ),
-      // Tier 2: organic - real weekly-signal scoring, excludes pinned/hidden.
-      query(
-        `${WEEKLY_SIGNALS_CTE}
-         SELECT COUNT(*)::integer AS total
-         FROM listings_with_details ld
-         JOIN listings l ON l.id = ld.id
-         LEFT JOIN recent_favorites rf ON rf.listing_id = ld.id
-         LEFT JOIN recent_reviews rr ON rr.listing_id = ld.id
-         LEFT JOIN recent_checkins rc ON rc.listing_id = ld.id
-         WHERE ${ORGANIC_ELIGIBILITY_SQL}`,
-      ),
-    ]);
+    // Sequential: prod pool is max:1; Promise.all only queues.
+    const { rows: pinned } = await query(
+      `SELECT ${CARD_COLUMNS_QUALIFIED}
+       FROM listings_with_details ld
+       JOIN listings l ON l.id = ld.id
+       WHERE ld.status = 'published'
+         AND l.trending_pinned = true
+         AND l.trending_hidden = false
+       ORDER BY l.trending_pinned_at DESC NULLS LAST, ld.id ASC`,
+    );
+    const { rows: countRows } = await query(
+      `${WEEKLY_SIGNALS_CTE}
+       SELECT COUNT(*)::integer AS total
+       FROM listings_with_details ld
+       JOIN listings l ON l.id = ld.id
+       LEFT JOIN recent_favorites rf ON rf.listing_id = ld.id
+       LEFT JOIN recent_reviews rr ON rr.listing_id = ld.id
+       LEFT JOIN recent_checkins rc ON rc.listing_id = ld.id
+       WHERE ${ORGANIC_ELIGIBILITY_SQL}`,
+    );
     pinnedRows = pinned as TrendingRow[];
     organicTotal = countRows[0]?.total ?? 0;
 
@@ -242,16 +279,25 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     // which is self-contradictory on the very page a client is looking at.
     // Floor the reported total at what's actually being returned.
     const totalItems = Math.max(pinnedRows.length + organicTotal, listings.length);
+    const pagination = buildPaginationMeta(page, limit, totalItems);
 
-    return ok(
+    trendingPageCache.set(cacheKey, {
       listings,
-      { pagination: buildPaginationMeta(page, limit, totalItems) },
-      {
-        headers: {
-          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
-        },
+      pagination,
+      expiresAt: Date.now() + TRENDING_CACHE_TTL_MS,
+    });
+    // Bound cache size — keep the most recent ~20 page keys.
+    if (trendingPageCache.size > 20) {
+      const oldest = trendingPageCache.keys().next().value;
+      if (oldest != null) trendingPageCache.delete(oldest);
+    }
+
+    return ok(listings, { pagination }, {
+      headers: {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+        "X-Cache": "MISS",
       },
-    );
+    });
   } catch (error) {
     console.error(
       "[mobile-api] trending listings query failed:",
@@ -262,5 +308,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       "Failed to load trending listings.",
       500,
     );
+  } finally {
+    resolveInflight();
+    trendingInflight.delete(cacheKey);
   }
 });
