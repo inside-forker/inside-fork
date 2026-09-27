@@ -12,8 +12,10 @@ import { Loader2 } from "lucide-react";
 import {
   validatePayFastCallback,
   normalizePayFastStatus,
+  getPayFastReturnBaseUrl,
 } from "@/lib/payments/payfast";
 import { CheckoutSuccessContent } from "@/components/checkout/CheckoutSuccessContent";
+import { headers } from "next/headers";
 
 interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -38,9 +40,18 @@ function flattenParams(
 async function fulfillPayFastRedirect(
   flat: Record<string, string>,
 ): Promise<void> {
-  const baseUrl = (
-    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-  ).replace(/\/+$/, "");
+  const hdrs = await headers();
+  let baseUrl: string;
+  try {
+    baseUrl = getPayFastReturnBaseUrl({
+      url: "https://www.insidekarachi.com/",
+      headers: hdrs,
+    });
+  } catch {
+    baseUrl = (
+      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    ).replace(/\/+$/, "");
+  }
 
   const body = new URLSearchParams(flat);
   try {
@@ -48,7 +59,6 @@ async function fulfillPayFastRedirect(
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
-      // Server-side; don't cache
       cache: "no-store",
     });
     if (!res.ok) {

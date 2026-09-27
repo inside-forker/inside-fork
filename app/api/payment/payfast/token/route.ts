@@ -15,6 +15,7 @@ import {
   formatPayFastMobile,
   getPayFastTransactionUrl,
   getPayFastTokenGeneratedAt,
+  getPayFastRedirectUrls,
 } from "@/lib/payments/payfast";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
@@ -162,23 +163,10 @@ export async function POST(request: NextRequest) {
     // 2. Fetch token from PayFast API (server-to-server)
     const tokenResponse = await fetchPayFastToken(basketId, amount);
 
-    // 3. Get success/failure URLs from environment
-    // Use NEXT_PUBLIC_APP_URL for production, fallback to localhost for development
-    // Strip any trailing slash so concatenated paths don't become "//api/...".
-    const baseUrl = (
-      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-    ).replace(/\/+$/, "");
-
-    const successUrl =
-      process.env.NEXT_PUBLIC_PAYFAST_SUCCESS_URL ||
-      `${baseUrl}/checkout/success`;
-    const failureUrl =
-      process.env.NEXT_PUBLIC_PAYFAST_FAILURE_URL ||
-      `${baseUrl}/checkout/failed`;
-    // Server-to-server IPN destination - PayFast POSTs the backend payment
-    // notification here. Without it, the live IPN has nowhere to land and the
-    // booking would never be confirmed server-side.
-    const checkoutUrl = `${baseUrl}/api/payments/payfast/callback`;
+    // 3. Public return URLs — never localhost in production (PayFast redirects here)
+    const { successUrl, failureUrl, checkoutUrl, baseUrl } =
+      getPayFastRedirectUrls(request);
+    console.info("[PayFast Token] return base", baseUrl);
 
     // 4. Generate complete form fields (server-side, uses crypto)
     const formFields = generatePayFastFormFields({
