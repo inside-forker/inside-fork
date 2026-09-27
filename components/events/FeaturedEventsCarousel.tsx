@@ -3,11 +3,11 @@
 import React, { useEffect, useRef } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { ArrowRight } from "lucide-react";
-import { TrendingEventCard } from "@/components/events/TrendingEventCard";
-import type { EventPreview } from "@/types/events.types";
+import { EventCard } from "@/components/events/EventCard";
+import type { Event } from "@/types/events.types";
 
 interface FeaturedEventsCarouselProps {
-  items: EventPreview[];
+  items: Event[];
 }
 
 export default function FeaturedEventsCarousel({
@@ -157,7 +157,7 @@ export default function FeaturedEventsCarousel({
                   contentRefs.current[idx] = el;
                 }}
               >
-                <TrendingEventCard event={item} showAnimation={false} />
+                <EventCard event={item} showAnimation={false} />
               </div>
             </div>
           ))}
