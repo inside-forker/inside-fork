@@ -3,19 +3,21 @@ import { withBotId } from "botid/next/config";
 import { withSentryConfig } from "@sentry/nextjs";
 import createBundleAnalyzer from "@next/bundle-analyzer";
 
+// Keep these inlined — next.config may load before path aliases resolve.
+export const PAYFAST_LIVE_HOST = "https://ipg1.apps.net.pk";
 export const PAYFAST_SANDBOX_HOST = "https://ipguat.apps.net.pk";
 
 // CSP hosts (connect-src / form-action) for the PayFast checkout endpoint.
 export function derivePayfastHosts(transactionUrl?: string): string[] {
-  if (!transactionUrl) {
-    return [];
+  const hosts = new Set<string>([PAYFAST_LIVE_HOST, PAYFAST_SANDBOX_HOST]);
+  if (transactionUrl) {
+    try {
+      hosts.add(new URL(transactionUrl).origin);
+    } catch {
+      // Ignore malformed PayFast URL.
+    }
   }
-  try {
-    return [new URL(transactionUrl).origin];
-  } catch {
-    // Ignore malformed PayFast URL.
-    return [];
-  }
+  return Array.from(hosts);
 }
 
 const withBundleAnalyzer = createBundleAnalyzer({
@@ -143,18 +145,8 @@ const nextConfig: NextConfig = (() => {
   }
 
   // CSP host for the PayFast checkout form (browser POSTs here). Token URL is server-only, excluded.
+  // Always allow both live + UAT so a mis-set env does not CSP-block the redirect.
   const payfastHosts = derivePayfastHosts(process.env.PAYFAST_TRANSACTION_URL);
-  // No transaction URL -> fall back to sandbox host (warns in production; live checkout would be CSP-blocked).
-  if (payfastHosts.length === 0) {
-    if (process.env.NODE_ENV === "production") {
-      console.warn(
-        "[next.config] No valid PayFast host derived from PAYFAST_TRANSACTION_URL; " +
-          "CSP is falling back to the sandbox host (ipguat) and live checkout will " +
-          "be blocked. Set the live PayFast transaction endpoint before deploying.",
-      );
-    }
-    payfastHosts.push(PAYFAST_SANDBOX_HOST);
-  }
   const payfastConnectSrc = payfastHosts.join(" ");
 
   return {

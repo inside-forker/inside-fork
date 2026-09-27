@@ -14,6 +14,7 @@ import {
   formatPayFastOrderDate,
   formatPayFastMobile,
   getPayFastTransactionUrl,
+  getPayFastTokenGeneratedAt,
 } from "@/lib/payments/payfast";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
@@ -201,7 +202,7 @@ export async function POST(request: NextRequest) {
       data: {
         formFields,
         transactionUrl: getPayFastTransactionUrl(),
-        generatedAt: tokenResponse["GENERATED DATE TIME"],
+        generatedAt: getPayFastTokenGeneratedAt(tokenResponse),
       },
     });
   } catch (error) {

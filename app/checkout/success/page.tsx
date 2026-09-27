@@ -1,8 +1,10 @@
 /**
  * PayFast Success Callback Page
  *
- * This page handles successful payment redirects from PayFast.
- * It validates the callback parameters and updates the booking status via API.
+ * Handles browser redirects from PayFast after payment. Validates the callback,
+ * then fulfills the booking via the same webhook path (mark paid, create passes,
+ * send ticket email). IPN alone is not enough for local/dev because PayFast
+ * cannot reach localhost CHECKOUT_URL.
  */
 
 import { Suspense } from "react";
@@ -17,17 +19,62 @@ interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
+function flattenParams(
+  params: Record<string, string | string[] | undefined>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (typeof v === "string") out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * Re-post the PayFast result to our IPN handler so booking fulfillment and
+ * ticket emails run even when PayFast's server-to-server IPN never arrives
+ * (localhost, blocked tunnels, etc.). The handler is idempotent for already-paid
+ * bookings.
+ */
+async function fulfillPayFastRedirect(
+  flat: Record<string, string>,
+): Promise<void> {
+  const baseUrl = (
+    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  ).replace(/\/+$/, "");
+
+  const body = new URLSearchParams(flat);
+  try {
+    const res = await fetch(`${baseUrl}/api/payments/payfast/callback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+      // Server-side; don't cache
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error(
+        "[PayFast Success] Fulfillment callback failed:",
+        res.status,
+        text.slice(0, 300),
+      );
+    } else {
+      console.log("[PayFast Success] Fulfillment callback ok");
+    }
+  } catch (err) {
+    console.error("[PayFast Success] Fulfillment callback error:", err);
+  }
+}
+
 async function SuccessContent({ searchParams }: PageProps) {
   const params = await searchParams;
 
-  // Extract callback parameters
   const basketId = typeof params.basket_id === "string" ? params.basket_id : "";
   const errCode = typeof params.err_code === "string" ? params.err_code : "";
   const errMsg = typeof params.err_msg === "string" ? params.err_msg : "";
   const transactionId =
     typeof params.transaction_id === "string" ? params.transaction_id : "";
 
-  // Dev preview mode: ?preview=paid|pending|security_failed renders the UI without PayFast validation.
   const previewMode =
     typeof params.preview === "string" ? params.preview : null;
 
@@ -47,25 +94,18 @@ async function SuccessContent({ searchParams }: PageProps) {
       />
     );
   }
-  // ============================================================================
 
-  // Validate callback
-  let validationResult = null;
   let isValid = false;
   let normalizedStatus: "paid" | "failed" | "pending" = "pending";
+  const flat = flattenParams(params);
 
   try {
-    validationResult = validatePayFastCallback({
+    const validationResult = validatePayFastCallback({
       basket_id: basketId,
       err_code: errCode,
       err_msg: errMsg,
       transaction_id: transactionId,
-      ...Object.fromEntries(
-        Object.entries(params).map(([k, v]) => [
-          k,
-          typeof v === "string" ? v : "",
-        ]),
-      ),
+      ...flat,
     });
 
     isValid = validationResult.isValid;
@@ -74,7 +114,6 @@ async function SuccessContent({ searchParams }: PageProps) {
     console.error("[PayFast Success] Validation error:", error);
   }
 
-  // Show security warning if hash validation failed
   if (!isValid) {
     return (
       <CheckoutSuccessContent
@@ -87,7 +126,11 @@ async function SuccessContent({ searchParams }: PageProps) {
     );
   }
 
-  // Determine status for the component (only paid/pending on success URL)
+  // Confirm booking + send ticket email (same path as IPN).
+  if (normalizedStatus === "paid" || normalizedStatus === "pending") {
+    await fulfillPayFastRedirect(flat);
+  }
+
   const status: "paid" | "pending" =
     normalizedStatus === "paid" ? "paid" : "pending";
 
