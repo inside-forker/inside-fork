@@ -41,6 +41,18 @@ const CATEGORY_COUNTS_CTE = `
  * many places sit under it, which is the whole reason that block can drop the
  * icons. Clients that only need the picker can ignore it.
  */
+type CategoryResult = {
+  value: string;
+  label: string;
+  slug: string;
+  parentId: string | null;
+  iconName: string | null;
+  listingCount: number;
+};
+
+const categoryCache = new Map<string, { timestamp: number; data: CategoryResult[] }>();
+const CACHE_TTL_MS = 30_000;
+
 export const GET = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
 
@@ -50,6 +62,16 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     rawType === "event" || rawType === "listing" || rawType === "both"
       ? rawType
       : null;
+
+  const cacheKey = type ?? "all";
+  const cached = categoryCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return ok(cached.data, undefined, {
+      headers: {
+        "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
+      },
+    });
+  }
 
   let data;
   try {
@@ -85,7 +107,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     );
   }
 
-  const categories = (data ?? []).map((c) => ({
+  const categories: CategoryResult[] = (data ?? []).map((c) => ({
     value: String(c.id),
     label: c.name,
     slug: c.slug,
@@ -93,6 +115,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     iconName: c.icon_name,
     listingCount: Number(c.listing_count ?? 0),
   }));
+
+  categoryCache.set(cacheKey, { timestamp: Date.now(), data: categories });
 
   return ok(categories, undefined, {
     headers: {

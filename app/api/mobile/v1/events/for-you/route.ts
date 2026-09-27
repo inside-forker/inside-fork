@@ -12,6 +12,10 @@ import { fetchPriceRangeByEventId, type EventPriceRange } from "@/lib/mobile/eve
 import { getEventCategoryAffinity } from "@/lib/recommendations/affinity";
 import { getTimeIntentBoostsByCategoryId } from "@/lib/recommendations/time-intent";
 import { scoreEventCandidates, type ScoredEventCandidate } from "@/lib/recommendations/event-scoring";
+import {
+  EVENT_CARD_SQL_COLUMNS,
+  EVENTS_FROM_SQL,
+} from "@/lib/events/upcoming-query";
 
 export const dynamic = "force-dynamic";
 
@@ -22,18 +26,6 @@ const LNG_BOUNDS = { min: 66.9, max: 67.4 };
 /** How many soonest upcoming events to pull before scoring - small inventory,
  * this only ever needs to feed a top handful, not a full paginated list. */
 const CANDIDATE_POOL_SIZE = 30;
-
-const EVENT_CARD_SQL_COLUMNS =
-  "events_with_details.event_id, event_name, event_slug, event_description, event_status, " +
-  "to_json(events_with_details.start_time) #>> '{}' AS start_time, " +
-  "to_json(events_with_details.end_time) #>> '{}' AS end_time, " +
-  "events_with_details.is_featured, organizer_name, organizer_avatar, " +
-  "events_with_details.location_name, events_with_details.address, " +
-  "events_with_details.latitude, events_with_details.longitude, " +
-  "events_with_details.category_id, c.name AS category_name";
-
-const EVENTS_FROM_SQL =
-  "events_with_details LEFT JOIN categories c ON c.id = events_with_details.category_id";
 
 type ForYouEventRow = Record<string, unknown> & {
   event_id: number | string;
@@ -129,10 +121,10 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       query(
         `SELECT ${EVENT_CARD_SQL_COLUMNS}
          FROM ${EVENTS_FROM_SQL}
-         WHERE event_status = 'published'
-           AND events_with_details.end_time >= NOW()
-           AND events_with_details.is_featured IS NOT TRUE
-         ORDER BY events_with_details.start_time ASC
+         WHERE e.status = 'published'
+           AND e.end_time >= NOW()
+           AND e.is_featured IS NOT TRUE
+         ORDER BY e.start_time ASC
          LIMIT $1`,
         [CANDIDATE_POOL_SIZE],
       ),
@@ -182,16 +174,16 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const orderedIds = ranked.map((c) => c.id);
   const rowById = new Map(eventCardRows.map((row) => [row.event_id, row]));
 
+  // Sequential enrichment — pool max:1 on Vercel; avoid Promise.all queueing.
   let attendeesPreviewByEvent: Awaited<ReturnType<typeof getAttendeesPreviewByEvent>> = new Map();
   let primaryImageByEvent = new Map<number, string>();
   let priceRangeByEvent = new Map<number, EventPriceRange>();
   try {
-    // Sequential, not Promise.all - same max:1 connection-pool reasoning as
-    // the generic events list route, and this only enriches the final
-    // (already-ranked, already-sliced) handful, not the whole candidate pool.
-    attendeesPreviewByEvent = await getAttendeesPreviewByEvent(orderedIds);
-    primaryImageByEvent = await fetchPrimaryImagesByEventId(orderedIds);
-    priceRangeByEvent = await fetchPriceRangeByEventId(orderedIds);
+    if (orderedIds.length > 0) {
+      attendeesPreviewByEvent = await getAttendeesPreviewByEvent(orderedIds);
+      primaryImageByEvent = await fetchPrimaryImagesByEventId(orderedIds);
+      priceRangeByEvent = await fetchPriceRangeByEventId(orderedIds);
+    }
   } catch (error) {
     console.error("[mobile-api] events/for-you attendees / image / price query failed:", error);
   }

@@ -98,31 +98,49 @@ async function loadListingImages(
   return imagesByListing;
 }
 
-async function fetchEventById(id: number): Promise<EventCardDTO | null> {
+async function fetchEventsByIds(ids: number[]): Promise<Map<number, EventCardDTO>> {
+  const map = new Map<number, EventCardDTO>();
+  if (ids.length === 0) return map;
   const { rows } = await query(
-    `SELECT ${EVENT_CARD_COLUMNS}
-     FROM events_with_details
-     WHERE event_id = $1
-     LIMIT 1`,
-    [id],
+    `SELECT e.id AS event_id, e.name AS event_name, e.slug AS event_slug,
+            e.description AS event_description, e.status AS event_status,
+            to_json(e.start_time) #>> '{}' AS start_time,
+            to_json(e.end_time) #>> '{}' AS end_time,
+            e.is_featured, p.full_name AS organizer_name, p.avatar_url AS organizer_avatar,
+            e.location_name, e.address, e.latitude, e.longitude, e.category_id
+     FROM events e
+     LEFT JOIN profiles p ON p.id = e.organizer_id
+     WHERE e.id = ANY($1)`,
+    [ids],
   );
-  if (rows.length === 0) return null;
-  const cardRow = toEventCardRowFromDb(rows[0]);
-  const images = await fetchPrimaryImagesByEventId([id]);
-  return toEventCard(cardRow, undefined, images.get(id) ?? null);
+  if (rows.length === 0) return map;
+  const foundIds = rows.map((r) => Number(r.event_id)).filter((id): id is number => id != null);
+  const images = await fetchPrimaryImagesByEventId(foundIds);
+  for (const row of rows) {
+    const id = Number(row.event_id);
+    const cardRow = toEventCardRowFromDb(row);
+    map.set(id, toEventCard(cardRow, undefined, images.get(id) ?? null));
+  }
+  return map;
 }
 
-async function fetchListingById(id: number): Promise<ListingCardDTO | null> {
+async function fetchListingsByIds(ids: number[]): Promise<Map<number, ListingCardDTO>> {
+  const map = new Map<number, ListingCardDTO>();
+  if (ids.length === 0) return map;
   const { rows } = await query(
     `SELECT ${LISTING_CARD_COLUMNS}
      FROM listings_with_details
-     WHERE id = $1
-     LIMIT 1`,
-    [id],
+     WHERE id = ANY($1)`,
+    [ids],
   );
-  if (rows.length === 0) return null;
-  const imagesByListing = await loadListingImages([id]);
-  return toListingCard(toNumericListingRow(rows[0]), imagesByListing[id] ?? []);
+  if (rows.length === 0) return map;
+  const foundIds = rows.map((r) => Number(r.id)).filter((id): id is number => id != null);
+  const imagesByListing = await loadListingImages(foundIds);
+  for (const row of rows) {
+    const id = Number(row.id);
+    map.set(id, toListingCard(toNumericListingRow(row), imagesByListing[id] ?? []));
+  }
+  return map;
 }
 
 function eventIsLive(event: EventCardDTO): boolean {
@@ -139,11 +157,19 @@ function listingIsLive(listing: ListingCardDTO): boolean {
 export async function previewHomeOpenerSlides(
   refs: HomeOpenerSlideRef[],
 ): Promise<HomeOpenerPreview[]> {
+  const eventIds = refs.filter((r) => r.kind === "event").map((r) => r.id);
+  const listingIds = refs.filter((r) => r.kind === "listing").map((r) => r.id);
+
+  const [eventsMap, listingsMap] = await Promise.all([
+    fetchEventsByIds(eventIds),
+    fetchListingsByIds(listingIds),
+  ]);
+
   const previews: HomeOpenerPreview[] = [];
 
   for (const ref of refs) {
     if (ref.kind === "event") {
-      const event = await fetchEventById(ref.id);
+      const event = eventsMap.get(ref.id);
       if (!event) {
         previews.push({
           kind: "event",
@@ -178,7 +204,7 @@ export async function previewHomeOpenerSlides(
             : "Event has ended",
       });
     } else {
-      const listing = await fetchListingById(ref.id);
+      const listing = listingsMap.get(ref.id);
       if (!listing) {
         previews.push({
           kind: "listing",
@@ -211,12 +237,18 @@ export async function previewHomeOpenerSlides(
 
 async function fetchFeaturedEvent(): Promise<EventCardDTO | null> {
   const { rows } = await query(
-    `SELECT ${EVENT_CARD_COLUMNS}
-     FROM events_with_details
-     WHERE event_status = 'published'
-       AND end_time >= NOW()
-       AND is_featured = true
-     ORDER BY featured_rank DESC NULLS LAST, start_time ASC, event_id ASC
+    `SELECT e.id AS event_id, e.name AS event_name, e.slug AS event_slug,
+            e.description AS event_description, e.status AS event_status,
+            to_json(e.start_time) #>> '{}' AS start_time,
+            to_json(e.end_time) #>> '{}' AS end_time,
+            e.is_featured, p.full_name AS organizer_name, p.avatar_url AS organizer_avatar,
+            e.location_name, e.address, e.latitude, e.longitude, e.category_id
+     FROM events e
+     LEFT JOIN profiles p ON p.id = e.organizer_id
+     WHERE e.status = 'published'
+       AND e.end_time >= NOW()
+       AND e.is_featured = true
+     ORDER BY e.featured_rank DESC NULLS LAST, e.start_time ASC, e.id ASC
      LIMIT 1`,
   );
   if (rows.length === 0) return null;
@@ -300,16 +332,24 @@ export async function resolveHomeOpenerSlides(): Promise<{
   const usedListings = new Set<number>();
   const usedEvents = new Set<number>();
 
+  const eventIds = config.slides.filter((r) => r.kind === "event").map((r) => r.id);
+  const listingIds = config.slides.filter((r) => r.kind === "listing").map((r) => r.id);
+
+  const [eventsMap, listingsMap] = await Promise.all([
+    fetchEventsByIds(eventIds),
+    fetchListingsByIds(listingIds),
+  ]);
+
   for (const ref of config.slides) {
     if (curated.length >= HOME_OPENER_MAX_SLIDES) break;
     if (ref.kind === "event") {
-      const event = await fetchEventById(ref.id);
+      const event = eventsMap.get(ref.id);
       if (!event || !eventIsLive(event) || event.event_id == null) continue;
       if (usedEvents.has(event.event_id)) continue;
       curated.push({ kind: "event", event });
       usedEvents.add(event.event_id);
     } else {
-      const listing = await fetchListingById(ref.id);
+      const listing = listingsMap.get(ref.id);
       if (!listing || !listingIsLive(listing) || listing.id == null) continue;
       if (usedListings.has(listing.id)) continue;
       curated.push({ kind: "listing", listing });

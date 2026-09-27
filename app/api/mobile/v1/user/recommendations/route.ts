@@ -116,10 +116,20 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const ranked = diversify(scored, limit);
   const orderedIds = ranked.map((c) => c.id);
 
-  const { rows: cardRows } = await query(
-    `SELECT ${LISTING_CARD_COLUMNS} FROM listings_with_details WHERE id = ANY($1::int[])`,
-    [orderedIds],
-  );
+  const [{ rows: cardRows }, { rows: images }] = await Promise.all([
+    query(
+      `SELECT ${LISTING_CARD_COLUMNS} FROM listings_with_details WHERE id = ANY($1::int[])`,
+      [orderedIds],
+    ),
+    query(
+      `SELECT id, listing_id, url, alt_text, display_order, is_primary
+       FROM listing_images
+       WHERE listing_id = ANY($1::int[])
+       ORDER BY display_order ASC`,
+      [orderedIds],
+    ),
+  ]);
+
   const byId = new Map<number, ListingRowLike>();
   for (const row of cardRows) {
     const normalized = toNumericListingRow(row);
@@ -127,13 +137,6 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   }
 
   const imagesByListing: Record<number, ListingImageDTO[]> = {};
-  const { rows: images } = await query(
-    `SELECT id, listing_id, url, alt_text, display_order, is_primary
-     FROM listing_images
-     WHERE listing_id = ANY($1::int[])
-     ORDER BY display_order ASC`,
-    [orderedIds],
-  );
   for (const img of images) {
     (imagesByListing[img.listing_id] ??= []).push(toListingImage(img));
   }
