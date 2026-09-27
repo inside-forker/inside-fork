@@ -1,8 +1,19 @@
 // reCAPTCHA v3 verification. Fail-closed in production; missing tokens allowed in dev.
+// Site key is public — prefer NEXT_PUBLIC_*, fall back to RECAPTCHA_V3_SITE_KEY for
+// runtime injection when the public var was not present at client-bundle build time.
 
 const GOOGLE_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
 
 export const RECAPTCHA_MIN_SCORE = 0.45;
+
+/** Public v3 site key from env (safe to expose to the browser). */
+export function getRecaptchaSiteKey(): string | undefined {
+  const key =
+    process.env.NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY?.trim() ||
+    process.env.RECAPTCHA_V3_SITE_KEY?.trim() ||
+    "";
+  return key || undefined;
+}
 
 export type RecaptchaFailureReason =
   | "missing_token"
@@ -53,6 +64,14 @@ export async function verifyRecaptcha(
   const token = (opts.token || "").trim();
 
   if (!token) {
+    // Clients cannot mint tokens without a site key. If it is missing from env,
+    // requiring a token bricks every form (signup, contact, newsletter, …).
+    if (!getRecaptchaSiteKey()) {
+      console.error(
+        `[reCAPTCHA] site key not configured; allowing request without token (action=${opts.action})`,
+      );
+      return { ok: true, score: null, action: null };
+    }
     if (isDev) {
       console.warn(
         `[reCAPTCHA] missing token for action=${opts.action} (allowed in development)`,
