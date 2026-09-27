@@ -113,21 +113,28 @@ function isSandboxHost(url: string): boolean {
   }
 }
 
+/** Official PayFast UAT test merchant from their integration guide. */
+function isUatTestMerchant(): boolean {
+  return (process.env.PAYFAST_MERCHANT_ID || "").trim() === "102";
+}
+
 /**
- * Sandbox is allowed only when not in production, or when
- * PAYFAST_ALLOW_SANDBOX=true is set explicitly (staging experiments).
+ * Sandbox is allowed when:
+ * - PAYFAST_ALLOW_SANDBOX=true, or
+ * - not production, or
+ * - merchant is the official UAT test id (102) — the only creds some setups have
  */
 function allowSandbox(): boolean {
   if (process.env.PAYFAST_ALLOW_SANDBOX === "true") return true;
+  if (isUatTestMerchant()) return true;
   return !isProductionRuntime();
 }
 
 /**
  * Resolve a PayFast API URL.
  *
- * - Local/dev: use env as-is (UAT for the official test merchant 102).
- * - Production: refuse UAT unless PAYFAST_ALLOW_SANDBOX=true — the UAT hosted
- *   checkout page often ships without CSS and looks broken to customers.
+ * - Merchant 102 (PayFast's published UAT test account): always use UAT hosts.
+ * - Production with live merchant: refuse UAT unless PAYFAST_ALLOW_SANDBOX=true.
  */
 function resolvePayFastUrl(
   envKey: "PAYFAST_TOKEN_URL" | "PAYFAST_TRANSACTION_URL",
@@ -135,6 +142,19 @@ function resolvePayFastUrl(
   sandboxDefault: string,
 ): string {
   const configured = process.env[envKey]?.trim();
+
+  // Test merchant 102 only exists on UAT — never send it to live.
+  if (isUatTestMerchant()) {
+    if (isProductionRuntime()) {
+      console.warn(
+        "[PayFast] Merchant 102 is the UAT test account. Using sandbox hosts. " +
+          "Replace with live merchant credentials before taking real payments.",
+      );
+    }
+    if (configured && isSandboxHost(configured)) return configured;
+    return sandboxDefault;
+  }
+
   const preferSandbox = process.env.PAYFAST_USE_SANDBOX === "true";
 
   let url =
@@ -189,18 +209,20 @@ export async function fetchPayFastToken(
   const merchantId = getEnv("PAYFAST_MERCHANT_ID");
   const securedKey = getEnv("PAYFAST_SECURED_KEY");
 
+  // Merchant 102 is handled via UAT hosts in resolvePayFastUrl — no hard fail here.
+
   // Ensure amount has 2 decimal places
   const formattedAmount = parseFloat(amount).toFixed(2);
 
+  // Match PayFast Merchant Integration Guide: MERCHANT_ID, SECURED_KEY, TXNAMT, BASKET_ID.
+  // (CURRENCY_CODE is optional; omitting avoids host-specific 500s.)
   const params = new URLSearchParams({
     MERCHANT_ID: merchantId,
     SECURED_KEY: securedKey,
     BASKET_ID: basketId,
     TXNAMT: formattedAmount,
-    CURRENCY_CODE: "PKR",
   });
 
-  // Always log host (not secrets) so UAT-vs-live mismatches are obvious in logs
   console.info("[PayFast Token Request]", {
     url: tokenUrl,
     merchant_id: merchantId,
@@ -218,58 +240,62 @@ export async function fetchPayFastToken(
     body: params.toString(),
   });
 
-  // Get raw response text for debugging
   const responseText = await response.text();
 
-  // Check if response is OK
+  let parsed: Record<string, unknown> | null = null;
+  try {
+    parsed = JSON.parse(responseText) as Record<string, unknown>;
+  } catch {
+    parsed = null;
+  }
+
+  const payfastError =
+    (typeof parsed?.errorDescription === "string" && parsed.errorDescription) ||
+    (typeof parsed?.Message === "string" && parsed.Message) ||
+    null;
+
   if (!response.ok) {
     console.error("[PayFast Token Error]", {
       status: response.status,
       url: tokenUrl,
       merchant_id: merchantId,
-      body: responseText,
+      body: responseText.slice(0, 500),
     });
+    const hostHint = isSandboxHost(tokenUrl)
+      ? " UAT rejected this merchant — production needs ipg1.apps.net.pk + live credentials."
+      : " Check live PAYFAST_MERCHANT_ID / PAYFAST_SECURED_KEY on Vercel.";
     throw new Error(
-      `PayFast token request failed (${response.status}): ${responseText}`,
+      `PayFast token failed (${response.status}): ${payfastError || responseText.slice(0, 200)}.${hostHint}`,
     );
   }
 
-  // Try to parse JSON
-  let data;
-  try {
-    data = JSON.parse(responseText);
-  } catch (parseError) {
+  if (!parsed) {
     console.error("[PayFast Token] Invalid JSON response:", {
-      responseText,
-      parseError,
+      responseText: responseText.slice(0, 500),
     });
     throw new Error(
-      `PayFast returned invalid JSON response: ${responseText.substring(
-        0,
-        200,
-      )}`,
+      `PayFast returned invalid JSON response: ${responseText.substring(0, 200)}`,
     );
   }
 
-  // Validate response structure
-  if (!data.ACCESS_TOKEN) {
-    console.error("[PayFast Token] Missing ACCESS_TOKEN in response:", data);
+  // Live sometimes returns HTTP 200 with errorCode and no token
+  if (!parsed.ACCESS_TOKEN) {
+    console.error("[PayFast Token] Missing ACCESS_TOKEN in response:", parsed);
     throw new Error(
-      `PayFast token response missing ACCESS_TOKEN. Response: ${JSON.stringify(
-        data,
-      )}`,
+      `PayFast token denied: ${payfastError || JSON.stringify(parsed)}. Check merchant credentials match the PayFast host (UAT vs live).`,
     );
   }
 
-  // Success
   if (process.env.NODE_ENV === "development") {
     console.log("[PayFast Token] ok", {
       url: tokenUrl,
-      generatedAt: getPayFastTokenGeneratedAt(data as PayFastTokenResponse),
+      generatedAt: getPayFastTokenGeneratedAt(
+        parsed as unknown as PayFastTokenResponse,
+      ),
     });
   }
 
-  return data as PayFastTokenResponse;
+  return parsed as unknown as PayFastTokenResponse;
 }
 
 // ============================================================================
