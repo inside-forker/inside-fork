@@ -12,6 +12,10 @@ import { fetchPriceRangeByEventId, type EventPriceRange } from "@/lib/mobile/eve
 import { getEventCategoryAffinity } from "@/lib/recommendations/affinity";
 import { getTimeIntentBoostsByCategoryId } from "@/lib/recommendations/time-intent";
 import { scoreEventCandidates, type ScoredEventCandidate } from "@/lib/recommendations/event-scoring";
+import {
+  EVENT_CARD_SQL_COLUMNS,
+  EVENTS_FROM_SQL,
+} from "@/lib/events/upcoming-query";
 
 export const dynamic = "force-dynamic";
 
@@ -22,18 +26,6 @@ const LNG_BOUNDS = { min: 66.9, max: 67.4 };
 /** How many soonest upcoming events to pull before scoring - small inventory,
  * this only ever needs to feed a top handful, not a full paginated list. */
 const CANDIDATE_POOL_SIZE = 30;
-
-const EVENT_CARD_SQL_COLUMNS =
-  "e.id AS event_id, e.name AS event_name, e.slug AS event_slug, e.description AS event_description, e.status AS event_status, " +
-  "to_json(e.start_time) #>> '{}' AS start_time, " +
-  "to_json(e.end_time) #>> '{}' AS end_time, " +
-  "e.is_featured, p.full_name AS organizer_name, p.avatar_url AS organizer_avatar, " +
-  "e.location_name, e.address, " +
-  "e.latitude, e.longitude, " +
-  "e.category_id, c.name AS category_name";
-
-const EVENTS_FROM_SQL =
-  "events e LEFT JOIN profiles p ON p.id = e.organizer_id LEFT JOIN categories c ON c.id = e.category_id";
 
 type ForYouEventRow = Record<string, unknown> & {
   event_id: number | string;
@@ -182,19 +174,15 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const orderedIds = ranked.map((c) => c.id);
   const rowById = new Map(eventCardRows.map((row) => [row.event_id, row]));
 
+  // Sequential enrichment — pool max:1 on Vercel; avoid Promise.all queueing.
   let attendeesPreviewByEvent: Awaited<ReturnType<typeof getAttendeesPreviewByEvent>> = new Map();
   let primaryImageByEvent = new Map<number, string>();
   let priceRangeByEvent = new Map<number, EventPriceRange>();
   try {
     if (orderedIds.length > 0) {
-      const [attendees, images, prices] = await Promise.all([
-        getAttendeesPreviewByEvent(orderedIds),
-        fetchPrimaryImagesByEventId(orderedIds),
-        fetchPriceRangeByEventId(orderedIds),
-      ]);
-      attendeesPreviewByEvent = attendees;
-      primaryImageByEvent = images;
-      priceRangeByEvent = prices;
+      attendeesPreviewByEvent = await getAttendeesPreviewByEvent(orderedIds);
+      primaryImageByEvent = await fetchPrimaryImagesByEventId(orderedIds);
+      priceRangeByEvent = await fetchPriceRangeByEventId(orderedIds);
     }
   } catch (error) {
     console.error("[mobile-api] events/for-you attendees / image / price query failed:", error);

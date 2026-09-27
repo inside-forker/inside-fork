@@ -10,26 +10,12 @@ import { toEventCard, type EventCardRow } from "@/lib/mobile/mappers";
 import { getAttendeesPreviewByEvent } from "@/lib/mobile/attendees";
 import { fetchPrimaryImagesByEventId } from "@/lib/mobile/event-images";
 import { fetchPriceRangeByEventId, type EventPriceRange } from "@/lib/mobile/event-pricing";
+import {
+  EVENT_CARD_SQL_COLUMNS,
+  EVENTS_FROM_SQL,
+} from "@/lib/events/upcoming-query";
 
 export const dynamic = "force-dynamic";
-
-// Lean direct-table joins on `events e` instead of double-joining `events_with_details` + `events e`.
-const EVENT_CARD_SQL_COLUMNS =
-  "e.id AS event_id, e.name AS event_name, e.slug AS event_slug, e.description AS event_description, e.status AS event_status, " +
-  "to_json(e.start_time) #>> '{}' AS start_time, " +
-  "to_json(e.end_time) #>> '{}' AS end_time, " +
-  "e.is_featured, p.full_name AS organizer_name, p.avatar_url AS organizer_avatar, " +
-  "e.location_name, e.address, " +
-  "e.latitude, e.longitude, " +
-  "e.category_id, c.name AS category_name, c.slug AS category_slug, c.icon_name AS category_icon_name, " +
-  "e.venue_id, v.name AS venue_name, v.rating AS venue_rating";
-
-/** Direct joins for maximum index utilization and zero redundant scans. */
-const EVENTS_FROM_SQL =
-  "events e " +
-  "LEFT JOIN profiles p ON p.id = e.organizer_id " +
-  "LEFT JOIN categories c ON c.id = e.category_id " +
-  "LEFT JOIN venues v ON v.id = e.venue_id";
 
 /** Kilometres, when `?lat`/`?lng` are given without an explicit `?radiusKm`. */
 const DEFAULT_NEARBY_RADIUS_KM = 15;
@@ -236,6 +222,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const eventCardRows = rows.map(toEventCardRow);
   const eventIds = eventCardRows.map((r) => r.event_id).filter((id): id is number => id != null);
 
+  // Sequential enrichment: Vercel pool defaults to max:1, so Promise.all
+  // only queues on one connection and can stall under contention.
   let attendeesPreviewByEvent: Awaited<
     ReturnType<typeof getAttendeesPreviewByEvent>
   > = new Map();
@@ -243,14 +231,9 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   let priceRangeByEvent = new Map<number, EventPriceRange>();
   try {
     if (eventIds.length > 0) {
-      const [attendeesResult, imagesByEvent, pricesByEvent] = await Promise.all([
-        getAttendeesPreviewByEvent(eventIds),
-        fetchPrimaryImagesByEventId(eventIds),
-        fetchPriceRangeByEventId(eventIds),
-      ]);
-      attendeesPreviewByEvent = attendeesResult;
-      primaryImageByEvent = imagesByEvent;
-      priceRangeByEvent = pricesByEvent;
+      attendeesPreviewByEvent = await getAttendeesPreviewByEvent(eventIds);
+      primaryImageByEvent = await fetchPrimaryImagesByEventId(eventIds);
+      priceRangeByEvent = await fetchPriceRangeByEventId(eventIds);
     }
   } catch (error) {
     console.error(
