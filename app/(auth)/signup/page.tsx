@@ -182,8 +182,28 @@ function SignupContent() {
     try {
       const t = await executeRecaptcha("signup");
       if (t) recaptcha_token = t;
-    } catch {
-      /* loading/exec failures fall through; server will reject in production */
+    } catch (err) {
+      console.warn("reCAPTCHA token fetch failed", err);
+    }
+
+    // If a site key is configured but we still have no token (blocked script,
+    // network, etc.), fail here with a clear message instead of a cryptic
+    // "reCAPTCHA token missing" from the API.
+    if (
+      !recaptcha_token &&
+      typeof window !== "undefined" &&
+      window.__recaptchaSiteKey
+    ) {
+      const message =
+        "Security check failed to load. Please refresh the page or disable ad blockers and try again.";
+      setError(message);
+      toast({
+        variant: "destructive",
+        title: "Signup Failed",
+        description: message,
+      });
+      setIsLoading(false);
+      return;
     }
 
     const signupData: SignupRequest & {
