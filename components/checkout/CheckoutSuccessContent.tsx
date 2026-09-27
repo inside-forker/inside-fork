@@ -29,6 +29,8 @@ interface CheckoutSuccessContentProps {
   transactionId?: string;
   errCode?: string;
   errMsg?: string; // Used for security_failed status
+  /** True only when fulfillment actually queued/sent the confirmation email. */
+  emailSent?: boolean;
 }
 
 export function CheckoutSuccessContent({
@@ -37,6 +39,7 @@ export function CheckoutSuccessContent({
   transactionId,
   errCode,
   errMsg: _errMsg, // Unused in paid/pending, but available for security_failed
+  emailSent = false,
 }: CheckoutSuccessContentProps) {
   const clearCart = useCartStore((s) => s.clearCart);
 
@@ -275,19 +278,36 @@ export function CheckoutSuccessContent({
             </motion.div>
 
             {/* Email Confirmation Notice */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.5 }}
-              className="text-center space-y-2"
-            >
-              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <Mail className="w-4 h-4 flex-shrink-0" />
-                <span className="text-center">
-                  Confirmation email sent to your registered email address
-                </span>
-              </div>
-            </motion.div>
+            {emailSent ? (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5, delay: 0.5 }}
+                className="text-center space-y-2"
+              >
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Mail className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-center">
+                    Confirmation email sent to your registered email address
+                  </span>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5, delay: 0.5 }}
+                className="text-center space-y-2"
+              >
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Mail className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-center">
+                    Your tickets are ready in the app. If a confirmation email
+                    does not arrive shortly, check spam or open View My Tickets.
+                  </span>
+                </div>
+              </motion.div>
+            )}
 
             {/* Action Buttons */}
             <motion.div

@@ -1,21 +1,11 @@
-/**
- * PayFast Success Callback Page
- *
- * Handles browser redirects from PayFast after payment. Validates the callback,
- * then fulfills the booking via the same webhook path (mark paid, create passes,
- * send ticket email). IPN alone is not enough for local/dev because PayFast
- * cannot reach localhost CHECKOUT_URL.
- */
-
 import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import {
   validatePayFastCallback,
   normalizePayFastStatus,
-  getPayFastReturnBaseUrl,
 } from "@/lib/payments/payfast";
+import { processPayFastCallbackParams } from "@/lib/payments/processPayFastCallback";
 import { CheckoutSuccessContent } from "@/components/checkout/CheckoutSuccessContent";
-import { headers } from "next/headers";
 
 interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -29,51 +19,6 @@ function flattenParams(
     if (typeof v === "string") out[k] = v;
   }
   return out;
-}
-
-/**
- * Re-post the PayFast result to our IPN handler so booking fulfillment and
- * ticket emails run even when PayFast's server-to-server IPN never arrives
- * (localhost, blocked tunnels, etc.). The handler is idempotent for already-paid
- * bookings.
- */
-async function fulfillPayFastRedirect(
-  flat: Record<string, string>,
-): Promise<void> {
-  const hdrs = await headers();
-  let baseUrl: string;
-  try {
-    baseUrl = getPayFastReturnBaseUrl({
-      url: "https://www.insidekarachi.com/",
-      headers: hdrs,
-    });
-  } catch {
-    baseUrl = (
-      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-    ).replace(/\/+$/, "");
-  }
-
-  const body = new URLSearchParams(flat);
-  try {
-    const res = await fetch(`${baseUrl}/api/payments/payfast/callback`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      console.error(
-        "[PayFast Success] Fulfillment callback failed:",
-        res.status,
-        text.slice(0, 300),
-      );
-    } else {
-      console.log("[PayFast Success] Fulfillment callback ok");
-    }
-  } catch (err) {
-    console.error("[PayFast Success] Fulfillment callback error:", err);
-  }
 }
 
 async function SuccessContent({ searchParams }: PageProps) {
@@ -101,6 +46,7 @@ async function SuccessContent({ searchParams }: PageProps) {
         transactionId={transactionId || "PREVIEW-TXN-456"}
         errCode={errCode || "N/A"}
         errMsg={errMsg}
+        emailSent={previewMode === "paid"}
       />
     );
   }
@@ -108,6 +54,7 @@ async function SuccessContent({ searchParams }: PageProps) {
   let isValid = false;
   let normalizedStatus: "paid" | "failed" | "pending" = "pending";
   const flat = flattenParams(params);
+  let emailSent = false;
 
   try {
     const validationResult = validatePayFastCallback({
@@ -132,13 +79,23 @@ async function SuccessContent({ searchParams }: PageProps) {
         transactionId={transactionId}
         errCode={errCode}
         errMsg={errMsg}
+        emailSent={false}
       />
     );
   }
 
-  // Confirm booking + send ticket email (same path as IPN).
+  // Confirm booking + send ticket email via shared processor (no HTTP self-fetch).
   if (normalizedStatus === "paid" || normalizedStatus === "pending") {
-    await fulfillPayFastRedirect(flat);
+    try {
+      const result = await processPayFastCallbackParams(flat);
+      console.log("[PayFast Success] Fulfillment result:", result.status, result.body);
+      emailSent =
+        result.ok &&
+        (result.body.paymentStatus === "paid" ||
+          result.body.message === "Booking already processed");
+    } catch (err) {
+      console.error("[PayFast Success] Fulfillment error:", err);
+    }
   }
 
   const status: "paid" | "pending" =
@@ -151,6 +108,7 @@ async function SuccessContent({ searchParams }: PageProps) {
       transactionId={transactionId}
       errCode={errCode}
       errMsg={errMsg}
+      emailSent={emailSent && status === "paid"}
     />
   );
 }
