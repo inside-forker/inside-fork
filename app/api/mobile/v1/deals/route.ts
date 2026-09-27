@@ -368,6 +368,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   });
 
   const bankIdRaw = searchParams.get("bankId");
+  const bankIdsRaw = searchParams.get("bankIds");
   const cardVariantIdRaw = searchParams.get("cardVariantId");
   const categoryRaw = searchParams.get("category");
   const endingSoonRaw = searchParams.get("endingSoonDays");
@@ -375,8 +376,14 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const sanitizedSearch =
     rawSearch && rawSearch.trim() ? sanitizeSearchTerm(rawSearch) : "";
 
-  const bankId =
-    bankIdRaw && /^\d+$/.test(bankIdRaw) ? parseInt(bankIdRaw, 10) : null;
+  // `bankId` is one bank; `bankIds` is a comma list for multi-bank browsing.
+  // Both feed the same set, so either (or both) narrows to "any of these banks".
+  const bankIdSet = new Set<number>();
+  for (const raw of [bankIdRaw, ...(bankIdsRaw ? bankIdsRaw.split(",") : [])]) {
+    const v = raw?.trim();
+    if (v && /^\d+$/.test(v)) bankIdSet.add(parseInt(v, 10));
+  }
+  const bankFilter = bankIdSet.size > 0 ? bankIdSet : null;
   const cardVariantId =
     cardVariantIdRaw && /^\d+$/.test(cardVariantIdRaw)
       ? parseInt(cardVariantIdRaw, 10)
@@ -394,7 +401,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const endingSoonOnly =
     endingSoonDays != null &&
     !sanitizedSearch &&
-    bankId === null &&
+    bankFilter === null &&
     cardVariantId === null &&
     categoryFilter === null;
 
@@ -406,7 +413,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const ifNoneMatch = request.headers.get("if-none-match");
   const isUnfiltered =
     !sanitizedSearch &&
-    bankId === null &&
+    bankFilter === null &&
     cardVariantId === null &&
     categoryFilter === null &&
     endingSoonDays === null &&
@@ -446,10 +453,11 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     );
   }
 
-  if (bankId != null) {
+  if (bankFilter != null) {
     deals = deals.filter(
       (d) =>
-        d.bankId === bankId || d.cardMatches.some((m) => m.bankId === bankId),
+        (d.bankId != null && bankFilter.has(d.bankId)) ||
+        d.cardMatches.some((m) => bankFilter.has(m.bankId)),
     );
   }
 
