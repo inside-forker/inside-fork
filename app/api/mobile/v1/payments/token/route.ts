@@ -13,6 +13,7 @@ import {
   formatPayFastOrderDate,
   formatPayFastMobile,
   getPayFastTransactionUrl,
+  getPayFastTokenGeneratedAt,
   isPayFastConfigured,
 } from "@/lib/payments/payfast";
 
@@ -185,6 +186,6 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   return ok({
     formFields,
     transactionUrl: getPayFastTransactionUrl(),
-    generatedAt: tokenResponse["GENERATED DATE TIME"],
+    generatedAt: getPayFastTokenGeneratedAt(tokenResponse),
   });
 });
