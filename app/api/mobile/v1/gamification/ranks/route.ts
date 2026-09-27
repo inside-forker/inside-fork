@@ -7,6 +7,31 @@ import { MobileApiError } from "@/lib/mobile/errors";
 import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+ 
+type RankRow = {
+  id: number;
+  name: string;
+  slug: string;
+  color: string | null;
+  icon_url: string | null;
+  min_xp_required: number;
+  max_slots: number | null;
+  benefits: unknown;
+  display_order: number;
+};
+
+function toNumericRankRow(row: Record<string, unknown>): RankRow {
+  return {
+    ...row,
+    id: Number(row.id),
+    min_xp_required: Number(row.min_xp_required ?? 0),
+    max_slots: row.max_slots != null ? Number(row.max_slots) : null,
+    display_order: Number(row.display_order ?? 0),
+  } as RankRow;
+}
+
+let ranksLadderCache: { rows: RankRow[]; expiresAt: number } | null = null;
+const RANKS_CACHE_TTL_MS = 60_000;
 
 /**
  * GET /api/mobile/v1/gamification/ranks
@@ -19,26 +44,31 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
   const { user } = await getOptionalMobileUser(request);
 
-  let rankList;
-  try {
-    const { rows } = await query(
-      `SELECT id, name, slug, color, icon_url, min_xp_required, max_slots, benefits, display_order
-       FROM ranks
-       WHERE is_active = true
-       ORDER BY min_xp_required ASC`,
-    );
-    rankList = rows;
-  } catch (error) {
-    console.error(
-      "[mobile-api] ranks query failed:",
-      error instanceof Error ? error.message : error,
-    );
-    throw new MobileApiError("internal_error", "Failed to load ranks.", 500);
+  let rankList: RankRow[];
+  if (ranksLadderCache && ranksLadderCache.expiresAt > Date.now()) {
+    rankList = ranksLadderCache.rows;
+  } else {
+    try {
+      const { rows } = await query(
+        `SELECT id, name, slug, color, icon_url, min_xp_required, max_slots, benefits, display_order
+         FROM ranks
+         WHERE is_active = true
+         ORDER BY min_xp_required ASC`,
+      );
+      rankList = rows.map(toNumericRankRow);
+      ranksLadderCache = { rows: rankList, expiresAt: Date.now() + RANKS_CACHE_TTL_MS };
+    } catch (error) {
+      console.error(
+        "[mobile-api] ranks query failed:",
+        error instanceof Error ? error.message : error,
+      );
+      throw new MobileApiError("internal_error", "Failed to load ranks.", 500);
+    }
   }
 
   let userRankInfo: {
-    current_rank: (typeof rankList)[number] | null;
-    next_rank: (typeof rankList)[number] | null;
+    current_rank: RankRow | null;
+    next_rank: RankRow | null;
     current_xp: number;
     xp_to_next_rank: number;
     progress_percent: number;
@@ -53,12 +83,12 @@ export const GET = mobileRoute(async (request: NextRequest) => {
        WHERE p.id = $1`,
       [user.id],
     );
-    const userXP = userRows[0]?.points ?? 0;
+    const userXP = Number(userRows[0]?.points ?? 0);
     const userRankData = userRows[0]?.rank_id != null ? userRows[0] : undefined;
 
     if (userRankData) {
       const currentRank =
-        rankList.find((r) => r.id === userRankData.rank_id) ?? null;
+        rankList.find((r) => r.id === Number(userRankData.rank_id)) ?? null;
       const nextRank =
         rankList.find((r) => (r.min_xp_required ?? 0) > userXP) ?? null;
       const currentMin = currentRank?.min_xp_required ?? 0;
