@@ -87,8 +87,6 @@ export async function getBorrowedHeaderImageUrls(
              PARTITION BY s.idx
              ORDER BY
                (l.status = 'published') DESC,
-               (COALESCE(b.branch_count, 0) >= 2) DESC,
-               COALESCE(g.gallery_count, 0) DESC,
                li.is_primary DESC NULLS LAST,
                li.display_order ASC NULLS LAST,
                li.id ASC
@@ -107,18 +105,6 @@ export async function getBorrowedHeaderImageUrls(
            ON li.listing_id = l.id
           AND li.url NOT LIKE '%/menu/%'
           AND (li.availability IS NULL OR li.availability IS DISTINCT FROM 'dead')
-         LEFT JOIN LATERAL (
-           SELECT COUNT(*)::int AS branch_count
-           FROM listing_branches lb
-           WHERE lb.listing_id = l.id
-         ) b ON true
-         LEFT JOIN LATERAL (
-           SELECT COUNT(*)::int AS gallery_count
-           FROM listing_images gi
-           WHERE gi.listing_id = l.id
-             AND gi.url NOT LIKE '%/menu/%'
-             AND (gi.availability IS NULL OR gi.availability IS DISTINCT FROM 'dead')
-         ) g ON true
        )
        SELECT idx, url
        FROM ranked
