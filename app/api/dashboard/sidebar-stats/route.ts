@@ -89,29 +89,25 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Regular User: Get personal stats
-    const [reviewsResult, bookingsResult, favoritesResult] = await Promise.all([
-      query(`SELECT COUNT(*) FROM reviews WHERE user_id = $1`, [
-        session.userId,
-      ]),
-      query(`SELECT COUNT(*) FROM bookings WHERE user_id = $1`, [
-        session.userId,
-      ]),
-      query(
-        `SELECT COUNT(*) FROM favorite_listings fl
-         JOIN listings_with_details l ON l.id = fl.listing_id AND l.status = 'published'
-         WHERE fl.user_id = $1`,
-        [session.userId],
-      ),
-    ]);
+    // Regular User: Get personal stats in a single consolidated roundtrip
+    const { rows: userStatsRows } = await query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM reviews WHERE user_id = $1) AS reviews,
+         (SELECT COUNT(*)::int FROM bookings WHERE user_id = $1) AS bookings,
+         (SELECT COUNT(*)::int FROM favorite_listings fl
+          JOIN listings l ON l.id = fl.listing_id AND l.status = 'published'
+          WHERE fl.user_id = $1) AS favorites`,
+      [session.userId],
+    );
+    const userStats = userStatsRows[0] || {};
 
     return NextResponse.json({
       success: true,
       role: role || "user",
       stats: {
-        reviews: parseInt(reviewsResult.rows[0].count, 10) || 0,
-        bookings: parseInt(bookingsResult.rows[0].count, 10) || 0,
-        favorites: parseInt(favoritesResult.rows[0].count, 10) || 0,
+        reviews: Number(userStats.reviews ?? 0),
+        bookings: Number(userStats.bookings ?? 0),
+        favorites: Number(userStats.favorites ?? 0),
       },
     });
   } catch (error) {

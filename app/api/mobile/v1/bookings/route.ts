@@ -32,14 +32,13 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const { rows } = await query(
     `SELECT ${BOOKING_SELECT}, e.name AS event_name, e.start_time AS event_start_time,
             e.location_name AS event_location_name,
-            COALESCE(tp.ticket_count, 0) AS ticket_count
+            (
+              SELECT COUNT(*)::int
+              FROM ticket_passes tp
+              WHERE tp.booking_id = b.id
+            ) AS ticket_count
      FROM bookings b
      LEFT JOIN events e ON e.id = b.event_id
-     LEFT JOIN (
-       SELECT booking_id, COUNT(*) AS ticket_count
-       FROM ticket_passes
-       GROUP BY booking_id
-     ) tp ON tp.booking_id = b.id
      WHERE b.user_id = $1
      ORDER BY b.created_at DESC`,
     [user.id],
