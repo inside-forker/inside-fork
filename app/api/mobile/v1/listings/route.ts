@@ -22,10 +22,7 @@ import {
   LISTING_COVER_CANDIDATE_CAP,
   resolveListingCovers,
 } from "@/lib/mobile/listing-covers";
-import {
-  OPEN_NOW_EXISTS_CLAUSE,
-  OPEN_TONIGHT_EXISTS_CLAUSE,
-} from "@/lib/listings/query-paginated-listings";
+import { getOpenListingIds } from "@/lib/listings/open-status";
 
 /** Explicit column list for `listings_with_details` - never use `*`. */
 const LISTING_CARD_SQL_COLUMNS =
@@ -171,10 +168,11 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     whereClauses.push(`is_featured = false`);
   }
 
-  if (openTonight) {
-    whereClauses.push(OPEN_TONIGHT_EXISTS_CLAUSE);
-  } else if (openNow) {
-    whereClauses.push(OPEN_NOW_EXISTS_CLAUSE);
+  if (openTonight || openNow) {
+    // Precompute open ids once (45s TTL) instead of per-row EXISTS + regex.
+    const openIds = await getOpenListingIds(openTonight ? "tonight" : "now");
+    params.push(openIds);
+    whereClauses.push(`id = ANY($${params.length}::bigint[])`);
   }
 
   const latStr = searchParams.get("lat") ?? searchParams.get("latitude");

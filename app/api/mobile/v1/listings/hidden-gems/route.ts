@@ -39,13 +39,9 @@ const CARD_COLUMNS_QUALIFIED = LISTING_CARD_COLUMNS.split(", ")
   .map((column) => `ld.${column}`)
   .join(", ");
 
-/** One aggregate pass over favorites instead of correlated COUNT per row. */
+/** Denormalized counts from listing_stats (trigger-maintained). */
 const FAVORITE_COUNTS_JOIN = `
-  LEFT JOIN (
-    SELECT listing_id, COUNT(*)::int AS favorite_count
-    FROM favorite_listings
-    GROUP BY listing_id
-  ) fav ON fav.listing_id = ld.id
+  LEFT JOIN listing_stats ls ON ls.listing_id = ld.id
 `;
 
 const ORGANIC_ELIGIBILITY_SQL = `
@@ -55,7 +51,7 @@ const ORGANIC_ELIGIBILITY_SQL = `
   AND ld.is_featured = false
   AND ld.avg_rating >= $1
   AND ld.review_count BETWEEN $2 AND $3
-  AND COALESCE(fav.favorite_count, 0) <= $4
+  AND COALESCE(ls.favorite_count, 0) <= $4
 `;
 
 function buildHiddenGemCard(
@@ -118,7 +114,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     const [{ rows: pinned }, { rows: countRows }] = await Promise.all([
       query(
         `SELECT ${CARD_COLUMNS_QUALIFIED},
-                COALESCE(fav.favorite_count, 0) AS favorite_count,
+                COALESCE(ls.favorite_count, 0) AS favorite_count,
                 NULL::numeric AS discovery_score
          FROM listings_with_details ld
          JOIN listings l ON l.id = ld.id
@@ -148,11 +144,11 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       const fetchLimit = hasTaste ? Math.max(organicNeeded * 3, 20) : organicNeeded;
       const { rows: organic } = await query(
         `SELECT ${CARD_COLUMNS_QUALIFIED},
-                COALESCE(fav.favorite_count, 0) AS favorite_count,
+                COALESCE(ls.favorite_count, 0) AS favorite_count,
                 (
                   (ld.review_count::numeric / (ld.review_count + $1)) * ld.avg_rating
                   + ($1::numeric / (ld.review_count + $1)) * $2
-                  - (LEAST(COALESCE(fav.favorite_count, 0), $3) * 0.02)
+                  - (LEAST(COALESCE(ls.favorite_count, 0), $3) * 0.02)
                 ) AS discovery_score
          FROM listings_with_details ld
          JOIN listings l ON l.id = ld.id
@@ -163,7 +159,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
            AND ld.is_featured = false
            AND ld.avg_rating >= $4
            AND ld.review_count BETWEEN $5 AND $6
-           AND COALESCE(fav.favorite_count, 0) <= $7
+           AND COALESCE(ls.favorite_count, 0) <= $7
          ORDER BY discovery_score DESC, ld.review_count DESC, ld.id ASC
          LIMIT $8 OFFSET $9`,
         [
@@ -201,7 +197,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
         const backfillLimit = hasTaste ? Math.max(shortBy * 4, 30) : shortBy;
         const { rows: backfill } = await query(
           `SELECT ${CARD_COLUMNS_QUALIFIED},
-                  COALESCE(fav.favorite_count, 0) AS favorite_count,
+                  COALESCE(ls.favorite_count, 0) AS favorite_count,
                   NULL::numeric AS discovery_score
            FROM listings_with_details ld
            JOIN listings l ON l.id = ld.id

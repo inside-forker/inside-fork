@@ -9,6 +9,7 @@ import {
   resolveCategoryBySlugWithScope,
   listingCategoriesExistsClause,
 } from "@/lib/listings/category-scope";
+import { getOpenListingIds } from "@/lib/listings/open-status";
 
 export type QueryListingsFilters = {
   page?: number;
@@ -156,7 +157,9 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
   }
 
   if (filters.openNow) {
-    whereClauses.push(OPEN_NOW_EXISTS_CLAUSE);
+    const openIds = await getOpenListingIds("now");
+    queryParams.push(openIds);
+    whereClauses.push(`id = ANY($${queryParams.length}::bigint[])`);
   }
 
   const needsDeals =
