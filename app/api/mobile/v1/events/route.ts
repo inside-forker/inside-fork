@@ -13,31 +13,29 @@ import { fetchPriceRangeByEventId, type EventPriceRange } from "@/lib/mobile/eve
 
 export const dynamic = "force-dynamic";
 
-// `events_with_details` and `events` share many column names (start_time,
-// end_time, address, latitude, longitude, is_featured, category_id, ...) -
-// now that EVENTS_FROM_SQL also joins `events e` (to reach venue_id), every
-// one of those must be qualified with `events_with_details.` or Postgres
-// rejects the query as ambiguous. `event_id`/`event_name`/etc. (the view's
-// renamed columns) don't collide and are left bare.
+// Lean direct-table joins on `events e` instead of double-joining `events_with_details` + `events e`.
 const EVENT_CARD_SQL_COLUMNS =
-  "events_with_details.event_id, event_name, event_slug, event_description, event_status, " +
-  "to_json(events_with_details.start_time) #>> '{}' AS start_time, " +
-  "to_json(events_with_details.end_time) #>> '{}' AS end_time, " +
-  "events_with_details.is_featured, organizer_name, organizer_avatar, " +
-  "events_with_details.location_name, events_with_details.address, " +
-  "events_with_details.latitude, events_with_details.longitude, " +
-  "events_with_details.category_id, c.name AS category_name, c.slug AS category_slug, c.icon_name AS category_icon_name, " +
+  "e.id AS event_id, e.name AS event_name, e.slug AS event_slug, e.description AS event_description, e.status AS event_status, " +
+  "to_json(e.start_time) #>> '{}' AS start_time, " +
+  "to_json(e.end_time) #>> '{}' AS end_time, " +
+  "e.is_featured, p.full_name AS organizer_name, p.avatar_url AS organizer_avatar, " +
+  "e.location_name, e.address, " +
+  "e.latitude, e.longitude, " +
+  "e.category_id, c.name AS category_name, c.slug AS category_slug, c.icon_name AS category_icon_name, " +
   "e.venue_id, v.name AS venue_name, v.rating AS venue_rating";
 
-/** Joined so the row select can surface category display fields, and the linked venue's display fields. */
+/** Direct joins for maximum index utilization and zero redundant scans. */
 const EVENTS_FROM_SQL =
-  "events_with_details " +
-  "LEFT JOIN categories c ON c.id = events_with_details.category_id " +
-  "LEFT JOIN events e ON e.id = events_with_details.event_id " +
+  "events e " +
+  "LEFT JOIN profiles p ON p.id = e.organizer_id " +
+  "LEFT JOIN categories c ON c.id = e.category_id " +
   "LEFT JOIN venues v ON v.id = e.venue_id";
 
 /** Kilometres, when `?lat`/`?lng` are given without an explicit `?radiusKm`. */
 const DEFAULT_NEARBY_RADIUS_KM = 15;
+
+const eventsRouteCache = new Map<string, { data: unknown; expiresAt: number }>();
+const EVENTS_CACHE_TTL_MS = 20_000;
 
 function toEventCardRow(row: Record<string, unknown>): EventCardRow {
   return {
@@ -60,25 +58,6 @@ function toEventCardRow(row: Record<string, unknown>): EventCardRow {
  *
  * Public, paginated list of upcoming/ongoing published events (those whose
  * `end_time >= now`), ordered by `start_time` (featured first when `?featured`).
- * Mirrors the website's `app/api/events` handler, normalized into the mobile
- * envelope. Published-only - `event_status` is enforced here.
- *
- * `?category=<id>` filters on `events.category_id`. Category display fields
- * (`category_name`/`category_slug`/`category_icon_name`) are always joined in
- * regardless of whether this filter is used, for the home screen's chips/grid.
- * `min_price` (cheapest ticket type) is always included for display.
- *
- * `?priceMin=`/`?priceMax=` filter on `min_price`; `?freeOnly=true` is
- * shorthand for `min_price = 0` (and overrides priceMin/priceMax if both are
- * given). Events with no ticket types match none of these.
- *
- * `?lat=`/`?lng=` (with optional `?radiusKm=`, default 15) filter to events
- * within that radius and switch the sort to nearest-first; events with no
- * coordinates never match. `distance_km` is included on every row (null
- * unless this filter is active).
- *
- * `venue_id`/`venue_name`/`venue_rating` are included when the event has a
- * linked venue (events.venue_id), for the card to link through to it.
  */
 export const GET = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
@@ -114,41 +93,59 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const radiusKm = parseFiniteNumber(searchParams.get("radiusKm")) ?? DEFAULT_NEARBY_RADIUS_KM;
   const nearby = lat != null && lng != null;
 
+  // Check in-memory cache for common default feed requests
+  const isDefaultQuery =
+    !search && !location && !date && !priceMin && !priceMax && !freeOnly && !nearby;
+  const cacheKey = isDefaultQuery
+    ? `events:${featured}:${categoryId ?? "all"}:${limit}:${offset}`
+    : null;
+
+  if (cacheKey) {
+    const cached = eventsRouteCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return ok(
+        (cached.data as { events: unknown }).events,
+        { pagination: (cached.data as { pagination: unknown }).pagination },
+        {
+          headers: {
+            "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300",
+            "X-Cache": "HIT",
+          },
+        },
+      );
+    }
+  }
+
   const whereClauses: string[] = [
-    "event_status = 'published'",
-    "events_with_details.end_time >= NOW()",
+    "e.status = 'published'",
+    "e.end_time >= NOW()",
   ];
   const params: unknown[] = [];
 
   if (featured) {
-    whereClauses.push("events_with_details.is_featured = true");
+    whereClauses.push("e.is_featured = true");
   }
 
   if (categoryId != null) {
     params.push(categoryId);
-    whereClauses.push(`events_with_details.category_id = $${params.length}`);
+    whereClauses.push(`e.category_id = $${params.length}`);
   }
 
   if (search) {
     params.push(`%${search}%`);
-    whereClauses.push(`event_name ILIKE $${params.length}`);
+    whereClauses.push(`e.name ILIKE $${params.length}`);
   }
 
   if (location) {
     params.push(`%${location}%`);
     const i = params.length;
     whereClauses.push(
-      `(events_with_details.address ILIKE $${i} OR events_with_details.location_name ILIKE $${i})`,
+      `(e.address ILIKE $${i} OR e.location_name ILIKE $${i})`,
     );
   }
 
-  // A standalone correlated subquery (not the `mp` join used for display)
-  // so this clause is identical whether it runs against the row query or the
-  // join-free count query. Events with no ticket types never match - there's
-  // nothing truthful to say about "is it free" or "is it in this price range"
-  // for an event that has no priced tickets yet.
   const MIN_PRICE_SUBQUERY =
-    "(SELECT MIN(price) FROM ticket_types tt WHERE tt.event_id = events_with_details.event_id)";
+    "(SELECT MIN(price) FROM ticket_types tt WHERE tt.event_id = e.id)";
   if (freeOnly) {
     whereClauses.push(`${MIN_PRICE_SUBQUERY} = 0`);
   } else {
@@ -168,23 +165,18 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     const latIdx = params.length;
     params.push(lng);
     const lngIdx = params.length;
-    // Great-circle (Haversine) distance in km. `least(1, greatest(-1, ...))`
-    // clamps the acos argument against floating-point drift pushing it just
-    // outside [-1, 1] for near-antipodal/identical points.
     const haversineExpr =
       `(6371 * acos(least(1, greatest(-1, ` +
-      `cos(radians($${latIdx})) * cos(radians(events_with_details.latitude)) * cos(radians(events_with_details.longitude) - radians($${lngIdx})) + ` +
-      `sin(radians($${latIdx})) * sin(radians(events_with_details.latitude))` +
+      `cos(radians($${latIdx})) * cos(radians(e.latitude)) * cos(radians(e.longitude) - radians($${lngIdx})) + ` +
+      `sin(radians($${latIdx})) * sin(radians(e.latitude))` +
       `))))`;
     distanceSelectSql = `${haversineExpr} AS distance_km`;
     whereClauses.push(
-      `events_with_details.latitude IS NOT NULL AND events_with_details.longitude IS NOT NULL AND ${haversineExpr} <= ${radiusKm}`,
+      `e.latitude IS NOT NULL AND e.longitude IS NOT NULL AND ${haversineExpr} <= ${radiusKm}`,
     );
   }
 
   if (date) {
-    // Day boundaries are Asia/Karachi (UTC+5) per the v1 contract, not UTC -
-    // anchor the parsed YYYY-MM-DD to Karachi midnight before forming the range.
     const filterDate = new Date(`${date}T00:00:00+05:00`);
     if (!Number.isNaN(filterDate.getTime())) {
       const nextDay = new Date(filterDate.getTime() + 24 * 60 * 60 * 1000);
@@ -193,16 +185,16 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       params.push(nextDay.toISOString());
       const endIdx = params.length;
       whereClauses.push(
-        `events_with_details.start_time >= $${startIdx} AND events_with_details.start_time < $${endIdx}`,
+        `e.start_time >= $${startIdx} AND e.start_time < $${endIdx}`,
       );
     }
   }
 
   const orderBy = nearby
-    ? "distance_km ASC, event_id ASC"
+    ? "distance_km ASC, e.id ASC"
     : featured
-      ? "events_with_details.featured_rank DESC NULLS LAST, events_with_details.start_time ASC, event_id ASC"
-      : "events_with_details.start_time ASC, event_id ASC";
+      ? "e.featured_rank DESC NULLS LAST, e.start_time ASC, e.id ASC"
+      : "e.start_time ASC, e.id ASC";
 
   const whereSql = whereClauses.join(" AND ");
 
@@ -216,7 +208,6 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   let rows: Record<string, unknown>[];
   let count: number;
   try {
-    // Sequential, NOT Promise.all. The production pool is capped at `max: 1`
     const rowsRes = await query(
       `SELECT ${EVENT_CARD_SQL_COLUMNS}, ${distanceSelectSql}, COUNT(*) OVER() AS total_count
        FROM ${EVENTS_FROM_SQL}
@@ -232,7 +223,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       count = 0;
     } else {
       const countRes = await query(
-        `SELECT COUNT(*) AS count FROM events_with_details WHERE ${whereSql}`,
+        `SELECT COUNT(*) AS count FROM events e WHERE ${whereSql}`,
         countParams,
       );
       count = Number(countRes.rows[0]?.count ?? 0);
@@ -279,9 +270,18 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     ),
   );
 
+  const pagination = buildPaginationMeta(page, limit, count);
+
+  if (cacheKey) {
+    eventsRouteCache.set(cacheKey, {
+      data: { events, pagination },
+      expiresAt: Date.now() + EVENTS_CACHE_TTL_MS,
+    });
+  }
+
   return ok(
     events,
-    { pagination: buildPaginationMeta(page, limit, count) },
+    { pagination },
     {
       headers: {
         "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300",
