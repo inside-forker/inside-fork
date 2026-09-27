@@ -54,7 +54,7 @@ const DEAL_SELECT = `
          l.slug AS listing_slug,
          l.latitude,
          l.longitude,
-         l.category_name,
+         c.name AS category_name,
          l.address,
          c.slug AS category_slug`;
 
@@ -126,7 +126,7 @@ async function enrichAndGroupDeals(
                 id,
                 name: nameById.get(id) ?? null,
               })),
-              { candidateCap: 1 },
+              { candidateCap: 1, skipBorrow: true },
             );
           } catch (error) {
             console.error(
@@ -233,7 +233,7 @@ async function compileFullCatalog(): Promise<CompiledCatalog> {
     const { rows } = await query(
       `SELECT ${DEAL_SELECT}
        FROM deals d
-       INNER JOIN listings_with_details l ON l.id = d.listing_id
+       INNER JOIN listings l ON l.id = d.listing_id
        LEFT JOIN banks b ON b.id = d.bank_id
        LEFT JOIN categories c ON c.id = l.category_id
        WHERE ${where.join(" AND ")}
@@ -271,7 +271,7 @@ async function compileEndingSoonCatalog(days: number): Promise<CompiledCatalog> 
     const { rows } = await query(
       `SELECT ${DEAL_SELECT}
        FROM deals d
-       INNER JOIN listings_with_details l ON l.id = d.listing_id
+       INNER JOIN listings l ON l.id = d.listing_id
        LEFT JOIN banks b ON b.id = d.bank_id
        LEFT JOIN categories c ON c.id = l.category_id
        WHERE d.is_active = true

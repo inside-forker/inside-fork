@@ -28,7 +28,7 @@ export type ListingCoverResult = {
  */
 export async function resolveListingCovers(
   listings: ListingCoverInput[],
-  opts?: { candidateCap?: number },
+  opts?: { candidateCap?: number; skipBorrow?: boolean },
 ): Promise<Map<number, ListingCoverResult>> {
   const out = new Map<number, ListingCoverResult>();
   if (listings.length === 0) return out;
@@ -72,13 +72,12 @@ export async function resolveListingCovers(
     );
   }
 
-  const needingBorrow = listings.filter((l) => {
-    const n = out.get(l.id)?.images.length ?? 0;
-    // Only borrow when we still need cover slots. Deals pass candidateCap:1 —
-    // previously this was hard-coded `< 2`, so a full catalog fired hundreds of
-    // stem lookups even when every listing already had its one cover.
-    return n < Math.min(2, cap);
-  });
+  const needingBorrow = opts?.skipBorrow
+    ? []
+    : listings.filter((l) => {
+        const n = out.get(l.id)?.images.length ?? 0;
+        return n < Math.min(2, cap);
+      });
 
   if (needingBorrow.length > 0) {
     const borrowed = await getBorrowedHeaderImageUrls(

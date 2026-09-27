@@ -33,14 +33,14 @@ export default function Home() {
         <FeaturedListingsContainer />
       </Suspense>
 
-      {/* Recent Posts/Guides Section */}
-      <Suspense fallback={<PostsSkeleton />}>
-        <RecentPostsContainer />
-      </Suspense>
-
       {/* Trending Events Section */}
       <Suspense fallback={<EventsSkeleton />}>
         <TrendingEventsContainer />
+      </Suspense>
+
+      {/* Recent Posts/Guides Section */}
+      <Suspense fallback={<PostsSkeleton />}>
+        <RecentPostsContainer />
       </Suspense>
 
       {/* Statistics & Social Proof Section */}
