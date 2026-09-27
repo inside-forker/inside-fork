@@ -22,7 +22,10 @@ import {
   LISTING_COVER_CANDIDATE_CAP,
   resolveListingCovers,
 } from "@/lib/mobile/listing-covers";
-import { OPEN_NOW_EXISTS_CLAUSE } from "@/lib/listings/query-paginated-listings";
+import {
+  OPEN_NOW_EXISTS_CLAUSE,
+  OPEN_TONIGHT_EXISTS_CLAUSE,
+} from "@/lib/listings/query-paginated-listings";
 
 /** Explicit column list for `listings_with_details` - never use `*`. */
 const LISTING_CARD_SQL_COLUMNS =
@@ -50,13 +53,16 @@ const SUPPORTED_SORTS = new Set([
   "name",
   "nearest",
   "distance",
+  "open-now",
+  "open-tonight",
+  "tonight",
 ]);
 
 /**
  * GET /api/mobile/v1/listings
  *
  * Public, paginated list of published listings. Supports the common filters
- * (category, search, rating, open_now, exclude_featured) and the order-based
+ * (category, search, rating, open_now, open_tonight, exclude_featured) and the order-based
  * sorts in {@link SUPPORTED_SORTS}. Deal/distance-ranked sorts (`distance`,
  * `best-deals`, `max-discount`) and deal filters (`deals`, `bank`, `card`) are
  * not yet implemented and are rejected rather than silently ignored.
@@ -97,7 +103,13 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const minRating = searchParams.get("rating");
   const excludeFeatured = searchParams.get("exclude_featured") === "true";
   const openNowParam = searchParams.get("open_now");
-  const openNow = openNowParam === "true" || openNowParam === "1";
+  const openNow = openNowParam === "true" || openNowParam === "1" || sort === "open-now";
+  const openTonightParam = searchParams.get("open_tonight") ?? searchParams.get("tonight");
+  const openTonight =
+    openTonightParam === "true" ||
+    openTonightParam === "1" ||
+    sort === "open-tonight" ||
+    sort === "tonight";
   // Client-generated once per screen visit (not per request) - keeps the
   // shuffle stable across pagination within one visit, but different on the
   // next visit. Bound as a query param below, never concatenated into SQL.
@@ -159,7 +171,9 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     whereClauses.push(`is_featured = false`);
   }
 
-  if (openNow) {
+  if (openTonight) {
+    whereClauses.push(OPEN_TONIGHT_EXISTS_CLAUSE);
+  } else if (openNow) {
     whereClauses.push(OPEN_NOW_EXISTS_CLAUSE);
   }
 

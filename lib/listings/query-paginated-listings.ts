@@ -52,6 +52,38 @@ export const OPEN_NOW_EXISTS_CLAUSE = `EXISTS (
     )
 )`;
 
+// Listings open on the current day during nightly hours (e.g. crossing midnight or open in the evening/night >= 20:00).
+export const OPEN_TONIGHT_EXISTS_CLAUSE = `(
+  EXISTS (
+    SELECT 1 FROM listing_branches lb
+    WHERE lb.listing_id = listings_with_details.id
+      AND lb.timings ~ '^[0-9]{2}:[0-9]{2}:[0-9]{2}-[0-9]{2}:[0-9]{2}:[0-9]{2}$'
+      AND (
+        split_part(lb.timings, '-', 1)::time > split_part(lb.timings, '-', 2)::time
+        OR (
+          split_part(lb.timings, '-', 2)::time >= '20:00:00'::time
+          AND split_part(lb.timings, '-', 1)::time <= '22:00:00'::time
+        )
+      )
+  )
+  OR EXISTS (
+    SELECT 1 FROM opening_hours oh
+    WHERE oh.listing_id = listings_with_details.id
+      AND oh.day_of_week = EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Karachi'))::int
+      AND oh.is_closed = false
+      AND oh.open_time IS NOT NULL
+      AND oh.close_time IS NOT NULL
+      AND (
+        oh.close_time <= oh.open_time
+        OR (
+          oh.close_time >= '20:00:00'::time
+          AND oh.open_time <= '22:00:00'::time
+        )
+      )
+  )
+)`;
+
+
 export async function attachListingImages(listings: ListingRow[]) {
   const listingIds = listings
     .map((l) => l.id)

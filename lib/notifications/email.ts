@@ -28,9 +28,26 @@ const BREVO_SENDER_EMAIL =
 const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME ?? "Inside Karachi";
 const BREVO_BASE_URL = "https://api.brevo.com/v3/smtp/email";
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://insidekarachi.com";
+const SITE_URL = (
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.SITE_URL ||
+  "https://www.insidekarachi.com"
+).replace(/\/+$/, "");
 const LOGO_URL = `${SITE_URL}/logo-white.png`;
+
+/** Email clients cannot resolve relative paths — always emit an absolute href. */
+function resolveEmailCtaUrl(ctaUrl: string | null | undefined): string | null {
+  if (!ctaUrl) return null;
+  const trimmed = ctaUrl.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  try {
+    return new URL(trimmed, `${SITE_URL}/`).toString();
+  } catch {
+    return `${SITE_URL}${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
+  }
+}
 
 const INLINE_STYLES = {
   body: "margin:0;padding:0;background-color:#0f172a;color:#0f172a;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;",
@@ -101,9 +118,10 @@ function buildEmailHtml(
   const safeBody = escapeHtml(body ?? "").replace(/\n/g, "<br/>");
   const safeTitle = escapeHtml(title ?? "Inside Karachi update");
   const metadataHtml = renderMetadata(metadata);
+  const absoluteCtaUrl = resolveEmailCtaUrl(cta_url);
 
-  const ctaButton = cta_url
-    ? `<a href="${escapeHtml(cta_url)}" style="${
+  const ctaButton = absoluteCtaUrl
+    ? `<a href="${escapeHtml(absoluteCtaUrl)}" style="${
         INLINE_STYLES.button
       }" target="_blank" rel="noopener noreferrer">${escapeHtml(
         cta_label ?? "View details"
@@ -189,9 +207,10 @@ function buildEmailText(
   lines.push(
     `Triggered at: ${new Date(notification.triggered_at).toLocaleString()}`
   );
-  if (notification.cta_url) {
+  const absoluteCtaUrl = resolveEmailCtaUrl(notification.cta_url);
+  if (absoluteCtaUrl) {
     lines.push("");
-    lines.push(`View details: ${notification.cta_url}`);
+    lines.push(`View details: ${absoluteCtaUrl}`);
   }
   lines.push("");
   lines.push("— Inside Karachi Team");
