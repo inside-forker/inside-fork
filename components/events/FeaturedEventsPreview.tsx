@@ -4,10 +4,10 @@ import { motion } from "framer-motion";
 import FeaturedEventsCarousel from "@/components/events/FeaturedEventsCarousel";
 import { Ticket } from "lucide-react";
 
-import type { EventPreview } from "@/types/events.types";
+import type { Event } from "@/types/events.types";
 
 interface FeaturedEventsPreviewProps {
-  featuredEvents: EventPreview[];
+  featuredEvents: Event[];
 }
 
 export function FeaturedEventsPreview({

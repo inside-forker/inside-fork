@@ -3,11 +3,11 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Calendar, ArrowRight } from "lucide-react";
-import { TrendingEventCard } from "@/components/events/TrendingEventCard";
-import type { EventPreview } from "@/types/events.types";
+import { EventCard } from "@/components/events/EventCard";
+import type { Event } from "@/types/events.types";
 
 interface TrendingEventsSectionProps {
-  events: EventPreview[];
+  events: Event[];
 }
 
 export function TrendingEventsSection({ events }: TrendingEventsSectionProps) {
@@ -16,8 +16,8 @@ export function TrendingEventsSection({ events }: TrendingEventsSectionProps) {
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.2,
-        delayChildren: 0.3,
+        staggerChildren: 0.15,
+        delayChildren: 0.2,
       },
     },
   };
@@ -33,8 +33,6 @@ export function TrendingEventsSection({ events }: TrendingEventsSectionProps) {
       },
     },
   };
-
-  // Formatting and pricing handled by the shared TrendingEventCard
 
   if (!events || events.length === 0) {
     return null;
@@ -81,11 +79,11 @@ export function TrendingEventsSection({ events }: TrendingEventsSectionProps) {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-50px" }}
-          className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8"
         >
-          {events.map((event) => (
+          {events.map((event, index) => (
             <motion.div key={event.id} variants={itemVariants}>
-              <TrendingEventCard event={event} />
+              <EventCard event={event} index={index} />
             </motion.div>
           ))}
         </motion.div>
