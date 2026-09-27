@@ -189,6 +189,123 @@ export function getPayFastTokenGeneratedAt(
   return token.GENERATED_DATE_TIME || token["GENERATED DATE TIME"];
 }
 
+function isLocalHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return (
+    h === "localhost" ||
+    h === "127.0.0.1" ||
+    h === "0.0.0.0" ||
+    h.endsWith(".localhost")
+  );
+}
+
+function originFromRaw(raw: string): string | null {
+  try {
+    const candidate = raw.includes("://") ? raw : `https://${raw}`;
+    const url = new URL(candidate);
+    if (isLocalHostname(url.hostname)) return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Public site origin for PayFast SUCCESS_URL / FAILURE_URL / CHECKOUT_URL.
+ *
+ * Never sends `localhost` to PayFast from production — that is what bounced
+ * customers off insidekarachi.com onto a local machine after paying.
+ */
+export function getPayFastReturnBaseUrl(request: {
+  url: string;
+  headers: Pick<Headers, "get">;
+}): string {
+  const explicitSuccess = process.env.NEXT_PUBLIC_PAYFAST_SUCCESS_URL?.trim();
+  if (explicitSuccess) {
+    try {
+      const u = new URL(explicitSuccess);
+      if (!isLocalHostname(u.hostname)) {
+        return u.origin;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  for (const key of [
+    "NEXT_PUBLIC_APP_URL",
+    "NEXT_PUBLIC_SITE_URL",
+    "SITE_URL",
+  ] as const) {
+    const raw = process.env[key]?.trim();
+    if (!raw) continue;
+    const origin = originFromRaw(raw);
+    if (origin) return origin;
+  }
+
+  const host =
+    request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+    request.headers.get("host")?.trim() ||
+    "";
+  const proto =
+    request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
+    (isProductionRuntime() ? "https" : "http");
+
+  if (host && !isLocalHostname(host.split(":")[0] || host)) {
+    return `${proto}://${host}`;
+  }
+
+  const vercel = process.env.VERCEL_URL?.trim();
+  if (vercel) {
+    const origin = originFromRaw(vercel);
+    if (origin) return origin;
+  }
+
+  // Local/dev only — PayFast return URLs will be localhost, which is expected
+  // when you intentionally start checkout on the local server.
+  if (!isProductionRuntime()) {
+    if (host) return `${proto}://${host}`;
+    return "http://localhost:3000";
+  }
+
+  throw new Error(
+    "PayFast return URL cannot be determined. Set NEXT_PUBLIC_APP_URL=https://www.insidekarachi.com on Vercel.",
+  );
+}
+
+export function getPayFastRedirectUrls(request: {
+  url: string;
+  headers: Pick<Headers, "get">;
+}): {
+  baseUrl: string;
+  successUrl: string;
+  failureUrl: string;
+  checkoutUrl: string;
+} {
+  const baseUrl = getPayFastReturnBaseUrl(request).replace(/\/+$/, "");
+
+  const envSuccess = process.env.NEXT_PUBLIC_PAYFAST_SUCCESS_URL?.trim();
+  const envFailure = process.env.NEXT_PUBLIC_PAYFAST_FAILURE_URL?.trim();
+
+  const usable = (raw: string | undefined, fallback: string) => {
+    if (!raw) return fallback;
+    try {
+      const u = new URL(raw);
+      if (isLocalHostname(u.hostname) && isProductionRuntime()) return fallback;
+      return raw;
+    } catch {
+      return fallback;
+    }
+  };
+
+  return {
+    baseUrl,
+    successUrl: usable(envSuccess, `${baseUrl}/checkout/success`),
+    failureUrl: usable(envFailure, `${baseUrl}/checkout/failed`),
+    checkoutUrl: `${baseUrl}/api/payments/payfast/callback`,
+  };
+}
+
 // ============================================================================
 // STEP 1: FETCH ACCESS TOKEN (Server-side only)
 // ============================================================================

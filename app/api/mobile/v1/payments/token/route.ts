@@ -14,6 +14,7 @@ import {
   formatPayFastMobile,
   getPayFastTransactionUrl,
   getPayFastTokenGeneratedAt,
+  getPayFastRedirectUrls,
   isPayFastConfigured,
 } from "@/lib/payments/payfast";
 
@@ -137,14 +138,9 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   }
 
   const amount = Number(booking.total_amount).toFixed(2);
-  const base = (
-    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-  ).replace(/\/+$/, "");
-  const successUrl =
-    process.env.NEXT_PUBLIC_PAYFAST_SUCCESS_URL || `${base}/checkout/success`;
-  const failureUrl =
-    process.env.NEXT_PUBLIC_PAYFAST_FAILURE_URL || `${base}/checkout/failed`;
-  const checkoutUrl = `${base}/api/payments/payfast/callback`;
+  const { successUrl, failureUrl, checkoutUrl, baseUrl } =
+    getPayFastRedirectUrls(request);
+  console.info("[mobile-api] PayFast return base", baseUrl);
 
   const userAgent =
     request.headers.get("user-agent") || "InsideKarachi-MobileApp/1.0";
