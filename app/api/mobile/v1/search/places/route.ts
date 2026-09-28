@@ -11,6 +11,8 @@ import {
   TAG_ONLY_CAP,
   tokenizeQuery,
 } from "@/lib/utils/places-search";
+import { fetchPrimaryImagesByEventId } from "@/lib/mobile/event-images";
+import { sanitizeSearchTerm } from "@/lib/utils/search-sanitization";
 export const dynamic = "force-dynamic";
 
 const DEFAULT_LIMIT = 20;
@@ -27,17 +29,117 @@ function parseCoord(
   return n;
 }
 
+async function searchUpcomingEvents({
+  searchTerm,
+  limit,
+  offset,
+  lat,
+  lng,
+}: {
+  searchTerm: string;
+  limit: number;
+  offset: number;
+  lat: number | null;
+  lng: number | null;
+}) {
+  const hasLoc = lat != null && lng != null;
+  const cleanTerm = sanitizeSearchTerm(searchTerm);
+  if (!cleanTerm) return { rows: [], hasMore: false };
+
+  const queryParams: unknown[] = [`${cleanTerm}%`, `%${cleanTerm}%`];
+  let latIdx = 0;
+  let lngIdx = 0;
+  if (hasLoc) {
+    queryParams.push(lat);
+    latIdx = queryParams.length;
+    queryParams.push(lng);
+    lngIdx = queryParams.length;
+  }
+  queryParams.push(limit + 1);
+  const limitIdx = queryParams.length;
+  queryParams.push(offset);
+  const offsetIdx = queryParams.length;
+
+  const distanceExpr = hasLoc
+    ? `(6371000 * acos(least(1, greatest(-1, cos(radians($${latIdx})) * cos(radians(e.latitude)) * cos(radians(e.longitude) - radians($${lngIdx})) + sin(radians($${latIdx})) * sin(radians(e.latitude))))))`
+    : "NULL::double precision";
+
+  const sql = `
+    SELECT
+      e.id,
+      e.name,
+      e.slug,
+      COALESCE(e.location_name, e.address) AS address,
+      c.name AS category_name,
+      to_json(e.start_time) #>> '{}' AS start_time,
+      to_json(e.end_time) #>> '{}' AS end_time,
+      v.rating AS venue_rating,
+      CASE
+        WHEN e.name ILIKE $1 THEN 1
+        WHEN e.name ILIKE $2 THEN 2
+        WHEN c.name ILIKE $2 OR e.location_name ILIKE $2 THEN 3
+        ELSE 4
+      END AS match_rank,
+      ${distanceExpr} AS distance_meters
+    FROM events e
+    LEFT JOIN categories c ON c.id = e.category_id
+    LEFT JOIN venues v ON v.id = e.venue_id
+    WHERE e.status = 'published'
+      AND e.end_time >= NOW()
+      AND (
+        e.name ILIKE $2
+        OR e.description ILIKE $2
+        OR e.location_name ILIKE $2
+        OR e.address ILIKE $2
+        OR c.name ILIKE $2
+      )
+    ORDER BY
+      match_rank ASC,
+      ${hasLoc ? "distance_meters ASC NULLS LAST," : ""}
+      e.start_time ASC,
+      e.id ASC
+    LIMIT $${limitIdx} OFFSET $${offsetIdx}
+  `;
+
+  const res = await query(sql, queryParams);
+  const hasMore = res.rows.length > limit;
+  const slice = hasMore ? res.rows.slice(0, limit) : res.rows;
+  const eventIds = slice.map((r) => Number(r.id));
+  const imageMap = await fetchPrimaryImagesByEventId(eventIds);
+
+  const rows = slice.map((row) => ({
+    type: "event" as const,
+    id: Number(row.id),
+    name: row.name as string | null,
+    slug: row.slug as string | null,
+    address: row.address as string | null,
+    category: (row.category_name as string | null) || "Event",
+    avg_rating: row.venue_rating != null ? Number(row.venue_rating) : null,
+    review_count: null,
+    distance_meters:
+      row.distance_meters != null ? Number(row.distance_meters) : null,
+    image_url: imageMap.get(Number(row.id)) ?? null,
+    start_time: row.start_time as string | null,
+    end_time: row.end_time as string | null,
+    match_rank: Number(row.match_rank),
+  }));
+
+  return { rows, hasMore };
+}
+
 /**
- * GET /api/mobile/v1/search/places?q=&limit=&offset=&lat=&lng=
+ * GET /api/mobile/v1/search/places?q=&limit=&offset=&lat=&lng=&type=
  *
  * Fast path: resolve matching categories once, pull candidate listing ids via
  * name/address trigram + tag links, then score/rank only that subset.
+ * Also searches published upcoming events in parallel or exclusively by type.
  */
 export const GET = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
 
   const { searchParams } = new URL(request.url);
   const rawQuery = searchParams.get("q") ?? "";
+  const searchType = (searchParams.get("type") ?? "all").toLowerCase();
   const limit = Math.min(
     MAX_LIMIT,
     Math.max(
@@ -76,6 +178,27 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   const hasLocation = lat != null && lng != null;
 
+  // Fast path: if the user specifically asked for events only, skip the heavy places query completely.
+  if (searchType === "events") {
+    const eventsRes = await searchUpcomingEvents({
+      searchTerm: rawQuery,
+      limit,
+      offset,
+      lat,
+      lng,
+    });
+    return ok({
+      query: rawQuery,
+      categories: [],
+      subcategories: [],
+      listings: eventsRes.rows,
+      total: eventsRes.rows.length,
+      listings_offset: offset,
+      listings_limit: limit,
+      listings_has_more: eventsRes.hasMore,
+    });
+  }
+
   const { normalized, tokens, fuzzyThreshold } = tokenizeQuery(rawQuery);
   if (tokens.length === 0 || normalized.length < MIN_QUERY_LENGTH) {
     throw new MobileApiError(
@@ -91,12 +214,24 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const tagOnlyCap = hasLocation ? limit : TAG_ONLY_CAP;
   const tokenCount = tokens.length;
 
+  // If searchType is "all", query events concurrently with the places query
+  const eventsPromise =
+    searchType === "all"
+      ? searchUpcomingEvents({
+          searchTerm: rawQuery,
+          limit: Math.min(6, limit),
+          offset,
+          lat,
+          lng,
+        })
+      : null;
+
   let listingsRes;
+  let eventsRes: Awaited<ReturnType<typeof searchUpcomingEvents>> | null = null;
 
   try {
-    // $1 norm, $2 tokens, $3 fuzzy, $4 parents, $5 limit, $6 offset,
-    // $7 tagCap, $8 lat, $9 lng, $10 token_count
-    listingsRes = await query(
+    const [listingsQueryResult, eventsQueryResult] = await Promise.all([
+      query(
       `WITH cfg AS (
          SELECT
            set_config(
@@ -338,7 +473,11 @@ export const GET = mobileRoute(async (request: NextRequest) => {
         lng,
         tokenCount,
       ],
-    );
+    ),
+      eventsPromise,
+    ]);
+    listingsRes = listingsQueryResult;
+    eventsRes = eventsQueryResult;
   } catch (error) {
     console.error("[mobile-api] places search failed:", error);
     throw new MobileApiError("internal_error", "Failed to search places.", 500);
@@ -372,14 +511,29 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     };
   });
 
+  let finalListings: Array<
+    | (typeof listings)[number]
+    | NonNullable<typeof eventsRes>["rows"][number]
+  > = listings;
+
+  if (eventsRes && eventsRes.rows.length > 0) {
+    const directEvents = eventsRes.rows.filter((e) => e.match_rank <= 2);
+    const otherEvents = eventsRes.rows.filter((e) => e.match_rank > 2);
+    finalListings = [
+      ...directEvents,
+      ...listings,
+      ...otherEvents,
+    ].slice(0, limit);
+  }
+
   return ok({
     query: rawQuery,
     categories: [],
     subcategories: [],
-    listings,
-    total: listings.length,
+    listings: finalListings,
+    total: finalListings.length,
     listings_offset: offset,
     listings_limit: limit,
-    listings_has_more: listingsHasMore,
+    listings_has_more: listingsHasMore || (eventsRes?.hasMore ?? false),
   });
 });

@@ -8,7 +8,6 @@ import {
   Calendar,
   CalendarRange,
   Clock,
-  Compass,
   Home as HomeIcon,
   Info,
   Layers,
@@ -117,20 +116,6 @@ const HOME_CHIP_ITEMS: ChipItem[] = [
     icon: CalendarRange,
   },
   {
-    key: "free",
-    label: "Free",
-    description: "Filter for free events",
-    icon: Tag,
-    note: "Also requires the ticket sales feature flag",
-  },
-  {
-    key: "cheap",
-    label: "Under PKR 1,000",
-    description: "Budget filter for events under PKR 1,000",
-    icon: Wallet,
-    note: "Also requires the ticket sales feature flag",
-  },
-  {
     key: "near",
     label: "Near me",
     description: "Saved search routing to top-rated places near the user",
@@ -142,32 +127,17 @@ const HOME_SECTIONS: SectionItem<HomeSectionKey>[] = [
   {
     key: "chips",
     label: "Quick filter chips",
-    description: "Saved-search intent pills ('Tonight', 'This weekend', 'Free', 'Under PKR 1,000', 'Near me') under the search bar",
+    description: "Saved-search intent pills ('Tonight', 'This weekend', 'Near me') under the search bar",
   },
   { key: "opener", label: "This week opener", description: "Hero carousel at the top of Home" },
   { key: "categories", label: "Explore Categories", description: "Pills linking directly to core categories" },
   { key: "spine", label: "What's on", description: "Chronological event timeline" },
-  { key: "ending", label: "Ending soon", description: "Card discounts & offers expiring soon" },
-  {
-    key: "budget",
-    label: "Free & under PKR 1,000",
-    description: "Budget-friendly activities",
-    note: "Also requires the ticket sales feature flag to be active",
-  },
   { key: "foryou", label: "For you", description: "Personalized event and place recommendations" },
   { key: "opennow", label: "Open now", description: "Places open right now near the user" },
   { key: "detour", label: "Worth the detour", description: "Curated destinations and hidden gems" },
   { key: "feature", label: "This week in Karachi", description: "Weekly editorial feature spotlight" },
   { key: "stat", label: "Your Karachi", description: "Personalized user exploration stats counter" },
   { key: "wallet", label: "Your card discounts", description: "Discounts unlocked by user's bank cards" },
-  { key: "neighbourhood", label: "Where to", description: "Neighborhood exploration carousel" },
-];
-
-const EXPLORE_SECTIONS: SectionItem<keyof PageSectionsConfig["explore"]>[] = [
-  { key: "browse", label: "Browse all", description: "All-categories discover grid" },
-  { key: "top", label: "Top places near you", description: "Highest rated places nearby" },
-  { key: "featured", label: "Worth knowing about", description: "Curated featured places rail" },
-  { key: "justadded", label: "Just added", description: "Recently listed venues & places" },
 ];
 
 const EVENTS_SECTIONS: SectionItem<keyof PageSectionsConfig["events"]>[] = [
@@ -186,7 +156,7 @@ const DEALS_SECTIONS: SectionItem<keyof PageSectionsConfig["deals"]>[] = [
 
 export function AppLayoutPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"hero" | "home" | "explore" | "events" | "deals">("hero");
+  const [activeTab, setActiveTab] = useState<"hero" | "home" | "events" | "deals">("hero");
 
   // Hero state
   const [heroLoading, setHeroLoading] = useState(true);
@@ -639,11 +609,11 @@ export function AppLayoutPage() {
       <Tabs
         value={activeTab}
         onValueChange={(val) =>
-          setActiveTab(val as "hero" | "home" | "explore" | "events" | "deals")
+          setActiveTab(val as "hero" | "home" | "events" | "deals")
         }
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
           <TabsTrigger value="hero" className="gap-1.5">
             <Sparkles className="h-4 w-4" />
             Hero
@@ -651,10 +621,6 @@ export function AppLayoutPage() {
           <TabsTrigger value="home" className="gap-1.5">
             <HomeIcon className="h-4 w-4" />
             Home
-          </TabsTrigger>
-          <TabsTrigger value="explore" className="gap-1.5">
-            <Compass className="h-4 w-4" />
-            Explore
           </TabsTrigger>
           <TabsTrigger value="events" className="gap-1.5">
             <Calendar className="h-4 w-4" />
@@ -989,56 +955,6 @@ export function AppLayoutPage() {
                           </div>
                         </div>
                       )}
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ── Tab: Explore ── */}
-        <TabsContent value="explore" className="space-y-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">Explore Feed Sections</CardTitle>
-                  <CardDescription>
-                    Toggle browse rails and shelves in the Explore tab. The search bar and recent searches remain always active.
-                  </CardDescription>
-                </div>
-                <Button onClick={saveSections} disabled={sectionsSaving} size="sm" className="gap-2">
-                  {sectionsSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Save Explore
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="divide-y rounded-lg border">
-                {EXPLORE_SECTIONS.map((sec) => {
-                  const enabled = sectionsConfig.explore[sec.key];
-                  return (
-                    <div
-                      key={sec.key}
-                      className="flex items-center justify-between gap-4 p-4 hover:bg-muted/40 transition-colors"
-                    >
-                      <div className="space-y-0.5 min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor={`explore-${sec.key}`} className="text-sm font-medium cursor-pointer">
-                            {sec.label}
-                          </Label>
-                          <Badge variant={enabled ? "default" : "outline"} className="text-xs">
-                            {enabled ? "Visible" : "Hidden"}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{sec.description}</p>
-                      </div>
-                      <Switch
-                        id={`explore-${sec.key}`}
-                        checked={enabled}
-                        onCheckedChange={(val) => updateSectionToggle("explore", sec.key, val)}
-                      />
                     </div>
                   );
                 })}
