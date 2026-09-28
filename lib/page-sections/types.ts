@@ -10,8 +10,8 @@ export const PAGE_SECTIONS_CONFIG_KEY = "mobile.page_sections";
 export type HomeChipsItems = {
   tonight: boolean;
   weekend: boolean;
-  free: boolean;
-  cheap: boolean;
+  free?: boolean;
+  cheap?: boolean;
   near: boolean;
 };
 
@@ -21,15 +21,15 @@ export type HomePageSections = {
   opener: boolean;
   categories: boolean;
   spine: boolean;
-  ending: boolean;
-  budget: boolean;
+  ending?: boolean;
+  budget?: boolean;
   foryou: boolean;
   opennow: boolean;
   detour: boolean;
   feature: boolean;
   stat: boolean;
   wallet: boolean;
-  neighbourhood: boolean;
+  neighbourhood?: boolean;
 };
 
 export type ExplorePageSections = {
@@ -63,8 +63,6 @@ export type PageSectionsConfig = {
 export const DEFAULT_HOME_CHIPS_ITEMS: HomeChipsItems = {
   tonight: true,
   weekend: true,
-  free: true,
-  cheap: true,
   near: true,
 };
 
@@ -75,15 +73,12 @@ export const DEFAULT_PAGE_SECTIONS_CONFIG: PageSectionsConfig = {
     opener: true,
     categories: true,
     spine: true,
-    ending: true,
-    budget: true,
     foryou: true,
     opennow: true,
     detour: true,
     feature: true,
     stat: true,
     wallet: true,
-    neighbourhood: true,
   },
   explore: {
     browse: true,
@@ -147,22 +142,17 @@ export function parsePageSectionsConfig(raw: unknown): PageSectionsConfig {
       chips_items: {
         tonight: parseBoolean(chipsItemsRaw.tonight, DEFAULT_HOME_CHIPS_ITEMS.tonight),
         weekend: parseBoolean(chipsItemsRaw.weekend, DEFAULT_HOME_CHIPS_ITEMS.weekend),
-        free: parseBoolean(chipsItemsRaw.free, DEFAULT_HOME_CHIPS_ITEMS.free),
-        cheap: parseBoolean(chipsItemsRaw.cheap, DEFAULT_HOME_CHIPS_ITEMS.cheap),
         near: parseBoolean(chipsItemsRaw.near, DEFAULT_HOME_CHIPS_ITEMS.near),
       },
       opener: parseBoolean(homeRaw.opener, def.home.opener),
       categories: parseBoolean(homeRaw.categories, def.home.categories),
       spine: parseBoolean(homeRaw.spine, def.home.spine),
-      ending: parseBoolean(homeRaw.ending, def.home.ending),
-      budget: parseBoolean(homeRaw.budget, def.home.budget),
       foryou: parseBoolean(homeRaw.foryou, def.home.foryou),
       opennow: parseBoolean(homeRaw.opennow, def.home.opennow),
       detour: parseBoolean(homeRaw.detour, def.home.detour),
       feature: parseBoolean(homeRaw.feature, def.home.feature),
       stat: parseBoolean(homeRaw.stat, def.home.stat),
       wallet: parseBoolean(homeRaw.wallet, def.home.wallet),
-      neighbourhood: parseBoolean(homeRaw.neighbourhood, def.home.neighbourhood),
     },
     explore: {
       browse: parseBoolean(exploreRaw.browse, def.explore.browse),
