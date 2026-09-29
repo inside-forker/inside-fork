@@ -56,35 +56,31 @@ function DisabledStoreBadge({
   );
 }
 
+const mockups = [
+  { src: "/assets/app/iphone-home.webp", alt: "Inside Karachi app home screen" },
+  { src: "/assets/app/iphone-places.webp", alt: "Browsing food and dining places in the app" },
+  { src: "/assets/app/iphone-deals.webp", alt: "Deals and bank card offers in the app" },
+  { src: "/assets/app/iphone-events.webp", alt: "Events and tickets in the app" },
+];
+
 export function AppComingSoonSection() {
   return (
     <section className="py-12 sm:py-16 md:py-20">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="overflow-hidden rounded-3xl bg-neutral-950 text-white">
-          <div className="grid items-center gap-10 p-6 sm:p-10 lg:grid-cols-2 lg:p-14">
+        <div className="overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-b from-primary/10 via-primary/5 to-background">
+          <div className="grid items-center gap-8 p-6 sm:p-10 lg:grid-cols-2 lg:gap-12 lg:p-14">
             <div>
-              <span className="inline-flex items-center rounded-full border border-primary/40 bg-primary/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+              <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
                 Coming soon
               </span>
-              <h2 className="mt-5 text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
+              <h2 className="mt-5 text-2xl font-bold tracking-tight text-foreground sm:text-3xl lg:text-4xl">
                 Inside Karachi, in your pocket
               </h2>
-              <p className="mt-4 max-w-lg text-sm leading-relaxed text-white/70 sm:text-base">
+              <p className="mt-4 max-w-lg text-sm leading-relaxed text-muted-foreground sm:text-base">
                 The Inside Karachi app for iPhone and Android is on its way.
                 Everything on the site, plus a few things that work better on
                 your phone.
               </p>
-
-              <ul className="mt-6 space-y-3">
-                {appPerks.map(({ icon: Icon, text }) => (
-                  <li key={text} className="flex items-center gap-3 text-sm sm:text-base">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
-                      <Icon className="h-4 w-4 text-primary" aria-hidden />
-                    </span>
-                    <span className="text-white/85">{text}</span>
-                  </li>
-                ))}
-              </ul>
 
               <div className="mt-8 flex flex-wrap gap-4">
                 <DisabledStoreBadge
@@ -100,24 +96,35 @@ export function AppComingSoonSection() {
               </div>
             </div>
 
-            <div className="mx-auto flex w-full max-w-md justify-center gap-4">
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {appPerks.map(({ icon: Icon, text }) => (
+                <li
+                  key={text}
+                  className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-4 text-sm"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                    <Icon className="h-4 w-4 text-primary" aria-hidden />
+                  </span>
+                  <span className="text-foreground">{text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 px-6 pb-8 sm:gap-6 sm:px-10 sm:pb-10 md:grid-cols-4 lg:px-14 lg:pb-14">
+            {mockups.map((mockup, index) => (
               <Image
-                src="/assets/app/01-explore-karachi.jpg"
-                alt="Inside Karachi app home screen"
-                width={640}
-                height={1385}
-                sizes="(min-width: 1024px) 220px, 45vw"
-                className="w-1/2 rounded-2xl"
+                key={mockup.src}
+                src={mockup.src}
+                alt={mockup.alt}
+                width={682}
+                height={1395}
+                sizes="(min-width: 1280px) 260px, (min-width: 768px) 22vw, 45vw"
+                className={`mx-auto w-full max-w-[260px] drop-shadow-2xl ${
+                  index % 2 === 1 ? "md:mt-12" : ""
+                }`}
               />
-              <Image
-                src="/assets/app/04-events-tickets.jpg"
-                alt="Inside Karachi app events and tickets screen"
-                width={640}
-                height={1385}
-                sizes="(min-width: 1024px) 220px, 45vw"
-                className="mt-10 w-1/2 rounded-2xl"
-              />
-            </div>
+            ))}
           </div>
         </div>
       </div>

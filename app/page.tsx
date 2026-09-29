@@ -9,14 +9,12 @@ import { AppComingSoonSection } from "@/components/homepage/AppComingSoonSection
 // Containers
 import { CategoriesContainer } from "@/components/homepage/containers/CategoriesContainer";
 import { FeaturedListingsContainer } from "@/components/homepage/containers/FeaturedListingsContainer";
-import { RecentPostsContainer } from "@/components/homepage/containers/RecentPostsContainer";
 import { TrendingEventsContainer } from "@/components/homepage/containers/TrendingEventsContainer";
 
 // Skeletons
 import {
   CategoriesSkeleton,
   FeaturedListingsSkeleton,
-  PostsSkeleton,
   EventsSkeleton,
 } from "@/components/listing/skeletons";
 
@@ -37,6 +35,11 @@ export default function Home() {
         <PlatformStatsStrip />
       </Suspense>
 
+      {/* Trending Events Section */}
+      <Suspense fallback={<EventsSkeleton />}>
+        <TrendingEventsContainer />
+      </Suspense>
+
       {/* Featured Categories Section */}
       <Suspense fallback={<CategoriesSkeleton />}>
         <CategoriesContainer />
@@ -50,18 +53,8 @@ export default function Home() {
         <FeaturedListingsContainer />
       </Suspense>
 
-      {/* Trending Events Section */}
-      <Suspense fallback={<EventsSkeleton />}>
-        <TrendingEventsContainer />
-      </Suspense>
-
       {/* Mobile app teaser - store badges disabled until launch */}
       <AppComingSoonSection />
-
-      {/* Recent Posts/Guides Section */}
-      <Suspense fallback={<PostsSkeleton />}>
-        <RecentPostsContainer />
-      </Suspense>
 
       {/* Call-to-Action Sections - Static Content */}
       <CallToActionSections />
