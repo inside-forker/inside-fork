@@ -118,9 +118,7 @@ export async function GET(request: NextRequest) {
       paramIdx++;
     }
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
+    // Fetch ALL categories to build the full hierarchy and calculate accurate rolled-up counts
     const { rows: categories } = await query(
       `SELECT
         id,
@@ -137,9 +135,7 @@ export async function GET(request: NextRequest) {
         gradient_style,
         created_at
       FROM public.categories
-      ${whereClause}
-      ORDER BY name ASC`,
-      params
+      ORDER BY name ASC`
     );
 
     const typedCategories = (categories as Record<string, unknown>[]).map((cat) => ({
@@ -292,7 +288,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Transform data to include parent name and counts
-    const transformedCategories: CategoryWithParent[] = typedCategories.map(
+    const allTransformedCategories: CategoryWithParent[] = typedCategories.map(
       (cat) => {
         const parentInfo = cat.parent_id
           ? categoryMap.get(cat.parent_id)
@@ -307,8 +303,6 @@ export async function GET(request: NextRequest) {
         };
 
         const isChild = cat.parent_id !== null;
-        // A subcategory is marked as archived when all its listings are archived (and it has archived listings with 0 published/draft),
-        // or if it's disabled.
         const isArchived = isChild
           ? (counts.archived > 0 && counts.published === 0 && counts.draft === 0) || !cat.is_enabled
           : (counts.total > 0 && counts.published === 0 && counts.draft === 0) || !cat.is_enabled;
@@ -339,34 +333,70 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Calculate stats
-    const allCategories = transformedCategories;
-    const subcategories = allCategories.filter((c) => c.parent_id !== null);
+    // Calculate overall stats across all categories
+    const subcategories = allTransformedCategories.filter((c) => c.parent_id !== null);
     const archivedSubcategories = subcategories.filter((c) => c.is_archived).length;
     const activeSubcategories = subcategories.length - archivedSubcategories;
 
     const stats: CategoryStats = {
-      total: allCategories.length,
-      parentCategories: allCategories.filter((c) => c.parent_id === null)
-        .length,
+      total: allTransformedCategories.length,
+      parentCategories: allTransformedCategories.filter((c) => c.parent_id === null).length,
       subcategories: subcategories.length,
       archivedSubcategories,
       activeSubcategories,
-      shownInNav: allCategories.filter((c) => c.show_in_nav).length,
-      featured: allCategories.filter((c) => c.show_in_featured).length,
-      enabled: allCategories.filter((c) => c.is_enabled).length,
-      listingCategories: allCategories.filter((c) =>
+      shownInNav: allTransformedCategories.filter((c) => c.show_in_nav).length,
+      featured: allTransformedCategories.filter((c) => c.show_in_featured).length,
+      enabled: allTransformedCategories.filter((c) => c.is_enabled).length,
+      listingCategories: allTransformedCategories.filter((c) =>
         ["listing", "both"].includes(c.category_type)
       ).length,
-      eventCategories: allCategories.filter((c) =>
+      eventCategories: allTransformedCategories.filter((c) =>
         ["event", "both"].includes(c.category_type)
       ).length,
     };
 
+    // Apply filtering to the returned categories
+    let filteredCategories = allTransformedCategories;
+
+    if (parentIdParam !== null && parentIdParam !== "all") {
+      if (parentIdParam === "null" || parentIdParam === "roots") {
+        filteredCategories = filteredCategories.filter((c) => c.parent_id === null);
+      } else {
+        const parentId = parseInt(parentIdParam, 10);
+        if (!isNaN(parentId)) {
+          filteredCategories = filteredCategories.filter((c) => c.parent_id === parentId);
+        }
+      }
+    }
+
+    if (showInNavParam !== null && showInNavParam !== "all") {
+      const isShowInNav = showInNavParam === "true";
+      filteredCategories = filteredCategories.filter((c) => c.show_in_nav === isShowInNav);
+    }
+
+    if (categoryTypeParam && categoryTypeParam !== "all") {
+      if (categoryTypeParam === "listing" || categoryTypeParam === "event") {
+        filteredCategories = filteredCategories.filter(
+          (c) => c.category_type === categoryTypeParam || c.category_type === "both"
+        );
+      } else if (categoryTypeParam === "both") {
+        filteredCategories = filteredCategories.filter((c) => c.category_type === "both");
+      }
+    }
+
+    if (searchParam) {
+      const queryLower = searchParam.toLowerCase();
+      filteredCategories = filteredCategories.filter(
+        (c) =>
+          c.name.toLowerCase().includes(queryLower) ||
+          c.slug.toLowerCase().includes(queryLower)
+      );
+    }
+
     return NextResponse.json({
       success: true,
       data: {
-        categories: transformedCategories,
+        categories: filteredCategories,
         stats,
       },
     });
