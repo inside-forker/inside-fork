@@ -58,17 +58,16 @@ export function CallToActionSections() {
 
                   {/* Description */}
                   <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed px-2 sm:px-0">
-                    Join thousands of explorers discovering the best of Karachi.
-                    Get personalized recommendations, earn rewards, and unlock
-                    exclusive experiences.
+                    Create a free account to save favorites, book event
+                    tickets, unlock deals and earn XP as you explore the city.
                   </p>
 
                   {/* Benefits */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-6 sm:mt-8">
                     {[
-                      { icon: Star, text: "Personalized Recommendations" },
-                      { icon: Zap, text: "Exclusive Deals & Offers" },
-                      { icon: Crown, text: "VIP Community Access" },
+                      { icon: Star, text: "Save Your Favorites" },
+                      { icon: Zap, text: "Deals & Card Offers" },
+                      { icon: Crown, text: "Earn XP & Ranks" },
                     ].map((benefit, index) => (
                       <div
                         key={index}
@@ -141,9 +140,9 @@ export function CallToActionSections() {
 
                     {/* Description */}
                     <p className="text-base sm:text-lg text-muted-foreground leading-relaxed text-center md:text-left">
-                      Reach thousands of potential customers in Karachi. Get
-                      discovered by food lovers, event-goers, and local
-                      explorers looking for their next favorite spot.
+                      Get discovered by food lovers, event-goers and local
+                      explorers looking for their next favorite spot in
+                      Karachi.
                     </p>
 
                     {/* Benefits List */}
@@ -195,7 +194,7 @@ export function CallToActionSections() {
                               Your Business Here
                             </div>
                             <div className="text-xs sm:text-sm text-muted-foreground">
-                              Join 2,800+ listed businesses
+                              Apply online in a few minutes
                             </div>
                           </div>
                         </div>
