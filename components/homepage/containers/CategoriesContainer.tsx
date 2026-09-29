@@ -114,7 +114,7 @@ export async function CategoriesContainer() {
           icon_name: string | null;
           category_type: string;
           gradient_style: GradientStyle | null;
-        } => !!c,
+        } => !!c && c.published_listing_count > 0,
       );
 
     return <FeaturedCategoriesSection categories={categories} />;

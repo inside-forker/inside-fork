@@ -24,13 +24,16 @@ export function isStaffRoute(pathname: string): boolean {
     pathname.startsWith("/api/admin/listings") ||
     pathname.startsWith("/api/admin/events") ||
     pathname.startsWith("/api/admin/reviews") ||
+    pathname.startsWith("/api/admin/categories") ||
     // Page routes for lister access
     pathname === "/admin/listings" ||
     pathname === "/admin/events" ||
     pathname === "/admin/reviews" ||
+    pathname === "/admin/categories" ||
     pathname.startsWith("/admin/listings/") ||
     pathname.startsWith("/admin/events/") ||
-    pathname.startsWith("/admin/reviews/")
+    pathname.startsWith("/admin/reviews/") ||
+    pathname.startsWith("/admin/categories/")
   );
 }
 

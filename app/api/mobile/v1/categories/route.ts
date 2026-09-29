@@ -8,10 +8,9 @@ import { MobileApiError } from "@/lib/mobile/errors";
 export const dynamic = "force-dynamic";
 
 /**
- * Published listings per category, rolled up through the tree so a top-level
- * category reports everything underneath it rather than only the handful of
- * listings filed directly against the parent. Depth is not assumed — the
- * recursive term walks `parent_id` for as many levels as exist.
+ * Published listings and events per category, rolled up through the tree so a top-level
+ * category reports everything underneath it.
+ * Depth is not assumed — the recursive term walks `parent_id` for as many levels as exist.
  */
 const CATEGORY_COUNTS_CTE = `
   WITH RECURSIVE tree AS (
@@ -19,10 +18,29 @@ const CATEGORY_COUNTS_CTE = `
     UNION ALL
     SELECT t.root_id, c.id FROM categories c JOIN tree t ON c.parent_id = t.id
   ),
+  distinct_listings AS (
+    SELECT id AS listing_id, category_id
+    FROM listings
+    WHERE status = 'published' AND category_id IS NOT NULL
+    UNION
+    SELECT l.id AS listing_id, lc.category_id
+    FROM listings l
+    JOIN listing_categories lc ON lc.listing_id = l.id
+    WHERE l.status = 'published' AND lc.category_id IS NOT NULL
+  ),
+  distinct_events AS (
+    SELECT id AS event_id, category_id
+    FROM events
+    WHERE status = 'published' AND end_time >= NOW()
+  ),
   counts AS (
-    SELECT t.root_id, COUNT(l.id)::int AS listing_count
+    SELECT
+      t.root_id,
+      COUNT(DISTINCT dl.listing_id)::int AS listing_count,
+      COUNT(DISTINCT de.event_id)::int AS event_count
     FROM tree t
-    LEFT JOIN listings l ON l.category_id = t.id AND l.status = 'published'
+    LEFT JOIN distinct_listings dl ON dl.category_id = t.id
+    LEFT JOIN distinct_events de ON de.category_id = t.id
     GROUP BY t.root_id
   )
 `;
@@ -33,13 +51,11 @@ const CATEGORY_COUNTS_CTE = `
  * Reference data for filter/category pickers. `value` is the stringified integer
  * id (contract section 1, IDs) - not the slug. Mirrors `app/api/categories`.
  *
+ * Excludes subcategories and parent categories that have 0 published listings/events (archived).
+ *
  * `?type=event|listing|both` filters by `category_type`, matching a row whose
  * `category_type` equals the requested value or is `'both'`. Omitted (default)
  * keeps the original unfiltered behavior so existing callers are unaffected.
- *
- * `listingCount` is additive: Home's category index labels each row with how
- * many places sit under it, which is the whole reason that block can drop the
- * icons. Clients that only need the picker can ignore it.
  */
 type CategoryResult = {
   value: string;
@@ -51,7 +67,7 @@ type CategoryResult = {
 };
 
 const categoryCache = new Map<string, { timestamp: number; data: CategoryResult[] }>();
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 5_000;
 
 export const GET = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
@@ -68,7 +84,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return ok(cached.data, undefined, {
       headers: {
-        "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
       },
     });
   }
@@ -79,19 +95,31 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       ? await query(
           `${CATEGORY_COUNTS_CTE}
            SELECT c.id, c.name, c.slug, c.parent_id, c.icon_name,
-                  COALESCE(ct.listing_count, 0) AS listing_count
+                  COALESCE(ct.listing_count, 0) AS listing_count,
+                  COALESCE(ct.event_count, 0) AS event_count
            FROM categories c
            LEFT JOIN counts ct ON ct.root_id = c.id
-           WHERE c.category_type = $1 OR c.category_type = 'both'
+           WHERE c.is_enabled = true
+             AND (c.category_type = $1 OR c.category_type = 'both')
+             AND (
+               COALESCE(ct.listing_count, 0) > 0
+               OR (c.category_type IN ('event', 'both') AND COALESCE(ct.event_count, 0) > 0)
+             )
            ORDER BY c.name ASC`,
           [type],
         )
       : await query(
           `${CATEGORY_COUNTS_CTE}
            SELECT c.id, c.name, c.slug, c.parent_id, c.icon_name,
-                  COALESCE(ct.listing_count, 0) AS listing_count
+                  COALESCE(ct.listing_count, 0) AS listing_count,
+                  COALESCE(ct.event_count, 0) AS event_count
            FROM categories c
            LEFT JOIN counts ct ON ct.root_id = c.id
+           WHERE c.is_enabled = true
+             AND (
+               COALESCE(ct.listing_count, 0) > 0
+               OR (c.category_type IN ('event', 'both') AND COALESCE(ct.event_count, 0) > 0)
+             )
            ORDER BY c.name ASC`,
         );
     data = rows;

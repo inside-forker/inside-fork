@@ -354,12 +354,43 @@ export default async function CategoryListingsPage({
     console.error("Failed to hydrate favorites for category page", err);
   }
 
-  // Fetch header categories
+  // Fetch header categories (only active categories with published listings)
   const { rows: categoriesData } = await query(
-    `SELECT id, name, slug, parent_id, icon_name 
-     FROM categories 
-     WHERE is_enabled = true AND show_in_filters = true AND category_type IN ('listing', 'both') AND slug != 'events' 
-     ORDER BY display_order ASC, name ASC LIMIT 200`
+    `WITH RECURSIVE cat_tree AS (
+      SELECT id AS root_id, id FROM categories
+      UNION ALL
+      SELECT t.root_id, c.id FROM categories c JOIN cat_tree t ON c.parent_id = t.id
+    ),
+    active_listings AS (
+      SELECT id, category_id FROM listings WHERE status = 'published' AND category_id IS NOT NULL
+      UNION
+      SELECT l.id, lc.category_id FROM listings l JOIN listing_categories lc ON lc.listing_id = l.id WHERE l.status = 'published' AND lc.category_id IS NOT NULL
+    ),
+    listing_counts AS (
+      SELECT t.root_id AS category_id, COUNT(DISTINCT al.id) AS listing_count
+      FROM cat_tree t
+      JOIN active_listings al ON al.category_id = t.id
+      GROUP BY t.root_id
+    ),
+    direct_listing_counts AS (
+      SELECT category_id, COUNT(DISTINCT id) AS direct_count
+      FROM active_listings
+      GROUP BY category_id
+    )
+    SELECT c.id, c.name, c.slug, c.parent_id, c.icon_name 
+    FROM categories c
+    LEFT JOIN listing_counts lc ON lc.category_id = c.id
+    LEFT JOIN direct_listing_counts dlc ON dlc.category_id = c.id
+    WHERE c.is_enabled = true 
+      AND c.show_in_filters = true 
+      AND c.category_type IN ('listing', 'both') 
+      AND c.slug != 'events' 
+      AND (
+        (c.parent_id IS NULL AND COALESCE(lc.listing_count, 0) > 0)
+        OR
+        (c.parent_id IS NOT NULL AND COALESCE(dlc.direct_count, 0) > 0)
+      )
+    ORDER BY c.display_order ASC, c.name ASC LIMIT 200`
   );
 
   // Compute SEO title & description

@@ -16,7 +16,24 @@ export async function Header() {
   const subsByParent = new Map<number, { id: number; name: string; slug: string }[]>();
   if (parentIds.length > 0) {
     const { rows: subs } = await query(
-      `SELECT id, name, slug, parent_id FROM categories WHERE parent_id = ANY($1) ORDER BY id`,
+      `SELECT c.id, c.name, c.slug, c.parent_id
+       FROM categories c
+       WHERE c.parent_id = ANY($1)
+         AND c.is_enabled = true
+         AND (
+           EXISTS (
+             SELECT 1 FROM listings l
+             WHERE (l.category_id = c.id OR EXISTS (
+               SELECT 1 FROM listing_categories lc WHERE lc.listing_id = l.id AND lc.category_id = c.id
+             ))
+             AND l.status = 'published'
+           )
+           OR EXISTS (
+             SELECT 1 FROM events e
+             WHERE e.category_id = c.id AND e.status = 'published' AND e.end_time >= NOW()
+           )
+         )
+       ORDER BY c.id`,
       [parentIds],
     );
     for (const sub of subs) {

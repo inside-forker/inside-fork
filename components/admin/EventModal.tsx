@@ -156,7 +156,7 @@ export function EventModal({
       setIsLoadingData(true);
       try {
         // Fetch categories
-        const categoriesResponse = await fetch("/api/categories");
+        const categoriesResponse = await fetch("/api/categories?all=true");
         if (categoriesResponse.ok) {
           const categoriesData = await categoriesResponse.json();
           setCategories(categoriesData.categories || []);
