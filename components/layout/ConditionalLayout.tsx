@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { ReactNode, isValidElement, Children } from "react";
 import { FavoritesProvider } from "@/components/layout/providers/FavoritesProvider";
+import { CrispChat } from "@/components/layout/CrispChat";
 
 interface ConditionalLayoutProps {
   children: React.ReactNode;
@@ -70,33 +71,45 @@ export function ConditionalLayout({
     pathname.endsWith("/not-found") ||
     pathname.endsWith("/maintenance");
 
-  if (isAuthPage) {
-    // Auth pages: no header/footer
-    return <main className="min-h-screen">{children}</main>;
-  }
-
-  if (isDashboardPage || isAdminPage) {
-    // Dashboard and Admin pages: use their own layout system
-    return <main className="min-h-screen">{children}</main>;
-  }
-
-  if (is404Page) {
-    // 404 pages: clean, minimal experience without header/footer
-    return <main className="min-h-screen">{children}</main>;
-  }
-
-  // Regular pages: with header, footer, and favorites
-  // Wrap with FavoritesProvider ONLY for user-facing pages
+  // Support chat only on regular user-facing pages
+  const showChat = !isAuthPage && !isDashboardPage && !isAdminPage && !is404Page;
 
   return (
-    <FavoritesProvider>
-      <div className="relative flex min-h-screen flex-col">
-        <div data-chrome="header">{header}</div>
-        <main data-chrome="content" className="flex-1 pt-20">
-          {children}
-        </main>
-        <div data-chrome="footer">{footer}</div>
-      </div>
-    </FavoritesProvider>
+    <>
+      {renderContent()}
+      <CrispChat visible={showChat} />
+    </>
   );
+
+  function renderContent() {
+    if (isAuthPage) {
+      // Auth pages: no header/footer
+      return <main className="min-h-screen">{children}</main>;
+    }
+
+    if (isDashboardPage || isAdminPage) {
+      // Dashboard and Admin pages: use their own layout system
+      return <main className="min-h-screen">{children}</main>;
+    }
+
+    if (is404Page) {
+      // 404 pages: clean, minimal experience without header/footer
+      return <main className="min-h-screen">{children}</main>;
+    }
+
+    // Regular pages: with header, footer, and favorites
+    // Wrap with FavoritesProvider ONLY for user-facing pages
+
+    return (
+      <FavoritesProvider>
+        <div className="relative flex min-h-screen flex-col">
+          <div data-chrome="header">{header}</div>
+          <main data-chrome="content" className="flex-1 pt-20">
+            {children}
+          </main>
+          <div data-chrome="footer">{footer}</div>
+        </div>
+      </FavoritesProvider>
+    );
+  }
 }
