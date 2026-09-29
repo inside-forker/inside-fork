@@ -17,9 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { PremiumHeading, PremiumText } from "@/components/brand/Typography";
 import { BookingPassList } from "@/components/events/BookingPassList";
-import { FullScreenPasses } from "@/components/events/FullScreenPasses";
 import { PublicPass } from "@/types/ticketing.types";
-import { useMediaQuery } from "@/lib/hooks/use-media-query";
 
 interface BookingEventSummary {
   id: number;
@@ -128,25 +126,12 @@ function safeFormatDate(
 export function BookingsDashboard({ bookings }: Props) {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [selected, setSelected] = useState<DashboardBooking | null>(null);
-  const isMobile = useMediaQuery("(max-width: 768px)");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
   useEffect(() => {
     setCurrentPage(1);
   }, [filter]);
-
-  // Lock body scroll when fullscreen passes is open on mobile
-  useEffect(() => {
-    if (selected && isMobile) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [selected, isMobile]);
 
   const summary = useMemo<BookingSummary>(() => {
     const now = new Date();
@@ -536,30 +521,13 @@ export function BookingsDashboard({ bookings }: Props) {
         </div>
       )}
 
-      {/* Mobile: FullScreen Passes Drawer */}
-      {isMobile && selected && (
-        <FullScreenPasses
-          isOpen={true}
-          onClose={() => setSelected(null)}
-          passes={selected.passes}
-          bookingReference={selected.booking_reference ?? String(selected.id)}
-          eventName={selected.event?.name}
-          eventDate={selected.event?.start_time}
-          eventTime={selected.event?.start_time}
-          venueName={selected.event?.venue_name ?? undefined}
-          eventEndTime={selected.event?.end_time ?? undefined}
-          address={selected.event?.address ?? undefined}
-          organizer={selected.event?.organizer_name ?? undefined}
-        />
-      )}
-
-      {/* Desktop: Dialog Modal */}
+      {/* Passes Modal (Responsive for both mobile and desktop) */}
       <AnimatePresence>
-        {selected && !isMobile && (
+        {selected && (
           <Dialog open onOpenChange={() => setSelected(null)}>
-            <DialogContent className="max-w-3xl border border-border/60 bg-background/95 backdrop-blur-2xl">
+            <DialogContent className="max-w-3xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto border border-border/60 bg-background/95 backdrop-blur-2xl p-4 sm:p-6">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-semibold font-display">
+                <DialogTitle className="text-xl sm:text-2xl font-semibold font-display">
                   Booking {selected.booking_reference ?? selected.id}
                 </DialogTitle>
                 <DialogDescription className="text-xs uppercase tracking-[0.35em] text-muted-foreground">
