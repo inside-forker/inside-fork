@@ -26,12 +26,7 @@ import { resolveAssignedGateIndex } from "@/lib/ticketing/resolve-gate-assignmen
 export type SkipPaymentReason = "free_order" | "payment_skipped";
 
 export function isPaymentSkipEnabled(): boolean {
-  // Skip payment by default so test/mobile checkouts succeed immediately without PayFast form.
-  // Can be explicitly disabled in production with MOBILE_CHECKOUT_SKIP_PAYMENT="false".
-  if (process.env.MOBILE_CHECKOUT_SKIP_PAYMENT === "false") {
-    return false;
-  }
-  return true;
+  return process.env.MOBILE_CHECKOUT_SKIP_PAYMENT === "true";
 }
 
 export async function confirmBookingWithoutPayment(
