@@ -4,7 +4,6 @@ import * as React from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { PublicPass } from "@/types/ticketing.types";
 import { Lock } from "lucide-react";
-import { format } from "date-fns";
 
 const TIME_ZONE = "Asia/Karachi";
 
@@ -35,6 +34,34 @@ function formatTime(iso: string | null | undefined): string {
     minute: "2-digit",
     hour12: true,
   }).replace(/\s?([ap])\.?m\.?$/i, (_, p: string) => ` ${p.toUpperCase()}M`);
+}
+
+function Field({
+  label,
+  value,
+  sub,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  className?: string;
+}) {
+  return (
+    <div className={`min-w-0 ${className}`}>
+      <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">
+        {label}
+      </div>
+      <div className="text-sm font-semibold text-zinc-900 break-words leading-snug">
+        {value || "—"}
+      </div>
+      {sub ? (
+        <div className="text-xs text-zinc-500 mt-0.5 break-words leading-snug">
+          {sub}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export interface OfficialTicketCardProps {
@@ -89,8 +116,7 @@ export const OfficialTicketCard = React.forwardRef<
   }, [endIso]);
 
   const sameDay =
-    startIso &&
-    endIso &&
+    Boolean(startIso && endIso) &&
     formatDate(startIso) === formatDate(endIso);
 
   const displayTime =
@@ -98,7 +124,7 @@ export const OfficialTicketCard = React.forwardRef<
       ? `${startFormattedTime} – ${endFormattedTime}`
       : startFormattedTime;
 
-  const displayDate = formatDate(startIso) || (eventDate ? format(new Date(eventDate), "EEE, d MMM yyyy") : "—");
+  const displayDate = formatDate(startIso) || "—";
   const displayType = pass.ticket_type_name || ticketType || "General Admission";
   const displayVenue = venueName || address || "—";
   const displayAddress =
@@ -112,158 +138,111 @@ export const OfficialTicketCard = React.forwardRef<
   return (
     <div
       ref={ref}
-      className={`official-ticket-card w-full max-w-3xl bg-white text-zinc-900 rounded-2xl border border-zinc-200/90 shadow-xl overflow-hidden flex flex-col md:flex-row select-none ${className}`}
+      className={`official-ticket-card w-full max-w-3xl bg-white text-zinc-900 rounded-2xl border border-zinc-200/90 shadow-xl overflow-hidden select-none ${className}`}
       style={{
         fontFamily:
-          '"Helvetica Neue", Helvetica, Arial, "Segoe UI", Roboto, sans-serif',
+          'Arial, Helvetica, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      {/* Left / Main Section */}
-      <div className="flex-1 min-w-0 p-5 sm:p-6 flex flex-col justify-between">
-        {/* Header: Title + Organizer + Lane */}
-        <div>
-          <div className="flex items-start justify-between gap-4">
+      {/*
+        CSS grid (not flex-row + w-full stub): a stub with width:100% in a
+        row flex crushes the main pane to ~0px, so DATE/TIME/TICKET paint on
+        top of each other and values truncate to "F..".
+      */}
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_13.5rem]">
+        {/* Main */}
+        <div className="min-w-0 p-5 sm:p-6 flex flex-col gap-4 border-b md:border-b-0 md:border-r border-dashed border-zinc-300">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <h2 className="text-xl sm:text-2xl font-extrabold text-zinc-900 tracking-tight leading-tight line-clamp-2">
+              <h2 className="text-lg sm:text-xl font-extrabold text-zinc-900 tracking-tight leading-snug">
                 {eventName || "Event"}
               </h2>
-              {organizer && (
-                <p className="text-xs sm:text-sm text-zinc-500 mt-0.5 truncate font-medium">
+              {organizer ? (
+                <p className="text-xs sm:text-sm text-zinc-500 mt-0.5 font-medium">
                   by {organizer}
                 </p>
-              )}
+              ) : null}
             </div>
 
-            {displayLane && (
-              <div className="flex-none px-3.5 py-1.5 rounded-lg border-2 border-[#F42354] bg-[#F42354]/5 text-center min-w-[90px]">
+            {displayLane ? (
+              <div className="shrink-0 px-3 py-1.5 rounded-lg border-2 border-[#F42354] bg-[#F42354]/5 text-center min-w-[5.5rem]">
                 <div className="text-[9px] font-bold uppercase tracking-wider text-[#F42354] leading-none mb-0.5">
                   Entry Lane
                 </div>
-                <div className="text-base sm:text-lg font-black text-[#F42354] leading-none">
+                <div className="text-base font-black text-[#F42354] leading-none">
                   {displayLane}
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
 
-          {/* Details Grid */}
-          <div className="mt-5 pt-4 border-t border-zinc-200/80 grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-4">
-            {/* Date */}
-            <div className="min-w-0">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">
-                Date
-              </div>
-              <div className="text-sm font-semibold text-zinc-900 truncate">
-                {displayDate}
-              </div>
-            </div>
+          <div className="pt-3 border-t border-zinc-200/80 grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-4">
+            <Field label="Date" value={displayDate} />
+            <Field label="Time" value={displayTime || "—"} />
+            <Field
+              label="Ticket"
+              value={displayType}
+              className="col-span-2 sm:col-span-1"
+            />
+            <Field
+              label="Venue"
+              value={displayVenue}
+              sub={displayAddress}
+              className="col-span-2"
+            />
+            <Field
+              label="Attendee"
+              value={displayAttendee}
+              sub={displayCnic}
+              className="col-span-2 sm:col-span-1"
+            />
+          </div>
 
-            {/* Time */}
-            <div className="min-w-0">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">
-                Time
-              </div>
-              <div className="text-sm font-semibold text-zinc-900 truncate">
-                {displayTime || "—"}
-              </div>
-            </div>
-
-            {/* Ticket Type */}
-            <div className="min-w-0 col-span-2 sm:col-span-1">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">
-                Ticket
-              </div>
-              <div className="text-sm font-semibold text-zinc-900 truncate">
-                {displayType}
-              </div>
-            </div>
-
-            {/* Venue */}
-            <div className="min-w-0 col-span-2 sm:col-span-2">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">
-                Venue
-              </div>
-              <div className="text-sm font-semibold text-zinc-900 truncate">
-                {displayVenue}
-              </div>
-              {displayAddress && (
-                <div className="text-xs text-zinc-500 truncate mt-0.5">
-                  {displayAddress}
-                </div>
-              )}
-            </div>
-
-            {/* Attendee */}
-            <div className="min-w-0 col-span-2 sm:col-span-1">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">
-                Attendee
-              </div>
-              <div className="text-sm font-semibold text-zinc-900 truncate">
-                {displayAttendee}
-              </div>
-              {displayCnic && (
-                <div className="text-xs text-zinc-500 font-mono truncate mt-0.5">
-                  {displayCnic}
-                </div>
-              )}
-            </div>
+          <div className="mt-auto pt-3 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] text-zinc-400">
+            <span>
+              {bookingReference ? `Booking ${bookingReference} · ` : ""}
+              One entry per ticket · Non-transferable · Carry a valid ID
+            </span>
+            <span className="font-medium">insidekarachi.com</span>
           </div>
         </div>
 
-        {/* Footer info */}
-        <div className="mt-5 pt-3 border-t border-zinc-100 flex items-center justify-between gap-3 text-[10px] text-zinc-400">
-          <span className="truncate">
-            {bookingReference ? `Booking ${bookingReference} · ` : ""}
-            One entry per ticket · Non-transferable · Carry a valid ID
-          </span>
-          <span className="flex-none font-medium text-zinc-400">
-            insidekarachi.com
-          </span>
-        </div>
-      </div>
-
-      {/* Right / Ticket Stub */}
-      <div className="w-full md:w-56 flex-none bg-zinc-50/60 border-t md:border-t-0 md:border-l border-dashed border-zinc-300 p-5 flex flex-col items-center justify-between text-center">
-        {/* Logo */}
-        <div className="w-full flex justify-center pt-1">
+        {/* Stub */}
+        <div className="bg-zinc-50/70 p-5 flex flex-col items-center justify-between text-center gap-3 min-h-[14rem] md:min-h-0">
           <img
             src="/logo-black.png"
             alt="Inside Karachi"
             className="h-7 w-auto object-contain"
           />
-        </div>
 
-        {/* QR Code */}
-        <div className="my-3 flex flex-col items-center">
-          {pass.code ? (
-            <div className="p-2.5 bg-white rounded-xl shadow-sm border border-zinc-200/80">
-              <QRCodeSVG
-                value={pass.code}
-                size={120}
-                level="H"
-                bgColor="#FFFFFF"
-                fgColor="#000000"
-              />
-            </div>
-          ) : (
-            <div className="w-28 h-28 bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-400">
-              <Lock className="w-8 h-8" />
-            </div>
-          )}
+          <div className="flex flex-col items-center">
+            {pass.code ? (
+              <div className="p-2.5 bg-white rounded-xl shadow-sm border border-zinc-200/80">
+                <QRCodeSVG
+                  value={pass.code}
+                  size={120}
+                  level="H"
+                  bgColor="#FFFFFF"
+                  fgColor="#000000"
+                />
+              </div>
+            ) : (
+              <div className="w-[120px] h-[120px] bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-400">
+                <Lock className="w-8 h-8" />
+              </div>
+            )}
 
-          {/* Ticket Code */}
-          <div className="mt-2.5 font-mono text-sm font-black text-zinc-900 tracking-wider">
-            {pass.code || "PENDING"}
+            <div className="mt-2.5 font-mono text-sm font-black text-zinc-900 tracking-wider">
+              {pass.code || "PENDING"}
+            </div>
+            <div className="mt-0.5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+              Ticket {index} of {total}
+            </div>
           </div>
 
-          {/* Ticket Count */}
-          <div className="mt-0.5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-            Ticket {index} of {total}
+          <div className="text-[9px] text-zinc-400 uppercase tracking-wider font-semibold">
+            Scan at Gate
           </div>
-        </div>
-
-        <div className="text-[9px] text-zinc-400 uppercase tracking-wider font-semibold pb-1">
-          Scan at Gate
         </div>
       </div>
     </div>
