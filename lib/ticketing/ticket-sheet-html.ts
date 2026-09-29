@@ -128,34 +128,37 @@ function ticketHtml(t: TicketSheetItem, logoSrc: string): string {
 
 // Every rule is scoped under .iks-root so the sheet can be mounted inside a live
 // web page for html2canvas without leaking into (or inheriting from) site CSS.
+// Arial first: html2canvas mis-measures Helvetica Neue glyphs on macOS and
+// paints letters as thick half-clipped bars. Keep line-heights ≥1.35 and avoid
+// negative letter-spacing for the same reason.
 export const TICKET_SHEET_STYLES = `
-.iks-root, .iks-root * { box-sizing: border-box; margin: 0; padding: 0; border: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.iks-root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #111827; background: #FFFFFF; line-height: 1.25; text-align: left; }
-.iks-page { width: 210mm; height: 296mm; padding: 10mm 12mm; display: flex; flex-direction: column; overflow: hidden; background: #FFFFFF; page-break-after: always; break-after: page; }
+.iks-root, .iks-root * { box-sizing: border-box; margin: 0; padding: 0; border: 0; font-family: Arial, Helvetica, "Segoe UI", Roboto, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.iks-root { color: #111827; background: #FFFFFF; line-height: 1.4; text-align: left; }
+.iks-page { width: 210mm; height: 296mm; padding: 10mm 12mm; display: flex; flex-direction: column; background: #FFFFFF; page-break-after: always; break-after: page; overflow: visible; }
 .iks-page:last-child { page-break-after: auto; break-after: auto; }
 .iks-cut { height: 7mm; flex: none; display: flex; align-items: center; }
 .iks-cut > div { flex: 1; border-top: 0.3mm dashed #D1D5DB; }
-.iks-ticket { height: 64mm; flex: none; display: flex; border: 0.3mm solid #D9DADD; border-radius: 3mm; overflow: hidden; background: #FFFFFF; }
-.iks-main { flex: 1; min-width: 0; padding: 4.5mm 5mm 3.5mm 6mm; display: flex; flex-direction: column; }
-.iks-head { display: flex; align-items: flex-start; gap: 4mm; height: 17mm; flex: none; }
-.iks-title { flex: 1; min-width: 0; }
-.iks-event { font-size: 13pt; font-weight: 800; line-height: 1.18; letter-spacing: -0.2pt; color: #111827; max-height: 10.9mm; overflow: hidden; }
-.iks-org { margin-top: 0.6mm; font-size: 7.5pt; color: #6B7280; white-space: nowrap; overflow: hidden; }
-.iks-lane { flex: none; min-width: 26mm; padding: 1.6mm 3mm; border: 0.4mm solid #F42354; border-radius: 2mm; text-align: center; }
+.iks-ticket { height: 64mm; flex: none; display: flex; border: 0.3mm solid #D9DADD; border-radius: 3mm; background: #FFFFFF; overflow: visible; }
+.iks-main { flex: 1; min-width: 0; padding: 4.5mm 5mm 3.5mm 6mm; display: flex; flex-direction: column; overflow: visible; }
+.iks-head { display: flex; align-items: flex-start; gap: 4mm; height: 17mm; flex: none; overflow: visible; }
+.iks-title { flex: 1; min-width: 0; overflow: visible; }
+.iks-event { font-size: 13pt; font-weight: 700; line-height: 1.4; color: #111827; padding: 0.4mm 0; }
+.iks-org { margin-top: 0.4mm; font-size: 7.5pt; color: #6B7280; white-space: nowrap; line-height: 1.4; padding: 0.3mm 0; }
+.iks-lane { flex: none; min-width: 26mm; padding: 1.6mm 3mm; border: 0.4mm solid #F42354; border-radius: 2mm; text-align: center; overflow: visible; }
 .iks-lane .iks-l { color: #F42354; }
-.iks-lv { font-size: 14pt; font-weight: 800; color: #F42354; line-height: 1.1; white-space: nowrap; }
-.iks-grid { flex: 1; display: grid; grid-template-columns: 1fr 1.1fr 1.3fr; grid-auto-rows: min-content; column-gap: 5mm; row-gap: 3mm; padding-top: 3mm; border-top: 0.3mm solid #E9EAEC; }
-.iks-f { min-width: 0; }
+.iks-lv { font-size: 14pt; font-weight: 700; color: #F42354; line-height: 1.35; white-space: nowrap; padding: 0.3mm 0; }
+.iks-grid { flex: 1; display: grid; grid-template-columns: 1fr 1.1fr 1.3fr; grid-auto-rows: min-content; column-gap: 5mm; row-gap: 3mm; padding-top: 3mm; border-top: 0.3mm solid #E9EAEC; overflow: visible; }
+.iks-f { min-width: 0; overflow: visible; }
 .iks-span { grid-column: span 2; }
-.iks-l { font-size: 6pt; font-weight: 700; letter-spacing: 0.9pt; text-transform: uppercase; color: #9CA3AF; margin-bottom: 0.7mm; }
-.iks-v { font-size: 10pt; font-weight: 600; color: #111827; white-space: nowrap; overflow: hidden; }
-.iks-sub { font-size: 7.5pt; color: #6B7280; margin-top: 0.4mm; white-space: nowrap; overflow: hidden; }
-.iks-foot { display: flex; justify-content: space-between; gap: 3mm; font-size: 6pt; color: #9CA3AF; white-space: nowrap; overflow: hidden; }
-.iks-stub { width: 48mm; flex: none; border-left: 0.4mm dashed #D1D5DB; padding: 4mm 3mm 3mm; display: flex; flex-direction: column; align-items: center; }
+.iks-l { font-size: 6pt; font-weight: 700; letter-spacing: 0.9pt; text-transform: uppercase; color: #9CA3AF; margin-bottom: 0.7mm; line-height: 1.35; padding: 0.2mm 0; }
+.iks-v { font-size: 10pt; font-weight: 600; color: #111827; white-space: nowrap; line-height: 1.4; padding: 0.4mm 0; }
+.iks-sub { font-size: 7.5pt; color: #6B7280; margin-top: 0.4mm; white-space: nowrap; line-height: 1.4; padding: 0.3mm 0; }
+.iks-foot { display: flex; justify-content: space-between; gap: 3mm; font-size: 6pt; color: #9CA3AF; white-space: nowrap; margin-top: auto; line-height: 1.4; padding: 0.3mm 0; }
+.iks-stub { width: 48mm; flex: none; border-left: 0.4mm dashed #D1D5DB; padding: 4mm 3mm 3mm; display: flex; flex-direction: column; align-items: center; overflow: visible; }
 .iks-logo { width: 30mm; height: auto; display: block; }
 .iks-qr { width: 32mm; height: 32mm; margin-top: 2.6mm; display: block; image-rendering: pixelated; }
-.iks-code { margin-top: 1.4mm; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8.5pt; font-weight: 800; letter-spacing: 0.6pt; color: #111827; white-space: nowrap; }
-.iks-count { margin-top: 0.6mm; font-size: 6.5pt; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.6pt; }
+.iks-code { margin-top: 1.4mm; font-family: Menlo, Consolas, "Courier New", monospace; font-size: 8.5pt; font-weight: 700; letter-spacing: 0.6pt; color: #111827; white-space: nowrap; line-height: 1.4; padding: 0.3mm 0; }
+.iks-count { margin-top: 0.6mm; font-size: 6.5pt; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.6pt; line-height: 1.4; padding: 0.3mm 0; }
 `;
 
 /** One `.iks-page` element per A4 sheet; each holds up to TICKETS_PER_PAGE fixed-height tickets. */

@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { MapPin, Navigation } from "lucide-react";
+import { MapPin, Navigation, Copy, Check } from "lucide-react";
 import { EventLocationProps } from "@/types/events.types";
 import {
   sectionVariants,
@@ -11,6 +12,7 @@ import {
 } from "@/lib/utils/listing-animations";
 
 export function EventLocation({ event }: EventLocationProps) {
+  const [copied, setCopied] = useState(false);
   const locationName = event.location_name;
   const locationAddress = event.address;
   const locationLatitude = event.latitude;
@@ -20,15 +22,31 @@ export function EventLocation({ event }: EventLocationProps) {
     return null;
   }
 
+  const fullAddressText = [locationName, locationAddress]
+    .filter(Boolean)
+    .join(", ");
+
   const handleGetDirections = () => {
     if (locationLatitude && locationLongitude) {
       const url = `https://www.google.com/maps/dir/?api=1&destination=${locationLatitude},${locationLongitude}`;
       window.open(url, "_blank");
-    } else if (locationAddress) {
+    } else if (locationAddress || locationName) {
+      const query = locationAddress || locationName || "";
       const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        locationAddress,
+        query,
       )}`;
       window.open(url, "_blank");
+    }
+  };
+
+  const handleCopyAddress = async () => {
+    if (!fullAddressText) return;
+    try {
+      await navigator.clipboard.writeText(fullAddressText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
     }
   };
 
@@ -45,78 +63,61 @@ export function EventLocation({ event }: EventLocationProps) {
       </p>
 
       {/* Location Card */}
-      <Card className="overflow-hidden rounded-2xl border-2 border-border p-0">
-        {/* Map Area (stylized, non-interactive preview) */}
-        <button
-          type="button"
-          onClick={handleGetDirections}
-          aria-label={`Open directions to ${locationName || "venue"}`}
-          className="group relative block h-40 md:h-56 w-full bg-[#161618] cursor-pointer"
-        >
-          <svg
-            viewBox="0 0 284 120"
-            preserveAspectRatio="none"
-            className="absolute inset-0 h-full w-full"
-          >
-            <rect width="284" height="120" fill="#161618" />
-            <path
-              d="M0 90 Q 80 60 150 75 T 284 55"
-              stroke="#2c2c30"
-              strokeWidth="10"
-              fill="none"
-            />
-            <path
-              d="M40 0 L 90 120"
-              stroke="#232326"
-              strokeWidth="6"
-              fill="none"
-            />
-            <path
-              d="M200 0 L 170 120"
-              stroke="#232326"
-              strokeWidth="5"
-              fill="none"
-            />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <svg
-              width="30"
-              height="34"
-              viewBox="0 0 30 34"
-              className="drop-shadow-md transition-transform group-hover:-translate-y-0.5"
-            >
-              <path
-                d="M15 0C6.7 0 0 6.7 0 15c0 10.5 15 19 15 19s15-8.5 15-19C30 6.7 23.3 0 15 0z"
-                fill="hsl(var(--primary))"
-              />
-              <circle cx="15" cy="15" r="6" fill="#161618" />
-            </svg>
+      <Card className="rounded-2xl border border-border/60 bg-gradient-to-br from-card via-card to-background p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Location info */}
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary flex-shrink-0 mt-0.5 sm:mt-0">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              {locationName && (
+                <h3 className="text-base sm:text-lg font-bold text-foreground leading-snug truncate">
+                  {locationName}
+                </h3>
+              )}
+              {locationAddress && (
+                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 leading-relaxed break-words">
+                  {locationAddress}
+                </p>
+              )}
+            </div>
           </div>
-        </button>
 
-        {/* Info bar */}
-        <div className="flex items-center gap-3 border-t-2 border-border p-4">
-          <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
-          <div className="min-w-0 flex-1">
-            {locationName && (
-              <h3 className="text-sm md:text-base font-semibold truncate">
-                {locationName}
-              </h3>
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40">
+            {fullAddressText && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCopyAddress}
+                className="rounded-xl border-border/60 text-xs gap-1.5 h-9"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    Copy Address
+                  </>
+                )}
+              </Button>
             )}
-            {locationAddress && (
-              <p className="text-xs md:text-sm text-muted-foreground truncate">
-                {locationAddress}
-              </p>
-            )}
+
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleGetDirections}
+              className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold gap-1.5 h-9 shadow-sm shadow-primary/20"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              Directions
+            </Button>
           </div>
-          <Button
-            className="flex-shrink-0 rounded-full border-2 border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-            size="sm"
-            onClick={handleGetDirections}
-          >
-            <Navigation className="w-4 h-4 mr-1.5" />
-            Directions
-          </Button>
         </div>
       </Card>
     </motion.div>

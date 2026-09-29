@@ -11,69 +11,16 @@ import { useSearch } from "@/hooks/useSearch";
 import {
   Search,
   MapPin,
-  Star,
-  Users,
   Calendar,
   ArrowRight,
   Sparkles,
   Heart,
   TrendingUp,
-  Award,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
-// Stats configuration - defined outside component to avoid recreation
-const stats = [
-  {
-    icon: Users,
-    label: "Active Users",
-    value: "50K+",
-    colors: {
-      bg: "from-blue-500/20 via-blue-500/10 to-blue-500/5",
-      border: "border-blue-500/30",
-      icon: "text-blue-500",
-      accent: "bg-blue-500",
-      glow: "hover:shadow-xl hover:shadow-blue-500/25",
-    },
-  },
-  {
-    icon: Star,
-    label: "Places Listed",
-    value: "2.5K+",
-    colors: {
-      bg: "from-amber-500/20 via-amber-500/10 to-amber-500/5",
-      border: "border-amber-500/30",
-      icon: "text-amber-500",
-      accent: "bg-amber-500",
-      glow: "hover:shadow-xl hover:shadow-amber-500/25",
-    },
-  },
-  {
-    icon: Calendar,
-    label: "Events Monthly",
-    value: "200+",
-    colors: {
-      bg: "from-emerald-500/20 via-emerald-500/10 to-emerald-500/5",
-      border: "border-emerald-500/30",
-      icon: "text-emerald-500",
-      accent: "bg-emerald-500",
-      glow: "hover:shadow-xl hover:shadow-emerald-500/25",
-    },
-  },
-  {
-    icon: Award,
-    label: "Reviews",
-    value: "15K+",
-    colors: {
-      bg: "from-purple-500/20 via-purple-500/10 to-purple-500/5",
-      border: "border-purple-500/30",
-      icon: "text-purple-500",
-      accent: "bg-purple-500",
-      glow: "hover:shadow-xl hover:shadow-purple-500/25",
-    },
-  },
-];
+
 
 export function PremiumHomepageHero() {
   const [location, setLocation] = useState("Karachi, Pakistan");
@@ -388,85 +335,6 @@ export function PremiumHomepageHero() {
             document.body,
           )}
 
-        {/* Stats Section - CSS animations */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto animate-hero-fade-in-delay-3">
-          {stats.map((stat, index) => (
-            <div
-              key={stat.label}
-              className="group"
-              style={{ animationDelay: `${0.35 + index * 0.05}s` }}
-            >
-              <div
-                className={cn(
-                  "relative overflow-hidden rounded-xl sm:rounded-2xl p-4 sm:p-6 cursor-pointer",
-                  "backdrop-blur-xl border transition-all duration-500",
-                  "hover:scale-[1.02] hover:-translate-y-1",
-                  `bg-gradient-to-br ${stat.colors.bg}`,
-                  stat.colors.border,
-                  stat.colors.glow,
-                  "transform-gpu",
-                )}
-              >
-                {/* Border glow */}
-                <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-                  <div
-                    className={cn(
-                      "absolute inset-0 rounded-2xl opacity-30 blur-md",
-                      stat.colors.accent,
-                    )}
-                  />
-                  <div
-                    className={cn(
-                      "absolute inset-0 rounded-2xl opacity-10 blur-lg",
-                      stat.colors.accent,
-                    )}
-                  />
-                </div>
-
-                {/* Animated accent line */}
-                <div
-                  className={cn(
-                    "absolute top-0 left-0 h-1 w-0 group-hover:w-full transition-all duration-700 ease-out",
-                    stat.colors.accent,
-                  )}
-                />
-
-                <div className="relative z-10">
-                  <div className="flex flex-col items-center space-y-3">
-                    {/* Icon container */}
-                    <div
-                      className={cn(
-                        "relative p-2 md:p-3 rounded-xl transition-all duration-500",
-                        "group-hover:scale-110 group-hover:rotate-6 transform-gpu",
-                        `bg-gradient-to-br ${stat.colors.bg}`,
-                        "border border-white/20 dark:border-white/10",
-                        "shadow-lg group-hover:shadow-xl",
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "h-5 w-5 md:h-6 md:w-6",
-                          stat.colors.icon,
-                        )}
-                      >
-                        <stat.icon className="h-full w-full" />
-                      </div>
-                    </div>
-
-                    <div className="text-center">
-                      <div className="text-xl sm:text-2xl font-bold text-foreground">
-                        {stat.value}
-                      </div>
-                      <div className="text-xs sm:text-sm text-muted-foreground">
-                        {stat.label}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </HeroSectionStatic>
   );
