@@ -386,10 +386,10 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const allowedStatuses = ["published", "draft"];
+    const allowedStatuses = ["published", "draft", "archived"];
     if (!allowedStatuses.includes(status)) {
       return NextResponse.json(
-        { error: "Invalid request: status must be 'published' or 'draft'" },
+        { error: "Invalid request: status must be 'published', 'draft', or 'archived'" },
         { status: 400 },
       );
     }
