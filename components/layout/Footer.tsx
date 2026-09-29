@@ -10,7 +10,6 @@ import {
   Twitter,
   Youtube,
   Mail,
-  Sparkles,
   ArrowRight,
 } from "lucide-react";
 import { FooterLinkTabs } from "./FooterLinkTabs";
@@ -151,36 +150,17 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
   };
 
   return (
-    <footer ref={footerRef} className="relative overflow-hidden">
-      {/* Background with Glassmorphism */}
-      <div className="absolute inset-0 bg-background/95 backdrop-blur-xl" />
-
-      {/* Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
-
-      {/* Floating Background Elements */}
-      <div className="hidden sm:block absolute -top-32 -right-32 w-64 h-64 bg-primary/10 rounded-full blur-3xl animate-pulse" />
-      <div className="hidden sm:block absolute -bottom-32 -left-32 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-
-      {/* Grid Pattern */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(var(--primary-rgb),0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(var(--primary-rgb),0.02)_1px,transparent_1px)] bg-[size:50px_50px]" />
-
+    <footer ref={footerRef} className="relative overflow-hidden border-t border-border bg-muted">
       {/* Newsletter Section */}
-      <div className="relative z-10 border-b border-border/50 animate-hero-fade-in">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
-        <div className="relative container mx-auto px-6 lg:px-8 py-16 sm:py-20 text-center">
+      <div className="relative z-10 border-b border-border">
+        <div className="relative container mx-auto px-6 lg:px-8 py-12 sm:py-14 text-center">
           {/* Newsletter Content */}
-          <div className="space-y-4 sm:space-y-6">
-            <div className="flex items-center justify-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
-              <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 hover:scale-110 hover:rotate-180 transition-all duration-500">
-                <Sparkles className="h-6 w-6 text-primary" />
-              </div>
-              <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight leading-tight">
-                Become an <span className="gradient-text-primary">Insider</span>
-              </h2>
-            </div>
+          <div className="space-y-3">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              Become an <span className="text-primary">Insider</span>
+            </h2>
 
-            <p className="max-w-2xl mx-auto text-base sm:text-lg md:text-xl text-muted-foreground leading-relaxed px-4 sm:px-0">
+            <p className="max-w-xl mx-auto text-sm sm:text-base text-muted-foreground leading-relaxed">
               Join our newsletter to get exclusive deals, early access to
               events, and the best of Karachi delivered to you.
             </p>
@@ -191,8 +171,7 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
               onSubmit={handleNewsletterSubmit}
             >
               <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-primary/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-300" />
-                <div className="relative flex bg-background/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-premium-lg overflow-hidden">
+                <div className="relative flex bg-card border border-border rounded-2xl overflow-hidden">
                   <div className="relative flex-1">
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
@@ -219,7 +198,7 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
                   </div>
                   <Button
                     type="submit"
-                    className="h-14 px-6 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-l-none rounded-r-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] group"
+                    className="h-14 px-6 bg-primary hover:bg-primary/90 active:opacity-80 text-primary-foreground font-semibold rounded-none group"
                   >
                     <span className="mr-2">Sign Me Up</span>
                     <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
@@ -239,7 +218,7 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
         {/* Mobile Layout */}
         <div className="flex flex-col items-center text-center md:hidden space-y-8">
           {/* Clean Logo Section */}
-          <div className="hover:scale-[1.02] transition-transform duration-300">
+          <div>
             <ThemeAwareLogo />
           </div>
 
@@ -261,7 +240,7 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
                   className="group opacity-0 animate-hero-fade-in"
                   style={{ animationDelay: `${0.3 + index * 0.1}s` }}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-background/80 backdrop-blur-xl border border-border/50 shadow-premium flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/30 hover:bg-primary/5 dark:hover:bg-primary/10 transition-all duration-300 hover:scale-110 hover:-translate-y-1">
+                  <div className="w-12 h-12 rounded-2xl bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/30 active:opacity-80 transition-colors">
                     <social.icon className="h-5 w-5" />
                   </div>
                   <span className="sr-only">{social.name}</span>
@@ -273,16 +252,7 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
 
         {/* Divider for Mobile */}
         <div className="my-16 md:hidden">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gradient-to-r from-transparent via-border to-transparent" />
-            </div>
-            <div className="relative flex justify-center">
-              <div className="px-6 bg-background/80 backdrop-blur-xl">
-                <div className="w-2 h-2 rounded-full bg-primary/50" />
-              </div>
-            </div>
-          </div>
+          <div className="border-t border-border" />
         </div>
 
         {/* Mobile Navigation */}
@@ -298,7 +268,7 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
           {/* Desktop: Logo and Brand Column */}
           <div className="md:col-span-4 space-y-8">
             {/* Clean Logo Presentation */}
-            <div className="w-fit hover:scale-[1.02] transition-transform duration-300">
+            <div className="w-fit">
               <ThemeAwareLogo />
             </div>
 
@@ -324,7 +294,7 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
                       className="group opacity-0 animate-hero-fade-in"
                       style={{ animationDelay: `${0.5 + index * 0.1}s` }}
                     >
-                      <div className="w-12 h-12 rounded-2xl bg-background/60 backdrop-blur-xl border border-border/50 shadow-premium flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/30 hover:bg-primary/5 dark:hover:bg-primary/10 hover:shadow-premium-lg transition-all duration-300 hover:scale-105 hover:-translate-y-1">
+                      <div className="w-12 h-12 rounded-2xl bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/30 active:opacity-80 transition-colors">
                         <social.icon className="h-5 w-5" />
                       </div>
                       <span className="sr-only">{social.name}</span>
@@ -340,7 +310,7 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
             {/* Explore Column */}
             <div className="space-y-6">
               <div className="flex items-center space-x-2">
-                <div className="w-1 h-6 bg-gradient-to-b from-primary to-primary/50 rounded-full" />
+                <div className="w-1 h-6 bg-primary rounded-full" />
                 <h4 className="font-bold text-foreground text-lg">Explore</h4>
               </div>
               <ul className="space-y-4">
@@ -370,7 +340,7 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
             {/* For Businesses Column */}
             <div className="space-y-6">
               <div className="flex items-center space-x-2">
-                <div className="w-1 h-6 bg-gradient-to-b from-primary to-primary/50 rounded-full" />
+                <div className="w-1 h-6 bg-primary rounded-full" />
                 <h4 className="font-bold text-foreground text-lg">
                   For Businesses
                 </h4>
@@ -399,7 +369,7 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
             {/* Company Column */}
             <div className="space-y-6">
               <div className="flex items-center space-x-2">
-                <div className="w-1 h-6 bg-gradient-to-b from-primary to-primary/50 rounded-full" />
+                <div className="w-1 h-6 bg-primary rounded-full" />
                 <h4 className="font-bold text-foreground text-lg">Company</h4>
               </div>
               <ul className="space-y-4">
@@ -431,23 +401,11 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
           style={{ animationDelay: "1s" }}
         >
           {/* Divider */}
-          <div className="relative mb-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gradient-to-r from-transparent via-border to-transparent" />
-            </div>
-            <div className="relative flex justify-center">
-              <div className="px-6 bg-background/80 backdrop-blur-xl">
-                <div
-                  className="w-3 h-3 rounded-full bg-gradient-to-r from-primary to-primary/50 animate-spin"
-                  style={{ animationDuration: "20s" }}
-                />
-              </div>
-            </div>
-          </div>
+          <div className="border-t border-border mb-8" />
 
           {/* Copyright Content */}
           <div className="text-center space-y-4">
-            <p className="text-sm text-muted-foreground font-medium hover:scale-[1.02] transition-transform duration-300">
+            <p className="text-sm text-muted-foreground font-medium">
               © <CurrentYear />{" "}
               <span className="text-primary font-semibold">Inside Karachi</span>
               . All Rights Reserved.
@@ -460,7 +418,7 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
               .
             </p>
             <p className="text-xs text-muted-foreground/70">
-              Crafted with <span className="text-primary animate-pulse">♥</span>{" "}
+              Crafted with <span className="text-primary">♥</span>{" "}
               for the people of Karachi
             </p>
           </div>

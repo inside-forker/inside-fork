@@ -1,4 +1,5 @@
 import { CalendarDays, LayoutGrid, MapPin } from "lucide-react";
+import { containerClass } from "@/components/homepage/SectionHeading";
 import { formatStat, getPlatformStats } from "@/lib/homepage/platform-stats";
 
 export async function PlatformStatsStrip() {
@@ -17,11 +18,11 @@ export async function PlatformStatsStrip() {
   if (items.length < 2) return null;
 
   return (
-    <section aria-label="Inside Karachi at a glance" className="border-y border-border/60 bg-muted/30">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <dl className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 py-6">
+    <section aria-label="Inside Karachi at a glance">
+      <div className={containerClass}>
+        <dl className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-center">
           {items.map(({ icon: Icon, value, label }) => (
-            <div key={label} className="flex items-center gap-3">
+            <div key={label} className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
               <Icon className="h-5 w-5 text-primary" aria-hidden />
               <div className="flex items-baseline gap-2">
                 <dt className="order-2 text-sm text-muted-foreground">{label}</dt>

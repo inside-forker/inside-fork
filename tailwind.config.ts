@@ -19,6 +19,10 @@ const config = {
   		}
   	},
   	extend: {
+  		fontFamily: {
+  			// Inter, loaded by next/font in app/layout.tsx, same face as the mobile app
+  			sans: ['var(--font-sans)', 'system-ui', 'sans-serif']
+  		},
   		colors: {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
