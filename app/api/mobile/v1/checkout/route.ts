@@ -299,6 +299,45 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     throw new MobileApiError("internal_error", "Failed to load booking.", 500);
   }
 
+  // Fetch platform and payment processing fees from system_config (mirrors web checkout)
+  const { rows: feeConfigs } = await query(
+    `SELECT config_key, config_value FROM system_config WHERE config_key = ANY($1::text[])`,
+    [
+      [
+        "fees.platform_fee_fixed",
+        "fees.platform_fee_percentage",
+        "fees.payment_processing_fee_fixed",
+        "fees.payment_processing_fee_percentage",
+      ],
+    ],
+  );
+  const feeMap: Record<string, number> = {};
+  for (const row of feeConfigs ?? []) {
+    const v = row.config_value;
+    feeMap[row.config_key] =
+      typeof v === "number" ? v : parseFloat(String(v)) || 0;
+  }
+  const platformFeeFixed = feeMap["fees.platform_fee_fixed"] ?? 0;
+  const platformFeePercentage = feeMap["fees.platform_fee_percentage"] ?? 0;
+  const paymentFeeFixed = feeMap["fees.payment_processing_fee_fixed"] ?? 0;
+  const paymentFeePercentage =
+    feeMap["fees.payment_processing_fee_percentage"] ?? 0;
+
+  const subtotal = Number(booking.total_amount);
+  const platformFee =
+    platformFeeFixed + subtotal * (platformFeePercentage / 100);
+  const paymentFee =
+    paymentFeeFixed + (subtotal + platformFee) * (paymentFeePercentage / 100);
+  const totalWithFees = subtotal + platformFee + paymentFee;
+
+  if (totalWithFees !== subtotal) {
+    await query(
+      `UPDATE bookings SET total_amount = $1 WHERE id = $2`,
+      [totalWithFees, bookingId],
+    );
+    booking.total_amount = totalWithFees;
+  }
+
   // Ensure a payment row exists (mirrors the website).
   const { rows: payExistingRows } = await query(
     `SELECT id FROM payments WHERE booking_id = $1 AND gateway_code = $2`,

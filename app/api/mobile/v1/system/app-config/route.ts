@@ -46,6 +46,11 @@ const CONFIG_KEYS = [
   "mobile.ios_store_url",
   // Feed sections toggle key
   PAGE_SECTIONS_CONFIG_KEY,
+  // Fee configuration keys
+  "fees.platform_fee_fixed",
+  "fees.platform_fee_percentage",
+  "fees.payment_processing_fee_fixed",
+  "fees.payment_processing_fee_percentage",
 ];
 
 /**
@@ -158,6 +163,21 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   const sections = parsePageSectionsConfig(byKey.get(PAGE_SECTIONS_CONFIG_KEY));
 
+  const platformFeeFixed = Number(byKey.get("fees.platform_fee_fixed")) || 0;
+  const platformFeePercentage =
+    Number(byKey.get("fees.platform_fee_percentage")) || 0;
+  const paymentFeeFixed =
+    Number(byKey.get("fees.payment_processing_fee_fixed")) || 0;
+  const paymentFeePercentage =
+    Number(byKey.get("fees.payment_processing_fee_percentage")) || 0;
+
+  const fees = {
+    platformFeeFixed,
+    platformFeePercentage,
+    paymentFeeFixed,
+    paymentFeePercentage,
+  };
+
   const payload = {
     maintenance: {
       enabled: maintenanceEnabled,
@@ -175,6 +195,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       ios_store_url: iosStoreUrl,
     },
     sections,
+    fees,
   };
 
   appConfigCache = { timestamp: Date.now(), data: payload };
