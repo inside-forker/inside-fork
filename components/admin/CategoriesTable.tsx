@@ -14,7 +14,16 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Pencil, Trash2, ChevronRight, Globe, Plus, GitBranch } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  ChevronRight,
+  Globe,
+  Plus,
+  GitBranch,
+  Archive,
+  ArchiveRestore,
+} from "lucide-react";
 import { getCategoryIcon } from "./CategoryIconSelect";
 import type { CategoryWithParent } from "@/types/category.types";
 
@@ -24,6 +33,7 @@ interface CategoriesTableProps {
   onEdit: (category: CategoryWithParent) => void;
   onDelete: (category: CategoryWithParent) => Promise<void>;
   onAddSubcategory?: (parentCategory: CategoryWithParent) => void;
+  onArchiveCategory?: (category: CategoryWithParent) => void;
   isBulkMode?: boolean;
   selectedIds?: Set<number>;
   onSelect?: (ids: Set<number>) => void;
@@ -35,6 +45,7 @@ export function CategoriesTable({
   onEdit,
   onDelete,
   onAddSubcategory,
+  onArchiveCategory,
   isBulkMode = false,
   selectedIds = new Set(),
   onSelect,
@@ -359,11 +370,40 @@ export function CategoriesTable({
                           <Plus className="h-4 w-4" />
                         </Button>
                       )}
+                      {onArchiveCategory && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onArchiveCategory(category)}
+                          aria-label={
+                            category.is_archived || !category.is_enabled
+                              ? `Unarchive ${category.name}`
+                              : `Archive ${category.name}`
+                          }
+                          title={
+                            category.is_archived || !category.is_enabled
+                              ? `Unarchive ${category.name}`
+                              : `Archive ${category.name} and listings`
+                          }
+                          className={
+                            category.is_archived || !category.is_enabled
+                              ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400"
+                              : "text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+                          }
+                        >
+                          {category.is_archived || !category.is_enabled ? (
+                            <ArchiveRestore className="h-4 w-4" />
+                          ) : (
+                            <Archive className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => onEdit(category)}
                         aria-label={`Edit ${category.name}`}
+                        title={`Edit ${category.name}`}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -372,6 +412,7 @@ export function CategoriesTable({
                         size="icon"
                         onClick={() => setDeleteCategory(category)}
                         aria-label={`Delete ${category.name}`}
+                        title={`Delete ${category.name}`}
                         className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       >
                         <Trash2 className="h-4 w-4" />

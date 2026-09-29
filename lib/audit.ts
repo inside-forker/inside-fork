@@ -48,6 +48,8 @@ export type AuditAction =
   | "category_created"
   | "category_updated"
   | "category_deleted"
+  | "category_archived"
+  | "category_unarchived"
   | "category_bulk_operation"
   // Notifications
   | "notification_sent"
