@@ -175,7 +175,9 @@ export function CategoryArchiveModal({
                   htmlFor="includeListings"
                   className="text-sm font-medium leading-none cursor-pointer"
                 >
-                  Also restore all {archivedCount} archived listings back to Published
+                  {archivedCount > 0
+                    ? `Also restore all ${archivedCount} archived listings back to Published`
+                    : `Also ensure listings in this category are set to Published`}
                 </Label>
               </div>
             </>
