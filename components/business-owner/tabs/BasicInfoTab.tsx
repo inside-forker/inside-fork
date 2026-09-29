@@ -77,7 +77,7 @@ export default function BasicInfoTab({
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const response = await fetch("/api/categories");
+        const response = await fetch("/api/categories?all=true");
         if (response.ok) {
           const data = await response.json();
           setCategories(data.categories || []);

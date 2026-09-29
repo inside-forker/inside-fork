@@ -81,7 +81,24 @@ export async function MegaMenu() {
     const subsByParent = new Map<number, SubCategory[]>();
     if (parentIds.length > 0) {
       const { rows: subs } = await query(
-        `SELECT id, name, slug, parent_id FROM categories WHERE parent_id = ANY($1)`,
+        `SELECT c.id, c.name, c.slug, c.parent_id
+         FROM categories c
+         WHERE c.parent_id = ANY($1)
+           AND c.is_enabled = true
+           AND (
+             EXISTS (
+               SELECT 1 FROM listings l
+               WHERE (l.category_id = c.id OR EXISTS (
+                 SELECT 1 FROM listing_categories lc WHERE lc.listing_id = l.id AND lc.category_id = c.id
+               ))
+               AND l.status = 'published'
+             )
+             OR EXISTS (
+               SELECT 1 FROM events e
+               WHERE e.category_id = c.id AND e.status = 'published' AND e.end_time >= NOW()
+             )
+           )
+         ORDER BY c.name ASC`,
         [parentIds],
       );
       for (const sub of subs) {
@@ -95,8 +112,7 @@ export async function MegaMenu() {
       }
     }
 
-    // Mirrors the old `categories!inner(...)` embed: only keep parents that
-    // have at least one sub-category.
+    // Only keep parents that have at least one active sub-category with published listings.
     parentCategories = parents
       .map((p) => ({
         id: Number(p.id),

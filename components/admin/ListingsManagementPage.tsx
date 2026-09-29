@@ -361,7 +361,7 @@ export function ListingsManagementPage() {
     const fetchCategories = async () => {
       setCategoriesLoading(true);
       try {
-        const response = await fetch("/api/categories");
+        const response = await fetch("/api/categories?all=true");
         const result = await response.json();
 
         if (result.success) {

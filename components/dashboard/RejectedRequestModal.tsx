@@ -163,7 +163,7 @@ export function RejectedRequestModal({
       setIsLoadingData(true);
       try {
         // 1. Fetch static data (categories)
-        const categoriesRes = await fetch("/api/categories");
+        const categoriesRes = await fetch("/api/categories?all=true");
 
         if (categoriesRes.ok) {
           const data = await categoriesRes.json();

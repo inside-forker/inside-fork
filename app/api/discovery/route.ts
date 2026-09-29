@@ -37,7 +37,24 @@ export async function GET() {
     >();
     if (parentIds.length > 0) {
       const { rows: subs } = await query(
-        `SELECT id, name, slug, parent_id FROM categories WHERE parent_id = ANY($1) ORDER BY name ASC`,
+        `SELECT c.id, c.name, c.slug, c.parent_id
+         FROM categories c
+         WHERE c.parent_id = ANY($1)
+           AND c.is_enabled = true
+           AND (
+             EXISTS (
+               SELECT 1 FROM listings l
+               WHERE (l.category_id = c.id OR EXISTS (
+                 SELECT 1 FROM listing_categories lc WHERE lc.listing_id = l.id AND lc.category_id = c.id
+               ))
+               AND l.status = 'published'
+             )
+             OR EXISTS (
+               SELECT 1 FROM events e
+               WHERE e.category_id = c.id AND e.status = 'published' AND e.end_time >= NOW()
+             )
+           )
+         ORDER BY c.name ASC`,
         [parentIds],
       );
       for (const sub of subs) {
@@ -51,12 +68,14 @@ export async function GET() {
       }
     }
 
-    const categories = parentsResult.rows.map((p) => ({
-      id: Number(p.id),
-      name: p.name,
-      slug: p.slug,
-      subcategories: subsByParent.get(Number(p.id)) || [],
-    }));
+    const categories = parentsResult.rows
+      .map((p) => ({
+        id: Number(p.id),
+        name: p.name,
+        slug: p.slug,
+        subcategories: subsByParent.get(Number(p.id)) || [],
+      }))
+      .filter((p) => p.subcategories.length > 0);
 
     const trendingListings = trendingResult.rows.map((row) => ({
       id: Number(row.id),

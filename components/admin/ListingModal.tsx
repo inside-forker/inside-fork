@@ -374,7 +374,7 @@ export function ListingModal({
   React.useEffect(() => {
     if (isOpen && categories.length === 0) {
       setCategoriesLoading(true);
-      fetch("/api/categories")
+      fetch("/api/categories?all=true")
         .then((res) => res.json())
         .then((data) => {
           if (data.success) {

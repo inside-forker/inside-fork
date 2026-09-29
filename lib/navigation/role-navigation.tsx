@@ -27,6 +27,7 @@ import {
   Link2,
   UserPlus,
   Sparkles,
+  FolderTree,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/types/auth.types";
@@ -124,6 +125,7 @@ export const adminNavigation: RoleNavItem[] = [
   { name: "Blog Approvals", href: "/admin/blogs/approvals", icon: ClipboardCheck, description: "Review pending posts" },
   { name: "Writer Applications", href: "/admin/writer-applications", icon: PenSquare, description: "Review writer applicants" },
   { name: "Blog Categories", href: "/admin/blog-categories", icon: FileText, description: "Manage blog categories" },
+  { name: "Categories Management", href: "/admin/categories", icon: FolderTree, description: "Manage categories and subcategories taxonomy" },
   { name: "Gamification", href: "/admin/gamification", icon: Trophy, description: "Manage ranks & badges" },
   { name: "Analytics", href: "/admin/analytics", icon: BarChart3, description: "Platform-wide analytics" },
   { name: "App Layout", href: "/admin/app-layout", icon: Sparkles, description: "Hero slides and which feed sections appear in the app" },
@@ -154,6 +156,7 @@ export const listerNavigation: RoleNavItem[] = [
   { name: "Blog Approvals", href: "/admin/blogs/approvals", icon: ClipboardCheck, description: "Review pending posts" },
   { name: "Writer Applications", href: "/admin/writer-applications", icon: PenSquare, description: "Review writer applicants" },
   { name: "Blog Categories", href: "/admin/blog-categories", icon: FileText, description: "Manage blog categories" },
+  { name: "Categories Management", href: "/admin/categories", icon: FolderTree, description: "Manage categories and subcategories taxonomy" },
 ];
 
 export const listerSecondaryNavigation: RoleNavItem[] = [
