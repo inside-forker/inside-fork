@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Pencil, Trash2, ChevronRight, Globe } from "lucide-react";
+import { Pencil, Trash2, ChevronRight, Globe, Plus, GitBranch } from "lucide-react";
 import { getCategoryIcon } from "./CategoryIconSelect";
 import type { CategoryWithParent } from "@/types/category.types";
 
@@ -23,6 +23,7 @@ interface CategoriesTableProps {
   isLoading: boolean;
   onEdit: (category: CategoryWithParent) => void;
   onDelete: (category: CategoryWithParent) => Promise<void>;
+  onAddSubcategory?: (parentCategory: CategoryWithParent) => void;
   isBulkMode?: boolean;
   selectedIds?: Set<number>;
   onSelect?: (ids: Set<number>) => void;
@@ -33,6 +34,7 @@ export function CategoriesTable({
   isLoading,
   onEdit,
   onDelete,
+  onAddSubcategory,
   isBulkMode = false,
   selectedIds = new Set(),
   onSelect,
@@ -324,6 +326,18 @@ export function CategoriesTable({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      {!isChild && onAddSubcategory && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onAddSubcategory(category)}
+                          aria-label={`Add subcategory under ${category.name}`}
+                          title={`Add subcategory under ${category.name}`}
+                          className="text-primary hover:text-primary hover:bg-primary/10"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"

@@ -55,6 +55,7 @@ export function CategoriesManagementPage() {
   const [page, setPage] = React.useState(1);
   const [perPage] = React.useState(20);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [defaultParentId, setDefaultParentId] = React.useState<number | null>(null);
   const [selectedCategory, setSelectedCategory] =
     React.useState<CategoryWithParent | null>(null);
   const { toast } = useToast();
@@ -199,15 +200,27 @@ export function CategoriesManagementPage() {
     await fetchCategories();
   };
 
-  // Open create modal
+  // Open create modal (top-level category)
   const handleOpenCreateModal = () => {
     setSelectedCategory(null);
+    setDefaultParentId(null);
+    setIsModalOpen(true);
+  };
+
+  // Open create subcategory modal
+  const handleOpenCreateSubcategory = (parentCategory?: CategoryWithParent) => {
+    setSelectedCategory(null);
+    setDefaultParentId(
+      parentCategory?.id ??
+        (categories.find((c) => c.parent_id === null)?.id || null)
+    );
     setIsModalOpen(true);
   };
 
   // Open edit modal
   const handleOpenEditModal = (category: CategoryWithParent) => {
     setSelectedCategory(category);
+    setDefaultParentId(category.parent_id);
     setIsModalOpen(true);
   };
 
@@ -215,6 +228,7 @@ export function CategoriesManagementPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedCategory(null);
+    setDefaultParentId(null);
   };
 
   // Handle save (create or update)
@@ -416,6 +430,16 @@ export function CategoriesManagementPage() {
             />
           </Button>
 
+          {/* Add Subcategory Button */}
+          <Button
+            variant="outline"
+            onClick={() => handleOpenCreateSubcategory()}
+            className="flex-1 sm:flex-none"
+          >
+            <GitBranch className="h-4 w-4 mr-2 text-primary" />
+            Add Subcategory
+          </Button>
+
           {/* Create Button */}
           <Button
             onClick={handleOpenCreateModal}
@@ -439,6 +463,7 @@ export function CategoriesManagementPage() {
           isLoading={isLoading}
           onEdit={handleOpenEditModal}
           onDelete={handleDelete}
+          onAddSubcategory={handleOpenCreateSubcategory}
           isBulkMode={isBulkMode}
           selectedIds={selectedCategoryIds}
           onSelect={setSelectedCategoryIds}
@@ -496,6 +521,7 @@ export function CategoriesManagementPage() {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onSave={handleSave}
+        defaultParentId={defaultParentId}
       />
     </div>
   );
