@@ -173,6 +173,8 @@ function PassCard({
   );
 }
 
+import { OfficialTicketCard } from "./OfficialTicketCard";
+
 // Full Ticket View Component (inline, replaces QR view)
 function FullTicketView({
   pass,
@@ -194,14 +196,11 @@ function FullTicketView({
   onBack: () => void;
 }) {
   const ticketRef = React.useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = React.useState(false);
 
-  const formattedDate = React.useMemo(() => {
-    return safeDateString(eventDate, "EEEE, MMMM d, yyyy") || "Date not specified";
-  }, [eventDate]);
-
-  const formattedTime = React.useMemo(() => {
-    return safeDateString(eventTime || eventDate, "h:mm a") || "";
-  }, [eventTime, eventDate]);
+  const passesList = orderPasses && orderPasses.length > 0 ? orderPasses : [pass];
+  const ticketIndex = passesList.findIndex((p) => p.id === pass.id) + 1 || 1;
+  const ticketTotal = Math.max(passesList.length, 1);
 
   const handleDownload = async () => {
     if (!pass.code) {
@@ -209,6 +208,7 @@ function FullTicketView({
       return;
     }
 
+    setDownloading(true);
     try {
       await saveTicketsPdf(
         pdfEvent,
@@ -219,104 +219,25 @@ function FullTicketView({
     } catch (error) {
       console.error("Error saving ticket PDF:", error);
       alert("Couldn't create the PDF. Please try again.");
+    } finally {
+      setDownloading(false);
     }
   };
 
   const handlePrint = async () => {
-    if (!ticketRef.current) return;
-    const printContent = ticketRef.current;
-
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      alert("Please allow popups to print the ticket.");
-      return;
-    }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Inside Karachi - Event Ticket</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            body { 
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              background: white;
-              padding: 40px 20px;
-              display: flex;
-              justify-content: center;
-              align-items: flex-start;
-              min-height: 100vh;
-            }
-            .mobile-ticket {
-              max-width: 850px;
-              width: 100%;
-              border: 2px solid #000;
-              border-radius: 20px;
-              overflow: hidden;
-              background: white;
-            }
-            .ticket-header {
-              background: linear-gradient(135deg, #ff184d 0%, #c91140 100%);
-              color: white;
-              padding: 24px 32px;
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-            }
-            .brand-container { display: flex; flex-direction: column; }
-            .brand-sub { font-size: 10px; text-transform: uppercase; letter-spacing: 3px; opacity: 0.9; margin-bottom: 2px; }
-            .brand { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
-            .ticket-type { background: rgba(255,255,255,0.25); padding: 8px 16px; border-radius: 8px; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
-            .ticket-body { display: flex; flex-direction: row; }
-            .ticket-main { flex: 1; padding: 32px; border-right: 2px dashed #ddd; }
-            .ticket-qr { width: 220px; padding: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fafafa; }
-            .event-name { font-size: 24px; font-weight: 800; color: #111; margin-bottom: 24px; line-height: 1.2; }
-            .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 30px; }
-            .detail-row { display: flex; align-items: center; gap: 12px; }
-            .detail-icon { width: 32px; height: 32px; background: #f5f5f5; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-            .detail-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #999; font-weight: 600; margin-bottom: 2px; }
-            .detail-value { font-size: 14px; color: #111; font-weight: 600; }
-            .guest-section { margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee; }
-            .guest-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #999; font-weight: 600; margin-bottom: 4px; }
-            .guest-name { font-size: 18px; font-weight: 800; color: #111; }
-            .qr-code { background: white; padding: 12px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
-            .ticket-code { margin-top: 12px; font-family: monospace; font-size: 14px; font-weight: 800; letter-spacing: 3px; color: #333; }
-            .scan-text { margin-top: 6px; font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 1.5px; }
-            .ticket-footer { background: #f8f8f8; padding: 14px 24px; font-size: 10px; color: #666; text-align: center; border-top: 1px solid #eee; }
-            @page {
-              size: auto;
-              margin: 0mm;
-            }
-            @media print { 
-              body { padding: 40px; background: none; } 
-              .mobile-ticket { box-shadow: none; border: 1px solid #000; }
-            }
-          </style>
-        </head>
-        <body>${printContent.innerHTML}</body>
-      </html>
-    `);
-
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 250);
+    await handleDownload();
   };
 
   const handleShare = async () => {
     if (!ticketRef.current) return;
-    const ticketElement = ticketRef.current.querySelector(".mobile-ticket") as HTMLElement;
+    const ticketElement = ticketRef.current.querySelector(".official-ticket-card") as HTMLElement;
     if (!ticketElement) return;
 
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         const { default: html2canvas } = await import("html2canvas");
         const canvas = await html2canvas(ticketElement, {
-          scale: 2,
+          scale: 2.5,
           backgroundColor: "#ffffff",
           useCORS: true,
           logging: false,
@@ -365,198 +286,55 @@ function FullTicketView({
       </div>
 
       {/* Ticket Content - Scrollable */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-        <div ref={ticketRef}>
-          <div
-            className="ticket relative bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-2xl max-w-xl mx-auto"
-            style={{ backgroundColor: "#ffffff" }}
-          >
-            {/* Header — centered type pill matching ticket preview */}
-            <div
-              className="ticket-header relative z-10 text-white px-6 py-4 flex items-center justify-center min-h-[60px]"
-              style={{
-                background: "linear-gradient(135deg, #F42354 0%, #c91140 100%)",
-              }}
-            >
-              <div
-                className="ticket-type px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider text-white leading-none"
-                style={{
-                  backgroundColor: "rgba(255,255,255,0.2)",
-                  border: "1px solid rgba(255,255,255,0.35)",
-                }}
-              >
-                Event Ticket
-              </div>
-            </div>
-
-            {/* Body */}
-            <div className="ticket-body relative flex flex-col bg-white">
-              {/* Main Content */}
-              <div className="ticket-main p-6">
-                <h2 className="event-name text-xl font-black text-gray-900 mb-4 leading-tight tracking-tight">
-                  {eventName || "Event"}
-                </h2>
-
-                <div className="details-grid space-y-3.5">
-                  {formattedDate && (
-                    <div className="detail-row flex items-center gap-3">
-                      <div className="detail-icon w-8 h-8 bg-gray-100/90 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Calendar className="w-4 h-4 text-gray-700" />
-                      </div>
-                      <div className="detail-content">
-                        <div className="detail-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
-                          Date
-                        </div>
-                        <div className="detail-value text-sm text-gray-900 font-bold">
-                          {formattedDate}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {formattedTime && (
-                    <div className="detail-row flex items-center gap-3">
-                      <div className="detail-icon w-8 h-8 bg-gray-100/90 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <svg className="w-4 h-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                      <div className="detail-content">
-                        <div className="detail-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
-                          Time
-                        </div>
-                        <div className="detail-value text-sm text-gray-900 font-bold">
-                          {formattedTime}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {venueName && (
-                    <div className="detail-row flex items-center gap-3">
-                      <div className="detail-icon w-8 h-8 bg-gray-100/90 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <MapPin className="w-4 h-4 text-gray-700" />
-                      </div>
-                      <div className="detail-content">
-                        <div className="detail-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
-                          Venue
-                        </div>
-                        <div className="detail-value text-sm text-gray-900 font-bold">
-                          {venueName}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {pass.gate_label && (
-                    <div className="detail-row flex items-center gap-3">
-                      <div className="detail-icon w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Ticket className="w-4 h-4 text-primary" />
-                      </div>
-                      <div className="detail-content">
-                        <div className="detail-label text-[9px] uppercase tracking-wider text-primary font-black mb-0.5">
-                          Gate / Entrance
-                        </div>
-                        <div className="detail-value text-sm text-primary font-black tracking-wide">
-                          {pass.gate_label}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Attendee Info */}
-                {(pass.guest_name || pass.cnic_last4) && (
-                  <div className="guest-section mt-5 pt-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-4">
-                    {pass.guest_name && (
-                      <div>
-                        <div className="guest-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
-                          Attendee
-                        </div>
-                        <div className="guest-name text-base font-black text-gray-900">
-                          {pass.guest_name}
-                        </div>
-                      </div>
-                    )}
-                    {pass.cnic_last4 && (
-                      <div>
-                        <div className="guest-label text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">
-                          CNIC
-                        </div>
-                        <div className="text-sm font-mono font-bold text-gray-800">
-                          *****-*******-{pass.cnic_last4}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Perforation Line & Notches */}
-              <div className="relative flex items-center justify-between w-full h-[1px]">
-                {/* Left Notch */}
-                <div className="absolute -left-3 -top-3 w-6 h-6 rounded-full bg-neutral-900 z-20" />
-                {/* Horizontal Dashed Line */}
-                <div className="w-full border-t-2 border-dashed border-gray-300 mx-3" />
-                {/* Right Notch */}
-                <div className="absolute -right-3 -top-3 w-6 h-6 rounded-full bg-neutral-900 z-20" />
-              </div>
-
-              {/* QR Code Section */}
-              <div className="ticket-qr p-6 flex flex-col items-center justify-center bg-gray-50/70">
-                {pass.code ? (
-                  <>
-                    <div className="qr-code bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
-                      <QRCodeSVG
-                        id={`mobile-qr-${pass.id}`}
-                        value={pass.code}
-                        size={150}
-                        level="H"
-                        bgColor="#FFFFFF"
-                        fgColor="#000000"
-                      />
-                    </div>
-                    <div className="ticket-code mt-3 font-mono text-sm font-black tracking-widest text-gray-900">
-                      {pass.code}
-                    </div>
-                    <div className="scan-text mt-1 text-[9px] text-gray-500 font-bold uppercase tracking-widest text-center">
-                      Scan at Entry
-                    </div>
-                  </>
-                ) : (
-                  <div className="py-4 text-center">
-                    <Lock className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm font-medium text-muted-foreground">Complete payment to view ticket code</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="ticket-footer bg-gray-50/90 px-6 py-3 text-center border-t border-gray-200">
-              <p className="text-[10px] text-gray-500 font-medium leading-relaxed">
-                This ticket is non-transferable. Present a valid ID at check-in.
-                <br />© {new Date().getFullYear()} Inside Karachi • insidekarachi.com
-              </p>
-            </div>
-          </div>
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex items-center justify-center">
+        <div ref={ticketRef} className="w-full flex justify-center">
+          <OfficialTicketCard
+            pass={pass}
+            eventName={eventName || pdfEvent.name || "Event"}
+            eventDate={eventDate || pdfEvent.startTime}
+            eventTime={eventTime}
+            eventEndTime={pdfEvent.endTime}
+            venueName={venueName || pdfEvent.venueName}
+            address={pdfEvent.address}
+            organizer={pdfEvent.organizer}
+            ticketType={pass.ticket_type_name || pdfEvent.ticketType}
+            bookingReference={pdfEvent.bookingReference}
+            index={ticketIndex}
+            total={ticketTotal}
+          />
         </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex-shrink-0 p-4 border-t border-border/30">
-        <div className="flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={handleDownload}>
-            <Download className="w-4 h-4 mr-2" />
-            Download PDF
+      <div className="flex-shrink-0 p-4 border-t border-border/30 bg-background/50 backdrop-blur-sm">
+        <div className="flex gap-3 max-w-xl mx-auto">
+          <Button
+            size="sm"
+            className="flex-1 gap-2 bg-primary hover:bg-primary/90 text-white font-semibold shadow-lg shadow-primary/25"
+            onClick={handleDownload}
+            disabled={downloading}
+          >
+            <Download className="w-4 h-4" />
+            {downloading ? "Preparing PDF…" : "Download PDF"}
           </Button>
-          <Button variant="outline" className="flex-1" onClick={handlePrint}>
-            <Printer className="w-4 h-4 mr-2" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-2 border-border/60"
+            onClick={handlePrint}
+            disabled={downloading}
+          >
+            <Printer className="w-4 h-4" />
             Print
           </Button>
           {typeof navigator !== "undefined" && "share" in navigator && (
-            <Button variant="outline" className="flex-1" onClick={handleShare}>
-              <Share2 className="w-4 h-4 mr-2" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 gap-2 border-border/60"
+              onClick={handleShare}
+            >
+              <Share2 className="w-4 h-4" />
               Share
             </Button>
           )}
