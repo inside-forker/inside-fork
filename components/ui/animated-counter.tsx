@@ -55,10 +55,12 @@ export function AnimatedCounter({
     return () => cancelAnimationFrame(frameId)
   }, [value, duration])
 
-  const formattedValue = React.useMemo(
-    () => `${prefix}${displayValue.toFixed(decimals)}${suffix}`,
-    [displayValue, prefix, suffix, decimals]
-  )
+  const formattedValue = React.useMemo(() => {
+    const parts = displayValue.toFixed(decimals).split(".");
+    parts[0] = Number(parts[0]).toLocaleString();
+    const formatted = parts.length > 1 && decimals > 0 ? parts.join(".") : parts[0];
+    return `${prefix}${formatted}${suffix}`;
+  }, [displayValue, prefix, suffix, decimals]);
 
   return (
     <span className={cn("tabular-nums", className)}>{formattedValue}</span>

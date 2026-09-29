@@ -31,7 +31,7 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-async function qrCodeDataUrl(value: string, size = 200): Promise<string> {
+async function qrCodeDataUrl(value: string, size = 400): Promise<string> {
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:-10000px;top:0;width:0;height:0;overflow:hidden;";
   document.body.appendChild(host);
@@ -59,192 +59,217 @@ async function qrCodeDataUrl(value: string, size = 200): Promise<string> {
   return dataUrl;
 }
 
-function buildTicketHtml(input: TicketPdfInput, qrDataUrl: string): string {
-  const typeLabel = escapeHtml(input.ticketType || "Standard Pass");
-  const eventName = escapeHtml(input.eventName || "Event");
-  const eventDate = escapeHtml(input.eventDate || "");
-  const eventTime = input.eventTime ? escapeHtml(input.eventTime) : "";
-  const venue = input.venueName ? escapeHtml(input.venueName) : "Karachi";
-  const venueAddress = input.venueAddress ? escapeHtml(input.venueAddress) : "";
-  const organizer = input.organizerName ? escapeHtml(input.organizerName) : "Inside Karachi";
-  const guest = escapeHtml(input.guestName || "Guest");
-  const cnicRaw = input.cnicLast4 ? escapeHtml(input.cnicLast4) : "";
-  const cnicFormatted = cnicRaw ? (cnicRaw.length <= 4 ? `··········${cnicRaw}` : cnicRaw) : "";
-  const gate = escapeHtml(input.gateLabel || "Lane 1");
-  const code = escapeHtml(input.code);
-  const bookingCode = escapeHtml(input.bookingCode || `IKB-${code.replace(/[^a-zA-Z0-9]/g, "")}`);
-  const ticketIndex = input.ticketIndex || 1;
-  const totalTickets = input.totalTickets || 1;
-
-  return `
-<div class="ik-ticket-card" style="width:740px;background:#ffffff;border:1px solid #cbd5e1;border-radius:12px;padding:22px 24px 16px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827;box-sizing:border-box;">
-  
-  <!-- Top Header Row -->
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px;">
-    <div style="flex:1;min-width:0;">
-      <div style="font-size:16px;font-weight:800;color:#000000;line-height:1.25;letter-spacing:-0.01em;">${eventName}</div>
-      <div style="font-size:11px;color:#64748b;font-weight:500;margin-top:2px;">by ${organizer}</div>
-    </div>
-    <div style="border:1.5px solid #F42354;border-radius:8px;padding:4px 14px;text-align:center;min-width:82px;flex-shrink:0;background:#ffffff;">
-      <div style="font-size:7.5px;font-weight:800;color:#F42354;letter-spacing:0.1em;text-transform:uppercase;">ENTRY LANE</div>
-      <div style="font-size:13.5px;font-weight:800;color:#F42354;line-height:1.15;margin-top:1px;">${gate}</div>
-    </div>
-  </div>
-
-  <!-- Header Divider -->
-  <div style="border-top:1px solid #e2e8f0;margin-bottom:16px;"></div>
-
-  <!-- Main Content + QR Area -->
-  <div style="display:flex;gap:20px;align-items:flex-start;justify-content:space-between;">
-    
-    <!-- Left Details -->
-    <div style="flex:1;min-width:0;">
-      
-      <!-- Row 1: DATE, TIME, TICKET -->
-      <div style="display:grid;grid-template-columns:1.2fr 1.2fr 1fr;gap:14px;margin-bottom:16px;">
-        <div>
-          <div style="font-size:8px;font-weight:700;color:#94a3b8;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;">DATE</div>
-          <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.3;">${eventDate}</div>
-        </div>
-        <div>
-          <div style="font-size:8px;font-weight:700;color:#94a3b8;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;">TIME</div>
-          <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.3;">${eventTime || "Doors Open 7:00 PM"}</div>
-        </div>
-        <div>
-          <div style="font-size:8px;font-weight:700;color:#94a3b8;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;">TICKET</div>
-          <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.3;">${typeLabel}</div>
-        </div>
-      </div>
-
-      <!-- Row 2: VENUE, ATTENDEE -->
-      <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;">
-        <div>
-          <div style="font-size:8px;font-weight:700;color:#94a3b8;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;">VENUE</div>
-          <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.3;">${venue}</div>
-          ${venueAddress ? `<div style="font-size:9.5px;color:#64748b;margin-top:2px;line-height:1.25;">${venueAddress}</div>` : ""}
-        </div>
-        <div>
-          <div style="font-size:8px;font-weight:700;color:#94a3b8;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;">ATTENDEE</div>
-          <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.3;">${guest}</div>
-          ${cnicFormatted ? `<div style="font-size:9.5px;color:#64748b;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:2px;">CNIC ${cnicFormatted}</div>` : ""}
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Right QR Section -->
-    <div style="border-left:1px solid #e2e8f0;padding-left:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:130px;flex-shrink:0;">
-      
-      <!-- Inside Karachi Logo -->
-      <div style="text-align:center;margin-bottom:6px;line-height:1;">
-        <span style="font-size:7.5px;font-weight:800;color:#F42354;letter-spacing:0.18em;text-transform:uppercase;display:block;margin-bottom:2px;">INSIDE</span>
-        <span style="font-size:16px;font-weight:900;color:#000000;letter-spacing:-0.03em;">karach<span style="color:#F42354;">i</span></span>
-      </div>
-
-      <!-- Sharp QR Code -->
-      <div style="background:#ffffff;padding:2px;border-radius:4px;">
-        <img src="${qrDataUrl}" width="96" height="96" alt="QR" style="display:block;" />
-      </div>
-
-      <!-- Monospace Ticket Code -->
-      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;font-weight:800;letter-spacing:0.06em;color:#0f172a;margin-top:6px;">${code}</div>
-      
-      <!-- Ticket Index / Total -->
-      <div style="font-size:8px;font-weight:700;letter-spacing:0.06em;color:#64748b;text-transform:uppercase;margin-top:2px;">TICKET ${ticketIndex} OF ${totalTickets}</div>
-
-    </div>
-
-  </div>
-
-  <!-- Bottom Footer Line -->
-  <div style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:7.5px;color:#94a3b8;">
-    <div>Booking ${bookingCode} · One entry per ticket · Non-transferable · Carry a valid ID</div>
-    <div>insidekarachi.com</div>
-  </div>
-
-</div>`;
-}
-
 /**
- * Build a ticket PDF that matches the clean white boarding pass style.
+ * Build a pure vector ticket PDF that is crystal-clear at 1000% zoom (never blurry).
  */
 export async function downloadTicketPdf(input: TicketPdfInput): Promise<void> {
   if (!input.code) {
     throw new Error("Ticket code is required to download a PDF.");
   }
 
-  const [{ default: html2canvas }] = await Promise.all([import("html2canvas")]);
+  const qrDataUrl = await qrCodeDataUrl(input.code, 400);
 
-  const qrDataUrl = await qrCodeDataUrl(input.code, 220);
-  const host = document.createElement("div");
-  host.style.cssText =
-    "position:fixed;left:-10000px;top:0;width:740px;background:#ffffff;pointer-events:none;";
-  host.innerHTML = buildTicketHtml(input, qrDataUrl);
-  document.body.appendChild(host);
+  const eventName = input.eventName || "Event";
+  const organizer = input.organizerName || "Inside Karachi";
+  const gateLabel = input.gateLabel || "Lane 1";
+  const eventDate = input.eventDate || "";
+  const eventTime = input.eventTime || "Doors Open 7:00 PM";
+  const typeLabel = input.ticketType || "Standard Pass";
+  const venue = input.venueName || "Karachi";
+  const venueAddress = input.venueAddress || "";
+  const guest = input.guestName || "Guest";
+  const cnicRaw = input.cnicLast4 || "";
+  const cnicFormatted = cnicRaw ? (cnicRaw.length <= 4 ? `CNIC ··········${cnicRaw}` : `CNIC ${cnicRaw}`) : "";
+  const code = input.code;
+  const bookingCode = input.bookingCode || `IKB-${code.replace(/[^a-zA-Z0-9]/g, "")}`;
+  const ticketIndex = input.ticketIndex || 1;
+  const totalTickets = input.totalTickets || 1;
 
-  const ticketEl = host.querySelector(".ik-ticket-card") as HTMLElement;
-  try {
-    if (typeof document !== "undefined" && "fonts" in document) {
-      try {
-        await document.fonts.ready;
-      } catch {
-        // ignore
-      }
-    }
+  // Standard A4 portrait in points (595.28 x 841.89 pt)
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "pt",
+    format: "a4",
+  });
 
-    const images = Array.from(ticketEl.querySelectorAll("img"));
-    await Promise.all(
-      images.map(
-        (img) =>
-          new Promise<void>((resolve) => {
-            if (img.complete) return resolve();
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
-          }),
-      ),
-    );
+  // White background page
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(0, 0, 595.28, 841.89, "F");
 
-    const canvas = await html2canvas(ticketEl, {
-      scale: 3,
-      backgroundColor: "#ffffff",
-      useCORS: true,
-      logging: false,
-      width: 740,
-    });
+  // Card Dimensions
+  const cardX = 36;
+  const cardY = 36;
+  const cardW = 523.28;
+  const cardH = 172;
 
-    const imgData = canvas.toDataURL("image/png");
+  // 1. Outer Card Box (Rounded with subtle border)
+  pdf.setDrawColor(203, 213, 225); // #cbd5e1
+  pdf.setFillColor(255, 255, 255);
+  pdf.setLineWidth(0.85);
+  pdf.roundedRect(cardX, cardY, cardW, cardH, 9, 9, "FD");
 
-    // Standard A4 portrait in pt (595.28 x 841.89)
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "pt",
-      format: "a4",
-    });
+  // 2. Top Header
+  // Event Name
+  pdf.setTextColor(15, 23, 42); // #0f172a
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(13);
+  pdf.text(eventName, cardX + 18, cardY + 22);
 
-    const pageWidth = 595.28;
-    const margin = 36;
-    const cardWidth = pageWidth - margin * 2;
-    const cardHeight = (canvas.height / canvas.width) * cardWidth;
+  // Organizer Subtitle
+  pdf.setTextColor(100, 116, 139); // #64748b
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(8.5);
+  pdf.text(`by ${organizer}`, cardX + 18, cardY + 33);
 
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, 0, 595.28, 841.89, "F");
+  // Entry Lane Badge (Right)
+  const badgeW = 68;
+  const badgeH = 26;
+  const badgeX = cardX + cardW - 18 - badgeW;
+  const badgeY = cardY + 11;
+  pdf.setDrawColor(244, 35, 84); // #F42354
+  pdf.setLineWidth(1.2);
+  pdf.roundedRect(badgeX, badgeY, badgeW, badgeH, 6, 6, "D");
 
-    pdf.addImage(
-      imgData,
-      "PNG",
-      margin,
-      margin + 4,
-      cardWidth,
-      cardHeight,
-      undefined,
-      "NONE",
-    );
+  pdf.setTextColor(244, 35, 84);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(5.5);
+  pdf.text("ENTRY LANE", badgeX + badgeW / 2, badgeY + 8.5, { align: "center" });
 
-    const filename = input.filename || `ticket-${input.code}`;
-    pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
-  } finally {
-    document.body.removeChild(host);
+  pdf.setFontSize(10.5);
+  pdf.text(gateLabel, badgeX + badgeW / 2, badgeY + 20, { align: "center" });
+
+  // 3. Header Divider Line
+  pdf.setDrawColor(226, 232, 240); // #e2e8f0
+  pdf.setLineWidth(0.65);
+  pdf.line(cardX + 18, cardY + 44, cardX + cardW - 18, cardY + 44);
+
+  // 4. Middle Section - Info Columns
+  const yRow1Label = cardY + 56;
+  const yRow1Val = cardY + 68;
+
+  // Column 1: DATE
+  pdf.setTextColor(148, 163, 184); // #94a3b8
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(6.5);
+  pdf.text("DATE", cardX + 18, yRow1Label);
+
+  pdf.setTextColor(15, 23, 42);
+  pdf.setFontSize(9.5);
+  pdf.text(eventDate, cardX + 18, yRow1Val);
+
+  // Column 2: TIME
+  const col2X = cardX + 145;
+  pdf.setTextColor(148, 163, 184);
+  pdf.setFontSize(6.5);
+  pdf.text("TIME", col2X, yRow1Label);
+
+  pdf.setTextColor(15, 23, 42);
+  pdf.setFontSize(9.5);
+  pdf.text(eventTime, col2X, yRow1Val);
+
+  // Column 3: TICKET
+  const col3X = cardX + 265;
+  pdf.setTextColor(148, 163, 184);
+  pdf.setFontSize(6.5);
+  pdf.text("TICKET", col3X, yRow1Label);
+
+  pdf.setTextColor(15, 23, 42);
+  pdf.setFontSize(9.5);
+  pdf.text(typeLabel, col3X, yRow1Val);
+
+  // Row 2: VENUE & ATTENDEE
+  const yRow2Label = cardY + 85;
+  const yRow2Val = cardY + 97;
+  const yRow2Sub = cardY + 107;
+
+  // VENUE
+  pdf.setTextColor(148, 163, 184);
+  pdf.setFontSize(6.5);
+  pdf.text("VENUE", cardX + 18, yRow2Label);
+
+  pdf.setTextColor(15, 23, 42);
+  pdf.setFontSize(9.5);
+  // Truncate venue text if too long
+  const truncatedVenue = venue.length > 42 ? venue.slice(0, 40) + "..." : venue;
+  pdf.text(truncatedVenue, cardX + 18, yRow2Val);
+
+  if (venueAddress) {
+    pdf.setTextColor(100, 116, 139);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7.5);
+    const truncatedAddress = venueAddress.length > 50 ? venueAddress.slice(0, 48) + "..." : venueAddress;
+    pdf.text(truncatedAddress, cardX + 18, yRow2Sub);
   }
+
+  // ATTENDEE
+  pdf.setTextColor(148, 163, 184);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(6.5);
+  pdf.text("ATTENDEE", col3X, yRow2Label);
+
+  pdf.setTextColor(15, 23, 42);
+  pdf.setFontSize(9.5);
+  pdf.text(guest, col3X, yRow2Val);
+
+  if (cnicFormatted) {
+    pdf.setTextColor(100, 116, 139);
+    pdf.setFont("courier", "bold");
+    pdf.setFontSize(8);
+    pdf.text(cnicFormatted, col3X, yRow2Sub);
+  }
+
+  // 5. Vertical Divider before QR
+  const qrSecX = cardX + cardW - 120;
+  pdf.setDrawColor(226, 232, 240);
+  pdf.setLineWidth(0.65);
+  pdf.line(qrSecX, cardY + 44, qrSecX, cardY + 148);
+
+  // 6. Right Section - Logo + QR Code + Monospace Pass Code + Count
+  const qrCenterX = qrSecX + (cardX + cardW - qrSecX) / 2;
+
+  // INSIDE karachi logo
+  pdf.setTextColor(244, 35, 84); // #F42354
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(6);
+  pdf.text("INSIDE", qrCenterX, cardY + 54, { align: "center" });
+
+  pdf.setTextColor(0, 0, 0);
+  pdf.setFontSize(12.5);
+  pdf.text("karachi", qrCenterX - 2, cardY + 65, { align: "center" });
+
+  // Pink dot on 'i' of karachi
+  pdf.setFillColor(244, 35, 84);
+  pdf.circle(qrCenterX + 17.5, cardY + 57.5, 0.9, "F");
+
+  // High-Resolution Crisp QR Code
+  const qrSize = 58;
+  pdf.addImage(qrDataUrl, "PNG", qrCenterX - qrSize / 2, cardY + 69, qrSize, qrSize);
+
+  // Monospace Pass Code
+  pdf.setTextColor(15, 23, 42);
+  pdf.setFont("courier", "bold");
+  pdf.setFontSize(8.5);
+  pdf.text(code, qrCenterX, cardY + 135, { align: "center" });
+
+  // Ticket X of Y
+  pdf.setTextColor(100, 116, 139);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(6);
+  pdf.text(`TICKET ${ticketIndex} OF ${totalTickets}`, qrCenterX, cardY + 143, { align: "center" });
+
+  // 7. Footer Divider & Text
+  pdf.setDrawColor(226, 232, 240);
+  pdf.line(cardX + 18, cardY + 148, cardX + cardW - 18, cardY + 148);
+
+  pdf.setTextColor(148, 163, 184);
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(6.5);
+  pdf.text(`Booking ${bookingCode} · One entry per ticket · Non-transferable · Carry a valid ID`, cardX + 18, cardY + 160);
+  pdf.text("insidekarachi.com", cardX + cardW - 18, cardY + 160, { align: "right" });
+
+  // Save PDF
+  const filename = input.filename || `ticket-${input.code}`;
+  pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
 }
 
 /** @deprecated Prefer downloadTicketPdf — DOM capture of Tailwind tickets often blanks. */
