@@ -62,16 +62,16 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is admin or super admin
+    // Check if user is super admin
     const { rows: profileRows } = await query(
       "SELECT role FROM profiles WHERE id = $1 LIMIT 1",
       [session.userId]
     );
     const profile = profileRows[0] as { role: string } | undefined;
 
-    if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
+    if (!profile || profile.role !== "super_admin") {
       return NextResponse.json(
-        { error: "Admin access required" },
+        { error: "Super admin access required" },
         { status: 403 },
       );
     }
@@ -118,7 +118,8 @@ export async function PATCH(request: NextRequest) {
          DO UPDATE SET
            config_value = EXCLUDED.config_value,
            config_type = EXCLUDED.config_type,
-           updated_by = EXCLUDED.updated_by
+           updated_by = EXCLUDED.updated_by,
+           updated_at = NOW()
          RETURNING *`,
         [
           config_key,

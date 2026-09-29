@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requireSessionUser } from "@/lib/auth/require-session";
 import { SystemSettingsPage } from "@/components/admin/SystemSettingsPage";
@@ -9,8 +10,8 @@ export default async function AdminSettingsPage() {
     redirect("/login");
   }
 
-  // Check admin/super admin access
-  if (profile.role !== "admin" && profile.role !== "super_admin") {
+  // Check super admin access
+  if (profile.role !== "super_admin") {
     redirect("/dashboard");
   }
 
@@ -54,7 +55,9 @@ export default async function AdminSettingsPage() {
       </div>
 
       {/* Settings Content */}
-      <SystemSettingsPage />
+      <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading settings...</div>}>
+        <SystemSettingsPage />
+      </Suspense>
     </div>
   );
 }
