@@ -12,6 +12,7 @@
   }
 
   :root {
+    color-scheme: light;
     --background: 0 0% 100%; /* Light mode background */
     --foreground: 224 71.4% 4.1%;
 

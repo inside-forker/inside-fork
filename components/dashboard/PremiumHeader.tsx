@@ -8,12 +8,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSearch } from "@/hooks/useSearch";
 import { motion } from "framer-motion";
 
-import { Search, Sparkles, Sun, Moon } from "lucide-react";
+import { Search, Sparkles } from "lucide-react";
 import { ThemeAwareLogo } from "@/components/layout/ThemeAwareLogo";
 import { UserDropdown } from "@/components/layout/UserDropdown";
 import { NotificationBell } from "@/components/layout/notifications/NotificationBell";
 import { SecurityAlertsBadge } from "@/components/admin/SecurityAlertsBadge";
-import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { PremiumDiscoveryPanel } from "@/components/layout/PremiumDiscoveryPanel";
 
@@ -50,7 +49,6 @@ export function PremiumHeader({
   onMenuClick,
   sidebarOpen = false,
 }: PremiumHeaderProps) {
-  const { setTheme, theme } = useTheme();
   const [isDiscoveryOpen, setIsDiscoveryOpen] = React.useState(false);
   const router = useRouter();
 
@@ -310,18 +308,6 @@ export function PremiumHeader({
           {/* Desktop Right: Actions */}
           <div className="flex items-center justify-end">
             <div className="flex items-center space-x-2">
-              {/* Theme Toggle - Desktop Only */}
-              <motion.button
-                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="group relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/60 bg-background/80 transition-all duration-200 hover:border-primary/50 hover:bg-primary/5 dark:border-border/50"
-              >
-                <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-muted-foreground group-hover:text-foreground" />
-                <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-muted-foreground group-hover:text-foreground" />
-                <span className="sr-only">Toggle theme</span>
-              </motion.button>
-
               {/* Security Alerts for Super Admin */}
               {user &&
                 (profile?.active_role || profile?.role) === "super_admin" && (
