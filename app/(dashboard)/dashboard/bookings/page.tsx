@@ -169,14 +169,18 @@ export default async function DashboardBookingsPage() {
       payment_status: booking.payment_status,
       status: booking.status,
       total_amount: booking.total_amount,
-      created_at: booking.created_at,
+      created_at: booking.created_at
+        ? new Date(booking.created_at as unknown as string).toISOString()
+        : "",
       passes: passes.map((pass) => ({
         id: pass.id,
         booking_id: pass.booking_id,
         code: pass.code,
         status: pass.status,
         quantity_index: pass.quantity_index,
-        issued_at: pass.issued_at,
+        issued_at: pass.issued_at
+          ? new Date(pass.issued_at as unknown as string).toISOString()
+          : "",
         ticket_type_id: pass.ticket_type_id,
         guest_name: pass.guest_name,
         cnic_last4: pass.cnic_last4,
@@ -189,8 +193,12 @@ export default async function DashboardBookingsPage() {
             id: event.event_id,
             name: event.event_name ?? "",
             slug: event.event_slug ?? "",
-            start_time: event.start_time ?? "",
-            end_time: event.end_time,
+            start_time: event.start_time
+              ? new Date(event.start_time as unknown as string).toISOString()
+              : "",
+            end_time: event.end_time
+              ? new Date(event.end_time as unknown as string).toISOString()
+              : null,
             venue_name: event.location_name,
             address: event.address,
             organizer_name: event.organizer_name,

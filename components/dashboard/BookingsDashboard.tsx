@@ -110,6 +110,21 @@ function getAmountLabel(amount: number) {
   return `PKR ${amount.toLocaleString()}`;
 }
 
+function safeFormatDate(
+  val?: string | Date | null,
+  pattern = "EEE, dd MMM yyyy · h:mm a",
+  fallback = "—"
+): string {
+  if (!val) return fallback;
+  try {
+    const d = typeof val === "string" ? new Date(val) : val;
+    if (isNaN(d.getTime())) return fallback;
+    return format(d, pattern);
+  } catch {
+    return fallback;
+  }
+}
+
 export function BookingsDashboard({ bookings }: Props) {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [selected, setSelected] = useState<DashboardBooking | null>(null);
@@ -150,9 +165,16 @@ export function BookingsDashboard({ bookings }: Props) {
       if (paymentStatus === "paid") totalPaid += booking.total_amount;
       passes += booking.passes.length;
 
-      const eventStart = booking.event?.start_time
-        ? new Date(booking.event.start_time)
-        : null;
+      let eventStart: Date | null = null;
+      if (booking.event?.start_time) {
+        try {
+          const d = new Date(booking.event.start_time);
+          if (!isNaN(d.getTime())) eventStart = d;
+        } catch {
+          eventStart = null;
+        }
+      }
+
       if (eventStart && isAfter(eventStart, now)) {
         upcoming += 1;
         if (!nextStart || eventStart < nextStart) {
@@ -189,9 +211,15 @@ export function BookingsDashboard({ bookings }: Props) {
       if (filter === "awaiting") {
         return isAwaiting;
       }
-      const eventStart = booking.event?.start_time
-        ? new Date(booking.event.start_time)
-        : null;
+      let eventStart: Date | null = null;
+      if (booking.event?.start_time) {
+        try {
+          const d = new Date(booking.event.start_time);
+          if (!isNaN(d.getTime())) eventStart = d;
+        } catch {
+          eventStart = null;
+        }
+      }
       if (!eventStart) return filter === "past";
       const isUpcoming = isAfter(eventStart, now);
       return filter === "upcoming" ? isUpcoming && !isAwaiting : !isUpcoming;
@@ -256,7 +284,7 @@ export function BookingsDashboard({ bookings }: Props) {
                 <Calendar className="h-4 w-4" />
                 <span>
                   Next: {nextEvent.name} on{" "}
-                  {format(nextStart, "dd MMM, h:mm a")}
+                  {safeFormatDate(nextStart, "dd MMM, h:mm a")}
                 </span>
                 <Button
                   asChild
@@ -350,14 +378,13 @@ export function BookingsDashboard({ bookings }: Props) {
       <div className="grid gap-5">
         {paginatedBookings.map((booking, index) => {
           const badge = getStatusBadge(booking.payment_status);
-          const eventStart = booking.event?.start_time
-            ? format(
-              new Date(booking.event.start_time),
-              "EEE, dd MMM yyyy · h:mm a"
-            )
-            : "—";
+          const eventStart = safeFormatDate(
+            booking.event?.start_time,
+            "EEE, dd MMM yyyy · h:mm a",
+            "—"
+          );
           const eventEnd = booking.event?.end_time
-            ? format(new Date(booking.event.end_time), "h:mm a")
+            ? safeFormatDate(booking.event.end_time, "h:mm a", "")
             : null;
           return (
             <motion.article
@@ -415,11 +442,7 @@ export function BookingsDashboard({ bookings }: Props) {
                       </div>
                     </div>
                     <PremiumText variant="caption" muted className="text-xs">
-                      Booked on{" "}
-                      {format(
-                        new Date(booking.created_at),
-                        "dd MMM yyyy, h:mm a"
-                      )}
+                      Booked on {safeFormatDate(booking.created_at, "dd MMM yyyy, h:mm a")}
                     </PremiumText>
                     <div className="flex flex-wrap gap-2">
                       {/* Show Retry Payment button for awaiting_payment/pending status */}
@@ -547,18 +570,17 @@ export function BookingsDashboard({ bookings }: Props) {
                 <div className="rounded-2xl border border-border/50 bg-background/70 px-4 py-3 flex flex-wrap gap-3 text-sm text-muted-foreground">
                   <span className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
-                    {selected.event?.start_time
-                      ? format(
-                        new Date(selected.event.start_time),
-                        "EEE, dd MMM yyyy · h:mm a"
-                      )
-                      : "Event details unavailable"}
+                    {safeFormatDate(
+                      selected.event?.start_time,
+                      "EEE, dd MMM yyyy · h:mm a",
+                      "Event details unavailable"
+                    )}
                   </span>
                   <span className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
                     Booked on{" "}
-                    {format(
-                      new Date(selected.created_at),
+                    {safeFormatDate(
+                      selected.created_at,
                       "dd MMM yyyy, h:mm a"
                     )}
                   </span>

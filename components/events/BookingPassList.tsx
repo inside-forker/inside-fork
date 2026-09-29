@@ -9,6 +9,18 @@ import { PublicPass } from "@/types/ticketing.types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { PrintableTicket } from "./PrintableTicket";
+import { format } from "date-fns";
+
+function safeDateString(val?: string | null, formatStr = "EEE, MMM d, yyyy"): string {
+  if (!val) return "";
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return format(d, formatStr);
+  } catch {
+    return String(val);
+  }
+}
 
 interface Props {
   passes: PublicPass[];
@@ -168,9 +180,9 @@ function TicketCard({
 
         {variant === "dashboard" && pass.issued_at && (
           <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-2 border-t border-border/30">
-            <span>Issued {new Date(pass.issued_at).toLocaleDateString()}</span>
+            <span>Issued {safeDateString(pass.issued_at, "dd MMM yyyy")}</span>
             <span className="font-mono">
-              {new Date(pass.issued_at).toLocaleTimeString()}
+              {safeDateString(pass.issued_at, "h:mm a")}
             </span>
           </div>
         )}

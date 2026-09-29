@@ -4,7 +4,6 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { format } from "date-fns";
-import html2canvas from "html2canvas";
 import {
   Download,
   Printer,
@@ -228,6 +227,7 @@ export function PrintableTicket({
 
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
+        const { default: html2canvas } = await import("html2canvas");
         const canvas = await html2canvas(ticketElement, {
           scale: 2,
           backgroundColor: "#ffffff",
