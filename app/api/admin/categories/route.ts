@@ -150,21 +150,33 @@ export async function GET(request: NextRequest) {
       categoryMap.set(cat.id, { name: cat.name, slug: cat.slug });
     });
 
-    // Count published listings per category via junction (supports multi-category)
+    // Count listings per category by status (published, draft, archived) via junction and direct column
     const { rows: allListings } = await query(
-      `SELECT lc.category_id
-       FROM public.listing_categories lc
-       INNER JOIN public.listings l ON l.id = lc.listing_id
-       WHERE l.status = 'published'`
+      `SELECT DISTINCT
+         COALESCE(lc.category_id, l.category_id) AS category_id,
+         l.id AS listing_id,
+         l.status
+       FROM public.listings l
+       LEFT JOIN public.listing_categories lc ON lc.listing_id = l.id
+       WHERE l.category_id IS NOT NULL OR lc.category_id IS NOT NULL`
     );
 
-    const listingCountMap = new Map<number, number>();
-    (allListings as { category_id: number | null }[]).forEach((l) => {
+    const publishedListingMap = new Map<number, number>();
+    const draftListingMap = new Map<number, number>();
+    const archivedListingMap = new Map<number, number>();
+    const totalListingMap = new Map<number, number>();
+
+    (allListings as { category_id: number | null; listing_id: number; status: string }[]).forEach((l) => {
       if (l.category_id) {
-        listingCountMap.set(
-          l.category_id,
-          (listingCountMap.get(l.category_id) || 0) + 1
-        );
+        const catId = Number(l.category_id);
+        totalListingMap.set(catId, (totalListingMap.get(catId) || 0) + 1);
+        if (l.status === "published") {
+          publishedListingMap.set(catId, (publishedListingMap.get(catId) || 0) + 1);
+        } else if (l.status === "draft") {
+          draftListingMap.set(catId, (draftListingMap.get(catId) || 0) + 1);
+        } else if (l.status === "archived") {
+          archivedListingMap.set(catId, (archivedListingMap.get(catId) || 0) + 1);
+        }
       }
     });
 
@@ -189,7 +201,10 @@ export async function GET(request: NextRequest) {
       {
         id: number;
         parent_id: number | null;
-        listing_count: number;
+        published_count: number;
+        draft_count: number;
+        archived_count: number;
+        total_count: number;
         event_count: number;
         children: number[];
       }
@@ -200,7 +215,10 @@ export async function GET(request: NextRequest) {
       categoryTree.set(cat.id, {
         id: cat.id,
         parent_id: cat.parent_id,
-        listing_count: listingCountMap.get(cat.id) || 0,
+        published_count: publishedListingMap.get(cat.id) || 0,
+        draft_count: draftListingMap.get(cat.id) || 0,
+        archived_count: archivedListingMap.get(cat.id) || 0,
+        total_count: totalListingMap.get(cat.id) || 0,
         event_count: eventCountMap.get(cat.id) || 0,
         children: [],
       });
@@ -214,24 +232,42 @@ export async function GET(request: NextRequest) {
     });
 
     // Recursive function to get total counts
-    const getTotalCounts = (id: number): { listings: number; events: number } => {
+    const getTotalCounts = (id: number): {
+      published: number;
+      draft: number;
+      archived: number;
+      total: number;
+      events: number;
+    } => {
       const node = categoryTree.get(id);
-      if (!node) return { listings: 0, events: 0 };
+      if (!node) return { published: 0, draft: 0, archived: 0, total: 0, events: 0 };
 
-      let listings = node.listing_count;
+      let published = node.published_count;
+      let draft = node.draft_count;
+      let archived = node.archived_count;
+      let total = node.total_count;
       let events = node.event_count;
 
       node.children.forEach((childId) => {
         const childCounts = getTotalCounts(childId);
-        listings += childCounts.listings;
+        published += childCounts.published;
+        draft += childCounts.draft;
+        archived += childCounts.archived;
+        total += childCounts.total;
         events += childCounts.events;
       });
 
-      return { listings, events };
+      return { published, draft, archived, total, events };
     };
 
     // Calculate final counts for all categories
-    const finalCounts = new Map<number, { listings: number; events: number }>();
+    const finalCounts = new Map<number, {
+      published: number;
+      draft: number;
+      archived: number;
+      total: number;
+      events: number;
+    }>();
     typedCategories.forEach((cat) => {
       finalCounts.set(cat.id, getTotalCounts(cat.id));
     });
@@ -243,7 +279,20 @@ export async function GET(request: NextRequest) {
           ? categoryMap.get(cat.parent_id)
           : null;
 
-        const counts = finalCounts.get(cat.id) || { listings: 0, events: 0 };
+        const counts = finalCounts.get(cat.id) || {
+          published: 0,
+          draft: 0,
+          archived: 0,
+          total: 0,
+          events: 0,
+        };
+
+        const isChild = cat.parent_id !== null;
+        // A subcategory is marked as archived when all its listings are archived (and it has archived listings with 0 published/draft),
+        // or if it's disabled.
+        const isArchived = isChild
+          ? (counts.archived > 0 && counts.published === 0 && counts.draft === 0) || !cat.is_enabled
+          : (counts.total > 0 && counts.published === 0 && counts.draft === 0) || !cat.is_enabled;
 
         return {
           id: cat.id,
@@ -261,19 +310,29 @@ export async function GET(request: NextRequest) {
           created_at: cat.created_at,
           parent_name: parentInfo?.name || null,
           parent_slug: parentInfo?.slug || null,
-          listing_count: counts.listings,
+          listing_count: counts.published,
+          published_listing_count: counts.published,
+          draft_listing_count: counts.draft,
+          archived_listing_count: counts.archived,
           event_count: counts.events,
+          is_archived: isArchived,
         };
       }
     );
 
     // Calculate stats
     const allCategories = transformedCategories;
+    const subcategories = allCategories.filter((c) => c.parent_id !== null);
+    const archivedSubcategories = subcategories.filter((c) => c.is_archived).length;
+    const activeSubcategories = subcategories.length - archivedSubcategories;
+
     const stats: CategoryStats = {
       total: allCategories.length,
       parentCategories: allCategories.filter((c) => c.parent_id === null)
         .length,
-      subcategories: allCategories.filter((c) => c.parent_id !== null).length,
+      subcategories: subcategories.length,
+      archivedSubcategories,
+      activeSubcategories,
       shownInNav: allCategories.filter((c) => c.show_in_nav).length,
       featured: allCategories.filter((c) => c.show_in_featured).length,
       enabled: allCategories.filter((c) => c.is_enabled).length,

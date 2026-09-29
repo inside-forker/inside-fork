@@ -648,7 +648,7 @@ export function ListingsManagementPage() {
       const result = await response.json();
 
       if (result.success) {
-        setSelectedListings(new Set(result.data.ids));
+        setSelectedListings(new Set((result.data.ids || []).map((id: unknown) => Number(id))));
         setSelectAllPages(true);
 
         toast({
@@ -693,7 +693,7 @@ export function ListingsManagementPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          ids: Array.from(selectedListings),
+          ids: Array.from(selectedListings).map((id) => Number(id)),
           status: nextStatus,
         }),
       });
@@ -734,7 +734,7 @@ export function ListingsManagementPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ids: Array.from(selectedListings) }),
+        body: JSON.stringify({ ids: Array.from(selectedListings).map((id) => Number(id)) }),
       });
 
       const result = await response.json();

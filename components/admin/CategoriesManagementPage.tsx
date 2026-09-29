@@ -24,6 +24,7 @@ import {
   Folders,
   GitBranch,
   Navigation,
+  Archive,
 } from "lucide-react";
 import type {
   CategoryWithParent,
@@ -31,7 +32,7 @@ import type {
   CategoryStats,
 } from "@/types/category.types";
 
-type FilterType = "all" | "parents" | "children" | "in_nav";
+type FilterType = "all" | "parents" | "children" | "active_subs" | "archived" | "in_nav";
 
 export function CategoriesManagementPage() {
   const [categories, setCategories] = React.useState<CategoryWithParent[]>([]);
@@ -39,6 +40,8 @@ export function CategoriesManagementPage() {
     total: 0,
     parentCategories: 0,
     subcategories: 0,
+    archivedSubcategories: 0,
+    activeSubcategories: 0,
     shownInNav: 0,
     featured: 0,
     enabled: 0,
@@ -95,10 +98,18 @@ export function CategoriesManagementPage() {
       if (result.success) {
         let fetchedCategories = result.data.categories;
 
-        // Client-side filter for children (API doesn't support this directly)
+        // Client-side filters
         if (filterType === "children") {
           fetchedCategories = fetchedCategories.filter(
             (c: CategoryWithParent) => c.parent_id !== null
+          );
+        } else if (filterType === "active_subs") {
+          fetchedCategories = fetchedCategories.filter(
+            (c: CategoryWithParent) => c.parent_id !== null && !c.is_archived
+          );
+        } else if (filterType === "archived") {
+          fetchedCategories = fetchedCategories.filter(
+            (c: CategoryWithParent) => c.parent_id !== null && c.is_archived
           );
         }
 
@@ -302,7 +313,7 @@ export function CategoriesManagementPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+        className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5"
       >
         <PremiumStatCard
           title="Total Categories"
@@ -316,21 +327,35 @@ export function CategoriesManagementPage() {
           value={stats.parentCategories}
           icon={Folders}
           color="purple"
-          delay={0.1}
+          delay={0.05}
         />
         <PremiumStatCard
           title="Subcategories"
           value={stats.subcategories}
           icon={GitBranch}
           color="orange"
-          delay={0.2}
+          delay={0.1}
         />
+        <div
+          onClick={() =>
+            setFilterType(filterType === "archived" ? "all" : "archived")
+          }
+          className="cursor-pointer"
+        >
+          <PremiumStatCard
+            title="Archived Subcategories"
+            value={stats.archivedSubcategories ?? 0}
+            icon={Archive}
+            color="red"
+            delay={0.15}
+          />
+        </div>
         <PremiumStatCard
           title="In Navigation"
           value={stats.shownInNav}
           icon={Navigation}
           color="emerald"
-          delay={0.3}
+          delay={0.2}
         />
       </motion.div>
 
@@ -358,13 +383,17 @@ export function CategoriesManagementPage() {
             value={filterType}
             onValueChange={(value) => setFilterType(value as FilterType)}
           >
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
               <SelectItem value="parents">Parent Only</SelectItem>
-              <SelectItem value="children">Children Only</SelectItem>
+              <SelectItem value="children">All Subcategories</SelectItem>
+              <SelectItem value="active_subs">Active Subcategories</SelectItem>
+              <SelectItem value="archived">
+                Archived Subcategories ({stats.archivedSubcategories ?? 0})
+              </SelectItem>
               <SelectItem value="in_nav">In Navigation</SelectItem>
             </SelectContent>
           </Select>
