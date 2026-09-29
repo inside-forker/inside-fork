@@ -2,13 +2,13 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { getCategoryIcon } from "@/components/admin/CategoryIconSelect";
+import type { GradientStyle } from "@/lib/utils/gradientStyles";
 import {
-  getCategoryGradient,
-  type GradientStyle,
-} from "@/lib/utils/gradientStyles";
+  SectionHeading,
+  containerClass,
+  sectionClass,
+} from "@/components/homepage/SectionHeading";
 
 interface Category {
   id: number;
@@ -27,138 +27,42 @@ interface FeaturedCategoriesSectionProps {
 export function FeaturedCategoriesSection({
   categories,
 }: FeaturedCategoriesSectionProps) {
+  if (categories.length === 0) return null;
+
   return (
-    <section className="relative py-12 sm:py-16 md:py-20 lg:py-24 overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-background/50 to-background" />
+    <section className={sectionClass}>
+      <div className={containerClass}>
+        <SectionHeading title="Explore categories" href="/listings" />
 
-      {/* Floating Background Elements */}
-      <div className="absolute top-20 right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-20 left-20 w-96 h-96 bg-primary/3 rounded-full blur-3xl" />
-
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header - CSS animation */}
-        <div className="mb-12 sm:mb-16 animate-hero-fade-in">
-          <div className="text-center">
-            <div className="flex items-center justify-center space-x-3 mb-4">
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium">
-                <Sparkles className="h-6 w-6 text-primary" />
-              </div>
-              <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight">
-                Explore by{" "}
-                <span className="gradient-text-primary">Category</span>
-              </h2>
-            </div>
-            <p className="max-w-2xl mx-auto text-sm sm:text-base md:text-lg lg:text-xl text-muted-foreground leading-relaxed px-4 sm:px-0">
-              From hidden culinary gems to trending entertainment spots,
-              discover what makes Karachi extraordinary.
-            </p>
-          </div>
-        </div>
-
-        {/* Categories Grid - CSS animations with stagger via animation-delay */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
-          {categories.map((category, index) => {
+        {/* Circle index, same shape as the app's category grid */}
+        <div className="grid grid-cols-4 gap-x-2 gap-y-5 sm:grid-cols-6 lg:grid-cols-8">
+          {categories.map((category) => {
             const IconComponent = getCategoryIcon(category.icon_name);
-            const colors = getCategoryGradient(category.gradient_style);
-
-            const listingCount = category.published_listing_count ?? 0;
+            const count = category.published_listing_count ?? 0;
             const isEvent =
               category.category_type === "event" || category.slug === "events";
             const href = isEvent ? "/events" : `/listings/${category.slug}`;
-            const baseLabel = isEvent ? "event" : "place";
-            const countLabel = `${baseLabel}${
-              listingCount === 1 ? "" : "s"
-            } available`;
+            const noun = isEvent ? "event" : "place";
 
             return (
-              <div
+              <Link
                 key={category.id}
-                className="opacity-0 animate-hero-fade-in"
-                style={{ animationDelay: `${0.1 + index * 0.05}s` }}
+                href={href}
+                className="group flex flex-col items-center gap-2 text-center active:opacity-80"
               >
-                <Link
-                  href={href}
-                  className="category-link block no-underline group"
-                  style={{ textDecoration: "none" }}
-                >
-                  <div
-                    className={cn(
-                      "relative overflow-hidden rounded-2xl p-4 md:p-6 cursor-pointer",
-                      "backdrop-blur-xl border transition-all duration-500",
-                      "hover:scale-[1.02] hover:-translate-y-1",
-                      `bg-gradient-to-br ${colors.bg}`,
-                      colors.border,
-                      colors.glow,
-                      "transform-gpu",
-                      "hover:border-opacity-50",
-                    )}
-                  >
-                    {/* Border glow */}
-                    <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-                      <div
-                        className={cn(
-                          "absolute inset-0 rounded-2xl opacity-30 blur-md",
-                          colors.accent,
-                        )}
-                      />
-                      <div
-                        className={cn(
-                          "absolute inset-0 rounded-2xl opacity-10 blur-lg",
-                          colors.accent,
-                        )}
-                      />
-                    </div>
-
-                    {/* Animated accent line - safelist: bg-emerald-500 bg-orange-500 bg-blue-500 bg-purple-500 bg-red-500 bg-indigo-500 bg-amber-500 bg-teal-500 bg-pink-500 bg-cyan-500 bg-lime-500 bg-rose-500 bg-slate-500 */}
-                    <div
-                      className={cn(
-                        "absolute top-0 left-0 h-1 w-0 group-hover:w-full transition-all duration-700 ease-out rounded-t-2xl",
-                        colors.accent,
-                      )}
-                    />
-
-                    <div className="relative z-10">
-                      {/* Header with icon and arrow */}
-                      <div className="flex items-center justify-between mb-3 md:mb-4">
-                        <div
-                          className={cn(
-                            "relative p-2 md:p-3 rounded-xl transition-all duration-500",
-                            "group-hover:scale-110 group-hover:rotate-6 transform-gpu",
-                            `bg-gradient-to-br ${colors.bg}`,
-                            "border border-white/20 dark:border-white/10",
-                            "shadow-lg group-hover:shadow-xl",
-                          )}
-                        >
-                          <div
-                            className={cn("h-5 w-5 md:h-6 md:w-6", colors.icon)}
-                          >
-                            <IconComponent className="h-full w-full" />
-                          </div>
-                        </div>
-
-                        <ArrowRight
-                          className={cn(
-                            "h-5 w-5 transition-all duration-300",
-                            "group-hover:translate-x-1 group-hover:scale-110",
-                            colors.icon,
-                          )}
-                        />
-                      </div>
-
-                      {/* Category Info */}
-                      <div className="space-y-1 md:space-y-2">
-                        <h3 className="text-base md:text-lg lg:text-xl font-bold text-foreground transition-colors duration-300">
-                          {category.name}
-                        </h3>
-                        <p className="text-xs md:text-sm text-muted-foreground">
-                          {listingCount} {countLabel}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              </div>
+                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 transition-colors group-hover:bg-primary/15 sm:h-20 sm:w-20">
+                  <IconComponent className="h-7 w-7 text-primary sm:h-8 sm:w-8" aria-hidden />
+                </span>
+                <span className="line-clamp-2 text-xs font-semibold leading-tight text-foreground sm:text-sm">
+                  {category.name}
+                </span>
+                {count > 0 ? (
+                  <span className="-mt-1 text-xs text-muted-foreground">
+                    {count} {noun}
+                    {count === 1 ? "" : "s"}
+                  </span>
+                ) : null}
+              </Link>
             );
           })}
         </div>

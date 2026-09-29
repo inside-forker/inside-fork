@@ -6,16 +6,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import { HeroSectionStatic } from "@/components/ui/HeroSectionStatic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { useSearch } from "@/hooks/useSearch";
 import {
   Search,
   MapPin,
   Calendar,
   ArrowRight,
-  Sparkles,
-  Heart,
-  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -134,40 +130,22 @@ export function PremiumHomepageHero() {
   };
 
   return (
-    <HeroSectionStatic
-      floating={
-        <>
-          {/* Floating decorative icons - CSS animations */}
-          <div className="absolute top-16 sm:top-20 left-4 sm:left-20 p-2 sm:p-3 rounded-lg sm:rounded-xl bg-background/20 backdrop-blur-xl border border-border/30 animate-premium-float">
-            <Heart className="h-4 w-4 sm:h-6 sm:w-6 text-primary" />
-          </div>
-
-          <div
-            className="absolute top-24 sm:top-32 right-4 sm:right-32 p-2 sm:p-3 rounded-lg sm:rounded-xl bg-background/20 backdrop-blur-xl border border-border/30 floating-element-delayed"
-            style={{ animationDelay: "2s" }}
-          >
-            <TrendingUp className="h-4 w-4 sm:h-6 sm:w-6 text-green-500" />
-          </div>
-        </>
-      }
-    >
+    <HeroSectionStatic>
       {/* Main Content - CSS animations for entrance */}
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        {/* Badge */}
-        <div className="mb-8 animate-hero-fade-in">
-          <Badge className="px-6 py-2 text-sm font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors">
-            <Sparkles className="h-4 w-4 mr-2" />
-            The Definitive Guide to Karachi
-          </Badge>
+        {/* Eyebrow */}
+        <div className="mb-4 animate-hero-fade-in">
+          <span className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
+            Your guide to Karachi
+          </span>
         </div>
 
         {/* Hero Heading */}
-        <div className="space-y-4 sm:space-y-6 mb-8 sm:mb-12 animate-hero-fade-in-delay-1">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold tracking-tight">
-            Unlock the Best of{" "}
-            <span className="gradient-text-primary">Karachi</span>
+        <div className="space-y-3 sm:space-y-4 mb-8 sm:mb-10 animate-hero-fade-in-delay-1">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
+            Unlock the best of <span className="text-primary">Karachi</span>
           </h1>
-          <p className="max-w-3xl mx-auto text-sm sm:text-base md:text-lg lg:text-xl text-muted-foreground leading-relaxed px-4 sm:px-0">
+          <p className="max-w-2xl mx-auto text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed">
             Discover hidden gems, trending spots, and exclusive experiences in
             Pakistan&apos;s vibrant metropolis.
             <span className="hidden sm:inline">
@@ -178,18 +156,15 @@ export function PremiumHomepageHero() {
         </div>
 
         {/* Search Bar */}
-        <div className="max-w-2xl mx-auto mb-8 sm:mb-12 md:mb-16 px-4 sm:px-0 animate-hero-fade-in-delay-2">
+        <div className="max-w-2xl mx-auto animate-hero-fade-in-delay-2">
           <div className="relative group" ref={searchContainerRef}>
-            {/* Glow Effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-primary/10 rounded-2xl md:rounded-3xl blur-xl group-hover:blur-2xl transition-all duration-300" />
-
             {/* Search Container */}
-            <div className="relative flex flex-col sm:flex-row bg-background/80 backdrop-blur-xl border border-border/50 rounded-2xl md:rounded-3xl shadow-premium-lg overflow-hidden">
+            <div className="relative flex flex-col sm:flex-row bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
               <div className="relative flex-1">
                 <Search className="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Search restaurants, events, places..."
+                  placeholder="Search places, events, deals"
                   value={searchQuery}
                   onChange={handleSearchChange}
                   onFocus={() =>
@@ -219,7 +194,7 @@ export function PremiumHomepageHero() {
               <div className="sm:flex-shrink-0">
                 <Button
                   size="lg"
-                  className="h-12 sm:h-14 md:h-16 w-full sm:w-auto px-4 sm:px-6 md:px-8 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-none rounded-b-2xl sm:rounded-b-none sm:rounded-l-none sm:rounded-r-3xl md:rounded-r-3xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] group"
+                  className="h-12 sm:h-14 md:h-16 w-full sm:w-auto px-4 sm:px-6 md:px-8 bg-primary hover:bg-primary/90 active:opacity-80 text-primary-foreground font-semibold rounded-none group"
                   onClick={handleExplore}
                   aria-label={
                     searchQuery && searchQuery.trim().length > 0
@@ -245,7 +220,7 @@ export function PremiumHomepageHero() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
                   transition={{ duration: 0.15 }}
-                  className="fixed z-[9999] bg-background backdrop-blur-xl border border-border/50 rounded-xl shadow-premium-lg overflow-hidden"
+                  className="fixed z-[9999] bg-card border border-border rounded-2xl shadow-lg overflow-hidden"
                   style={{
                     top: dropdownPosition.top,
                     left: dropdownPosition.left,

@@ -1,5 +1,10 @@
 import Link from "next/link";
 import {
+  SectionHeading,
+  containerClass,
+  sectionClass,
+} from "@/components/homepage/SectionHeading";
+import {
   ArrowUpRight,
   BarChart3,
   Bell,
@@ -184,7 +189,7 @@ function FeatureCard({ feature }: { feature: Feature }) {
   const body = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:h-10 sm:w-10">
           <Icon className="h-5 w-5" aria-hidden />
         </div>
         {feature.href && (
@@ -194,18 +199,23 @@ function FeatureCard({ feature }: { feature: Feature }) {
           />
         )}
       </div>
-      <h4 className="mt-4 font-semibold text-foreground">{feature.title}</h4>
-      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+      <h4 className="mt-3 text-sm font-semibold tracking-tight text-foreground sm:mt-4 sm:text-base">
+        {feature.title}
+      </h4>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">
         {feature.description}
       </p>
     </>
   );
 
   const className =
-    "group block h-full rounded-2xl border border-border/60 bg-card p-5 transition-colors";
+    "group block h-full rounded-2xl border border-border bg-card p-4 transition-colors sm:p-5";
 
   return feature.href ? (
-    <Link href={feature.href} className={`${className} hover:border-primary/40`}>
+    <Link
+      href={feature.href}
+      className={`${className} hover:border-primary/40 active:opacity-80`}
+    >
       {body}
     </Link>
   ) : (
@@ -215,30 +225,23 @@ function FeatureCard({ feature }: { feature: Feature }) {
 
 export function FeaturesSection() {
   return (
-    <section className="py-12 sm:py-16 md:py-20 lg:py-24">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto mb-12 max-w-2xl text-center sm:mb-16">
-          <h2 className="text-xl font-bold tracking-tight sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl">
-            Everything you can do on{" "}
-            <span className="gradient-text-primary">Inside Karachi</span>
-          </h2>
-          <p className="mt-4 text-sm leading-relaxed text-muted-foreground sm:text-base md:text-lg">
-            One place to find what&apos;s good, go to it, and get rewarded for
-            it. And if you run a business or host events, the tools to be
-            found.
-          </p>
-        </div>
+    <section className={`${sectionClass} bg-muted`}>
+      <div className={containerClass}>
+        <SectionHeading
+          title="Everything you can do"
+          subtitle="Find what's good, go to it, and get rewarded for it. Plus the tools to be found if you run a business or host events."
+        />
 
-        <div className="space-y-12 sm:space-y-14">
+        <div className="space-y-8 sm:space-y-10">
           {groups.map((group) => (
             <div key={group.title}>
-              <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3">
-                <h3 className="text-lg font-bold text-foreground sm:text-xl">
+              <div className="mb-3 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-foreground">
                   {group.title}
                 </h3>
                 <p className="text-sm text-muted-foreground">{group.blurb}</p>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
                 {group.features.map((feature) => (
                   <FeatureCard key={feature.title} feature={feature} />
                 ))}

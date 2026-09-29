@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
+import { containerClass, sectionClass } from "@/components/homepage/SectionHeading";
 import { Bell, QrCode, Tag, WifiOff } from "lucide-react";
 
 const appPerks = [
@@ -65,15 +66,15 @@ const mockups = [
 
 export function AppComingSoonSection() {
   return (
-    <section className="py-12 sm:py-16 md:py-20">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-b from-primary/10 via-primary/5 to-background">
+    <section className={sectionClass}>
+      <div className={containerClass}>
+        <div className="overflow-hidden rounded-2xl border border-border bg-muted">
           <div className="grid items-center gap-8 p-6 sm:p-10 lg:grid-cols-2 lg:gap-12 lg:p-14">
             <div>
-              <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+              <span className="inline-flex items-center rounded-full bg-primary px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-primary-foreground">
                 Coming soon
               </span>
-              <h2 className="mt-5 text-2xl font-bold tracking-tight text-foreground sm:text-3xl lg:text-4xl">
+              <h2 className="mt-4 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                 Inside Karachi, in your pocket
               </h2>
               <p className="mt-4 max-w-lg text-sm leading-relaxed text-muted-foreground sm:text-base">
@@ -100,7 +101,7 @@ export function AppComingSoonSection() {
               {appPerks.map(({ icon: Icon, text }) => (
                 <li
                   key={text}
-                  className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-4 text-sm"
+                  className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-sm"
                 >
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
                     <Icon className="h-4 w-4 text-primary" aria-hidden />
@@ -120,7 +121,7 @@ export function AppComingSoonSection() {
                 width={682}
                 height={1395}
                 sizes="(min-width: 1280px) 260px, (min-width: 768px) 22vw, 45vw"
-                className={`mx-auto w-full max-w-[260px] drop-shadow-2xl ${
+                className={`mx-auto w-full max-w-[260px] drop-shadow-xl ${
                   index % 2 === 1 ? "md:mt-12" : ""
                 }`}
               />
