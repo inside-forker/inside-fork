@@ -35,7 +35,11 @@ export default async function ScanPage() {
 
   // Check if user organizes any events (even without organizer role)
   const { rows: organizerEvents } = await query(
-    `SELECT id FROM public.events WHERE organizer_id = $1 LIMIT 1`,
+    `SELECT id FROM public.events e
+     WHERE e.organizer_id = $1 OR EXISTS (
+       SELECT 1 FROM public.event_co_organizers eco
+       WHERE eco.event_id = e.id AND eco.organizer_id = $1
+     ) LIMIT 1`,
     [user.id],
   );
 

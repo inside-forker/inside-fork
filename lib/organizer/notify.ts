@@ -116,29 +116,43 @@ export async function notifyOrganizer(input: NotifyOrganizerInput) {
       throw new Error(`Invalid organizer notification type: ${type}`);
   }
 
-  return createNotification({
-    recipientId: event.organizer_id,
-    roleScope: role,
-    categorySlug,
-    title,
-    body: bodyText,
-    metadata: {
-      eventId,
-      eventName: event.name,
-      type,
-      ...data,
-    },
-    priority:
-      type === "milestone" && (data?.milestonePercent || 0) >= 100
-        ? "high"
-        : "normal",
-    ctaLabel: "View Dashboard",
-    ctaUrl,
-    dedupeKey:
-      type === "milestone"
-        ? `organizer_milestone_${eventId}_${data?.milestonePercent}`
-        : type === "check_in" && data?.milestonePercent
-          ? `organizer_checkin_milestone_${eventId}_${data.milestonePercent}`
-          : undefined,
-  });
+  const { rows: coOrgRows } = await query(
+    `SELECT organizer_id FROM public.event_co_organizers WHERE event_id = $1`,
+    [eventId]
+  );
+  const recipientIds = Array.from(
+    new Set([event.organizer_id, ...coOrgRows.map((r) => String(r.organizer_id))])
+  );
+
+  const notifications = await Promise.all(
+    recipientIds.map((recId) =>
+      createNotification({
+        recipientId: recId,
+        roleScope: role,
+        categorySlug,
+        title,
+        body: bodyText,
+        metadata: {
+          eventId,
+          eventName: event.name,
+          type,
+          ...data,
+        },
+        priority:
+          type === "milestone" && (data?.milestonePercent || 0) >= 100
+            ? "high"
+            : "normal",
+        ctaLabel: "View Dashboard",
+        ctaUrl,
+        dedupeKey:
+          type === "milestone"
+            ? `organizer_milestone_${eventId}_${data?.milestonePercent}_${recId}`
+            : type === "check_in" && data?.milestonePercent
+              ? `organizer_checkin_milestone_${eventId}_${data.milestonePercent}_${recId}`
+              : undefined,
+      })
+    )
+  );
+
+  return notifications[0];
 }

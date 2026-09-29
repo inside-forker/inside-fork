@@ -47,8 +47,16 @@ async function verifyEventAccess(userId: string, eventIdNum: number) {
 
   const isOwner = event.organizer_id === userId;
   const isAdmin = PRIVILEGED_ROLES.includes(profile.role);
-
+  let isCoOrg = false;
   if (!isOwner && !isAdmin) {
+    const { rows: coRows } = await query(
+      `SELECT 1 FROM public.event_co_organizers WHERE event_id = $1 AND organizer_id = $2`,
+      [eventIdNum, userId]
+    );
+    isCoOrg = coRows.length > 0;
+  }
+
+  if (!isOwner && !isAdmin && !isCoOrg) {
     return { error: "Access denied", status: 403 } as const;
   }
 

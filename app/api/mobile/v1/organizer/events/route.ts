@@ -126,7 +126,11 @@ export const GET = mobileRoute(async (request: NextRequest) => {
         scanning_mode, total_gates,
         NULL::smallint AS assigned_device_index,
         NULL::text AS assigned_device_label
-      FROM events WHERE organizer_id = $1`;
+      FROM events
+      WHERE (organizer_id = $1 OR EXISTS (
+        SELECT 1 FROM public.event_co_organizers eco
+        WHERE eco.event_id = events.id AND eco.organizer_id = $1
+      ))`;
     if (eventIdNum) {
       eventParams.push(eventIdNum);
       eventsSql += ` AND id = $${eventParams.length}`;

@@ -36,7 +36,10 @@ export default async function OrganizerProfilePage({
             organizer_id, organizer_name, organizer_avatar,
             location_name, address, latitude, longitude
      FROM events_with_details
-     WHERE organizer_id = $1 AND event_status = 'published'
+     WHERE (organizer_id = $1 OR EXISTS (
+       SELECT 1 FROM public.event_co_organizers eco
+       WHERE eco.event_id = events_with_details.event_id AND eco.organizer_id = $1
+     )) AND event_status = 'published'
      ORDER BY start_time DESC`,
     [organizer.id],
   );

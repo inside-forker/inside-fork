@@ -69,12 +69,22 @@ export async function requireMobileOrganizer(
          AND (
            e.organizer_id::text = $2
            OR EXISTS (
+             SELECT 1 FROM public.event_co_organizers eco
+             WHERE eco.event_id = e.id AND eco.organizer_id::text = $2
+           )
+           OR EXISTS (
              SELECT 1 FROM public.event_device_operators edo
              WHERE edo.event_id = e.id AND edo.operator_id::text = $2
            )
            OR (
              $3::text IS NOT NULL
-             AND e.organizer_id::text = $3
+             AND (
+               e.organizer_id::text = $3
+               OR EXISTS (
+                 SELECT 1 FROM public.event_co_organizers eco
+                 WHERE eco.event_id = e.id AND eco.organizer_id::text = $3
+               )
+             )
            )
          )
        LIMIT 1`,

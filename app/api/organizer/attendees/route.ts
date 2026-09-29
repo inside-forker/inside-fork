@@ -38,9 +38,17 @@ export async function GET(request: NextRequest) {
     const role = profileRows[0]?.role;
 
     const isAdmin = role === "admin" || role === "super_admin";
-    const isOrganizer = event.organizer_id === session.userId;
+    const isOwner = event.organizer_id === session.userId;
+    let isCoOrg = false;
+    if (!isOwner && !isAdmin) {
+      const { rows: coRows } = await query(
+        `SELECT 1 FROM public.event_co_organizers WHERE event_id = $1 AND organizer_id = $2`,
+        [parseInt(eventId, 10), session.userId]
+      );
+      isCoOrg = coRows.length > 0;
+    }
 
-    if (!isOrganizer && !isAdmin) {
+    if (!isOwner && !isAdmin && !isCoOrg) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 

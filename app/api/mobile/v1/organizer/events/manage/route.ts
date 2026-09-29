@@ -47,7 +47,10 @@ export const GET = mobileRoute(async (request: NextRequest) => {
        ORDER BY ecr_inner.created_at DESC
        LIMIT 1
      ) ecr ON true
-     WHERE e.organizer_id = $1
+     WHERE (e.organizer_id = $1 OR EXISTS (
+       SELECT 1 FROM public.event_co_organizers eco
+       WHERE eco.event_id = e.id AND eco.organizer_id = $1
+     ))
      ORDER BY e.start_time DESC`,
     [user.id],
   );
@@ -189,12 +192,18 @@ export const POST = mobileRoute(async (request: NextRequest) => {
         }
 
         if (user.role === "organizer" && existingEvent.organizer_id !== user.id) {
-          await client.query("ROLLBACK");
-          throw new MobileApiError(
-            "forbidden",
-            "You can only modify your own events.",
-            403,
+          const { rows: coRows } = await client.query(
+            `SELECT 1 FROM public.event_co_organizers WHERE event_id = $1 AND organizer_id = $2`,
+            [event_id, user.id]
           );
+          if (coRows.length === 0) {
+            await client.query("ROLLBACK");
+            throw new MobileApiError(
+              "forbidden",
+              "You can only modify your own events.",
+              403,
+            );
+          }
         }
 
         const { rows: pendingRows } = await client.query(

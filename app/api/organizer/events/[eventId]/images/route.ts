@@ -20,6 +20,22 @@ function toNumericEventImage(row: Record<string, unknown>) {
   };
 }
 
+async function hasEventAccess(
+  userId: string,
+  userRole: string,
+  eventId: number,
+  eventOrganizerId: string
+): Promise<boolean> {
+  if (eventOrganizerId === userId || ADMIN_ROLES.includes(userRole)) {
+    return true;
+  }
+  const { rows } = await query(
+    `SELECT 1 FROM public.event_co_organizers WHERE event_id = $1 AND organizer_id = $2`,
+    [eventId, userId]
+  );
+  return rows.length > 0;
+}
+
 // GET /api/organizer/events/[eventId]/images - Get images for an event owned by the organizer
 export async function GET(
   request: NextRequest,
@@ -65,11 +81,15 @@ export async function GET(
       );
     }
 
-    // Only allow organizer who owns the event or admin/lister
-    const isOwner = event.organizer_id === session.userId;
-    const isAdmin = ADMIN_ROLES.includes(profile.role);
+    // Only allow organizer who owns the event or admin/lister/co-organizer
+    const canAccess = await hasEventAccess(
+      session.userId,
+      profile.role,
+      eventIdNum,
+      event.organizer_id
+    );
 
-    if (!isOwner && !isAdmin) {
+    if (!canAccess) {
       return NextResponse.json(
         { success: false, error: "Access denied" },
         { status: 403 }
@@ -157,11 +177,15 @@ export async function POST(
       );
     }
 
-    // Check access: owner, organizer role, or admin/lister
-    const isOwner = event.organizer_id === session.userId;
-    const isAdmin = ADMIN_ROLES.includes(profile.role);
+    // Check access: owner, co-organizer, or admin/lister
+    const canAccess = await hasEventAccess(
+      session.userId,
+      profile.role,
+      eventIdNum,
+      event.organizer_id
+    );
 
-    if (!isOwner && !isAdmin) {
+    if (!canAccess) {
       return NextResponse.json(
         {
           success: false,
@@ -337,10 +361,14 @@ export async function PATCH(
       );
     }
 
-    const isOwner = event.organizer_id === session.userId;
-    const isAdmin = ADMIN_ROLES.includes(profile.role);
+    const canAccess = await hasEventAccess(
+      session.userId,
+      profile.role,
+      eventIdNum,
+      event.organizer_id
+    );
 
-    if (!isOwner && !isAdmin) {
+    if (!canAccess) {
       return NextResponse.json(
         { success: false, error: "Access denied" },
         { status: 403 }
@@ -445,10 +473,14 @@ export async function DELETE(
       );
     }
 
-    const isOwner = event.organizer_id === session.userId;
-    const isAdmin = ADMIN_ROLES.includes(profile.role);
+    const canAccess = await hasEventAccess(
+      session.userId,
+      profile.role,
+      eventIdNum,
+      event.organizer_id
+    );
 
-    if (!isOwner && !isAdmin) {
+    if (!canAccess) {
       return NextResponse.json(
         { success: false, error: "Access denied" },
         { status: 403 }
