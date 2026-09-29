@@ -142,7 +142,21 @@ export async function GET(request: NextRequest) {
       params
     );
 
-    const typedCategories = categories as CategoryRow[];
+    const typedCategories = (categories as Record<string, unknown>[]).map((cat) => ({
+      id: Number(cat.id),
+      name: String(cat.name || ""),
+      slug: String(cat.slug || ""),
+      parent_id: cat.parent_id !== null && cat.parent_id !== undefined ? Number(cat.parent_id) : null,
+      icon_name: (cat.icon_name as string | null) ?? null,
+      show_in_nav: Boolean(cat.show_in_nav),
+      show_in_featured: Boolean(cat.show_in_featured),
+      show_in_filters: Boolean(cat.show_in_filters),
+      is_enabled: Boolean(cat.is_enabled),
+      category_type: String(cat.category_type || "listing"),
+      display_order: cat.display_order !== null && cat.display_order !== undefined ? Number(cat.display_order) : null,
+      gradient_style: (cat.gradient_style as string | null) ?? null,
+      created_at: typeof cat.created_at === "string" ? cat.created_at : String(cat.created_at || ""),
+    }));
 
     // Build a map of category id -> category for parent lookups
     const categoryMap = new Map<number, { name: string; slug: string }>();
@@ -152,13 +166,17 @@ export async function GET(request: NextRequest) {
 
     // Count listings per category by status (published, draft, archived) via junction and direct column
     const { rows: allListings } = await query(
-      `SELECT DISTINCT
-         COALESCE(lc.category_id, l.category_id) AS category_id,
-         l.id AS listing_id,
-         l.status
-       FROM public.listings l
-       LEFT JOIN public.listing_categories lc ON lc.listing_id = l.id
-       WHERE l.category_id IS NOT NULL OR lc.category_id IS NOT NULL`
+      `SELECT DISTINCT category_id, id AS listing_id, status
+       FROM (
+         SELECT category_id, id, status
+         FROM public.listings
+         WHERE category_id IS NOT NULL
+         UNION
+         SELECT lc.category_id, l.id, l.status
+         FROM public.listings l
+         JOIN public.listing_categories lc ON lc.listing_id = l.id
+         WHERE lc.category_id IS NOT NULL
+       ) s`
     );
 
     const publishedListingMap = new Map<number, number>();
@@ -166,8 +184,8 @@ export async function GET(request: NextRequest) {
     const archivedListingMap = new Map<number, number>();
     const totalListingMap = new Map<number, number>();
 
-    (allListings as { category_id: number | null; listing_id: number; status: string }[]).forEach((l) => {
-      if (l.category_id) {
+    (allListings as { category_id: number | string | null; listing_id: number | string; status: string }[]).forEach((l) => {
+      if (l.category_id !== null && l.category_id !== undefined) {
         const catId = Number(l.category_id);
         totalListingMap.set(catId, (totalListingMap.get(catId) || 0) + 1);
         if (l.status === "published") {
@@ -186,11 +204,12 @@ export async function GET(request: NextRequest) {
     );
 
     const eventCountMap = new Map<number, number>();
-    (allEvents as { category_id: number | null }[]).forEach((evt) => {
-      if (evt.category_id) {
+    (allEvents as { category_id: number | string | null }[]).forEach((evt) => {
+      if (evt.category_id !== null && evt.category_id !== undefined) {
+        const catId = Number(evt.category_id);
         eventCountMap.set(
-          evt.category_id,
-          (eventCountMap.get(evt.category_id) || 0) + 1
+          catId,
+          (eventCountMap.get(catId) || 0) + 1
         );
       }
     });
