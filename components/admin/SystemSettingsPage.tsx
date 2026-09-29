@@ -81,6 +81,9 @@ export function SystemSettingsPage() {
     return `${parsedDate.getFullYear()}-${pad(parsedDate.getMonth() + 1)}-${pad(parsedDate.getDate())}T${pad(parsedDate.getHours())}:${pad(parsedDate.getMinutes())}`;
   };
 
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams?.get("tab") || "maintenance";
+
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [maintenanceEstimatedEnd, setMaintenanceEstimatedEnd] = useState(
@@ -690,9 +693,6 @@ export function SystemSettingsPage() {
       </div>
     );
   }
-
-  const searchParams = useSearchParams();
-  const defaultTab = searchParams?.get("tab") || "maintenance";
 
   return (
     <div className="space-y-6">
