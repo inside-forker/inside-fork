@@ -63,9 +63,10 @@ export async function GET(request: NextRequest) {
         { status: 404 },
       );
     }
-    if (!ADMIN_ROLES.includes(profile.role)) {
+    const isOrganizer = profile.role === "organizer";
+    if (!ADMIN_ROLES.includes(profile.role) && !isOrganizer) {
       return NextResponse.json(
-        { success: false, error: "Admin access required" },
+        { success: false, error: "Access required" },
         { status: 403 },
       );
     }
@@ -73,6 +74,15 @@ export async function GET(request: NextRequest) {
     // Build query for events with details
     const whereClauses: string[] = [];
     const params: unknown[] = [];
+
+    if (isOrganizer) {
+      params.push(session.userId);
+      const userParam = `$${params.length}`;
+      whereClauses.push(`(organizer_id = ${userParam} OR EXISTS (
+        SELECT 1 FROM public.event_co_organizers eco
+        WHERE eco.event_id = events_with_details.event_id AND eco.organizer_id = ${userParam}
+      ))`);
+    }
 
     if (status && status !== "all") {
       params.push(status);

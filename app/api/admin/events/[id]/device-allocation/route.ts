@@ -4,17 +4,49 @@ import { requireAdmin } from "@/lib/auth/admin";
 import { captureRouteError } from "@/lib/sentry/captureRouteError";
 import { hashPassword } from "@/lib/auth/password";
 
+import { getSession } from "@/lib/auth/session";
+
 const ROUTE = "/api/admin/events/[id]/device-allocation";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+async function requireAdminOrOrganizerAccess(request: NextRequest, eventId: number) {
+  const session = await getSession(request);
+  if (!session) {
+    throw new Error("Unauthorized");
+  }
+  const { rows } = await query("SELECT id, role FROM profiles WHERE id = $1 LIMIT 1", [session.userId]);
+  const profile = rows[0];
+  if (!profile) {
+    throw new Error("Profile not found");
+  }
+  if (profile.role === "admin" || profile.role === "super_admin" || profile.role === "lister") {
+    return { user: { id: session.userId, email: session.email }, profile };
+  }
+  if (profile.role === "organizer") {
+    const { rows: accessRows } = await query(
+      `SELECT 1 FROM public.events e
+       WHERE e.id = $1 AND (
+         e.organizer_id = $2 OR EXISTS (
+           SELECT 1 FROM public.event_co_organizers eco
+           WHERE eco.event_id = e.id AND eco.organizer_id = $2
+         )
+       ) LIMIT 1`,
+      [eventId, session.userId]
+    );
+    if (accessRows.length > 0) {
+      return { user: { id: session.userId, email: session.email }, profile };
+    }
+  }
+  throw new Error("Access denied");
+}
+
 // GET /api/admin/events/[id]/device-allocation
 // Returns event config, devices list with assigned operators and labels, attendee list, and summary stats
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    await requireAdmin(request);
     const { id } = await params;
     const eventId = parseInt(id, 10);
     if (isNaN(eventId)) {
@@ -23,6 +55,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         { status: 400 },
       );
     }
+    await requireAdminOrOrganizerAccess(request, eventId);
 
     // 1. Fetch Event Header Info & Organizer details
     const { rows: eventRows } = await query(
@@ -259,7 +292,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 // Handles architecture updates, label updates, credentials updates, single/bulk ticket device assignment, auto-distribution, and operator linking
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    await requireAdmin(request);
     const { id } = await params;
     const eventId = parseInt(id, 10);
     if (isNaN(eventId)) {
@@ -268,6 +300,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         { status: 400 },
       );
     }
+    await requireAdminOrOrganizerAccess(request, eventId);
 
     const body = await request.json();
     const { action } = body;

@@ -6,6 +6,8 @@ import { hashPassword } from "@/lib/auth/password";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 
+import { getSession } from "@/lib/auth/session";
+
 const ROUTE = "/api/admin/accounts/gate-pass";
 
 // POST /api/admin/accounts/gate-pass - Create an EO Gate Pass Operator account
@@ -13,11 +15,24 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   try {
-    const adminAuth = await requireAdmin(request);
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    const { rows: profileRows } = await query("SELECT id, role FROM profiles WHERE id = $1 LIMIT 1", [session.userId]);
+    const profile = profileRows[0];
+    if (!profile) {
+      return NextResponse.json({ success: false, error: "Profile not found" }, { status: 404 });
+    }
+    const isAdmin = profile.role === "admin" || profile.role === "super_admin";
+    const isOrganizer = profile.role === "organizer" || profile.role === "lister";
+    if (!isAdmin && !isOrganizer) {
+      return NextResponse.json({ success: false, error: "Access denied" }, { status: 403 });
+    }
 
     // Rate limiting
     const { userCreationLimiter } = await import("@/lib/rate-limiter");
-    const rateLimitCheck = userCreationLimiter.check(adminAuth.user.id);
+    const rateLimitCheck = userCreationLimiter.check(session.userId);
 
     if (!rateLimitCheck.allowed) {
       const resetInSeconds = Math.ceil(
@@ -58,7 +73,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!linked_organizer_id?.trim()) {
+    const targetOrgId = isOrganizer && profile.role === "organizer" ? session.userId : linked_organizer_id?.trim();
+
+    if (!targetOrgId) {
       return NextResponse.json(
         {
           success: false,
@@ -71,8 +88,8 @@ export async function POST(request: NextRequest) {
     // Verify linked organizer exists and has organizer/admin role
     const { rows: organizerRows } = await query(
       `SELECT id, full_name, role, organizer_company FROM public.profiles 
-       WHERE id = $1 AND role IN ('organizer', 'admin', 'super_admin') LIMIT 1`,
-      [linked_organizer_id.trim()],
+       WHERE id = $1 AND role IN ('organizer', 'admin', 'super_admin', 'lister') LIMIT 1`,
+      [targetOrgId],
     );
 
     if (organizerRows.length === 0) {
