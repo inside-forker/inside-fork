@@ -172,6 +172,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         [categoryIdsInScope]
       );
 
+      // If unarchiving a subcategory, ensure all parent/ancestor categories are also enabled
+      await query(
+        `WITH RECURSIVE cat_ancestors AS (
+          SELECT parent_id FROM public.categories WHERE id = $1 AND parent_id IS NOT NULL
+          UNION ALL
+          SELECT c.parent_id FROM public.categories c JOIN cat_ancestors ca ON c.id = ca.parent_id WHERE c.parent_id IS NOT NULL
+        )
+        UPDATE public.categories
+        SET is_enabled = true
+        WHERE id IN (SELECT parent_id FROM cat_ancestors)`,
+        [categoryId]
+      );
+
       // Log audit
       await logAuditEvent({
         admin_id: session.userId,

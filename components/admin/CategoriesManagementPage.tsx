@@ -26,6 +26,7 @@ import {
   GitBranch,
   Navigation,
   Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import type {
   CategoryWithParent,
@@ -112,7 +113,7 @@ export function CategoriesManagementPage() {
           );
         } else if (filterType === "archived") {
           fetchedCategories = fetchedCategories.filter(
-            (c: CategoryWithParent) => c.parent_id !== null && c.is_archived
+            (c: CategoryWithParent) => c.is_archived || !c.is_enabled
           );
         }
 
@@ -334,6 +335,39 @@ export function CategoriesManagementPage() {
     }
   };
 
+  // Bulk unarchive selected categories and their listings
+  const handleBulkUnarchive = async () => {
+    try {
+      setIsLoading(true);
+      const updates = Array.from(selectedCategoryIds).map((id) =>
+        fetch(`/api/admin/categories/${id}/archive`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "unarchive", unarchiveListings: true }),
+        })
+      );
+
+      await Promise.all(updates);
+
+      toast({
+        title: "Success",
+        description: `Unarchived ${selectedCategoryIds.size} categories and restored listings`,
+      });
+
+      setSelectedCategoryIds(new Set());
+      await fetchCategories();
+    } catch (error) {
+      console.error("Bulk unarchive error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to unarchive some categories",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Bulk remove parent
   const handleBulkRemoveParent = async () => {
     try {
@@ -516,6 +550,16 @@ export function CategoriesManagementPage() {
               >
                 <Archive className="h-4 w-4 mr-1.5" />
                 Archive Selected ({selectedCategoryIds.size})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBulkUnarchive}
+                disabled={isLoading}
+                className="text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10 dark:text-emerald-400"
+              >
+                <ArchiveRestore className="h-4 w-4 mr-1.5" />
+                Unarchive Selected ({selectedCategoryIds.size})
               </Button>
               <Button
                 variant="destructive"
