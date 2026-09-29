@@ -33,7 +33,6 @@ const curatedExploreLinks = [
   { name: "Eat & Drink", href: "/listings" },
   { name: "Events", href: "/events" },
   { name: "Where to Stay", href: "/listings/where-to-stay" },
-  { name: "Guides & Reviews", href: "/guides" },
   { name: "Things to do", href: "/listings/things-to-do" },
 ];
 

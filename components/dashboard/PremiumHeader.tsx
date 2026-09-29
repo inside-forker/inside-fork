@@ -230,7 +230,7 @@ export function PremiumHeader({
                 placeholder={
                   context === "dashboard"
                     ? "Search places, events, or experiences..."
-                    : "Find restaurants, guides, events in Karachi..."
+                    : "Find restaurants, places, events in Karachi..."
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
