@@ -6,9 +6,6 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft,
-  Sun,
-  Moon,
-  Monitor,
   Bell,
   MapPin,
   Save,
@@ -147,39 +144,7 @@ export function PremiumSettingsPage({ profile }: PremiumSettingsPageProps) {
       }));
     }
 
-    // Load theme from localStorage
-    const savedTheme = localStorage.getItem("theme") as
-      | "light"
-      | "dark"
-      | "system"
-      | null;
-    if (savedTheme) {
-      setPreferences((prev) => ({ ...prev, theme: savedTheme }));
-    }
   }, [profile]);
-
-  // Theme management
-  const updateTheme = (theme: "light" | "dark" | "system") => {
-    setPreferences((prev) => ({ ...prev, theme }));
-
-    // Apply theme immediately
-    const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else if (theme === "light") {
-      root.classList.remove("dark");
-    } else {
-      // System preference
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light";
-      root.classList.toggle("dark", systemTheme === "dark");
-    }
-
-    // Save to localStorage
-    localStorage.setItem("theme", theme);
-  };
 
   // Save preferences to database
   const savePreferences = async () => {
@@ -227,61 +192,6 @@ export function PremiumSettingsPage({ profile }: PremiumSettingsPageProps) {
 
       {/* Settings Sections - Matching Profile Page Card Design */}
       <div className="space-y-6">
-        {/* Theme Preferences */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="relative overflow-hidden glass-card border border-border rounded-2xl p-6 md:p-8 mb-6 md:mb-8 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 shadow-sm"
-        >
-          <div
-            className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 opacity-40 dark:from-primary/10 dark:to-primary/5 pointer-events-none"
-            aria-hidden
-          />
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-              <Sun className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-lg sm:text-xl md:text-3xl font-bold text-foreground">
-                Theme <span className="gradient-text-primary">Preferences</span>
-              </h2>
-              <p className="text-muted-foreground text-sm">
-                Choose your preferred theme for the application
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { key: "light", icon: Sun, label: "Light", desc: "Bright theme" },
-              { key: "dark", icon: Moon, label: "Dark", desc: "Easy on eyes" },
-              {
-                key: "system",
-                icon: Monitor,
-                label: "System",
-                desc: "Auto detect",
-              },
-            ].map(({ key, icon: Icon, label, desc }) => (
-              <button
-                key={key}
-                onClick={() => updateTheme(key as "light" | "dark" | "system")}
-                className={`p-6 rounded-xl border-2 transition-all hover:scale-105 ${
-                  preferences.theme === key
-                    ? "border-primary bg-primary/5 text-primary shadow-lg"
-                    : "border-border/40 hover:border-border/60 bg-card/50"
-                }`}
-              >
-                <Icon className="w-8 h-8 mx-auto mb-3" />
-                <span className="text-sm font-semibold block">{label}</span>
-                <span className="text-xs text-muted-foreground mt-1 block">
-                  {desc}
-                </span>
-              </button>
-            ))}
-          </div>
-        </motion.div>
-
         {/* Notification Preferences */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
