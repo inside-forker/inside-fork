@@ -52,9 +52,11 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const paid = isBookingPaid(booking.payment_status);
 
   const { rows: eventRows } = await query(
-    `SELECT e.name, e.start_time, e.end_time, e.location_name, e.address
+    `SELECT e.name, e.start_time, e.end_time, e.location_name, e.address,
+            COALESCE(NULLIF(p.organizer_company, ''), p.full_name) AS organizer_name
      FROM bookings b
      INNER JOIN events e ON e.id = b.event_id
+     LEFT JOIN profiles p ON p.id = e.organizer_id
      WHERE b.id = $1`,
     [bookingId],
   );
@@ -63,9 +65,10 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const passes = paid
     ? (
         await query(
-          `SELECT ${PASS_COLUMNS} 
+          `SELECT ${PASS_COLUMNS}, tt.name AS ticket_type_name
            FROM ticket_passes tp
            LEFT JOIN event_device_operators edo ON edo.event_id = tp.event_id AND edo.device_index = tp.assigned_gate_index
+           LEFT JOIN ticket_types tt ON tt.id = tp.ticket_type_id
            WHERE tp.booking_id = $1 
            ORDER BY tp.quantity_index ASC`,
           [bookingId],
@@ -85,8 +88,12 @@ export const GET = mobileRoute(async (request: NextRequest) => {
           end_time: event.end_time as string | null,
           location_name: event.location_name as string | null,
           address: event.address as string | null,
+          organizer_name: (event.organizer_name as string | null) ?? null,
         }
       : null,
-    passes: (passes as PassRow[]).map((p) => toPass(p, paid)),
+    passes: (passes as Array<PassRow & { ticket_type_name?: string | null }>).map((p) => ({
+      ...toPass(p, paid),
+      ticket_type_name: p.ticket_type_name ?? null,
+    })),
   });
 });

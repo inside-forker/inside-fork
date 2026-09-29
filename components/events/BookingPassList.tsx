@@ -18,6 +18,10 @@ interface Props {
   eventTime?: string;
   venueName?: string;
   ticketType?: string;
+  eventEndTime?: string;
+  address?: string;
+  organizer?: string;
+  bookingReference?: string;
 }
 
 function TicketCard({
@@ -189,13 +193,48 @@ export function BookingPassList({
   eventTime,
   venueName,
   ticketType,
+  eventEndTime,
+  address,
+  organizer,
+  bookingReference,
 }: Props) {
   const [selectedPass, setSelectedPass] = React.useState<PublicPass | null>(
     null,
   );
   const [autoDownloadPdf, setAutoDownloadPdf] = React.useState(false);
+  const [downloadingAll, setDownloadingAll] = React.useState(false);
 
   if (!passes.length) return null;
+
+  const issuedCount = passes.filter((p) => p.code).length;
+
+  const handleDownloadAll = async () => {
+    setDownloadingAll(true);
+    try {
+      const { downloadTicketsPdf } = await import(
+        "@/lib/ticketing/download-ticket-pdf"
+      );
+      await downloadTicketsPdf({
+        event: {
+          name: eventName || "Event",
+          startTime: eventDate || null,
+          endTime: eventEndTime ?? null,
+          venueName: venueName ?? null,
+          address: address ?? null,
+          organizer: organizer ?? null,
+          bookingReference: bookingReference ?? null,
+          ticketType: ticketType ?? null,
+        },
+        passes,
+        filename: `tickets-${bookingReference || passes[0].booking_id}`,
+      });
+    } catch (error) {
+      console.error("Error saving tickets PDF:", error);
+      alert("Couldn't create the PDF. Please try again.");
+    } finally {
+      setDownloadingAll(false);
+    }
+  };
 
   const listClassName =
     variant === "dashboard"
@@ -210,7 +249,23 @@ export function BookingPassList({
   return (
     <>
       <div className={variant === "dashboard" ? "space-y-4" : "space-y-3 mt-4"}>
-        <h4 className={headingClassName}>Your Tickets</h4>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h4 className={headingClassName}>Your Tickets</h4>
+          {issuedCount > 1 && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleDownloadAll}
+              disabled={downloadingAll}
+              className="gap-2"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {downloadingAll
+                ? "Preparing PDF…"
+                : `Download all ${issuedCount} tickets`}
+            </Button>
+          )}
+        </div>
         <ul className={listClassName}>
           {passes.map((p, index) => (
             <TicketCard
@@ -239,6 +294,11 @@ export function BookingPassList({
           eventTime={eventTime}
           venueName={venueName}
           ticketType={ticketType}
+          eventEndTime={eventEndTime}
+          address={address}
+          organizer={organizer}
+          bookingReference={bookingReference}
+          orderPasses={passes}
           autoDownloadPdf={autoDownloadPdf}
           onClose={() => {
             setSelectedPass(null);

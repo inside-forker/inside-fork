@@ -15,7 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { QRCodeCanvas } from "qrcode.react";
-import { downloadTicketPdf } from "@/lib/ticketing/download-ticket-pdf";
+import { downloadTicketsPdf } from "@/lib/ticketing/download-ticket-pdf";
+import type { PublicPass } from "@/types/ticketing.types";
 import {
   Search,
   Download,
@@ -174,31 +175,37 @@ export function SoldTicketsModal({
     try {
       setIsDownloadingPdf((prev) => ({ ...prev, [ticket.code]: true }));
       const eventName = eventDetails?.name || initialEventName || "Event";
-      const eventDate = eventDetails?.start_time
-        ? format(new Date(eventDetails.start_time), "EEE, MMM d, yyyy")
-        : "Event Date";
-      const eventTime = eventDetails?.start_time
-        ? format(new Date(eventDetails.start_time), "h:mm a")
-        : "";
+      const toPass = (item: AttendeeTicketItem): PublicPass => ({
+        id: item.id,
+        booking_id: item.bookingId ?? 0,
+        code: item.code,
+        status: item.status as PublicPass["status"],
+        quantity_index: item.quantityIndex ?? 0,
+        issued_at: item.issuedAt ?? "",
+        ticket_type_id: 0,
+        guest_name: item.guestName || item.buyerName,
+        cnic_last4: item.guestCnic?.replace(/\D/g, "").slice(-4) || null,
+        ticket_type_name: item.ticketType,
+        gate_label:
+          item.assignedDeviceIndex !== null ? `Lane ${item.assignedDeviceIndex + 1}` : null,
+      });
+      const orderPasses = attendees
+        .filter((a) => ticket.bookingId !== undefined && a.bookingId === ticket.bookingId)
+        .sort((a, b) => (a.quantityIndex ?? 0) - (b.quantityIndex ?? 0))
+        .map(toPass);
 
-      await downloadTicketPdf({
-        code: ticket.code,
-        eventName,
-        eventDate,
-        eventTime,
-        venueName: eventDetails?.location_name || eventDetails?.address || "Karachi",
-        venueAddress: eventDetails?.address || undefined,
-        organizerName: eventDetails?.organizer_name || "Inside Karachi",
-        ticketType: ticket.ticketType,
-        guestName: ticket.guestName || ticket.buyerName,
-        cnicLast4: ticket.guestCnic || undefined,
-        gateLabel:
-          ticket.assignedDeviceIndex !== null
-            ? `Lane ${ticket.assignedDeviceIndex + 1}`
-            : "Lane 1",
-        bookingCode: ticket.bookingCode || undefined,
-        ticketIndex: (ticket.quantityIndex || 0) + 1,
-        totalTickets: 1,
+      await downloadTicketsPdf({
+        event: {
+          name: eventName,
+          startTime: eventDetails?.start_time ?? null,
+          endTime: eventDetails?.end_time ?? null,
+          venueName: eventDetails?.location_name ?? null,
+          address: eventDetails?.address ?? null,
+          organizer: eventDetails?.organizer_name ?? null,
+          bookingReference: ticket.bookingCode ?? null,
+        },
+        passes: [toPass(ticket)],
+        orderPasses: orderPasses.length ? orderPasses : [toPass(ticket)],
         filename: `ticket-${eventName.replace(/[^a-zA-Z0-9]/g, "-")}-${ticket.code}.pdf`,
       });
 

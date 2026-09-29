@@ -21,7 +21,11 @@ type BookingRow = Database["public"]["Tables"]["bookings"]["Row"] & {
       | "ticket_type_id"
       | "guest_name"
       | "cnic_last4"
-    >
+    > & {
+      assigned_gate_index: number | null;
+      gate_label: string | null;
+      ticket_type_name: string | null;
+    }
   >;
 };
 
@@ -32,15 +36,8 @@ type EventDetails = {
   start_time: string | null;
   end_time: string | null;
   location_name: string | null;
-};
-
-type EventsWithDetailsRow = {
-  event_id: number | null;
-  event_name: string | null;
-  event_slug: string | null;
-  start_time: string | null;
-  end_time: string | null;
-  location_name: string | null;
+  address: string | null;
+  organizer_name: string | null;
 };
 
 export default async function DashboardBookingsPage() {
@@ -70,9 +67,11 @@ export default async function DashboardBookingsPage() {
           tp.guest_name, 
           tp.cnic_last4,
           tp.assigned_gate_index,
-          COALESCE(edo.device_label, CASE WHEN tp.assigned_gate_index IS NOT NULL THEN 'Gate ' || (tp.assigned_gate_index + 1) ELSE NULL END) AS gate_label
+          COALESCE(edo.device_label, CASE WHEN tp.assigned_gate_index IS NOT NULL THEN 'Gate ' || (tp.assigned_gate_index + 1) ELSE NULL END) AS gate_label,
+          tt.name AS ticket_type_name
          FROM ticket_passes tp
          LEFT JOIN event_device_operators edo ON edo.event_id = tp.event_id AND edo.device_index = tp.assigned_gate_index
+         LEFT JOIN ticket_types tt ON tt.id = tp.ticket_type_id
          WHERE tp.booking_id = ANY($1)`,
         [bookingIds],
       );
@@ -126,12 +125,16 @@ export default async function DashboardBookingsPage() {
   if (eventIds.length > 0) {
     try {
       const { rows: eventsRows } = await query(
-        `SELECT event_id, event_name, event_slug, start_time, end_time, location_name
-         FROM events_with_details WHERE event_id = ANY($1)`,
+        `SELECT e.id AS event_id, e.name AS event_name, e.slug AS event_slug,
+                e.start_time, e.end_time, e.location_name, e.address,
+                COALESCE(NULLIF(p.organizer_company, ''), p.full_name) AS organizer_name
+         FROM events e
+         LEFT JOIN profiles p ON p.id = e.organizer_id
+         WHERE e.id = ANY($1)`,
         [eventIds],
       );
       eventsMap = new Map(
-        (eventsRows as EventsWithDetailsRow[])
+        (eventsRows as EventDetails[])
           .filter((row) => row?.event_id)
           .map((row) => [
             Number(row.event_id),
@@ -142,6 +145,8 @@ export default async function DashboardBookingsPage() {
               start_time: row.start_time,
               end_time: row.end_time,
               location_name: row.location_name,
+              address: row.address,
+              organizer_name: row.organizer_name,
             },
           ]),
       );
@@ -175,6 +180,9 @@ export default async function DashboardBookingsPage() {
         ticket_type_id: pass.ticket_type_id,
         guest_name: pass.guest_name,
         cnic_last4: pass.cnic_last4,
+        ticket_type_name: pass.ticket_type_name,
+        assigned_gate_index: pass.assigned_gate_index,
+        gate_label: pass.gate_label,
       })),
       event: event
         ? {
@@ -184,6 +192,8 @@ export default async function DashboardBookingsPage() {
             start_time: event.start_time ?? "",
             end_time: event.end_time,
             venue_name: event.location_name,
+            address: event.address,
+            organizer_name: event.organizer_name,
           }
         : null,
     };

@@ -28,6 +28,8 @@ interface BookingEventSummary {
   start_time: string;
   end_time: string | null;
   venue_name?: string | null;
+  address?: string | null;
+  organizer_name?: string | null;
   cover_image?: string | null;
 }
 
@@ -522,6 +524,9 @@ export function BookingsDashboard({ bookings }: Props) {
           eventDate={selected.event?.start_time}
           eventTime={selected.event?.start_time}
           venueName={selected.event?.venue_name ?? undefined}
+          eventEndTime={selected.event?.end_time ?? undefined}
+          address={selected.event?.address ?? undefined}
+          organizer={selected.event?.organizer_name ?? undefined}
         />
       )}
 
@@ -564,6 +569,10 @@ export function BookingsDashboard({ bookings }: Props) {
                   eventName={selected.event?.name}
                   eventDate={selected.event?.start_time}
                   venueName={selected.event?.venue_name ?? undefined}
+                  eventEndTime={selected.event?.end_time ?? undefined}
+                  address={selected.event?.address ?? undefined}
+                  organizer={selected.event?.organizer_name ?? undefined}
+                  bookingReference={selected.booking_reference ?? undefined}
                 />
               </div>
             </DialogContent>
