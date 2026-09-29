@@ -7,7 +7,11 @@ async function main() {
   const email = "prismfest.co@insidekarachi.com";
   const fullName = "PRISMFEST Team";
   const username = "prismfest_team";
-  const password = "Prismfest2026!Eo";
+  const password = process.env.CO_ORGANIZER_PASSWORD || "";
+  if (!password) {
+    console.error("Error: CO_ORGANIZER_PASSWORD environment variable is required.");
+    process.exit(1);
+  }
   const company = "PRISMFEST";
   const bio = "Official co-organizer and event operations team for PRISMFEST 2026.";
 
