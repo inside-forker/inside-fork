@@ -29,9 +29,14 @@ export function GoPayFastForm({
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormFieldsData | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const hasFetchedRef = useRef(false);
+  const hasSubmittedRef = useRef(false);
 
   // Fetch form fields from server
   const fetchFormFields = useCallback(async () => {
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+
     try {
       setError(null);
 
@@ -57,6 +62,7 @@ export function GoPayFastForm({
 
       setFormData(result.data);
     } catch (err) {
+      hasFetchedRef.current = false;
       console.error("[GoPayFastForm] Form generation error:", err);
       setError(
         err instanceof Error ? err.message : "Failed to initialize payment"
@@ -77,16 +83,20 @@ export function GoPayFastForm({
 
   // Auto-submit form when form data is received
   useEffect(() => {
-    if (formData && formRef.current && !isLoading) {
+    if (formData && formRef.current && !hasSubmittedRef.current) {
+      hasSubmittedRef.current = true;
       setIsLoading(true);
       // Small delay to ensure DOM is ready
       setTimeout(() => {
         formRef.current?.submit();
       }, 100);
     }
-  }, [formData, isLoading]);
+  }, [formData]);
 
   const handleRetry = () => {
+    hasFetchedRef.current = false;
+    hasSubmittedRef.current = false;
+    setIsLoading(false);
     setError(null);
     setFormData(null);
     fetchFormFields();

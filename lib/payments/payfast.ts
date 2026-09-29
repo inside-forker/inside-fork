@@ -331,13 +331,13 @@ export async function fetchPayFastToken(
   // Ensure amount has 2 decimal places
   const formattedAmount = parseFloat(amount).toFixed(2);
 
-  // Match PayFast Merchant Integration Guide: MERCHANT_ID, SECURED_KEY, TXNAMT, BASKET_ID.
-  // (CURRENCY_CODE is optional; omitting avoids host-specific 500s.)
+  // Match PayFast Merchant Integration Guide: MERCHANT_ID, SECURED_KEY, TXNAMT, BASKET_ID, CURRENCY_CODE
   const params = new URLSearchParams({
     MERCHANT_ID: merchantId,
     SECURED_KEY: securedKey,
     BASKET_ID: basketId,
     TXNAMT: formattedAmount,
+    CURRENCY_CODE: "PKR",
   });
 
   console.info("[PayFast Token Request]", {
@@ -490,7 +490,10 @@ export function formatPayFastOrderDate(date: Date = new Date()): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
 // ============================================================================
@@ -517,7 +520,32 @@ export function validatePayFastCallback(params: PayFastCallbackParams): {
   /** True when we accepted a sandbox success despite a hash mismatch. */
   sandboxBypass?: boolean;
 } {
-  const { basket_id, err_code, err_msg, transaction_id } = params;
+  const basket_id = (
+    params.basket_id ||
+    params.BASKET_ID ||
+    params.Basket_Id ||
+    params.basketId ||
+    ""
+  ).trim();
+  const err_code = (
+    params.err_code ||
+    params.ERR_CODE ||
+    params.Err_Code ||
+    params.errCode ||
+    params.errorCode ||
+    ""
+  ).trim();
+  const err_msg =
+    params.err_msg ||
+    params.ERR_MSG ||
+    params.Err_Msg ||
+    params.errMsg ||
+    params.errorMessage;
+  const transaction_id =
+    params.transaction_id ||
+    params.TRANSACTION_ID ||
+    params.Transaction_Id ||
+    params.transactionId;
 
   if (!basket_id || !err_code) {
     throw new Error(
@@ -530,9 +558,15 @@ export function validatePayFastCallback(params: PayFastCallbackParams): {
 
   const receivedHash = (
     params.validation_hash ||
+    params.Validation_Hash ||
+    params.VALIDATION_HASH ||
+    params.validationHash ||
     params.hash ||
-    params.response_hash ||
+    params.Hash ||
     params.HASH ||
+    params.response_hash ||
+    params.Response_Hash ||
+    params.RESPONSE_HASH ||
     ""
   ).trim();
 
@@ -549,6 +583,20 @@ export function validatePayFastCallback(params: PayFastCallbackParams): {
   let isValid =
     !!receivedHash &&
     receivedHash.toLowerCase() === calculatedHash.toLowerCase();
+
+  // Also try PAYFAST_HASH_KEY (New Hash Private Key) if provided by PayFast
+  if (!isValid) {
+    const hashKey = process.env.PAYFAST_HASH_KEY?.trim();
+    if (hashKey) {
+      const alt = crypto
+        .createHash("sha256")
+        .update(`${safeBasketId}|${hashKey}|${merchantId}|${safeErrCode}`)
+        .digest("hex");
+      if (receivedHash.toLowerCase() === alt.toLowerCase()) {
+        isValid = true;
+      }
+    }
+  }
 
   // Some UAT responses omit validation_hash or use a divergent secret; also try
   // Response_Key as the middle segment (observed on Apps.net.pk callbacks).
