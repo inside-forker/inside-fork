@@ -53,7 +53,10 @@ export async function GET(
            to_json(end_time) #>> '{}' AS end_time,
            status
          FROM events
-         WHERE organizer_id = $1 AND status = 'published'
+         WHERE (organizer_id = $1 OR EXISTS (
+           SELECT 1 FROM public.event_co_organizers eco
+           WHERE eco.event_id = events.id AND eco.organizer_id = $1
+         )) AND status = 'published'
          ORDER BY start_time DESC`,
         [organizerId]
       );
@@ -79,7 +82,10 @@ export async function GET(
          FROM bookings b
          JOIN booking_items bi ON bi.booking_id = b.id
          JOIN events e ON e.id = b.event_id
-         WHERE e.organizer_id = $1 AND b.status = 'completed'`,
+         WHERE (e.organizer_id = $1 OR EXISTS (
+           SELECT 1 FROM public.event_co_organizers eco
+           WHERE eco.event_id = e.id AND eco.organizer_id = $1
+         )) AND b.status = 'completed'`,
         [organizerId]
       );
       totalAttendees = parseInt(attendeeRows[0].total_attendees, 10);

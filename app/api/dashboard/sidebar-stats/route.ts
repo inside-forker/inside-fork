@@ -64,9 +64,14 @@ export async function GET(request: NextRequest) {
     // Organizer: Get organizer-specific stats
     if (role === "organizer") {
       const [eventsResult, bookingsResult, ticketsResult] = await Promise.all([
-        query(`SELECT COUNT(*) FROM events WHERE organizer_id = $1`, [
-          session.userId,
-        ]),
+        query(
+          `SELECT COUNT(*) FROM events e
+           WHERE e.organizer_id = $1 OR EXISTS (
+             SELECT 1 FROM public.event_co_organizers eco
+             WHERE eco.event_id = e.id AND eco.organizer_id = $1
+           )`,
+          [session.userId],
+        ),
         query(`SELECT COUNT(*) FROM bookings WHERE user_id = $1`, [
           session.userId,
         ]),

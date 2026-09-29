@@ -36,6 +36,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Users,
+  Ticket,
+  SlidersHorizontal,
 } from "lucide-react";
 import type {
   OrganizerManagedEvent,
@@ -45,6 +47,8 @@ import type {
 } from "@/types/event-change-request.types";
 import { OrganizerEventModal } from "./OrganizerEventModal";
 import { RejectedRequestModal } from "./RejectedRequestModal";
+import { SoldTicketsModal } from "./SoldTicketsModal";
+import Link from "next/link";
 
 export function OrganizerEventsPage() {
   const [events, setEvents] = React.useState<OrganizerManagedEvent[]>([]);
@@ -75,6 +79,7 @@ export function OrganizerEventsPage() {
   const [dropdownOpen, setDropdownOpen] = React.useState<
     Record<number, boolean>
   >({});
+  const [selectedEventForTickets, setSelectedEventForTickets] = React.useState<OrganizerManagedEvent | null>(null);
 
   const { toast } = useToast();
 
@@ -815,6 +820,19 @@ export function OrganizerEventsPage() {
                           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/2 rounded-xl pointer-events-none" />
                           <div className="relative z-10 p-2">
                             <DropdownMenuItem
+                              onClick={() => setSelectedEventForTickets(event)}
+                              className="cursor-pointer hover:bg-primary/10 text-primary font-medium"
+                            >
+                              <Ticket className="h-4 w-4 mr-2" />
+                              Sold Tickets & PDFs
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild className="cursor-pointer hover:bg-primary/10">
+                              <Link href={`/admin/accounts?event_id=${event.event_id}`}>
+                                <SlidersHorizontal className="h-4 w-4 mr-2" />
+                                Gate & Device Console
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               onClick={() => handleEditEvent(event)}
                               disabled={event.has_pending_changes}
                               className="cursor-pointer hover:bg-primary/10"
@@ -947,6 +965,14 @@ export function OrganizerEventsPage() {
         }}
         onSave={handleSaveEvent}
         isSaving={isSaving}
+      />
+
+      {/* Sold Tickets Modal */}
+      <SoldTicketsModal
+        eventId={selectedEventForTickets?.event_id || null}
+        eventName={selectedEventForTickets?.event_name}
+        isOpen={!!selectedEventForTickets}
+        onClose={() => setSelectedEventForTickets(null)}
       />
 
       {/* Rejected Request Modal */}

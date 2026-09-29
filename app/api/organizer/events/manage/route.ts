@@ -76,7 +76,10 @@ export async function GET(request: NextRequest) {
            ORDER BY ecr_inner.created_at DESC
            LIMIT 1
          ) ecr ON true
-         WHERE e.organizer_id = $1
+         WHERE (e.organizer_id = $1 OR EXISTS (
+           SELECT 1 FROM public.event_co_organizers eco
+           WHERE eco.event_id = e.id AND eco.organizer_id = $1
+         ))
          ORDER BY e.start_time DESC`,
         [session.userId]
       );
@@ -291,16 +294,27 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          if (role === "organizer" && existingEvent.organizer_id !== session.userId) {
-            response = {
-              success: false,
-              error: "You can only modify your own events",
-            };
-            await client.query("ROLLBACK");
-            return NextResponse.json(
-              { success: false, error: response.error },
-              { status: 400 }
-            );
+          if (role === "organizer") {
+            const isOwner = existingEvent.organizer_id === session.userId;
+            let isCoOrg = false;
+            if (!isOwner) {
+              const { rows: coRows } = await client.query(
+                `SELECT 1 FROM public.event_co_organizers WHERE event_id = $1 AND organizer_id = $2`,
+                [event_id, session.userId]
+              );
+              isCoOrg = coRows.length > 0;
+            }
+            if (!isOwner && !isCoOrg) {
+              response = {
+                success: false,
+                error: "You can only modify your own events",
+              };
+              await client.query("ROLLBACK");
+              return NextResponse.json(
+                { success: false, error: response.error },
+                { status: 400 }
+              );
+            }
           }
 
           const { rows: pendingRows } = await client.query(

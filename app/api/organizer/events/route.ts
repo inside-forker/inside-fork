@@ -62,7 +62,11 @@ export async function GET(request: NextRequest) {
         max_capacity, status, is_commission_based, commission_rate,
         to_json(created_at) #>> '{}' AS created_at,
         location_name, address
-      FROM events WHERE organizer_id = $1`;
+      FROM events
+      WHERE (organizer_id = $1 OR EXISTS (
+        SELECT 1 FROM public.event_co_organizers eco
+        WHERE eco.event_id = events.id AND eco.organizer_id = $1
+      ))`;
 
     if (eventId) {
       eventParams.push(parseInt(eventId, 10));

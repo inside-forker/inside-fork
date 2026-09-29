@@ -18,7 +18,7 @@ async function requireAdminRole(userId: string) {
   return { ok: true, role: profile.role } as const;
 }
 
-// GET: List eligible event organizers (minimal info)
+// GET: List eligible event organizers & current event organizers (primary + co-organizers)
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -43,6 +43,30 @@ export async function GET(
       return NextResponse.json({ error: "Invalid event id" }, { status: 400 });
     }
 
+    // Get current primary and co-organizers for this event
+    const { rows: eventRow } = await query(
+      `SELECT organizer_id FROM events WHERE id = $1`,
+      [eventId]
+    );
+    const primaryOrganizerId = eventRow[0]?.organizer_id;
+
+    const { rows: coOrgRows } = await query(
+      `SELECT p.id, p.full_name, p.username, p.avatar_url, p.role
+       FROM profiles p
+       JOIN event_co_organizers eco ON eco.organizer_id = p.id
+       WHERE eco.event_id = $1`,
+      [eventId]
+    );
+
+    let primaryOrganizer = null;
+    if (primaryOrganizerId) {
+      const { rows: primaryRows } = await query(
+        `SELECT id, full_name, username, avatar_url, role FROM profiles WHERE id = $1`,
+        [primaryOrganizerId]
+      );
+      primaryOrganizer = primaryRows[0] || null;
+    }
+
     // Search users by query param (for autocomplete)
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q")?.trim() || "";
@@ -62,7 +86,7 @@ export async function GET(
       whereClauses.push(`id = $${queryParams.length}`);
     }
 
-    let users;
+    let users = [];
     try {
       const { rows } = await query(
         `SELECT id, full_name, username, avatar_url, role
@@ -80,7 +104,12 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, users });
+    return NextResponse.json({
+      success: true,
+      users,
+      primaryOrganizer,
+      coOrganizers: coOrgRows,
+    });
   } catch (err) {
     console.error("[API][GET] Exception:", err);
     return NextResponse.json(
@@ -90,7 +119,106 @@ export async function GET(
   }
 }
 
-// PATCH: Assign organizer to an event
+// POST: Add a co-organizer to an event
+export async function POST(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const params = await context.params;
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const access = await requireAdminRole(session.userId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error },
+        { status: access.status }
+      );
+    }
+
+    const eventId = parseInt(params.id);
+    if (isNaN(eventId)) {
+      return NextResponse.json({ error: "Invalid event id" }, { status: 400 });
+    }
+
+    const { organizer_id } = await request.json();
+    if (!organizer_id) {
+      return NextResponse.json(
+        { error: "organizer_id is required" },
+        { status: 400 }
+      );
+    }
+
+    await query(
+      `INSERT INTO public.event_co_organizers (event_id, organizer_id)
+       VALUES ($1, $2)
+       ON CONFLICT (event_id, organizer_id) DO NOTHING`,
+      [eventId, organizer_id]
+    );
+
+    return NextResponse.json({ success: true, message: "Co-organizer added" });
+  } catch (err) {
+    console.error("[API][POST] Failed to add co-organizer:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE: Remove a co-organizer from an event
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const params = await context.params;
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const access = await requireAdminRole(session.userId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error },
+        { status: access.status }
+      );
+    }
+
+    const eventId = parseInt(params.id);
+    if (isNaN(eventId)) {
+      return NextResponse.json({ error: "Invalid event id" }, { status: 400 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const organizer_id = searchParams.get("organizer_id");
+    if (!organizer_id) {
+      return NextResponse.json(
+        { error: "organizer_id query param is required" },
+        { status: 400 }
+      );
+    }
+
+    await query(
+      `DELETE FROM public.event_co_organizers WHERE event_id = $1 AND organizer_id = $2`,
+      [eventId, organizer_id]
+    );
+
+    return NextResponse.json({ success: true, message: "Co-organizer removed" });
+  } catch (err) {
+    console.error("[API][DELETE] Failed to remove co-organizer:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH: Assign/Update primary organizer to an event
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }

@@ -18,8 +18,13 @@ export default async function AdminAccountsPage({ searchParams }: AdminAccountsP
     redirect("/login");
   }
 
-  // Check admin access (admin and super_admin allowed)
-  if (profile.role !== "admin" && profile.role !== "super_admin") {
+  // Check access (admin, super_admin, organizer, and lister allowed)
+  if (
+    profile.role !== "admin" &&
+    profile.role !== "super_admin" &&
+    profile.role !== "organizer" &&
+    profile.role !== "lister"
+  ) {
     redirect("/dashboard");
   }
 

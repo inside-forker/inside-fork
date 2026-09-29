@@ -174,6 +174,7 @@ export const organizerMainNavigation: RoleNavItem[] = [
   { name: "Home", href: "/", icon: Home, description: "Back to the homepage" },
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Your events overview" },
   { name: "My Events", href: "/dashboard/events", icon: Calendar, description: "Manage your events" },
+  { name: "Gate & Device Hub", href: "/admin/accounts", icon: UserPlus, description: "Manage Gate Pass operators and device gate allocations" },
   { name: "Scan Tickets", href: "/dashboard/scan", icon: ScanLine, description: "Check in attendees" },
 ];
 

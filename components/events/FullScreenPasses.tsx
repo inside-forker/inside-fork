@@ -34,6 +34,17 @@ interface FullScreenPassesProps {
   venueName?: string;
 }
 
+function safeDateString(val?: string | null, formatStr = "EEE, MMM d, yyyy"): string {
+  if (!val) return "";
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return format(d, formatStr);
+  } catch {
+    return String(val);
+  }
+}
+
 // Individual Pass Card Component
 function PassCard({
   pass,
@@ -136,9 +147,9 @@ function PassCard({
 
       {pass.issued_at && (
         <div className="flex items-center justify-between text-[11px] text-muted-foreground px-4 pb-3 pt-2 border-t border-border/30">
-          <span>Issued {new Date(pass.issued_at).toLocaleDateString()}</span>
+          <span>Issued {safeDateString(pass.issued_at, "dd MMM yyyy")}</span>
           <span className="font-mono">
-            {new Date(pass.issued_at).toLocaleTimeString()}
+            {safeDateString(pass.issued_at, "h:mm a")}
           </span>
         </div>
       )}
@@ -165,32 +176,11 @@ function FullTicketView({
   const ticketRef = React.useRef<HTMLDivElement>(null);
 
   const formattedDate = React.useMemo(() => {
-    if (!eventDate) return "Date not specified";
-    try {
-      return format(new Date(eventDate), "EEEE, MMMM d, yyyy");
-    } catch {
-      return eventDate;
-    }
+    return safeDateString(eventDate, "EEEE, MMMM d, yyyy") || "Date not specified";
   }, [eventDate]);
 
   const formattedTime = React.useMemo(() => {
-    if (!eventTime) {
-      if (!eventDate) return null;
-      try {
-        const date = new Date(eventDate);
-        if (date.getHours() !== 0 || date.getMinutes() !== 0) {
-          return format(date, "h:mm a");
-        }
-      } catch {
-        // Ignore
-      }
-      return null;
-    }
-    try {
-      return format(new Date(eventTime), "h:mm a");
-    } catch {
-      return eventTime;
-    }
+    return safeDateString(eventTime || eventDate, "h:mm a") || "";
   }, [eventTime, eventDate]);
 
   const handleDownload = async () => {
@@ -207,11 +197,11 @@ function FullTicketView({
         code: pass.code,
         eventName: eventName || "Event",
         eventDate: formattedDate || "",
-        eventTime: formattedTime,
+        eventTime: formattedTime || undefined,
         venueName: venueName || null,
         guestName: pass.guest_name || null,
         cnicLast4: pass.cnic_last4 || null,
-        gateLabel: pass.gate_label || null,
+        gateLabel: pass.gate_label || "Lane 1",
         filename: `ticket-${pass.code || pass.id}`,
       });
     } catch (error) {
@@ -696,17 +686,17 @@ export function FullScreenPasses({
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 w-fit">
                       <QrCode className="h-4 w-4 text-primary" />
                       <span className="text-sm font-medium text-primary">
-                        {passes.length}{" "}
-                        {passes.length === 1 ? "Pass" : "Passes"}
+                        {(passes || []).length}{" "}
+                        {(passes || []).length === 1 ? "Pass" : "Passes"}
                       </span>
                     </div>
                   </div>
 
                   {/* Scrollable Passes List */}
                   <div className="flex-1 overflow-y-auto scrollbar-thin p-4 sm:p-6">
-                    {passes.length > 0 ? (
+                    {(passes || []).length > 0 ? (
                       <div className="grid gap-4 md:grid-cols-2">
-                        {passes.map((pass, index) => (
+                        {(passes || []).map((pass, index) => (
                           <PassCard
                             key={pass.id}
                             pass={pass}

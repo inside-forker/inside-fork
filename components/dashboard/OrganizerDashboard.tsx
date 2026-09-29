@@ -24,11 +24,11 @@ import {
   ScanLine,
   Users,
   Activity,
-  BarChart3,
-  Loader2,
   Plus,
+  SlidersHorizontal,
 } from "lucide-react";
 import Link from "next/link";
+import { SoldTicketsModal } from "./SoldTicketsModal";
 
 // Types
 interface EventStats {
@@ -99,81 +99,62 @@ function PremiumStatCard({
   subtitle: string;
   icon: React.ReactNode;
   trend?: { value: number; isPositive: boolean };
-  color: "primary" | "blue" | "green" | "amber" | "rose" | "purple";
+  color: "primary" | "blue" | "green" | "amber" | "purple";
   prefix?: string;
   delay?: number;
 }) {
-  const colorClasses = {
+  const colorStyles = {
     primary: {
-      bg: "from-primary/20 via-primary/10 to-primary/5",
-      border: "border-primary/30",
-      icon: "text-primary",
-      glow: "hover:shadow-xl hover:shadow-primary/25",
+      border: "hover:border-primary/50",
+      iconBg: "bg-primary/10 text-primary",
+      gradient: "from-primary/5 via-transparent to-transparent",
     },
     blue: {
-      bg: "from-blue-500/20 via-blue-500/10 to-blue-500/5",
-      border: "border-blue-500/30",
-      icon: "text-blue-500",
-      glow: "hover:shadow-xl hover:shadow-blue-500/25",
+      border: "hover:border-blue-500/50",
+      iconBg: "bg-blue-500/10 text-blue-500",
+      gradient: "from-blue-500/5 via-transparent to-transparent",
     },
     green: {
-      bg: "from-emerald-500/20 via-emerald-500/10 to-emerald-500/5",
-      border: "border-emerald-500/30",
-      icon: "text-emerald-500",
-      glow: "hover:shadow-xl hover:shadow-emerald-500/25",
+      border: "hover:border-emerald-500/50",
+      iconBg: "bg-emerald-500/10 text-emerald-500",
+      gradient: "from-emerald-500/5 via-transparent to-transparent",
     },
     amber: {
-      bg: "from-amber-500/20 via-amber-500/10 to-amber-500/5",
-      border: "border-amber-500/30",
-      icon: "text-amber-500",
-      glow: "hover:shadow-xl hover:shadow-amber-500/25",
-    },
-    rose: {
-      bg: "from-rose-500/20 via-rose-500/10 to-rose-500/5",
-      border: "border-rose-500/30",
-      icon: "text-rose-500",
-      glow: "hover:shadow-xl hover:shadow-rose-500/25",
+      border: "hover:border-amber-500/50",
+      iconBg: "bg-amber-500/10 text-amber-500",
+      gradient: "from-amber-500/5 via-transparent to-transparent",
     },
     purple: {
-      bg: "from-purple-500/20 via-purple-500/10 to-purple-500/5",
-      border: "border-purple-500/30",
-      icon: "text-purple-500",
-      glow: "hover:shadow-xl hover:shadow-purple-500/25",
+      border: "hover:border-purple-500/50",
+      iconBg: "bg-purple-500/10 text-purple-500",
+      gradient: "from-purple-500/5 via-transparent to-transparent",
     },
   };
 
-  const config = colorClasses[color];
+  const style = colorStyles[color];
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      whileHover={{ scale: 1.02, y: -4, transition: { duration: 0.2 } }}
-      transition={{ duration: 0.5, delay: delay * 0.1 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: delay * 0.1 }}
       className={cn(
-        "relative overflow-hidden rounded-xl border bg-gradient-to-br backdrop-blur-sm transition-all duration-300",
-        config.bg,
-        config.border,
-        config.glow,
+        "relative rounded-2xl border bg-card p-6 shadow-sm transition-all duration-300",
+        "bg-gradient-to-br",
+        style.gradient,
+        style.border,
       )}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent" />
-      <div className="relative p-6">
+      <div className="relative">
         <div className="flex items-center justify-between">
-          <div
-            className={cn(
-              "p-2 rounded-lg bg-gradient-to-br",
-              config.bg,
-              config.icon,
-            )}
-          >
-            {icon}
-          </div>
+          <div className={cn("rounded-xl p-3", style.iconBg)}>{icon}</div>
           {trend && (
             <div
               className={cn(
-                "flex items-center gap-1 text-xs font-medium",
-                trend.isPositive ? "text-emerald-600" : "text-red-600",
+                "flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full",
+                trend.isPositive
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400",
               )}
             >
               {trend.isPositive ? (
@@ -205,10 +186,12 @@ function EventCard({
   event,
   index,
   onExport,
+  onViewTickets,
 }: {
   event: Event;
   index: number;
   onExport: () => void;
+  onViewTickets: () => void;
 }) {
   const statusColors = {
     live: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
@@ -228,7 +211,7 @@ function EventCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
-      className="rounded-xl border bg-card/50 backdrop-blur-sm overflow-hidden hover:border-primary/30 transition-colors"
+      className="rounded-xl border bg-card/50 backdrop-blur-sm overflow-hidden hover:border-primary/30 transition-colors flex flex-col justify-between"
     >
       <div className="p-5">
         <div className="flex items-start justify-between gap-4">
@@ -304,28 +287,53 @@ function EventCard({
             />
           </div>
         </div>
+      </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2 mt-4">
+      {/* Actions */}
+      <div className="p-5 pt-0 space-y-2">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={onViewTickets}
+            className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            <Ticket className="w-4 h-4 mr-1.5" />
+            Sold Tickets & PDFs
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            className="flex-1 border-primary/20 hover:bg-primary/5"
+          >
+            <Link href={`/admin/accounts?event_id=${event.id}`}>
+              <SlidersHorizontal className="w-4 h-4 mr-1.5 text-primary" />
+              Gate Console
+            </Link>
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={onExport}
             className="flex-1"
           >
-            <Download className="w-4 h-4 mr-2" />
-            Export
+            <Download className="w-4 h-4 mr-1.5" />
+            Export CSV
           </Button>
           <Link href={`/dashboard/events`} className="flex-1">
             <Button variant="outline" size="sm" className="w-full">
-              <Edit2 className="w-4 h-4 mr-2" />
+              <Edit2 className="w-4 h-4 mr-1.5" />
               Edit
             </Button>
           </Link>
           <Link href={`/events/${event.slug}`} className="flex-1">
             <Button variant="outline" size="sm" className="w-full">
-              <Eye className="w-4 h-4 mr-2" />
-              View
+              <Eye className="w-4 h-4 mr-1.5" />
+              View Page
             </Button>
           </Link>
         </div>
@@ -343,6 +351,7 @@ export function OrganizerDashboard({
   const [events, setEvents] = React.useState<Event[]>([]);
   const [summary, setSummary] = React.useState<Summary | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [selectedEventForTickets, setSelectedEventForTickets] = React.useState<Event | null>(null);
 
   const fetchData = React.useCallback(async () => {
     try {
@@ -448,50 +457,55 @@ export function OrganizerDashboard({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading organizer dashboard...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      {/* Hero Section */}
+    <div className="space-y-6">
+      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-background border border-primary/20 p-8"
+        className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-card to-background p-6 md:p-8"
       >
-        <div className="absolute inset-0 bg-grid-white/5 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
-        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-              className="flex items-center gap-3 mb-3"
-            >
-              <div className="p-3 rounded-xl bg-primary/20 backdrop-blur-sm">
-                <BarChart3 className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                  Welcome back,{" "}
-                  {profile?.full_name?.split(" ")[0] || "Organizer"}
-                </h1>
-                <p className="text-muted-foreground">
-                  Manage your events and track performance
-                </p>
-              </div>
-            </motion.div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="p-2 rounded-xl bg-primary/10 text-primary">
+                <Ticket className="w-5 h-5" />
+              </span>
+              <span className="text-sm font-medium text-muted-foreground">
+                Organizer Portal
+              </span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold">
+              Welcome back,{" "}
+              <span className="gradient-text-primary">
+                {profile?.full_name?.split(" ")[0] || "Organizer"}
+              </span>
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Manage your events, sold ticket passes, gate allocations, and verify attendees
+            </p>
           </div>
-          <div className="flex gap-3">
-            <Button variant="outline" size="sm" onClick={fetchData}>
-              <RefreshCw className="w-4 h-4 mr-2" />
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchData}
+              className="gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
               Refresh
             </Button>
             <Link href="/dashboard/scan">
-              <Button size="sm" className="bg-primary hover:bg-primary/90">
-                <ScanLine className="w-4 h-4 mr-2" />
+              <Button size="sm" className="gap-2 shadow-premium">
+                <ScanLine className="w-4 h-4" />
                 Verify Tickets
               </Button>
             </Link>
@@ -575,55 +589,59 @@ export function OrganizerDashboard({
             </div>
           </Link>
         </motion.div>
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <Link href="/dashboard/scan">
+          <Link href="/admin/accounts">
             <div className="rounded-xl border bg-card/50 p-4 hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer group">
-              <ScanLine className="w-8 h-8 text-primary mb-3 group-hover:scale-110 transition-transform" />
+              <SlidersHorizontal className="w-8 h-8 text-primary mb-3 group-hover:scale-110 transition-transform" />
+              <h3 className="font-semibold">Gate & Device Hub</h3>
+              <p className="text-sm text-muted-foreground">Lanes & staff control</p>
+            </div>
+          </Link>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45 }}
+        >
+          <Link href="/dashboard/scan">
+            <div className="rounded-xl border bg-card/50 p-4 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all cursor-pointer group">
+              <ScanLine className="w-8 h-8 text-blue-500 mb-3 group-hover:scale-110 transition-transform" />
               <h3 className="font-semibold">Scan Tickets</h3>
               <p className="text-sm text-muted-foreground">Verify & check-in</p>
             </div>
           </Link>
         </motion.div>
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
         >
           <Link href="/dashboard/notifications">
-            <div className="rounded-xl border bg-card/50 p-4 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all cursor-pointer group">
-              <Activity className="w-8 h-8 text-blue-500 mb-3 group-hover:scale-110 transition-transform" />
+            <div className="rounded-xl border bg-card/50 p-4 hover:border-purple-500/50 hover:bg-purple-500/5 transition-all cursor-pointer group">
+              <Activity className="w-8 h-8 text-purple-500 mb-3 group-hover:scale-110 transition-transform" />
               <h3 className="font-semibold">Notifications</h3>
-              <p className="text-sm text-muted-foreground">View updates</p>
+              <p className="text-sm text-muted-foreground">Sales & updates</p>
             </div>
           </Link>
         </motion.div>
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.55 }}
         >
           <Link href="/dashboard/profile">
-            <div className="rounded-xl border bg-card/50 p-4 hover:border-purple-500/50 hover:bg-purple-500/5 transition-all cursor-pointer group">
-              <Users className="w-8 h-8 text-purple-500 mb-3 group-hover:scale-110 transition-transform" />
-              <h3 className="font-semibold">Profile</h3>
-              <p className="text-sm text-muted-foreground">Manage account</p>
-            </div>
-          </Link>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-        >
-          <Link href="/dashboard/settings">
             <div className="rounded-xl border bg-card/50 p-4 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all cursor-pointer group">
-              <TrendingUp className="w-8 h-8 text-amber-500 mb-3 group-hover:scale-110 transition-transform" />
-              <h3 className="font-semibold">Settings</h3>
-              <p className="text-sm text-muted-foreground">Preferences</p>
+              <Users className="w-8 h-8 text-amber-500 mb-3 group-hover:scale-110 transition-transform" />
+              <h3 className="font-semibold">Profile</h3>
+              <p className="text-sm text-muted-foreground">Organizer profile</p>
             </div>
           </Link>
         </motion.div>
@@ -654,11 +672,20 @@ export function OrganizerDashboard({
                 event={event}
                 index={index}
                 onExport={() => exportAttendees(event.id)}
+                onViewTickets={() => setSelectedEventForTickets(event)}
               />
             ))}
           </div>
         </div>
       )}
+
+      {/* Sold Tickets & PDF Viewer Dialog */}
+      <SoldTicketsModal
+        eventId={selectedEventForTickets?.id || null}
+        eventName={selectedEventForTickets?.name}
+        isOpen={!!selectedEventForTickets}
+        onClose={() => setSelectedEventForTickets(null)}
+      />
     </div>
   );
 }

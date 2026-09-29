@@ -3,19 +3,41 @@ import { query } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/admin";
 import { captureRouteError } from "@/lib/sentry/captureRouteError";
 
+import { getSession } from "@/lib/auth/session";
+
 const ROUTE = "/api/admin/accounts";
 
 // GET /api/admin/accounts - Get EO and Gate Pass operators with linked data and stats
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    const session = await getSession(request);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { rows: profileRows } = await query(
+      "SELECT id, role FROM profiles WHERE id = $1 LIMIT 1",
+      [session.userId]
+    );
+    const profile = profileRows[0];
+    if (!profile) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    }
+
+    const isAdmin = profile.role === "admin" || profile.role === "super_admin";
+    const isOrganizer = profile.role === "organizer" || profile.role === "lister";
+
+    if (!isAdmin && !isOrganizer) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
 
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
     const search = searchParams.get("search")?.trim() || "";
     const role = searchParams.get("role") || ""; // 'organizer', 'eo_gate_pass', or '' (all)
-    const organizerId = searchParams.get("organizer_id") || ""; // filter gate passes by linked EO
+    const organizerIdParam = searchParams.get("organizer_id") || ""; // filter gate passes by linked EO
+    const organizerId = isOrganizer && profile.role === "organizer" ? session.userId : organizerIdParam;
 
     const offset = (page - 1) * limit;
 

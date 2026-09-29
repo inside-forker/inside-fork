@@ -47,7 +47,15 @@ async function loadEventAndAuthorize(eventIdNum: number, userId: string, role: s
   }
   const isOwner = event.organizer_id === userId;
   const isAdmin = IMAGE_ADMIN_ROLES.includes(role);
+  let isCoOrg = false;
   if (!isOwner && !isAdmin) {
+    const { rows: coRows } = await query(
+      `SELECT 1 FROM public.event_co_organizers WHERE event_id = $1 AND organizer_id = $2`,
+      [eventIdNum, userId]
+    );
+    isCoOrg = coRows.length > 0;
+  }
+  if (!isOwner && !isAdmin && !isCoOrg) {
     throw new MobileApiError("forbidden", "Access denied.", 403);
   }
   return event;

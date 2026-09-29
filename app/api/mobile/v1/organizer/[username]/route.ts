@@ -42,7 +42,10 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
   const { rows: eventRows } = await query(
     `SELECT id, name, slug, start_time, end_time, location_name
      FROM events
-     WHERE organizer_id = $1 AND status = 'published'
+     WHERE (organizer_id = $1 OR EXISTS (
+       SELECT 1 FROM public.event_co_organizers eco
+       WHERE eco.event_id = events.id AND eco.organizer_id = $1
+     )) AND status = 'published'
      ORDER BY start_time DESC`,
     [organizer.id],
   );
