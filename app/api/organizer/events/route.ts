@@ -209,8 +209,8 @@ export async function GET(request: NextRequest) {
         (sum, t) => sum + (t.quantity_available || 0),
         0,
       );
-      const revenue = eventBookings.reduce(
-        (sum, b) => sum + Number(b.total_amount || 0),
+      const grossRevenue = eventTicketTypes.reduce(
+        (sum, t) => sum + (ticketsSoldByType[t.id] || 0) * Number(t.price || 0),
         0,
       );
       const checkIns = eventPasses.filter(
@@ -228,7 +228,7 @@ export async function GET(request: NextRequest) {
         stats: {
           ticketsSold,
           totalCapacity: totalCapacity || event.max_capacity || 0,
-          revenue,
+          revenue: grossRevenue,
           checkIns,
           totalPasses: eventPasses.length,
           occupancyRate:
