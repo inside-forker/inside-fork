@@ -40,6 +40,7 @@ interface CategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (data: CategoryFormData) => Promise<void>;
+  defaultParentId?: number | null;
 }
 
 export function CategoryModal({
@@ -48,11 +49,12 @@ export function CategoryModal({
   isOpen,
   onClose,
   onSave,
+  defaultParentId = null,
 }: CategoryModalProps) {
   const [formData, setFormData] = React.useState<CategoryFormData>({
     name: "",
     slug: "",
-    parent_id: null,
+    parent_id: defaultParentId ?? null,
     icon_name: DEFAULT_CATEGORY_ICON,
     show_in_nav: false,
     show_in_featured: false,
@@ -129,7 +131,7 @@ export function CategoryModal({
         setFormData({
           name: "",
           slug: "",
-          parent_id: null,
+          parent_id: defaultParentId ?? null,
           icon_name: DEFAULT_CATEGORY_ICON,
           show_in_nav: false,
           show_in_featured: false,
@@ -143,7 +145,7 @@ export function CategoryModal({
       }
       setErrors({});
     }
-  }, [isOpen, category]);
+  }, [isOpen, category, defaultParentId]);
 
   // Auto-generate slug from name if not manually edited
   React.useEffect(() => {
@@ -167,6 +169,9 @@ export function CategoryModal({
 
     return parents;
   }, [categories, category]);
+
+  const isSubcategory = formData.parent_id !== null;
+  const parentCategoryObj = categories.find((c) => c.id === formData.parent_id);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -200,9 +205,9 @@ export function CategoryModal({
       await onSave(formData);
       toast({
         title: "Success",
-        description: `Category ${
-          isEditing ? "updated" : "created"
-        } successfully`,
+        description: `${
+          isSubcategory ? "Subcategory" : "Category"
+        } ${isEditing ? "updated" : "created"} successfully`,
       });
       onClose();
     } catch (error) {
@@ -246,12 +251,20 @@ export function CategoryModal({
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
           <DialogTitle>
-            {isEditing ? "Edit Category" : "Create Category"}
+            {isEditing
+              ? isSubcategory
+                ? "Edit Subcategory"
+                : "Edit Category"
+              : isSubcategory
+                ? `Create Subcategory${parentCategoryObj ? ` under "${parentCategoryObj.name}"` : ""}`
+                : "Create Category"}
           </DialogTitle>
           <DialogDescription>
             {isEditing
               ? "Update the category details below."
-              : "Add a new category to organize your content."}
+              : isSubcategory
+                ? "Add a new subcategory to organize listings and events under this parent category."
+                : "Add a new top-level category or select a parent category to create a subcategory."}
           </DialogDescription>
         </DialogHeader>
 

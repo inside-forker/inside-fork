@@ -387,7 +387,9 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const validIds = ids.filter((id) => typeof id === "number" && !isNaN(id));
+    const validIds = ids
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && !Number.isNaN(id) && id > 0);
     if (validIds.length !== ids.length) {
       return NextResponse.json(
         { error: "Invalid request: all ids must be valid numbers" },
@@ -505,7 +507,9 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Validate all IDs are numbers
-    const validIds = ids.filter((id) => typeof id === "number" && !isNaN(id));
+    const validIds = ids
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && !Number.isNaN(id) && id > 0);
     if (validIds.length !== ids.length) {
       return NextResponse.json(
         { error: "Invalid request: all ids must be valid numbers" },

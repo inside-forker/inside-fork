@@ -36,7 +36,11 @@ export interface CategoryWithParent extends Category {
   parent_name: string | null;
   parent_slug: string | null;
   listing_count?: number;
+  published_listing_count?: number;
+  draft_listing_count?: number;
+  archived_listing_count?: number;
   event_count?: number;
+  is_archived?: boolean;
 }
 
 /**
@@ -93,6 +97,8 @@ export interface CategoryStats {
   total: number;
   parentCategories: number;
   subcategories: number;
+  archivedSubcategories: number;
+  activeSubcategories: number;
   shownInNav: number;
   featured: number;
   enabled: number;

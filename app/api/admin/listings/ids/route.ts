@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const ids = listings.map((l) => l.id);
+    const ids = listings.map((l) => Number(l.id));
 
     return NextResponse.json({
       success: true,

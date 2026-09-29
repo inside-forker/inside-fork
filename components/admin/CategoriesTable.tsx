@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Pencil, Trash2, ChevronRight, Globe } from "lucide-react";
+import { Pencil, Trash2, ChevronRight, Globe, Plus, GitBranch } from "lucide-react";
 import { getCategoryIcon } from "./CategoryIconSelect";
 import type { CategoryWithParent } from "@/types/category.types";
 
@@ -23,6 +23,7 @@ interface CategoriesTableProps {
   isLoading: boolean;
   onEdit: (category: CategoryWithParent) => void;
   onDelete: (category: CategoryWithParent) => Promise<void>;
+  onAddSubcategory?: (parentCategory: CategoryWithParent) => void;
   isBulkMode?: boolean;
   selectedIds?: Set<number>;
   onSelect?: (ids: Set<number>) => void;
@@ -33,6 +34,7 @@ export function CategoriesTable({
   isLoading,
   onEdit,
   onDelete,
+  onAddSubcategory,
   isBulkMode = false,
   selectedIds = new Set(),
   onSelect,
@@ -202,7 +204,7 @@ export function CategoriesTable({
                   className={`
                     border-b border-border/30 
                     transition-colors hover:bg-muted/50
-                    ${!category.is_enabled ? "opacity-60" : ""}
+                    ${category.is_archived ? "bg-muted/10 opacity-80" : !category.is_enabled ? "opacity-60" : ""}
                   `}
                 >
                   <TableCell>
@@ -239,8 +241,9 @@ export function CategoriesTable({
                         <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
                       )}
                       <span
-                        className={`font-medium ${isChild ? "text-muted-foreground text-sm" : ""
-                          }`}
+                        className={`font-medium ${
+                          isChild ? "text-muted-foreground text-sm" : ""
+                        }`}
                       >
                         {category.name}
                       </span>
@@ -270,12 +273,24 @@ export function CategoriesTable({
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex flex-col gap-1 items-center text-xs">
-                      {(category.category_type === 'listing' || category.category_type === 'both') && (
-                        <span className="text-blue-600 dark:text-blue-400 font-medium">
-                          {category.listing_count || 0} Listings
-                        </span>
+                      {(category.category_type === "listing" ||
+                        category.category_type === "both") && (
+                        <>
+                          <span className="text-blue-600 dark:text-blue-400 font-medium">
+                            {category.published_listing_count ??
+                              category.listing_count ??
+                              0}{" "}
+                            Listings
+                          </span>
+                          {(category.archived_listing_count ?? 0) > 0 && (
+                            <span className="text-slate-500 dark:text-slate-400 text-[11px]">
+                              {category.archived_listing_count} Archived
+                            </span>
+                          )}
+                        </>
                       )}
-                      {(category.category_type === 'event' || category.category_type === 'both') && (
+                      {(category.category_type === "event" ||
+                        category.category_type === "both") && (
                         <span className="text-purple-600 dark:text-purple-400 font-medium">
                           {category.event_count || 0} Events
                         </span>
@@ -284,6 +299,14 @@ export function CategoriesTable({
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 flex-wrap">
+                      {category.is_archived && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/40 font-medium"
+                        >
+                          Archived
+                        </Badge>
+                      )}
                       {category.show_in_nav && (
                         <Badge
                           variant="outline"
@@ -300,7 +323,7 @@ export function CategoriesTable({
                           Featured
                         </Badge>
                       )}
-                      {!category.is_enabled && (
+                      {!category.is_enabled && !category.is_archived && (
                         <Badge
                           variant="outline"
                           className="text-xs bg-red-500/5 text-red-600 dark:text-red-400 border-red-500/20"
@@ -324,6 +347,18 @@ export function CategoriesTable({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      {!isChild && onAddSubcategory && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onAddSubcategory(category)}
+                          aria-label={`Add subcategory under ${category.name}`}
+                          title={`Add subcategory under ${category.name}`}
+                          className="text-primary hover:text-primary hover:bg-primary/10"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
