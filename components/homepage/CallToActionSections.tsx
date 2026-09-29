@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { containerClass, sectionClass } from "@/components/homepage/SectionHeading";
+import { containerClass, sectionClass } from "@/components/shared/SectionHeading";
 
 const memberPerks = ["Save your favorites", "Deals & card offers", "Earn XP & ranks"];
 

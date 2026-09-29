@@ -101,12 +101,12 @@ export default async function EventPage({
             {event.description && (
               <AnimatedSection className="space-y-6">
                 <div className="flex items-center space-x-3">
-                  <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium">
+                  <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
                     <ExternalLink className="w-5 h-5 text-primary" />
                   </div>
                   <PremiumHeading level={2} dense className="text-foreground">
                     About This{" "}
-                    <span className="gradient-text-primary">Event</span>
+                    <span className="text-primary">Event</span>
                   </PremiumHeading>
                 </div>
                 <div className="prose prose-gray dark:prose-invert max-w-none">
@@ -149,7 +149,7 @@ export default async function EventPage({
           {/* Right Column - Sidebar */}
           <AnimatedSection className="space-y-8 md:space-y-12">
             <div className="sticky lg:top-20 lg:self-start space-y-8 md:space-y-10 lg:space-y-12">
-              <div className="group relative overflow-hidden bg-gradient-to-br from-primary/5 via-transparent to-primary/10 border-2 md:border rounded-2xl p-6 md:p-8 hover:shadow-premium hover:shadow-primary/20 hover:border-primary/40 hover:scale-[1.01] transition-all duration-300 space-y-6">
+              <div className="group relative overflow-hidden bg-card border rounded-2xl p-6 md:p-8 hover:border-primary/40 transition-all duration-300 space-y-6">
                 <h3 className="text-xl font-semibold">Event Information</h3>
 
                 <div className="space-y-4">

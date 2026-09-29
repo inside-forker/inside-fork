@@ -150,7 +150,7 @@ export function PremiumPagination({
                   "h-8 w-8 sm:h-9 sm:w-9 p-0 font-medium transition-all duration-200 text-xs sm:text-sm",
                   currentPage === page
                     ? "bg-primary text-primary-foreground shadow-md hover:bg-primary/90 border-primary"
-                    : "border-border/50 hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/20 hover:scale-105"
+                    : "border-border/50 hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/20"
                 )}
               >
                 {page}

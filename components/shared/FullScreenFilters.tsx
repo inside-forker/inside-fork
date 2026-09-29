@@ -65,15 +65,14 @@ export function FullScreenFilters({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="fixed inset-0 z-[60] flex flex-col bg-background/95 backdrop-blur-xl"
+          className="fixed inset-0 z-[60] flex flex-col bg-background"
         >
-          {/* Header wrapper - gradient limited to header only to match listings */}
+          {/* Header wrapper */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent" />
 
             <div className="relative flex items-center justify-between p-6 border-b border-border/50">
               <div>
-                <h2 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground">
                   {title}
                 </h2>
                 {subtitle && (
@@ -97,8 +96,7 @@ export function FullScreenFilters({
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">{children}</div>
 
-          <div className="relative border-t border-border/50 bg-background/95">
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+          <div className="relative border-t border-border/50 bg-background">
             <div className="p-6 flex items-center gap-4">
               <Button
                 variant="outline"
@@ -112,7 +110,7 @@ export function FullScreenFilters({
 
               <Button
                 onClick={() => onApply && onApply()}
-                className="flex-1 h-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
+                className="flex-1 h-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground active:opacity-80"
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 {applyLabel}

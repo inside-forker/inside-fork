@@ -444,7 +444,7 @@ export function CheckoutClient() {
             >
               <div className="space-y-4 pt-4">
                 <Button
-                  className="w-full text-lg py-6 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/20 transition-all duration-300 hover:shadow-xl hover:shadow-primary/30"
+                  className="w-full text-lg py-6 rounded-xl bg-primary hover:bg-primary/90 active:opacity-80 transition-colors"
                   size="lg"
                   onClick={handleProceed}
                   disabled={isSubmitting}

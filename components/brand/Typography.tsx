@@ -59,10 +59,9 @@ export function PremiumHeading({
     <Component
       className={cn(
         computedHeading,
-        gradient &&
-          "bg-gradient-to-r from-foreground via-foreground/90 to-foreground/80 bg-clip-text text-transparent",
-        !gradient && "text-foreground",
-        "font-display",
+        // `gradient` is accepted for compatibility but renders solid, and the
+        // heading stays in Inter (font-sans) to match the mobile app.
+        "text-foreground",
         className
       )}
     >
@@ -135,12 +134,13 @@ interface GradientTextProps {
   delay?: number;
 }
 
+// Solid colours: the site no longer uses gradient text (matches the app).
 const gradientVariants = {
-  primary: "from-primary via-primary/90 to-primary/80",
-  blue: "from-blue-600 via-blue-500 to-blue-400",
-  purple: "from-purple-600 via-purple-500 to-purple-400",
-  emerald: "from-emerald-600 via-emerald-500 to-emerald-400",
-  amber: "from-amber-600 via-amber-500 to-amber-400",
+  primary: "text-primary",
+  blue: "text-blue-600",
+  purple: "text-purple-600",
+  emerald: "text-emerald-600",
+  amber: "text-amber-600",
 };
 
 export function GradientText({
@@ -153,7 +153,7 @@ export function GradientText({
   const content = (
     <span
       className={cn(
-        "bg-gradient-to-r bg-clip-text text-transparent font-semibold",
+        "font-semibold",
         gradientVariants[gradient],
         className
       )}

@@ -10,8 +10,7 @@ import {
   Lock,
   Wallet,
   CreditCard,
-  Building2,
-} from "lucide-react";
+  } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -69,11 +68,6 @@ export default function PaymentPage() {
   if (!mounted || loading) {
     return (
       <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
-        {/* Background */}
-        <div
-          className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-primary/10"
-          aria-hidden
-        />
         <div className="animate-pulse text-muted-foreground text-lg">
           Loading payment details...
         </div>
@@ -89,19 +83,7 @@ export default function PaymentPage() {
   if (booking.payment_status === "paid") {
     return (
       <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
-        {/* Background gradient */}
-        <div
-          className="absolute inset-0 bg-gradient-to-br from-green-500/5 via-background to-green-500/10"
-          aria-hidden
-        />
 
-        {/* Decorative orbs */}
-        <motion.div
-          animate={{ y: [0, 50, 0] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="hidden sm:block absolute -top-32 -right-32 w-96 h-96 bg-green-500/10 rounded-full blur-3xl pointer-events-none"
-          aria-hidden
-        />
 
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -110,13 +92,13 @@ export default function PaymentPage() {
           className="container max-w-md px-4 py-20 text-center space-y-6 relative z-10"
         >
           <div className="relative mx-auto w-24 h-24">
-            <div className="absolute inset-0 bg-green-500/20 rounded-full animate-ping" />
-            <div className="relative bg-background rounded-full p-2 shadow-xl">
-              <CheckCircle2 className="h-20 w-20 text-green-500" />
+            <div className="absolute inset-0 bg-emerald-700/10 rounded-full" />
+            <div className="relative rounded-full p-2">
+              <CheckCircle2 className="h-20 w-20 text-emerald-700" />
             </div>
           </div>
           <div className="space-y-3">
-            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent">
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
               Payment Successful!
             </h1>
             <p className="text-muted-foreground text-base sm:text-lg">
@@ -129,7 +111,7 @@ export default function PaymentPage() {
           <Button
             asChild
             size="lg"
-            className="mt-6 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-600/90 hover:to-green-500/90"
+            className="mt-6 rounded-xl active:opacity-80"
           >
             <Link href="/dashboard/bookings">View My Bookings</Link>
           </Button>
@@ -138,71 +120,13 @@ export default function PaymentPage() {
     );
   }
 
-  // Payment State
-  const floatingIcons = [
-    { icon: ShieldCheck, delay: 0, position: "top-16 left-4 sm:left-20" },
-    { icon: Lock, delay: 2, position: "top-24 right-4 sm:right-32" },
-    { icon: Wallet, delay: 4, position: "bottom-32 left-8 sm:left-16" },
-    { icon: CreditCard, delay: 1, position: "bottom-24 right-8 sm:right-16" },
-    { icon: Building2, delay: 3, position: "top-1/2 left-4 sm:left-12" },
-  ];
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Background gradient */}
-      <div
-        className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-primary/10"
-        aria-hidden
-      />
 
-      {/* Subtle grid overlay */}
-      <div
-        className="absolute inset-0 bg-[linear-gradient(rgba(var(--primary-rgb),0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(var(--primary-rgb),0.02)_1px,transparent_1px)] bg-[size:50px_50px]"
-        style={{ "--primary-rgb": "255, 24, 77" } as React.CSSProperties}
-        aria-hidden
-      />
 
-      {/* Decorative orbs */}
-      <motion.div
-        animate={{ y: [0, 50, 0] }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        className="hidden sm:block absolute -top-32 -right-32 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none"
-        aria-hidden
-      />
 
-      <motion.div
-        animate={{ y: [0, -30, 0] }}
-        transition={{
-          duration: 6,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: 2,
-        }}
-        className="hidden sm:block absolute -bottom-32 -left-32 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none"
-        aria-hidden
-      />
 
-      {/* Floating decorative icons */}
-      {floatingIcons.map((element, index) => (
-        <motion.div
-          key={index}
-          animate={{
-            y: [0, -20, 0],
-            rotate: [0, element.icon === ShieldCheck ? 4 : -4, 0],
-            scale: [1, 1.1, 1],
-          }}
-          transition={{
-            duration: 5 + element.delay,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: element.delay,
-          }}
-          className={`hidden md:block absolute ${element.position} text-primary/10 pointer-events-none`}
-          aria-hidden
-        >
-          <element.icon className="w-8 h-8" />
-        </motion.div>
-      ))}
 
       {/* Main Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
@@ -237,7 +161,7 @@ export default function PaymentPage() {
                     </p>
                   </div>
 
-                  <Card className="border-0 shadow-2xl bg-background/60 backdrop-blur-xl overflow-hidden ring-1 ring-white/10">
+                  <Card className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
                     <CardHeader className="pb-4 pt-6">
                       <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                         <Wallet className="w-5 h-5 text-primary" />
@@ -312,8 +236,7 @@ export default function PaymentPage() {
                   transition={{ duration: 0.6, delay: 0.2 }}
                   className="space-y-4"
                 >
-                  <Card className="border-0 shadow-[0_0_50px_-12px_rgba(0,0,0,0.1)] bg-background/80 backdrop-blur-xl ring-1 ring-primary/10 relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#ff184d] via-[#ff4d7d] to-[#ff184d]" />
+                  <Card className="border-0 shadow-[0_0_50px_-12px_rgba(0,0,0,0.1)] bg-background ring-1 ring-primary/10 relative overflow-hidden">
 
                     <CardHeader className="text-center pb-2 pt-6 sm:pt-8 px-4 sm:px-6">
                       <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">

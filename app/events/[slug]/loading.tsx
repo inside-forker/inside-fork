@@ -6,7 +6,6 @@ export default function EventLoading() {
             {/* Hero Skeleton (Matches EventHero) */}
             <div className="relative w-full h-[60vh] md:h-[70vh] lg:h-[80vh] overflow-hidden">
                 <Skeleton className="absolute inset-0" />
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
 
                 {/* Hero Content Information Skeleton */}
                 <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 lg:p-12">

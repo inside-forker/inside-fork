@@ -40,7 +40,7 @@ export function SimilarEventsSkeleton() {
 export function EventSidebarSkeleton() {
   return (
     <div className="sticky top-8">
-      <div className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-transparent to-primary/10 border-2 rounded-2xl p-6 md:p-8 space-y-6 animate-pulse">
+      <div className="relative overflow-hidden bg-card border rounded-2xl p-6 md:p-8 space-y-6 animate-pulse">
         <Skeleton className="h-6 w-40" />
         <div className="space-y-4">
           <div>
