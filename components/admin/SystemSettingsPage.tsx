@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,9 @@ export function SystemSettingsPage() {
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${parsedDate.getFullYear()}-${pad(parsedDate.getMonth() + 1)}-${pad(parsedDate.getDate())}T${pad(parsedDate.getHours())}:${pad(parsedDate.getMinutes())}`;
   };
+
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams?.get("tab") || "maintenance";
 
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
@@ -692,7 +696,7 @@ export function SystemSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="maintenance" className="w-full">
+      <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className="grid w-full grid-cols-6 lg:w-[1050px]">
           <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
           <TabsTrigger value="mobile-app">
