@@ -14,6 +14,7 @@ import {
 import { PremiumStatCard } from "./PremiumStatCard";
 import { CategoriesTable } from "./CategoriesTable";
 import { CategoryModal } from "./CategoryModal";
+import { CategoryArchiveModal } from "./CategoryArchiveModal";
 import { useToast } from "@/hooks/use-toast";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 import {
@@ -60,6 +61,8 @@ export function CategoriesManagementPage() {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [defaultParentId, setDefaultParentId] = React.useState<number | null>(null);
   const [selectedCategory, setSelectedCategory] =
+    React.useState<CategoryWithParent | null>(null);
+  const [archiveCategory, setArchiveCategory] =
     React.useState<CategoryWithParent | null>(null);
   const { toast } = useToast();
 
@@ -211,6 +214,53 @@ export function CategoriesManagementPage() {
     await fetchCategories();
   };
 
+  // Handle category archive / unarchive
+  const handleArchiveCategory = async (
+    category: CategoryWithParent,
+    archiveListings: boolean,
+    action: "archive" | "unarchive"
+  ) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/admin/categories/${category.id}/archive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          archiveListings,
+          unarchiveListings: archiveListings,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to update category archive status",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: result.message,
+      });
+
+      await fetchCategories();
+    } catch (error) {
+      console.error("Archive category error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to process category archive request",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Open create modal (top-level category)
   const handleOpenCreateModal = () => {
     setSelectedCategory(null);
@@ -248,6 +298,39 @@ export function CategoriesManagementPage() {
       await handleUpdate(data);
     } else {
       await handleCreate(data);
+    }
+  };
+
+  // Bulk archive selected categories and their listings
+  const handleBulkArchive = async () => {
+    try {
+      setIsLoading(true);
+      const updates = Array.from(selectedCategoryIds).map((id) =>
+        fetch(`/api/admin/categories/${id}/archive`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "archive", archiveListings: true }),
+        })
+      );
+
+      await Promise.all(updates);
+
+      toast({
+        title: "Success",
+        description: `Archived ${selectedCategoryIds.size} categories and their listings`,
+      });
+
+      setSelectedCategoryIds(new Set());
+      await fetchCategories();
+    } catch (error) {
+      console.error("Bulk archive error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to archive some categories",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -423,15 +506,26 @@ export function CategoriesManagementPage() {
 
         <div className="flex gap-2 w-full sm:w-auto items-center">
           {isBulkMode && selectedCategoryIds.size > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleBulkRemoveParent}
-              disabled={isLoading}
-              className="mr-2"
-            >
-              Remove Parent ({selectedCategoryIds.size})
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBulkArchive}
+                disabled={isLoading}
+                className="text-amber-600 border-amber-500/30 hover:bg-amber-500/10 dark:text-amber-400"
+              >
+                <Archive className="h-4 w-4 mr-1.5" />
+                Archive Selected ({selectedCategoryIds.size})
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkRemoveParent}
+                disabled={isLoading}
+              >
+                Remove Parent ({selectedCategoryIds.size})
+              </Button>
+            </>
           )}
 
           {/* Bulk Mode Toggle */}
@@ -493,6 +587,7 @@ export function CategoriesManagementPage() {
           onEdit={handleOpenEditModal}
           onDelete={handleDelete}
           onAddSubcategory={handleOpenCreateSubcategory}
+          onArchiveCategory={(category) => setArchiveCategory(category)}
           isBulkMode={isBulkMode}
           selectedIds={selectedCategoryIds}
           onSelect={setSelectedCategoryIds}
@@ -551,6 +646,14 @@ export function CategoriesManagementPage() {
         onClose={handleCloseModal}
         onSave={handleSave}
         defaultParentId={defaultParentId}
+      />
+
+      {/* Archive Category Modal */}
+      <CategoryArchiveModal
+        isOpen={!!archiveCategory}
+        onClose={() => setArchiveCategory(null)}
+        category={archiveCategory}
+        onConfirm={handleArchiveCategory}
       />
     </div>
   );
