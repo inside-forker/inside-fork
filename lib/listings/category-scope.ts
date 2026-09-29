@@ -7,26 +7,20 @@ export type CategoryRow = {
   parent_id: number | null;
 };
 
-/** Expands a category id to itself plus its subcategory ids when it's a parent. */
+/** Expands a category id to itself plus all descendant subcategory ids when it has children. */
 export async function resolveCategoryIdScope(
   categoryId: number,
 ): Promise<number[]> {
   const { rows } = await query(
-    `SELECT id, parent_id FROM categories WHERE id = $1 LIMIT 1`,
+    `WITH RECURSIVE cat_tree AS (
+       SELECT id FROM categories WHERE id = $1
+       UNION ALL
+       SELECT c.id FROM categories c JOIN cat_tree ct ON c.parent_id = ct.id
+     )
+     SELECT id FROM cat_tree`,
     [categoryId],
   );
-  const category = rows[0];
-  if (!category) return [];
-
-  if (category.parent_id === null) {
-    const { rows: subs } = await query(
-      `SELECT id FROM categories WHERE parent_id = $1`,
-      [categoryId],
-    );
-    return [categoryId, ...subs.map((s) => Number(s.id))];
-  }
-
-  return [categoryId];
+  return rows.map((r) => Number(r.id));
 }
 
 /**

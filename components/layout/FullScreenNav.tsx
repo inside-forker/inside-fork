@@ -17,7 +17,6 @@ import { AnimatePresence } from "framer-motion";
 import { CategoryPanel } from "./CategoryPanel";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { PremiumDiscoveryPanel } from "./PremiumDiscoveryPanel";
 import { RoleSwitcher } from "./RoleSwitcher";
 
@@ -364,20 +363,6 @@ export function FullScreenNav({
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className="mt-auto pt-6">
-                <div className="flex items-center justify-between p-4 rounded-xl bg-card/30 border border-border/30">
-                  <div>
-                    <span className="text-sm font-medium text-foreground">
-                      Appearance
-                    </span>
-                    <p className="text-xs text-muted-foreground">
-                      Switch theme
-                    </p>
-                  </div>
-                  <ThemeToggle />
-                </div>
-              </div>
             </motion.div>
           )}
 

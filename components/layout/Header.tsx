@@ -1,6 +1,5 @@
 import { query } from "@/lib/db";
 import Link from "next/link";
-import { ThemeToggle } from "./theme-toggle";
 import { ThemeAwareLogo } from "./ThemeAwareLogo";
 import { UserNav } from "./UserNav";
 import { MegaMenu } from "./MegaMenu";
@@ -74,7 +73,6 @@ export async function Header() {
           </nav>
           {/* Right aligned actions div */}
           <div className="hidden md:flex items-center space-x-2">
-            <ThemeToggle />
             <UserNav />
           </div>
         </div>

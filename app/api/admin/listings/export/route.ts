@@ -3,6 +3,7 @@ import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { Parser } from "json2csv";
 import { getListingCategoryIdsMap } from "@/lib/listings/sync-listing-categories";
+import { resolveCategoryIdScope } from "@/lib/listings/category-scope";
 import type { Database } from "@/types/database";
 
 type ExportListingRow = Database["public"]["Tables"]["listings"]["Row"] & {
@@ -67,13 +68,21 @@ export async function POST(request: NextRequest) {
     if (filters.categoryId && filters.categoryId !== "all") {
       const categoryIdNum = Number(filters.categoryId);
       if (Number.isFinite(categoryIdNum)) {
-        whereParams.push(categoryIdNum);
-        whereClauses.push(
-          `EXISTS (
-             SELECT 1 FROM listing_categories lc
-             WHERE lc.listing_id = listings.id AND lc.category_id = $${whereParams.length}
-           )`,
-        );
+        const categoryIds = await resolveCategoryIdScope(categoryIdNum);
+        if (categoryIds.length > 0) {
+          whereParams.push(categoryIds);
+          whereClauses.push(
+            `(
+               EXISTS (
+                 SELECT 1 FROM listing_categories lc
+                 WHERE lc.listing_id = listings.id AND lc.category_id = ANY($${whereParams.length}::int[])
+               )
+               OR listings.category_id = ANY($${whereParams.length}::int[])
+             )`,
+          );
+        } else {
+          whereClauses.push("1 = 0");
+        }
       }
     }
 

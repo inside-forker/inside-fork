@@ -3,6 +3,7 @@ import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { syncListingCategories, normalizeCategoryIds, getListingCategoryIdsMap } from "@/lib/listings/sync-listing-categories";
 import { deleteListingsBulk } from "@/lib/utils/listing-deletion";
+import { resolveCategoryIdScope } from "@/lib/listings/category-scope";
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,15 +48,23 @@ export async function GET(request: NextRequest) {
     }
 
     if (categoryId && categoryId !== "all") {
-      const categoryIdNum = parseInt(categoryId);
-      if (!isNaN(categoryIdNum)) {
-        whereParams.push(categoryIdNum);
-        whereClauses.push(
-          `EXISTS (
-             SELECT 1 FROM listing_categories lc
-             WHERE lc.listing_id = listings.id AND lc.category_id = $${whereParams.length}
-           )`,
-        );
+      const categoryIdNum = parseInt(categoryId, 10);
+      if (!Number.isNaN(categoryIdNum)) {
+        const categoryIds = await resolveCategoryIdScope(categoryIdNum);
+        if (categoryIds.length > 0) {
+          whereParams.push(categoryIds);
+          whereClauses.push(
+            `(
+               EXISTS (
+                 SELECT 1 FROM listing_categories lc
+                 WHERE lc.listing_id = listings.id AND lc.category_id = ANY($${whereParams.length}::int[])
+               )
+               OR listings.category_id = ANY($${whereParams.length}::int[])
+             )`,
+          );
+        } else {
+          whereClauses.push("1 = 0");
+        }
       }
     }
 
