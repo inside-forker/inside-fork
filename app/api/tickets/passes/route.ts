@@ -55,9 +55,11 @@ export async function GET(req: NextRequest) {
         tp.guest_name,
         tp.cnic_last4,
         tp.assigned_gate_index,
+        tt.name AS ticket_type_name,
         COALESCE(edo.device_label, CASE WHEN tp.assigned_gate_index IS NOT NULL THEN 'Gate ' || (tp.assigned_gate_index + 1) ELSE NULL END) AS gate_label
        FROM ticket_passes tp
        LEFT JOIN event_device_operators edo ON edo.event_id = tp.event_id AND edo.device_index = tp.assigned_gate_index
+       LEFT JOIN ticket_types tt ON tt.id = tp.ticket_type_id
        WHERE tp.booking_id = $1
        ORDER BY tp.quantity_index ASC`,
       [bookingId]

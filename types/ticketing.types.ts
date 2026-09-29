@@ -14,6 +14,7 @@ export interface PublicPass {
   ticket_type_id: number;
   guest_name?: string | null;
   cnic_last4?: string | null;
+  ticket_type_name?: string | null;
   assigned_gate_index?: number | null;
   gate_label?: string | null;
 }

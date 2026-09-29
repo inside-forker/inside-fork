@@ -4,7 +4,6 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { format } from "date-fns";
-import html2canvas from "html2canvas";
 import {
   Download,
   Printer,
@@ -26,6 +25,12 @@ interface PrintableTicketProps {
   eventTime?: string;
   venueName?: string;
   ticketType?: string;
+  eventEndTime?: string;
+  address?: string;
+  organizer?: string;
+  bookingReference?: string;
+  /** Every pass in the booking, so the PDF can number this one "n of N". */
+  orderPasses?: PublicPass[];
   /** When true, trigger a PDF download once the ticket is mounted. */
   autoDownloadPdf?: boolean;
   onClose: () => void;
@@ -38,6 +43,11 @@ export function PrintableTicket({
   eventTime,
   venueName,
   ticketType,
+  eventEndTime,
+  address,
+  organizer,
+  bookingReference,
+  orderPasses,
   autoDownloadPdf = false,
   onClose,
 }: PrintableTicketProps) {
@@ -53,53 +63,34 @@ export function PrintableTicket({
     };
   }, []);
 
-  const buildPdfInput = React.useCallback(() => {
-    let dateLabel = eventDate;
-    try {
-      dateLabel = format(new Date(eventDate), "EEEE, MMMM d, yyyy");
-    } catch {
-      // keep raw
-    }
-
-    let timeLabel: string | null = null;
-    if (eventTime) {
-      try {
-        timeLabel = format(new Date(eventTime), "h:mm a");
-      } catch {
-        timeLabel = eventTime;
-      }
-    } else {
-      try {
-        const date = new Date(eventDate);
-        if (date.getHours() !== 0 || date.getMinutes() !== 0) {
-          timeLabel = format(date, "h:mm a");
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    return {
-      code: pass.code || "",
-      eventName,
-      eventDate: dateLabel,
-      eventTime: timeLabel,
-      venueName: venueName || null,
-      ticketType: ticketType || null,
-      guestName: pass.guest_name || null,
-      cnicLast4: pass.cnic_last4 || null,
-      gateLabel: pass.gate_label || null,
+  const downloadPdf = React.useCallback(async () => {
+    const { downloadTicketsPdf } = await import(
+      "@/lib/ticketing/download-ticket-pdf"
+    );
+    await downloadTicketsPdf({
+      event: {
+        name: eventName,
+        startTime: eventDate || null,
+        endTime: eventEndTime ?? null,
+        venueName: venueName ?? null,
+        address: address ?? null,
+        organizer: organizer ?? null,
+        bookingReference: bookingReference ?? null,
+        ticketType: ticketType ?? null,
+      },
+      passes: [pass],
+      orderPasses: orderPasses ?? [pass],
       filename: `ticket-${pass.code || pass.id}`,
-    };
+    });
   }, [
+    address,
+    bookingReference,
     eventDate,
+    eventEndTime,
     eventName,
-    eventTime,
-    pass.code,
-    pass.cnic_last4,
-    pass.gate_label,
-    pass.guest_name,
-    pass.id,
+    orderPasses,
+    organizer,
+    pass,
     ticketType,
     venueName,
   ]);
@@ -111,17 +102,14 @@ export function PrintableTicket({
     const timer = window.setTimeout(async () => {
       autoDownloadFired.current = true;
       try {
-        const { downloadTicketPdf } = await import(
-          "@/lib/ticketing/download-ticket-pdf"
-        );
-        await downloadTicketPdf(buildPdfInput());
+        await downloadPdf();
       } catch (error) {
         console.error("Error auto-downloading ticket PDF:", error);
       }
     }, 350);
 
     return () => window.clearTimeout(timer);
-  }, [mounted, autoDownloadPdf, pass.code, buildPdfInput]);
+  }, [mounted, autoDownloadPdf, pass.code, downloadPdf]);
 
   const handlePrint = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -222,10 +210,7 @@ export function PrintableTicket({
     }
 
     try {
-      const { downloadTicketPdf } = await import(
-        "@/lib/ticketing/download-ticket-pdf"
-      );
-      await downloadTicketPdf(buildPdfInput());
+      await downloadPdf();
     } catch (error) {
       console.error("Error saving ticket PDF:", error);
       alert("Couldn't create the PDF. Please try again.");
@@ -242,6 +227,7 @@ export function PrintableTicket({
 
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
+        const { default: html2canvas } = await import("html2canvas");
         const canvas = await html2canvas(ticketElement, {
           scale: 2,
           backgroundColor: "#ffffff",

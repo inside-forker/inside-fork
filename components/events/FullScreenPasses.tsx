@@ -22,6 +22,19 @@ import { Button } from "@/components/ui/button";
 import { PublicPass } from "@/types/ticketing.types";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import type { TicketPdfEvent } from "@/lib/ticketing/download-ticket-pdf";
+
+async function saveTicketsPdf(
+  event: TicketPdfEvent,
+  passes: PublicPass[],
+  orderPasses: PublicPass[],
+  filename: string,
+) {
+  const { downloadTicketsPdf } = await import(
+    "@/lib/ticketing/download-ticket-pdf"
+  );
+  await downloadTicketsPdf({ event, passes, orderPasses, filename });
+}
 
 interface FullScreenPassesProps {
   isOpen: boolean;
@@ -32,6 +45,9 @@ interface FullScreenPassesProps {
   eventDate?: string;
   eventTime?: string;
   venueName?: string;
+  eventEndTime?: string;
+  address?: string;
+  organizer?: string;
 }
 
 function safeDateString(val?: string | null, formatStr = "EEE, MMM d, yyyy"): string {
@@ -164,6 +180,8 @@ function FullTicketView({
   eventDate,
   eventTime,
   venueName,
+  pdfEvent,
+  orderPasses,
   onBack,
 }: {
   pass: PublicPass;
@@ -171,6 +189,8 @@ function FullTicketView({
   eventDate?: string;
   eventTime?: string;
   venueName?: string;
+  pdfEvent: TicketPdfEvent;
+  orderPasses: PublicPass[];
   onBack: () => void;
 }) {
   const ticketRef = React.useRef<HTMLDivElement>(null);
@@ -190,20 +210,12 @@ function FullTicketView({
     }
 
     try {
-      const { downloadTicketPdf } = await import(
-        "@/lib/ticketing/download-ticket-pdf"
+      await saveTicketsPdf(
+        pdfEvent,
+        [pass],
+        orderPasses,
+        `ticket-${pass.code || pass.id}`,
       );
-      await downloadTicketPdf({
-        code: pass.code,
-        eventName: eventName || "Event",
-        eventDate: formattedDate || "",
-        eventTime: formattedTime || undefined,
-        venueName: venueName || null,
-        guestName: pass.guest_name || null,
-        cnicLast4: pass.cnic_last4 || null,
-        gateLabel: pass.gate_label || "Lane 1",
-        filename: `ticket-${pass.code || pass.id}`,
-      });
     } catch (error) {
       console.error("Error saving ticket PDF:", error);
       alert("Couldn't create the PDF. Please try again.");
@@ -566,9 +578,36 @@ export function FullScreenPasses({
   eventDate,
   eventTime,
   venueName,
+  eventEndTime,
+  address,
+  organizer,
 }: FullScreenPassesProps) {
   const [selectedPass, setSelectedPass] = useState<PublicPass | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [downloadingAll, setDownloadingAll] = useState(false);
+
+  const pdfEvent: TicketPdfEvent = {
+    name: eventName || "Event",
+    startTime: eventDate || null,
+    endTime: eventEndTime ?? null,
+    venueName: venueName ?? null,
+    address: address ?? null,
+    organizer: organizer ?? null,
+    bookingReference,
+  };
+  const issuedCount = passes.filter((p) => p.code).length;
+
+  const handleDownloadAll = async () => {
+    setDownloadingAll(true);
+    try {
+      await saveTicketsPdf(pdfEvent, passes, passes, `tickets-${bookingReference}`);
+    } catch (error) {
+      console.error("Error saving tickets PDF:", error);
+      alert("Couldn't create the PDF. Please try again.");
+    } finally {
+      setDownloadingAll(false);
+    }
+  };
 
   // Handle client-side mounting for portal
   useEffect(() => {
@@ -643,6 +682,8 @@ export function FullScreenPasses({
                   eventDate={eventDate}
                   eventTime={eventTime}
                   venueName={venueName}
+                  pdfEvent={pdfEvent}
+                  orderPasses={passes}
                   onBack={() => setSelectedPass(null)}
                 />
               ) : (
@@ -682,7 +723,7 @@ export function FullScreenPasses({
                   )}
 
                   {/* Passes Count Badge */}
-                  <div className="flex-shrink-0 px-4 sm:px-6 pt-4">
+                  <div className="flex-shrink-0 px-4 sm:px-6 pt-4 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 w-fit">
                       <QrCode className="h-4 w-4 text-primary" />
                       <span className="text-sm font-medium text-primary">
@@ -690,6 +731,18 @@ export function FullScreenPasses({
                         {(passes || []).length === 1 ? "Pass" : "Passes"}
                       </span>
                     </div>
+                    {issuedCount > 1 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleDownloadAll}
+                        disabled={downloadingAll}
+                        className="gap-2"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        {downloadingAll ? "Preparing PDF…" : "Download all (PDF)"}
+                      </Button>
+                    )}
                   </div>
 
                   {/* Scrollable Passes List */}
