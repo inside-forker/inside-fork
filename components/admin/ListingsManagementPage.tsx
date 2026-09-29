@@ -680,7 +680,7 @@ export function ListingsManagementPage() {
     setIsBulkDeleteDialogOpen(true);
   };
 
-  const handleBulkStatusUpdate = async (nextStatus: "published" | "draft") => {
+  const handleBulkStatusUpdate = async (nextStatus: "published" | "draft" | "archived") => {
     if (selectedListings.size === 0 || !isBulkMode) return;
 
     try {
@@ -1149,6 +1149,16 @@ export function ListingsManagementPage() {
                   >
                     <Star className="h-3 w-3 mr-1" />
                     Move to Draft
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkStatusUpdate("archived")}
+                    disabled={isBulkStatusUpdating || isBulkDeleting}
+                    className="h-8 bg-background/50 border-border/50 hover:bg-background/80"
+                  >
+                    <Archive className="h-3 w-3 mr-1" />
+                    Archive Selected
                   </Button>
                   <Button
                     variant="destructive"
