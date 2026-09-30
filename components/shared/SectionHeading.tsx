@@ -43,6 +43,49 @@ export function SectionHeading({
   );
 }
 
+type CalloutHeadingProps = {
+  /** The bold line. */
+  title: string;
+  /** The lighter line under it. */
+  subtitle: string;
+  href?: string;
+  actionLabel?: string;
+};
+
+/**
+ * The mobile app's callout: a thin bar on the left, a bold statement and a
+ * lighter line under it. Used where a section opens with a sentence rather
+ * than a label.
+ */
+export function CalloutHeading({
+  title,
+  subtitle,
+  href,
+  actionLabel = "View all",
+}: CalloutHeadingProps) {
+  return (
+    <div className="mb-4 flex items-end justify-between gap-3">
+      <div className="min-w-0 border-l-4 border-border pl-4">
+        <h2 className="text-base font-bold tracking-tight text-foreground sm:text-lg">
+          {title}
+        </h2>
+        <p className="mt-0.5 text-base text-muted-foreground sm:text-lg">
+          {subtitle}
+        </p>
+      </div>
+      {href ? (
+        <Link
+          href={href}
+          className="inline-flex shrink-0 items-center gap-0.5 text-sm font-semibold text-primary hover:opacity-80"
+        >
+          {actionLabel}
+          <ChevronRight className="h-4 w-4" aria-hidden />
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 /** Shared section shell: one vertical rhythm and one gutter for every section. */
 export const sectionClass = "py-8 sm:py-10";
 export const containerClass = "container mx-auto px-5 sm:px-6 lg:px-8";

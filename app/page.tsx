@@ -5,6 +5,7 @@ import { CallToActionSections } from "@/components/homepage/CallToActionSections
 import { PlatformStatsStrip } from "@/components/homepage/PlatformStatsStrip";
 import { FeaturesSection } from "@/components/homepage/FeaturesSection";
 import { AppComingSoonSection } from "@/components/homepage/AppComingSoonSection";
+import { BankOffersSection } from "@/components/homepage/BankOffersSection";
 
 // Containers
 import { CategoriesContainer } from "@/components/homepage/containers/CategoriesContainer";
@@ -43,6 +44,11 @@ export default function Home() {
       {/* Featured Categories Section */}
       <Suspense fallback={<CategoriesSkeleton />}>
         <CategoriesContainer />
+      </Suspense>
+
+      {/* Bank card offers (hidden when no bank has a live deal) */}
+      <Suspense fallback={null}>
+        <BankOffersSection />
       </Suspense>
 
       {/* Everything the platform does */}
