@@ -366,7 +366,9 @@ export async function PATCH(
         );
       }
       const isValidationError =
-        updateErrorCode === "23503" || updateErrorCode === "22P02";
+        updateErrorCode === "23503" ||
+        updateErrorCode === "22P02" ||
+        updateErrorCode === "23514";
       if (!isValidationError) {
         captureRouteError(error, { route: ROUTE, method: "PATCH" });
       }
@@ -375,7 +377,7 @@ export async function PATCH(
         isValidationError ? 400 : 500,
         isValidationError ? "VALIDATION_ERROR" : "UPDATE_FAILED",
         isValidationError
-          ? "Invalid data provided (e.g. category or format mismatch)"
+          ? "Invalid data provided (e.g. category, coordinates, or format mismatch)"
           : "Failed to update listing",
         {
           dbCode: updateErrorCode ?? null,
