@@ -64,8 +64,8 @@ export async function BankOffersSection() {
                 </span>
                 {/* Foreground ink, not pink: a count on every coin isn't an accent */}
                 <span className="-mt-1 text-xs tabular-nums text-muted-foreground">
-                  {bank.offers > 0
-                    ? `${bank.offers} ${bank.offers === 1 ? "place" : "places"}`
+                  {bank.dealsCount > 0
+                    ? `${bank.dealsCount} ${bank.dealsCount === 1 ? "deal" : "deals"}`
                     : "No offers yet"}
                 </span>
               </>
@@ -74,7 +74,7 @@ export async function BankOffersSection() {
 
             return (
               <li key={bank.id}>
-                {bank.offers > 0 ? (
+                {bank.dealsCount > 0 ? (
                   <Link
                     href={`/listings?deals=true&bank=${bank.id}`}
                     className={`${className} active:opacity-80`}

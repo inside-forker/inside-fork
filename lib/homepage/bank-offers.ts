@@ -5,7 +5,11 @@ export type SupportedBank = {
   id: number;
   name: string;
   logoUrl: string | null;
-  /** Places with a live deal on this bank's cards. 0 when it has none yet. */
+  /** Number of distinct places with a live deal on this bank. */
+  places: number;
+  /** Total number of live deals on this bank. */
+  dealsCount: number;
+  /** Backwards compatible alias */
   offers: number;
 };
 
@@ -19,7 +23,8 @@ export const getSupportedBanks = unstable_cache(
     try {
       const { rows } = await query(
         `SELECT b.id, b.name, b.logo_url,
-                COUNT(DISTINCT l.id)::integer AS offers
+                COUNT(DISTINCT l.id)::integer AS places,
+                COUNT(d.id)::integer AS deals_count
          FROM banks b
          LEFT JOIN deals d
            ON d.bank_id = b.id
@@ -30,19 +35,21 @@ export const getSupportedBanks = unstable_cache(
            ON l.id = d.listing_id
           AND l.status = 'published'
          GROUP BY b.id, b.name, b.logo_url
-         ORDER BY offers DESC, b.name ASC`,
+         ORDER BY deals_count DESC, places DESC, b.name ASC`,
       );
       return rows.map((row) => ({
         id: Number(row.id),
         name: String(row.name),
         logoUrl: (row.logo_url as string | null) || null,
-        offers: Number(row.offers) || 0,
+        places: Number(row.places) || 0,
+        dealsCount: Number(row.deals_count) || 0,
+        offers: Number(row.places) || 0,
       }));
     } catch (error) {
       console.error("Supported banks query failed:", error);
       return [];
     }
   },
-  ["homepage-supported-banks"],
-  { revalidate: 3600, tags: ["deals"] },
+  ["homepage-supported-banks-v2"],
+  { revalidate: 300, tags: ["deals"] },
 );
