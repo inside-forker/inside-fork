@@ -245,9 +245,11 @@ export async function startParchiVerification(input: {
     );
   }
 
+  // Latest request for this student at this event, used or not: a reference
+  // whose last request was approved (or consumed) is never reused.
   const { rows: prevRows } = await query(
     `SELECT * FROM parchi_verifications
-     WHERE user_id = $1 AND event_id = $2 AND parchi_id = $3 AND booking_id IS NULL
+     WHERE user_id = $1 AND event_id = $2 AND parchi_id = $3
      ORDER BY created_at DESC
      LIMIT 1`,
     [input.userId, input.eventId, parchiId],
@@ -260,7 +262,9 @@ export async function startParchiVerification(input: {
   // (safe retry); after expiry it's how "Resend" opens a fresh one. A
   // rejection or an earlier approval gets a new reference, so a new request.
   const externalReference =
-    prev && (prev.status === "pending" || prev.status === "expired")
+    prev &&
+    prev.booking_id == null &&
+    (prev.status === "pending" || prev.status === "expired")
       ? prev.external_reference
       : `ik_chk_${crypto.randomUUID()}`;
 
@@ -425,8 +429,8 @@ export async function previewParchiDiscount(input: {
  */
 export async function reportParchiRedemption(bookingId: number): Promise<void> {
   const { rows } = await query(
-    `SELECT v.request_id, v.parchi_id, v.external_reference,
-            b.payment_status, b.discount_amount, b.total_amount,
+    `SELECT v.request_id, v.parchi_id,
+            b.id AS booking_id, b.payment_status, b.discount_amount, b.total_amount,
             e.name AS event_name, e.start_time
      FROM parchi_verifications v
      JOIN bookings b ON b.id = v.booking_id
@@ -441,7 +445,10 @@ export async function reportParchiRedemption(bookingId: number): Promise<void> {
 
   await recordParchiRedemption({
     verificationRequestId: row.request_id,
-    externalReference: row.external_reference,
+    // The order id, one per booking. Parchi 409s if a verification or an
+    // order id is ever logged under a different pair, and a verification is
+    // consumed by exactly one booking, so this pair is stable across retries.
+    externalReference: `ik_booking_${row.booking_id}`,
     parchiId: row.parchi_id,
     discountAmountPkr: Math.round(discount * 100) / 100,
     orderTotalPkr: Math.round(Number(row.total_amount) * 100) / 100,
