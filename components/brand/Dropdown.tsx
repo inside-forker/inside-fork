@@ -46,7 +46,9 @@ export function PremiumDropdown({
   const filteredOptions =
     searchable && searchQuery
       ? options.filter((option) =>
-          option.label.toLowerCase().includes(searchQuery.toLowerCase())
+          String(option?.label || option?.value || "")
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())
         )
       : options;
 
@@ -358,7 +360,9 @@ export function PremiumDropdown({
                       />
                     )}
 
-                    <span className="flex-1 truncate">{option.label}</span>
+                    <span className="flex-1 truncate">
+                      {option.label || option.value || ""}
+                    </span>
 
                     {option.value === value && (
                       <motion.div
