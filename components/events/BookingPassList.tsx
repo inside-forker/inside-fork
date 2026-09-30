@@ -59,7 +59,7 @@ function TicketCard({
 
   const itemClassName =
     variant === "dashboard"
-      ? "relative rounded-2xl border border-border/60 bg-gradient-to-br from-background via-background to-primary/5 backdrop-blur overflow-hidden shadow-lg shadow-primary/5 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300"
+      ? "relative rounded-2xl border border-border bg-card overflow-hidden"
       : "relative rounded-xl border border-neutral-700/40 bg-neutral-800/90 overflow-hidden";
 
   return (
@@ -73,7 +73,7 @@ function TicketCard({
         className={cn(
           "flex items-center justify-between px-4 py-3",
           variant === "dashboard"
-            ? "bg-gradient-to-r from-primary/10 to-transparent border-b border-border/40"
+            ? "bg-muted border-b border-border"
             : "bg-neutral-700/50 border-b border-neutral-600/40",
         )}
       >

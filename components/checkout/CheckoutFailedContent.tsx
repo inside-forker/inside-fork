@@ -110,73 +110,13 @@ export function CheckoutFailedContent({
 
   const isSecurityFailed = status === "security_failed";
 
-  // Floating decorative elements
-  const floatingElements = [
-    { icon: AlertTriangle, delay: 0, position: "top-16 left-4 sm:left-20" },
-    { icon: Shield, delay: 2, position: "top-24 right-4 sm:right-32" },
-    { icon: XCircle, delay: 4, position: "bottom-32 left-8 sm:left-16" },
-    { icon: Info, delay: 1, position: "bottom-24 right-8 sm:right-16" },
-    { icon: CreditCard, delay: 3, position: "top-1/2 left-4 sm:left-12" },
-    { icon: Mail, delay: 5, position: "top-1/3 right-4 sm:right-12" },
-  ];
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden flex flex-col">
-      {/* Background gradient */}
-      <div
-        className="absolute inset-0 bg-gradient-to-br from-red-500/10 via-background to-rose-500/5"
-        aria-hidden
-      />
 
-      {/* Subtle grid overlay */}
-      <div
-        className="absolute inset-0 bg-[linear-gradient(rgba(239,68,68,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(239,68,68,0.02)_1px,transparent_1px)] bg-[size:50px_50px]"
-        aria-hidden
-      />
 
-      {/* Decorative orbs */}
-      <motion.div
-        animate={{ y: [0, 50, 0] }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        className="hidden sm:block absolute -top-32 -right-32 w-96 h-96 bg-red-500/10 rounded-full blur-3xl pointer-events-none"
-        aria-hidden
-      />
 
-      <motion.div
-        animate={{ y: [0, -30, 0] }}
-        transition={{
-          duration: 6,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: 2,
-        }}
-        className="hidden sm:block absolute -bottom-32 -left-32 w-96 h-96 bg-rose-500/5 rounded-full blur-3xl pointer-events-none"
-        aria-hidden
-      />
 
-      {/* Floating decorative elements */}
-      {floatingElements.map((element, index) => (
-        <motion.div
-          key={index}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{
-            opacity: [0.2, 0.5, 0.2],
-            y: [0, -10, 0],
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: element.delay,
-          }}
-          className={cn(
-            "absolute hidden sm:block pointer-events-none",
-            element.position,
-          )}
-        >
-          <element.icon className="w-6 h-6 text-red-500/30" />
-        </motion.div>
-      ))}
 
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8 relative z-10">
@@ -198,7 +138,7 @@ export function CheckoutFailedContent({
             }}
             className="text-center"
           >
-            <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-red-500/20 to-rose-500/20 border-2 border-red-500/20 shadow-xl shadow-red-500/10">
+            <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-red-600/10">
               {isSecurityFailed ? (
                 <AlertTriangle className="w-12 h-12 text-red-500" />
               ) : (
@@ -231,7 +171,7 @@ export function CheckoutFailedContent({
               )}
             </Badge>
 
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight">
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
               {isSecurityFailed
                 ? "Security Validation Failed"
                 : "Payment Unsuccessful"}
@@ -252,9 +192,8 @@ export function CheckoutFailedContent({
             transition={{ duration: 0.5, delay: 0.4 }}
             className="relative group"
           >
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-red-500/20 to-rose-500/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-1000" />
 
-            <div className="relative rounded-2xl border border-red-500/20 bg-red-500/5 backdrop-blur-sm p-6 space-y-4">
+            <div className="relative rounded-2xl border border-red-500/20 bg-red-500/5 p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                   Transaction Details
@@ -321,7 +260,7 @@ export function CheckoutFailedContent({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.45 }}
-              className="rounded-2xl border border-amber-500/30 bg-amber-500/10 backdrop-blur-sm p-4"
+              className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4"
             >
               <div className="flex items-start gap-3">
                 <Info className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />

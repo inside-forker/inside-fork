@@ -117,11 +117,11 @@ export function EventTicketSection({
       variants={sectionVariants}
     >
       <div className="flex items-center space-x-3">
-        <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium">
+        <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
           <Ticket className="w-5 h-5 text-primary" />
         </div>
         <PremiumHeading level={2} dense className="text-foreground">
-          Select <span className="gradient-text-primary">Tickets</span>
+          Select <span className="text-primary">Tickets</span>
         </PremiumHeading>
       </div>
 
@@ -139,7 +139,7 @@ export function EventTicketSection({
 
           return (
             <motion.div key={ticket.id} variants={cardVariants}>
-              <Card className="group relative overflow-hidden bg-gradient-to-br from-primary/5 via-transparent to-primary/10 backdrop-blur-sm border-2 md:border rounded-2xl p-4 md:p-6 lg:p-8 hover:shadow-premium hover:shadow-primary/20 hover:border-primary/40 hover:scale-[1.01] transition-all duration-300">
+              <Card className="group relative overflow-hidden bg-card border rounded-2xl p-4 md:p-6 lg:p-8 hover:border-primary/40 transition-all duration-300">
                 {/* Mobile: Stack vertically, Desktop: Side by side */}
                 <div className="flex flex-col gap-4 lg:gap-6">
                   {/* Top row: Ticket info */}
@@ -191,7 +191,7 @@ export function EventTicketSection({
                       </div>
 
                       {isAvailable && (
-                        <div className="flex items-center space-x-2 sm:space-x-3 bg-background/50 rounded-full p-0.5 sm:p-1 shrink-0">
+                        <div className="flex items-center space-x-2 sm:space-x-3 bg-background rounded-full p-0.5 sm:p-1 shrink-0">
                           <Button
                             variant="outline"
                             size="sm"
@@ -246,7 +246,7 @@ export function EventTicketSection({
           animate={{ opacity: 1, y: 0 }}
           className="sticky bottom-4 z-10"
         >
-          <Card className="p-6 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 backdrop-blur-sm border-2 md:border rounded-2xl shadow-premium hover:shadow-primary/20 hover:border-primary/40 transition-all duration-300">
+          <Card className="p-6 bg-card border rounded-2xl hover:border-primary/40 transition-all duration-300">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <h4 className="text-base sm:text-lg font-semibold mb-1">
@@ -263,7 +263,7 @@ export function EventTicketSection({
 
               <Button
                 size="lg"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 py-3 rounded-xl transition-all duration-300"
                 onClick={handleProceedToCheckout}
               >
                 <CreditCard className="w-5 h-5 mr-2" />

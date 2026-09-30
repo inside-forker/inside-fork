@@ -98,16 +98,16 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
     return (
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center space-x-4">
-          <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium">
+          <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
             <User className="w-6 h-6 text-primary" />
           </div>
           <div>
             <PremiumHeading level={2} dense className="text-foreground">
-              Event <span className="gradient-text-primary">Organizer</span>
+              Event <span className="text-primary">Organizer</span>
             </PremiumHeading>
           </div>
         </div>
-        <Card className="group relative overflow-hidden bg-gradient-to-br from-primary/5 via-transparent to-primary/10 border-2 md:border rounded-2xl p-6 md:p-8">
+        <Card className="group relative overflow-hidden bg-card border rounded-2xl p-6 md:p-8">
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16 md:h-20 md:w-20 border-4 border-primary/20">
               <AvatarImage src={event.organizer_avatar || undefined} />
@@ -131,16 +131,16 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
     return (
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center space-x-4">
-          <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium">
+          <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
             <User className="w-6 h-6 text-primary" />
           </div>
           <div>
             <PremiumHeading level={2} dense className="text-foreground">
-              Event <span className="gradient-text-primary">Organizer</span>
+              Event <span className="text-primary">Organizer</span>
             </PremiumHeading>
           </div>
         </div>
-        <Card className="group relative overflow-hidden bg-gradient-to-br from-primary/5 via-transparent to-primary/10 border-2 md:border rounded-2xl p-6 md:p-8">
+        <Card className="group relative overflow-hidden bg-card border rounded-2xl p-6 md:p-8">
           <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
             {/* Avatar Skeleton */}
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 lg:flex-col lg:items-center lg:min-w-[200px]">
@@ -157,7 +157,7 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
                 {[1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="p-4 bg-card/50 rounded-xl border border-border/30"
+                    className="p-4 bg-card rounded-xl border border-border/30"
                   >
                     <Skeleton className="h-8 w-16 mx-auto mb-2" />
                     <Skeleton className="h-3 w-20 mx-auto" />
@@ -188,12 +188,12 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
     >
       {/* Section Header */}
       <div className="flex items-center space-x-4">
-        <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium">
+        <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
           <User className="w-6 h-6 text-primary" />
         </div>
         <div>
           <PremiumHeading level={2} dense className="text-foreground">
-            Event <span className="gradient-text-primary">{isMultiOrganizer ? "Organizers" : "Organizer"}</span>
+            Event <span className="text-primary">{isMultiOrganizer ? "Organizers" : "Organizer"}</span>
           </PremiumHeading>
           <p className="text-sm sm:text-base md:text-lg text-muted-foreground md:mt-1">
             {isMultiOrganizer
@@ -210,7 +210,7 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
           return (
             <Card
               key={organizer.id}
-              className="group relative overflow-hidden bg-gradient-to-br from-primary/5 via-transparent to-primary/10 backdrop-blur-sm border-2 md:border rounded-2xl p-6 md:p-8 hover:shadow-premium hover:shadow-primary/20 hover:border-primary/40 hover:scale-[1.01] transition-all duration-300"
+              className="group relative overflow-hidden bg-card border rounded-2xl p-6 md:p-8 hover:border-primary/40 transition-all duration-300"
             >
               <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
                 {/* Organizer Avatar & Basic Info */}

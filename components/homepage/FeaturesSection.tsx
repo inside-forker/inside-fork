@@ -3,7 +3,7 @@ import {
   SectionHeading,
   containerClass,
   sectionClass,
-} from "@/components/homepage/SectionHeading";
+} from "@/components/shared/SectionHeading";
 import {
   ArrowUpRight,
   BarChart3,

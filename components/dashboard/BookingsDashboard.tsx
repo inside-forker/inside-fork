@@ -219,8 +219,7 @@ export function BookingsDashboard({ bookings }: Props) {
 
   if (!bookings.length) {
     return (
-      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-background/70 backdrop-blur-xl p-8 text-center shadow-premium-lg">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(var(--primary-rgb),0.12),transparent_60%)]" />
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-background/70 p-8 text-center">
         <div className="relative z-10 space-y-3">
           <PremiumText className="text-lg font-semibold">
             You haven’t made any bookings yet
@@ -244,9 +243,7 @@ export function BookingsDashboard({ bookings }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-3xl border border-black/10 dark:border-border/60 bg-white/60 dark:bg-transparent bg-gradient-to-br from-primary/10 via-white/50 to-white dark:from-primary/15 dark:via-background dark:to-background backdrop-blur-2xl shadow-xl shadow-primary/5 dark:shadow-premium-lg">
-        <div className="absolute -top-32 -right-28 h-64 w-64 rounded-full bg-primary/10 dark:bg-primary/30 blur-3xl" />
-        <div className="absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-primary/10 dark:bg-primary/20 blur-3xl" />
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-card">
         <div className="relative z-10 flex flex-col gap-8 p-6 lg:flex-row lg:items-end lg:justify-between lg:p-10">
           <div className="space-y-4 max-w-2xl">
             <div className="flex items-center gap-3">
@@ -322,7 +319,7 @@ export function BookingsDashboard({ bookings }: Props) {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + idx * 0.05, duration: 0.4 }}
-                className="rounded-2xl border border-border/40 bg-background/80 px-4 py-3 text-sm shadow-sm backdrop-blur"
+                className="rounded-2xl border border-border/40 bg-background px-4 py-3 text-sm shadow-sm"
               >
                 <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">
                   {card.label}
@@ -352,7 +349,7 @@ export function BookingsDashboard({ bookings }: Props) {
               "rounded-full px-5 whitespace-nowrap flex-shrink-0 transition-all",
               filter === item.key
                 ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 scale-105"
-                : "hover:bg-primary/5 hover:text-primary bg-background/50 backdrop-blur border border-transparent hover:border-primary/10"
+                : "hover:bg-primary/5 hover:text-primary bg-background border border-transparent hover:border-primary/10"
             )}
           >
             {item.label}
@@ -381,9 +378,8 @@ export function BookingsDashboard({ bookings }: Props) {
                 duration: 0.35,
                 ease: [0.22, 1, 0.36, 1],
               }}
-              className="relative overflow-hidden rounded-3xl border border-black/10 dark:border-border/60 bg-white dark:bg-background/80 backdrop-blur-xl shadow-lg dark:shadow-premium-lg"
+              className="relative overflow-hidden rounded-2xl border border-border bg-card"
             >
-              <div className="absolute inset-0 opacity-40 dark:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(var(--primary-rgb),0.16),transparent_58%)]" />
               <div className="relative z-10 p-5 sm:p-6 lg:p-8 space-y-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="space-y-2">
@@ -394,7 +390,7 @@ export function BookingsDashboard({ bookings }: Props) {
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <h3 className="text-2xl font-semibold font-display text-foreground">
+                      <h3 className="text-2xl font-semibold text-foreground">
                         {booking.event?.name ?? "Private experience"}
                       </h3>
                       <Badge className={cn("border", badge.className)}>
@@ -418,7 +414,7 @@ export function BookingsDashboard({ bookings }: Props) {
                     </div>
                   </div>
                   <div className="flex flex-col items-start gap-3 text-sm">
-                    <div className="rounded-2xl border border-border/50 bg-background/60 px-4 py-2">
+                    <div className="rounded-2xl border border-border/50 bg-background px-4 py-2">
                       <span className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
                         Total paid
                       </span>
@@ -450,7 +446,7 @@ export function BookingsDashboard({ bookings }: Props) {
                           variant="outline"
                           size="sm"
                           asChild
-                          className="flex-1 sm:flex-none backdrop-blur border-primary/20 hover:bg-primary/5 hover:text-primary"
+                          className="flex-1 sm:flex-none border-primary/20 hover:bg-primary/5 hover:text-primary"
                         >
                           <Link href={`/events/${booking.event.slug}`}>
                             View event
@@ -462,7 +458,7 @@ export function BookingsDashboard({ bookings }: Props) {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex-1 sm:flex-none backdrop-blur border-primary/20 hover:bg-primary/5 hover:text-primary"
+                          className="flex-1 sm:flex-none border-primary/20 hover:bg-primary/5 hover:text-primary"
                           onClick={() => setSelected(booking)}
                         >
                           <Ticket className="mr-2 h-3.5 w-3.5" />
@@ -499,7 +495,7 @@ export function BookingsDashboard({ bookings }: Props) {
               window.scrollTo({ top: 300, behavior: "smooth" });
             }}
             disabled={currentPage === 1}
-            className="h-9 w-9 rounded-full border-black/10 dark:border-border/60 bg-white dark:bg-background/50 backdrop-blur shadow-sm hover:bg-gray-50 dark:hover:bg-accent"
+            className="h-9 w-9 rounded-full border-black/10 dark:border-border/60 bg-white dark:bg-background shadow-sm hover:bg-gray-50 dark:hover:bg-accent"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -514,7 +510,7 @@ export function BookingsDashboard({ bookings }: Props) {
               window.scrollTo({ top: 300, behavior: "smooth" });
             }}
             disabled={currentPage === totalPages}
-            className="h-9 w-9 rounded-full border-black/10 dark:border-border/60 bg-white dark:bg-background/50 backdrop-blur shadow-sm hover:bg-gray-50 dark:hover:bg-accent"
+            className="h-9 w-9 rounded-full border-black/10 dark:border-border/60 bg-white dark:bg-background shadow-sm hover:bg-gray-50 dark:hover:bg-accent"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -525,9 +521,9 @@ export function BookingsDashboard({ bookings }: Props) {
       <AnimatePresence>
         {selected && (
           <Dialog open onOpenChange={() => setSelected(null)}>
-            <DialogContent className="max-w-3xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto border border-border/60 bg-background/95 backdrop-blur-2xl p-4 sm:p-6">
+            <DialogContent className="max-w-3xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto border border-border/60 bg-background p-4 sm:p-6">
               <DialogHeader>
-                <DialogTitle className="text-xl sm:text-2xl font-semibold font-display">
+                <DialogTitle className="text-xl sm:text-2xl font-semibold">
                   Booking {selected.booking_reference ?? selected.id}
                 </DialogTitle>
                 <DialogDescription className="text-xs uppercase tracking-[0.35em] text-muted-foreground">

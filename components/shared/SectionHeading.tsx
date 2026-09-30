@@ -10,7 +10,7 @@ type SectionHeadingProps = {
 };
 
 /**
- * Landing-page section heading, mirroring the mobile app's `SectionHeading`:
+ * Section heading, mirroring the mobile app's `SectionHeading`:
  * a left-aligned bold title, an optional muted subtitle, and a pink
  * "View all" link on the right. One treatment for every section.
  */

@@ -14,7 +14,7 @@ import {
   SectionHeading,
   containerClass,
   sectionClass,
-} from "@/components/homepage/SectionHeading";
+} from "@/components/shared/SectionHeading";
 
 type Listing = Database["public"]["Views"]["listings_with_details"]["Row"] & {
   category_group?: string | null;

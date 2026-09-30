@@ -28,7 +28,7 @@ export function CheckoutSteps({ currentStep }: CheckoutStepsProps) {
 
           {/* Active Progress Bar */}
           <motion.div
-            className="absolute top-1/2 -translate-y-1/2 h-1 bg-gradient-to-r from-primary to-primary/80 rounded-full shadow-lg shadow-primary/25"
+            className="absolute top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full"
             initial={{ width: 0 }}
             animate={{
               width: `${(currentStepIndex / (steps.length - 1)) * 100}%`,

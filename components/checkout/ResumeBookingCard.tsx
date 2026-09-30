@@ -83,16 +83,14 @@ export function ResumeBookingCard({
         transition={{ duration: 0.4, ease: "easeOut" }}
         className="relative z-10 w-full max-w-lg p-0 sm:p-4"
       >
-        <Card className="border-white/10 dark:border-white/10 shadow-2xl bg-white/40 dark:bg-black/40 backdrop-blur-md overflow-hidden ring-1 ring-black/5 dark:ring-white/5">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500/40 via-amber-500 to-amber-500/40" />
+        <Card className="rounded-2xl border border-border bg-card shadow-lg overflow-hidden">
 
           <CardContent className="px-5 pb-6 pt-8 sm:px-8 sm:pt-10 sm:pb-8 space-y-6">
             {/* Header */}
             <div className="flex flex-col items-center text-center space-y-4">
               <div className="relative">
-                <div className="absolute inset-0 bg-amber-500/20 blur-xl rounded-full" />
-                <div className="relative h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-gradient-to-br from-amber-500/10 to-amber-500/5 ring-1 ring-amber-500/20 flex items-center justify-center shadow-lg">
-                  <AlertCircle className="h-7 w-7 sm:h-8 sm:w-8 text-amber-500" />
+                <div className="relative h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-amber-500/10 flex items-center justify-center">
+                  <AlertCircle className="h-7 w-7 sm:h-8 sm:w-8 text-amber-700" />
                 </div>
               </div>
               <div className="space-y-2">
@@ -107,9 +105,7 @@ export function ResumeBookingCard({
             </div>
 
             {/* Preview */}
-            <div className="relative overflow-hidden rounded-xl border border-border/50 bg-muted/30 p-4 sm:p-5">
-              <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] dark:bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
-
+            <div className="relative overflow-hidden rounded-xl border border-border bg-muted p-4 sm:p-5">
               <div className="relative z-10 space-y-4">
                 {/* Event */}
                 <div className="space-y-1.5">
@@ -211,7 +207,7 @@ export function ResumeBookingCard({
             <div className="flex flex-col sm:flex-row gap-3 pt-1">
               <Button
                 disabled={!canResume}
-                className="flex-1 h-11 text-base bg-gradient-to-r from-amber-600 to-amber-500 text-white shadow-lg shadow-amber-500/20 border-0 transition-all duration-300 hover:shadow-xl hover:shadow-amber-500/40 hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+                className="flex-1 h-11 rounded-xl text-base bg-primary hover:bg-primary/90 text-primary-foreground active:opacity-80 disabled:opacity-50"
                 onClick={onResume}
               >
                 {isResuming ? "Resuming..." : "Resume Payment"}

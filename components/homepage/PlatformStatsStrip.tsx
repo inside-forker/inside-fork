@@ -1,5 +1,5 @@
 import { CalendarDays, LayoutGrid, MapPin } from "lucide-react";
-import { containerClass } from "@/components/homepage/SectionHeading";
+import { containerClass } from "@/components/shared/SectionHeading";
 import { formatStat, getPlatformStats } from "@/lib/homepage/platform-stats";
 
 export async function PlatformStatsStrip() {

@@ -102,7 +102,7 @@ export function EventHero({
                 transition={{ delay: 0.1, duration: 0.35 }}
                 className="mb-3 sm:mb-4 md:mb-6 flex justify-center md:justify-start"
               >
-                <Badge className="bg-primary/20 dark:bg-primary/30 backdrop-blur-md border border-primary/30 text-primary-foreground font-semibold px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm md:text-base shadow-lg">
+                <Badge className="bg-primary/20 dark:bg-primary/30 border border-primary/30 text-primary-foreground font-semibold px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm md:text-base shadow-lg">
                   <Calendar className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                   {event.status === "published"
                     ? "Upcoming Event"
@@ -123,7 +123,7 @@ export function EventHero({
                   if (parts.length === 0) return null;
                   if (parts.length === 1) {
                     return (
-                      <span className="gradient-text-primary">{parts[0]}</span>
+                      <span className="text-primary">{parts[0]}</span>
                     );
                   }
                   const last = parts.pop();
@@ -131,7 +131,7 @@ export function EventHero({
                   return (
                     <>
                       {first}{" "}
-                      <span className="gradient-text-primary">{last}</span>
+                      <span className="text-primary">{last}</span>
                     </>
                   );
                 })()}
@@ -145,9 +145,9 @@ export function EventHero({
                 className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-3 sm:gap-4 md:gap-6 mb-4 sm:mb-6 md:mb-8"
               >
                 {/* Date & Time Card */}
-                <div className="glass-card rounded-xl p-4 md:p-5 border border-white/20 bg-white/5 dark:bg-white/10 shadow-premium w-full sm:w-auto">
+                <div className="glass-card rounded-xl p-4 md:p-5 border border-white/20 bg-white/5 dark:bg-white/10 w-full sm:w-auto">
                   <div className="flex items-center justify-center sm:justify-start space-x-3 sm:space-x-4">
-                    <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr from-primary/30 to-primary/10 shadow-sm flex-shrink-0">
+                    <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 shadow-sm flex-shrink-0">
                       <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                     </div>
                     <div className="text-center sm:text-left">
@@ -163,9 +163,9 @@ export function EventHero({
 
                 {/* Location Card */}
                 {event.location_name && (
-                  <div className="glass-card rounded-xl p-4 md:p-5 border border-white/20 bg-white/5 dark:bg-white/10 shadow-premium w-full sm:w-auto">
+                  <div className="glass-card rounded-xl p-4 md:p-5 border border-white/20 bg-white/5 dark:bg-white/10 w-full sm:w-auto">
                     <div className="flex items-center justify-center sm:justify-start space-x-3 sm:space-x-4">
-                      <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr from-primary/30 to-primary/10 shadow-sm flex-shrink-0">
+                      <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 shadow-sm flex-shrink-0">
                         <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                       </div>
                       <div className="text-center sm:text-left">
@@ -192,7 +192,7 @@ export function EventHero({
               >
                 <Button
                   size="lg"
-                  className="bg-primary text-primary-foreground font-semibold px-6 sm:px-8 py-3 rounded-xl shadow-lg transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_20px_rgba(255,24,77,0.5)] focus-visible:ring-2 focus-visible:ring-primary/40 focus:outline-none hover:scale-[1.02] text-sm sm:text-base"
+                  className="bg-primary text-primary-foreground font-semibold px-6 sm:px-8 py-3 rounded-xl shadow-lg transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_20px_rgba(255,24,77,0.5)] focus-visible:ring-2 focus-visible:ring-primary/40 focus:outline-none text-sm sm:text-base"
                   onClick={() => {
                     const ticketsSection = document.getElementById("tickets");
                     if (ticketsSection) {
