@@ -183,11 +183,15 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
 
     for (const deal of dealRows) {
       if (deal.listing_id == null) continue;
-      const lid = deal.listing_id as number;
+      const lid = Number(deal.listing_id);
+      if (!Number.isFinite(lid) || lid <= 0) continue;
+
       const endMs = deal.end_date
         ? Date.parse(String(deal.end_date))
         : Number.POSITIVE_INFINITY;
-      const isActiveNow = Boolean(deal.is_active) && endMs >= nowMs;
+      const isActiveNow =
+        Boolean(deal.is_active) &&
+        (isNaN(endMs) || endMs >= nowMs);
 
       let maxDiscount = 0;
       if (deal.discount_value) {
@@ -199,15 +203,37 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
         maxDiscount,
       );
 
+      const dealBankId =
+        deal.bank_id != null && deal.bank_id !== ""
+          ? Number(deal.bank_id)
+          : null;
       const bankMatch =
         bankId != null && !Number.isNaN(bankId)
-          ? deal.bank_id === bankId
+          ? dealBankId === bankId
           : true;
-      const cardMatch =
-        cardId != null && !Number.isNaN(cardId)
-          ? Array.isArray(deal.valid_card_variants) &&
-            deal.valid_card_variants.includes(cardId)
-          : true;
+
+      let cardMatch = true;
+      if (cardId != null && !Number.isNaN(cardId)) {
+        if (Array.isArray(deal.valid_card_variants)) {
+          cardMatch = deal.valid_card_variants.some(
+            (v: unknown) => Number(v) === cardId,
+          );
+        } else if (typeof deal.valid_card_variants === "string") {
+          try {
+            const parsed = JSON.parse(deal.valid_card_variants);
+            if (Array.isArray(parsed)) {
+              cardMatch = parsed.some((v: unknown) => Number(v) === cardId);
+            } else {
+              cardMatch = false;
+            }
+          } catch {
+            cardMatch = false;
+          }
+        } else {
+          cardMatch = false;
+        }
+      }
+
       const dealsMatch = filters.dealsOnly ? isActiveNow : true;
 
       if (dealsMatch && bankMatch && cardMatch) {
@@ -229,7 +255,7 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
     }
 
     queryParams.push(dealIds);
-    whereClauses.push(`id = ANY($${queryParams.length})`);
+    whereClauses.push(`id = ANY($${queryParams.length}::bigint[])`);
   }
 
   const whereSql = whereClauses.join(" AND ");
