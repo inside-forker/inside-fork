@@ -809,7 +809,10 @@ export function EventModal({
       console.error("Error saving event:", error);
       toast({
         title: "Error",
-        description: "Failed to save event. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to save event. Please try again.",
         variant: "destructive",
       });
     } finally {

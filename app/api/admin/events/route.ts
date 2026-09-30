@@ -212,10 +212,39 @@ export async function POST(request: NextRequest) {
       total_gates,
     } = body;
 
-    const slug = name
+    if (!name || !name.trim()) {
+      return NextResponse.json(
+        { success: false, error: "Event name is required" },
+        { status: 400 },
+      );
+    }
+
+    if (!start_time || !end_time) {
+      return NextResponse.json(
+        { success: false, error: "Start time and end time are required" },
+        { status: 400 },
+      );
+    }
+
+    let baseSlug = name
       .toLowerCase()
+      .trim()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
+    if (!baseSlug) baseSlug = "event";
+
+    // Ensure slug uniqueness to avoid unique constraint violation on events_slug_key
+    let slug = baseSlug;
+    let counter = 1;
+    while (true) {
+      const { rows: existing } = await query(
+        `SELECT id FROM events WHERE slug = $1 LIMIT 1`,
+        [slug]
+      );
+      if (existing.length === 0) break;
+      counter++;
+      slug = `${baseSlug}-${counter}`;
+    }
 
     let event;
     try {
@@ -235,44 +264,72 @@ export async function POST(request: NextRequest) {
            category_id, max_capacity, is_featured, featured_rank, require_guest_details,
            location_name, address, latitude, longitude, scanning_mode, total_gates`,
         [
-          name,
+          name.trim(),
           slug,
-          description,
+          description?.trim() || null,
           start_time,
           end_time,
-          location_name || null,
-          address || null,
-          latitude ?? null,
-          longitude ?? null,
-          category_id || null,
+          location_name?.trim() || null,
+          address?.trim() || null,
+          latitude !== undefined && latitude !== null && latitude !== "" && !isNaN(Number(latitude))
+            ? Number(latitude)
+            : null,
+          longitude !== undefined && longitude !== null && longitude !== "" && !isNaN(Number(longitude))
+            ? Number(longitude)
+            : null,
+          category_id ? Number(category_id) : null,
           organizer_id || session.userId,
-          max_capacity,
-          is_featured || false,
-          featured_rank || null,
-          commission_rate || null,
-          is_commission_based || false,
+          max_capacity !== undefined && max_capacity !== null && max_capacity !== "" && !isNaN(Number(max_capacity))
+            ? Number(max_capacity)
+            : null,
+          is_featured === true || is_featured === "true",
+          featured_rank ? Number(featured_rank) : null,
+          commission_rate !== undefined && commission_rate !== null && commission_rate !== "" && !isNaN(Number(commission_rate))
+            ? Number(commission_rate)
+            : null,
+          is_commission_based === true || is_commission_based === "true",
           status || "draft",
-          require_guest_details || false,
+          require_guest_details === true || require_guest_details === "true",
           scanning_mode || "single",
-          total_gates ? parseInt(total_gates, 10) : 1,
+          total_gates ? Math.max(1, parseInt(String(total_gates), 10) || 1) : 1,
         ]
       );
       const row = rows[0];
-      event = {
-        ...row,
-        id: Number(row.id),
-        category_id: row.category_id !== null ? Number(row.category_id) : null,
-        total_gates: row.total_gates !== null && row.total_gates !== undefined ? Number(row.total_gates) : 1,
-        latitude: row.latitude !== null ? Number(row.latitude) : null,
-        longitude: row.longitude !== null ? Number(row.longitude) : null,
-        commission_rate:
-          row.commission_rate !== null ? Number(row.commission_rate) : null,
-      };
+      const insertedId = Number(row.id);
+
+      // Attempt to return complete enriched row from events_with_details
+      try {
+        const { rows: detailRows } = await query(
+          `SELECT ${EVENT_COLUMNS} FROM events_with_details WHERE event_id = $1`,
+          [insertedId]
+        );
+        if (detailRows[0]) {
+          event = {
+            ...toNumericEvent(detailRows[0]),
+            id: insertedId,
+            event_id: insertedId,
+          };
+        } else {
+          event = {
+            ...toNumericEvent(row),
+            id: insertedId,
+            event_id: insertedId,
+          };
+        }
+      } catch {
+        event = {
+          ...toNumericEvent(row),
+          id: insertedId,
+          event_id: insertedId,
+        };
+      }
     } catch (error) {
       console.error("Error creating event:", error);
       captureRouteError(error, { route: ROUTE, method: "POST" });
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to create event";
       return NextResponse.json(
-        { success: false, error: "Failed to create event" },
+        { success: false, error: errorMessage },
         { status: 500 },
       );
     }
