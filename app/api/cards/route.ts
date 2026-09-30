@@ -37,6 +37,8 @@ export async function GET(request: NextRequest) {
     );
 
     const cardData = cards.map((card) => ({
+      value: String(card.id),
+      label: card.card_name as string,
       id: card.id,
       card_name: card.card_name,
       card_type: card.card_type,
