@@ -171,14 +171,29 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
   const maxDiscountByListingId: Record<number, number> = {};
 
   if (needsDeals) {
+    const bankId = filters.bankParam ? parseInt(filters.bankParam, 10) : null;
+    const cardId = filters.cardParam ? parseInt(filters.cardParam, 10) : null;
+
+    let targetCardName: string | null = null;
+    let targetCardBankId: number | null = null;
+
+    if (cardId != null && !Number.isNaN(cardId)) {
+      const { rows: cardRows } = await query(
+        `SELECT id, bank_id, card_name FROM card_variants WHERE id = $1 LIMIT 1`,
+        [cardId],
+      );
+      if (cardRows.length > 0) {
+        targetCardName = String(cardRows[0].card_name || "").toLowerCase().replace(/\s+/g, " ").trim();
+        targetCardBankId = cardRows[0].bank_id != null ? Number(cardRows[0].bank_id) : null;
+      }
+    }
+
     const { rows: dealRows } = await query(
-      `SELECT listing_id, discount_value, is_active, bank_id, valid_card_variants, end_date
+      `SELECT listing_id, discount_value, is_active, bank_id, valid_card_variants, metadata, end_date
        FROM deals`,
     );
 
     const nowMs = Date.now();
-    const bankId = filters.bankParam ? parseInt(filters.bankParam, 10) : null;
-    const cardId = filters.cardParam ? parseInt(filters.cardParam, 10) : null;
     const filteredIds = new Set<number>();
 
     for (const deal of dealRows) {
@@ -214,6 +229,8 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
 
       let cardMatch = true;
       if (cardId != null && !Number.isNaN(cardId)) {
+        cardMatch = false;
+        // 1) Direct ID match
         if (Array.isArray(deal.valid_card_variants)) {
           cardMatch = deal.valid_card_variants.some(
             (v: unknown) => Number(v) === cardId,
@@ -223,14 +240,37 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
             const parsed = JSON.parse(deal.valid_card_variants);
             if (Array.isArray(parsed)) {
               cardMatch = parsed.some((v: unknown) => Number(v) === cardId);
-            } else {
-              cardMatch = false;
             }
           } catch {
-            cardMatch = false;
+            // Ignore JSON parse error
           }
-        } else {
-          cardMatch = false;
+        }
+
+        // 2) Name match via Peekaboo metadata.card_associations within bank
+        if (
+          !cardMatch &&
+          targetCardName &&
+          (targetCardBankId == null || targetCardBankId === dealBankId)
+        ) {
+          const metadata = deal.metadata as Record<string, unknown> | null;
+          if (metadata && Array.isArray(metadata.card_associations)) {
+            for (const assoc of metadata.card_associations) {
+              if (
+                assoc &&
+                typeof assoc === "object" &&
+                typeof (assoc as { name?: string }).name === "string"
+              ) {
+                const assocName = (assoc as { name: string }).name
+                  .toLowerCase()
+                  .replace(/\s+/g, " ")
+                  .trim();
+                if (assocName === targetCardName) {
+                  cardMatch = true;
+                  break;
+                }
+              }
+            }
+          }
         }
       }
 
