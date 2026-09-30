@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Database } from "@/types/database";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,6 @@ type Listing = Database["public"]["Views"]["listings_with_details"]["Row"];
 interface PremiumListingHeroClientProps {
   listing: Listing;
   images: string[];
-  hasMultipleImages: boolean;
   fallbackImage: string;
 }
 
@@ -78,57 +76,23 @@ function truncateAddress(
 export function PremiumListingHeroClient({
   listing,
   images,
-  hasMultipleImages,
   fallbackImage,
 }: PremiumListingHeroClientProps) {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-
-  // Auto-rotate images
-  useEffect(() => {
-    if (hasMultipleImages) {
-      const interval = setInterval(() => {
-        setCurrentImageIndex((prev) => (prev + 1) % images.length);
-      }, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [hasMultipleImages, images.length]);
+  const heroImage = images[0] || fallbackImage;
 
   return (
     <>
-      {/* Dynamic Background Image - Changes with slider */}
+      {/* Background Image */}
       <div className="absolute inset-0 scale-105">
-        {/* Show all images but only the current one is visible for smooth transitions */}
-        {images.length > 0 ? (
-          images.map((img, index) => (
-            <div
-              key={img}
-              className={cn(
-                "absolute inset-0 transition-opacity duration-700",
-                index === currentImageIndex ? "opacity-100" : "opacity-0",
-              )}
-            >
-              <OptimizedImage
-                src={img}
-                alt={`${listing.name || "Listing"} - Image ${index + 1}`}
-                fill
-                className="object-cover"
-                priority={index === 0}
-                sizes="100vw"
-                loading={index === 0 ? "eager" : "lazy"}
-              />
-            </div>
-          ))
-        ) : (
-          <OptimizedImage
-            src={fallbackImage}
-            alt={listing.name || "Listing"}
-            fill
-            className="object-cover"
-            priority
-            sizes="100vw"
-            loading="eager"
-          />
-        )}
+        <OptimizedImage
+          src={heroImage}
+          alt={listing.name || "Listing"}
+          fill
+          className="object-cover"
+          priority
+          sizes="100vw"
+          loading="eager"
+        />
       </div>
 
       {/* Gradient Overlays - Must be AFTER background image for proper stacking */}
@@ -142,37 +106,6 @@ export function PremiumListingHeroClient({
         {/* Vignette effect for depth */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.2)_100%)]" />
       </div>
-
-      {/* Image Navigation - Only show if multiple images */}
-      {hasMultipleImages && (
-        <div className="absolute top-2 right-2 md:top-6 md:right-6 z-20 scale-75 md:scale-100 origin-top-right">
-          <div className="flex items-center gap-2 bg-black/20 backdrop-blur-xl rounded-full px-4 py-2 border border-white/20 opacity-0 animate-[fadeInDown_0.6s_ease-out_0.3s_forwards]">
-            {images.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentImageIndex(index)}
-                className={cn(
-                  "relative transition-all duration-300 hover:scale-110 active:scale-90",
-                  index === currentImageIndex ? "w-6 h-2" : "w-2 h-2 hover:w-3",
-                )}
-              >
-                <div
-                  className={cn(
-                    "w-full h-full rounded-full transition-all duration-300",
-                    index === currentImageIndex
-                      ? "bg-gradient-to-r from-primary to-primary/80 shadow-lg shadow-primary/30"
-                      : "bg-white/40 hover:bg-white/60",
-                  )}
-                />
-              </button>
-            ))}
-            <div className="w-px h-3 bg-white/30 mx-1" />
-            <span className="text-white/80 text-xs font-medium">
-              {currentImageIndex + 1}/{images.length}
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Content - Mobile Centered, Desktop Bottom */}
       <div className="absolute inset-0 flex items-center md:items-end z-20">
