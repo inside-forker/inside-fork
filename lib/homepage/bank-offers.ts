@@ -1,31 +1,33 @@
 import { unstable_cache } from "next/cache";
 import { query } from "@/lib/db";
 
-export type BankWithOffers = {
+export type SupportedBank = {
   id: number;
   name: string;
   logoUrl: string | null;
+  /** Places with a live deal on this bank's cards. 0 when it has none yet. */
   offers: number;
 };
 
 /**
- * Banks that currently have at least one live deal on a listing, busiest
- * first. Same "live" rule as the listings deals filter: active and not ended.
+ * Every bank the platform supports, with how many places currently have a
+ * live deal on it (active and not ended, the same rule as the listings deals
+ * filter). Busiest first, then A-Z, like the app's bank index.
  */
-export const getBanksWithOffers = unstable_cache(
-  async (): Promise<BankWithOffers[]> => {
+export const getSupportedBanks = unstable_cache(
+  async (): Promise<SupportedBank[]> => {
     try {
       const { rows } = await query(
         `SELECT b.id, b.name, b.logo_url,
                 COUNT(DISTINCT d.listing_id)::integer AS offers
          FROM banks b
-         JOIN deals d ON d.bank_id = b.id
-         WHERE d.is_active = true
-           AND d.listing_id IS NOT NULL
-           AND (d.end_date IS NULL OR d.end_date::timestamptz >= NOW())
+         LEFT JOIN deals d
+           ON d.bank_id = b.id
+          AND d.is_active = true
+          AND d.listing_id IS NOT NULL
+          AND (d.end_date IS NULL OR d.end_date::timestamptz >= NOW())
          GROUP BY b.id, b.name, b.logo_url
-         ORDER BY offers DESC, b.name ASC
-         LIMIT 12`,
+         ORDER BY offers DESC, b.name ASC`,
       );
       return rows.map((row) => ({
         id: Number(row.id),
@@ -34,10 +36,10 @@ export const getBanksWithOffers = unstable_cache(
         offers: Number(row.offers) || 0,
       }));
     } catch (error) {
-      console.error("Bank offers query failed:", error);
+      console.error("Supported banks query failed:", error);
       return [];
     }
   },
-  ["homepage-bank-offers"],
+  ["homepage-supported-banks"],
   { revalidate: 3600, tags: ["deals"] },
 );

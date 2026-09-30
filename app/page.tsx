@@ -46,17 +46,17 @@ export default function Home() {
         <CategoriesContainer />
       </Suspense>
 
-      {/* Bank card offers (hidden when no bank has a live deal) */}
-      <Suspense fallback={null}>
-        <BankOffersSection />
-      </Suspense>
-
       {/* Everything the platform does */}
       <FeaturesSection />
 
       {/* Featured Listings Section */}
       <Suspense fallback={<FeaturedListingsSkeleton />}>
         <FeaturedListingsContainer />
+      </Suspense>
+
+      {/* Every supported bank, with live offer counts */}
+      <Suspense fallback={null}>
+        <BankOffersSection />
       </Suspense>
 
       {/* Mobile app teaser - store badges disabled until launch */}
