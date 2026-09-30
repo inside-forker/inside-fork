@@ -60,6 +60,9 @@ const bodySchema = z.object({
       .pipe(z.string().regex(/^\d{13}$/, "CNIC must be 13 digits.")),
   }),
   coupon_code: z.string().min(1).max(64).optional(),
+  // Approved Parchi student verification (POST /parchi/verifications).
+  // Mutually exclusive with coupon_code.
+  parchi_verification_id: z.string().uuid().optional(),
 });
 
 /**
@@ -80,6 +83,10 @@ const bodySchema = z.object({
  * (see the coupon migration's header comment). `GET /coupons/validate` is a
  * separate, non-authoritative preview for the "Apply Offer" UI before this
  * point.
+ *
+ * Optional `parchi_verification_id` applies the Parchi student discount
+ * instead: the RPC checks the approval (owner, event, unused) and consumes it
+ * under a row lock via `claim_parchi_discount`.
  */
 export const POST = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
@@ -103,7 +110,20 @@ export const POST = mobileRoute(async (request: NextRequest) => {
       path || undefined,
     );
   }
-  const { tickets, customer, coupon_code: couponCode } = parsed.data;
+  const {
+    tickets,
+    customer,
+    coupon_code: couponCode,
+    parchi_verification_id: parchiVerificationId,
+  } = parsed.data;
+  if (couponCode && parchiVerificationId) {
+    throw new MobileApiError(
+      "coupon_invalid",
+      "A coupon can't be combined with the Parchi student discount.",
+      400,
+      "coupon_code",
+    );
+  }
 
   // Aggregate duplicate ticket types.
   const agg = new Map<number, number>();
@@ -192,7 +212,13 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     }
   }
 
-  const basket = computeBasketHash(user.id, eventId, items, customer.cnic);
+  const basket = computeBasketHash(
+    user.id,
+    eventId,
+    items,
+    customer.cnic,
+    parchiVerificationId,
+  );
 
   // Reuse an existing unpaid booking for this basket (drives the UX `reused`
   // flag); the RPC's ON CONFLICT is the real atomic dedup.
@@ -225,7 +251,8 @@ export const POST = mobileRoute(async (request: NextRequest) => {
            p_cnic_hash => $6,
            p_cnic_last4 => $7,
            p_basket_id => $8,
-           p_coupon_code => $9
+           p_coupon_code => $9,
+           p_parchi_request_id => $10::uuid
          ) AS result`,
         [
           user.id,
@@ -237,6 +264,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
           cnicLast4(customer.cnic),
           basket,
           couponCode ?? null,
+          parchiVerificationId ?? null,
         ],
       );
       newId = (rpcRows[0]?.result as number | null) ?? null;
@@ -245,6 +273,13 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     }
     if (rpcErrMsg || newId == null) {
       const msg = rpcErrMsg ?? "";
+      if (/^parchi:/i.test(msg))
+        throw new MobileApiError(
+          "parchi_invalid",
+          msg.replace(/^parchi:\s*/i, ""),
+          400,
+          "parchi_verification_id",
+        );
       if (/sale window/i.test(msg))
         throw new MobileApiError(
           "sale_window_closed",

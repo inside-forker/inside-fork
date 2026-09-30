@@ -13,6 +13,11 @@ import { GuestDetailsForm } from "./GuestDetailsForm";
 import { useToast } from "@/hooks/use-toast";
 import { CheckoutSteps } from "./CheckoutSteps";
 import { ResumeBookingCard } from "./ResumeBookingCard";
+import { ParchiDiscountCard } from "./ParchiDiscountCard";
+import {
+  computeParchiDiscount,
+  type ParchiOffer,
+} from "@/lib/parchi/discount";
 import type {
   ResumableBookingDTO,
   ResumableResponse,
@@ -45,6 +50,40 @@ export function CheckoutClient() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Parchi student discount - only for single-event carts (bookings are
+  // single-event anyway).
+  const cartEventIds = Array.from(new Set(items.map((i) => i.eventId)));
+  const parchiEventId = cartEventIds.length === 1 ? cartEventIds[0] : null;
+  const userId = user?.id;
+  const [parchiOffer, setParchiOffer] = useState<ParchiOffer | null>(null);
+  const [parchiVerificationId, setParchiVerificationId] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    setParchiOffer(null);
+    setParchiVerificationId(null);
+    if (!userId || !parchiEventId) return;
+    let cancelled = false;
+    fetch(`/api/parchi/offer?eventId=${parchiEventId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled) setParchiOffer(data?.offer ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, parchiEventId]);
+
+  const parchiDiscount =
+    parchiOffer && parchiVerificationId
+      ? computeParchiDiscount(
+          parchiOffer,
+          items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+        )
+      : 0;
 
   // Fetch Config
   useEffect(() => {
@@ -269,6 +308,7 @@ export function CheckoutClient() {
         body: JSON.stringify({
           buyerDetails,
           items,
+          parchiVerificationId,
           fees: {
             platformFeeFixed: Number(config?.["fees.platform_fee_fixed"] || 0),
             platformFeePercentage: Number(
@@ -376,6 +416,14 @@ export function CheckoutClient() {
             </CardContent>
           </Card>
 
+          {parchiOffer && parchiEventId && (
+            <ParchiDiscountCard
+              eventId={parchiEventId}
+              offer={parchiOffer}
+              onApprovedChange={setParchiVerificationId}
+            />
+          )}
+
           {/* Guest Details */}
           {items.map((item) => {
             const event = eventDetails[item.eventId];
@@ -441,6 +489,7 @@ export function CheckoutClient() {
               paymentFeePercentage={Number(
                 config?.["fees.payment_processing_fee_percentage"] || 0
               )}
+              discount={parchiDiscount}
             >
               <div className="space-y-4 pt-4">
                 <Button

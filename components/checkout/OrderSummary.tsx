@@ -11,6 +11,8 @@ interface OrderSummaryProps {
   platformFeePercentage: number;
   paymentFeeFixed: number;
   paymentFeePercentage: number;
+  /** Parchi student discount, taken off the subtotal before fees. */
+  discount?: number;
 }
 
 export function OrderSummary({
@@ -19,6 +21,7 @@ export function OrderSummary({
   platformFeePercentage,
   paymentFeeFixed,
   paymentFeePercentage,
+  discount = 0,
   children,
 }: OrderSummaryProps & { children?: React.ReactNode }) {
   const subtotal = items.reduce(
@@ -26,12 +29,15 @@ export function OrderSummary({
     0
   );
 
+  // Mirrors app/api/bookings/create/route.ts: fees on the discounted subtotal.
+  const discountedSubtotal = subtotal - discount;
   const platformFee =
-    platformFeeFixed + subtotal * (platformFeePercentage / 100);
+    platformFeeFixed + discountedSubtotal * (platformFeePercentage / 100);
   const paymentFee =
-    paymentFeeFixed + (subtotal + platformFee) * (paymentFeePercentage / 100);
+    paymentFeeFixed +
+    (discountedSubtotal + platformFee) * (paymentFeePercentage / 100);
 
-  const total = subtotal + platformFee + paymentFee;
+  const total = discountedSubtotal + platformFee + paymentFee;
 
   return (
     <Card className="h-fit border-2 border-primary/10 shadow-lg">
@@ -70,6 +76,13 @@ export function OrderSummary({
             <span>Subtotal</span>
             <span>PKR {subtotal.toLocaleString()}</span>
           </div>
+
+          {discount > 0 && (
+            <div className="flex justify-between text-primary">
+              <span>Parchi student discount</span>
+              <span>- PKR {Math.round(discount).toLocaleString()}</span>
+            </div>
+          )}
 
           {platformFee > 0 && (
             <div className="flex justify-between text-muted-foreground">

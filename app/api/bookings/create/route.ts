@@ -6,6 +6,10 @@ import { captureRouteError } from "@/lib/sentry/captureRouteError";
 import { hashCnic, cnicLast4 } from "@/lib/utils/cnic-server";
 import { resolveAssignedGateIndex } from "@/lib/ticketing/resolve-gate-assignment";
 import crypto from "crypto";
+import {
+  ParchiServiceError,
+  previewParchiDiscount,
+} from "@/lib/parchi/service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +22,11 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { buyerDetails, items } = body;
+    // Approved Parchi student verification (POST /api/parchi/verifications).
+    const parchiVerificationId: string | null =
+      typeof body.parchiVerificationId === "string"
+        ? body.parchiVerificationId
+        : null;
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
@@ -123,11 +132,36 @@ export async function POST(request: NextRequest) {
     const paymentFeePercentage =
       feeMap["fees.payment_processing_fee_percentage"] ?? 0;
 
+    // Parchi discount comes off the ticket subtotal before fees (same order
+    // as the mobile route). Non-authoritative: create_booking_atomic
+    // re-derives it under row locks and rejects a mismatch.
+    let discountAmount = 0;
+    if (parchiVerificationId) {
+      try {
+        discountAmount = await previewParchiDiscount({
+          userId: user.id,
+          eventId: verifiedItems[0].eventId,
+          requestId: parchiVerificationId,
+          subtotal,
+        });
+      } catch (err) {
+        if (err instanceof ParchiServiceError) {
+          return NextResponse.json(
+            { error: err.message, error_code: err.code },
+            { status: err.status },
+          );
+        }
+        throw err;
+      }
+    }
+    const discountedSubtotal = subtotal - discountAmount;
+
     const platformFee =
-      platformFeeFixed + subtotal * (platformFeePercentage / 100);
+      platformFeeFixed + discountedSubtotal * (platformFeePercentage / 100);
     const paymentFee =
-      paymentFeeFixed + (subtotal + platformFee) * (paymentFeePercentage / 100);
-    const totalAmount = subtotal + platformFee + paymentFee;
+      paymentFeeFixed +
+      (discountedSubtotal + platformFee) * (paymentFeePercentage / 100);
+    const totalAmount = discountedSubtotal + platformFee + paymentFee;
 
     // 2. Create Booking + Booking Items atomically via DB function.
     // The RPC wraps both inserts in a single PL/pgSQL transaction -
@@ -166,7 +200,9 @@ export async function POST(request: NextRequest) {
            p_customer_name => $10,
            p_customer_email => $11,
            p_customer_phone => $12,
-           p_items => $13::jsonb
+           p_items => $13::jsonb,
+           p_parchi_request_id => $14::uuid,
+           p_discount_amount => $15
          ) AS result`,
         [
           user.id,
@@ -182,6 +218,8 @@ export async function POST(request: NextRequest) {
           buyerDetails.email,
           buyerDetails.phone,
           JSON.stringify(rpcItems),
+          parchiVerificationId,
+          discountAmount,
         ],
       );
       const rpcResult = rpcRows[0]?.result as BookingAtomicResult | null;
@@ -214,6 +252,16 @@ export async function POST(request: NextRequest) {
         /sale window closed|insufficient quantity|per-person limit exceeded|ticket type .* not found|invalid quantity/i.test(
           message,
         );
+
+      if (/^parchi:/i.test(message)) {
+        return NextResponse.json(
+          {
+            error: message.replace(/^parchi:\s*/i, ""),
+            error_code: "parchi_invalid",
+          },
+          { status: 400 },
+        );
+      }
 
       if (isValidationFailure) {
         return NextResponse.json({ error: message }, { status: 400 });
