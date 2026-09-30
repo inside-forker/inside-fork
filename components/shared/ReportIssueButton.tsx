@@ -26,7 +26,7 @@ export function ReportIssueButton({
         variant="ghost"
         size="sm"
         onClick={() => setIsModalOpen(true)}
-        className="text-muted-foreground hover:text-foreground transition-all duration-300 hover:scale-105 rounded-xl px-4 py-3 text-xs md:text-sm"
+        className="text-muted-foreground hover:text-foreground transition-all duration-300 rounded-xl px-4 py-3 text-xs md:text-sm"
       >
         <div className="flex items-center space-x-2">
           <div className="p-1 rounded-md bg-muted/50 border border-border/50">

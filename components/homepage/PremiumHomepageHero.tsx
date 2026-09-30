@@ -143,15 +143,11 @@ export function PremiumHomepageHero() {
         {/* Hero Heading */}
         <div className="space-y-3 sm:space-y-4 mb-8 sm:mb-10 animate-hero-fade-in-delay-1">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
-            Unlock the best of <span className="text-primary">Karachi</span>
+            Your next plan starts <span className="text-primary">Inside</span>.
           </h1>
           <p className="max-w-2xl mx-auto text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed">
-            Discover hidden gems, trending spots, and exclusive experiences in
-            Pakistan&apos;s vibrant metropolis.
-            <span className="hidden sm:inline">
-              {" "}
-              Your ultimate companion for exploring the city that never sleeps.
-            </span>
+            Discover places, find bank discounts, and book events across
+            Karachi.
           </p>
         </div>
 

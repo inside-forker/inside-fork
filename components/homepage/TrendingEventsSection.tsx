@@ -6,7 +6,7 @@ import {
   SectionHeading,
   containerClass,
   sectionClass,
-} from "@/components/homepage/SectionHeading";
+} from "@/components/shared/SectionHeading";
 
 interface TrendingEventsSectionProps {
   events: Event[];

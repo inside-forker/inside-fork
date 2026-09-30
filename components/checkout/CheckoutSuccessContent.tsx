@@ -16,9 +16,6 @@ import {
   CreditCard,
   Shield,
   Sparkles,
-  Star,
-  Heart,
-  Gift,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/lib/context/cartStore";
@@ -92,82 +89,16 @@ export function CheckoutSuccessContent({
     }
   }, [status]);
 
-  // Floating decorative elements based on status
-  const getFloatingElements = () => {
-    if (status === "paid") {
-      return [
-        { icon: Star, delay: 0, position: "top-16 left-4 sm:left-20" },
-        { icon: Heart, delay: 2, position: "top-24 right-4 sm:right-32" },
-        { icon: Gift, delay: 4, position: "bottom-32 left-8 sm:left-16" },
-        { icon: Sparkles, delay: 1, position: "bottom-24 right-8 sm:right-16" },
-        { icon: Ticket, delay: 3, position: "top-1/2 left-4 sm:left-12" },
-        { icon: Mail, delay: 5, position: "top-1/3 right-4 sm:right-12" },
-      ];
-    }
-    return [];
-  };
 
-  const floatingElements = getFloatingElements();
 
   // Success State (Paid)
   if (status === "paid") {
     return (
       <div className="min-h-screen bg-background relative overflow-hidden flex flex-col">
-        {/* Background gradient */}
-        <div
-          className="absolute inset-0 bg-gradient-to-br from-green-500/10 via-background to-emerald-500/5"
-          aria-hidden
-        />
 
-        {/* Subtle grid overlay */}
-        <div
-          className="absolute inset-0 bg-[linear-gradient(rgba(34,197,94,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,0.02)_1px,transparent_1px)] bg-[size:50px_50px]"
-          aria-hidden
-        />
 
-        {/* Decorative orbs */}
-        <motion.div
-          animate={{ y: [0, 50, 0] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="hidden sm:block absolute -top-32 -right-32 w-96 h-96 bg-green-500/10 rounded-full blur-3xl pointer-events-none"
-          aria-hidden
-        />
 
-        <motion.div
-          animate={{ y: [0, -30, 0] }}
-          transition={{
-            duration: 6,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 2,
-          }}
-          className="hidden sm:block absolute -bottom-32 -left-32 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"
-          aria-hidden
-        />
 
-        {/* Floating decorative elements */}
-        {floatingElements.map((element, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{
-              opacity: [0.2, 0.5, 0.2],
-              y: [0, -10, 0],
-            }}
-            transition={{
-              duration: 4,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: element.delay,
-            }}
-            className={cn(
-              "absolute hidden sm:block pointer-events-none",
-              element.position,
-            )}
-          >
-            <element.icon className="w-6 h-6 text-green-500/30" />
-          </motion.div>
-        ))}
 
         {/* Main Content */}
         <div className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8 relative z-10">
@@ -189,7 +120,7 @@ export function CheckoutSuccessContent({
               }}
               className="text-center"
             >
-              <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/20 border-2 border-green-500/20 shadow-xl shadow-green-500/10">
+              <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-emerald-700/10">
                 <CheckCircle2 className="w-12 h-12 text-green-500" />
               </div>
             </motion.div>
@@ -209,7 +140,7 @@ export function CheckoutSuccessContent({
                 Payment Successful
               </Badge>
 
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight">
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
                 All Set!
               </h1>
 
@@ -226,9 +157,8 @@ export function CheckoutSuccessContent({
               transition={{ duration: 0.5, delay: 0.4 }}
               className="relative group"
             >
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-1000" />
 
-              <div className="relative rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 space-y-4">
+              <div className="relative rounded-2xl border border-border/50 bg-card p-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                     Transaction Details
@@ -345,10 +275,6 @@ export function CheckoutSuccessContent({
   if (status === "pending") {
     return (
       <div className="min-h-screen bg-background relative overflow-hidden flex flex-col">
-        <div
-          className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-background to-orange-500/5"
-          aria-hidden
-        />
 
         <div className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8 relative z-10">
           <motion.div
@@ -368,7 +294,7 @@ export function CheckoutSuccessContent({
               }}
               className="text-center"
             >
-              <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 border-2 border-amber-500/20">
+              <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-amber-500/10">
                 <Clock className="w-12 h-12 text-amber-500 animate-pulse" />
               </div>
             </motion.div>
@@ -387,7 +313,7 @@ export function CheckoutSuccessContent({
                 Processing Payment
               </Badge>
 
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight">
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
                 Almost There...
               </h1>
 
@@ -401,7 +327,7 @@ export function CheckoutSuccessContent({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
-              className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 space-y-4"
+              className="rounded-2xl border border-border/50 bg-card p-6 space-y-4"
             >
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                 Transaction Details
@@ -481,10 +407,6 @@ export function CheckoutSuccessContent({
   if (status === "security_failed") {
     return (
       <div className="min-h-screen bg-background relative overflow-hidden flex flex-col">
-        <div
-          className="absolute inset-0 bg-gradient-to-br from-red-500/10 via-background to-rose-500/5"
-          aria-hidden
-        />
 
         <div className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8 relative z-10">
           <motion.div
@@ -504,7 +426,7 @@ export function CheckoutSuccessContent({
               }}
               className="text-center"
             >
-              <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-red-500/20 to-rose-500/20 border-2 border-red-500/20">
+              <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-red-600/10">
                 <AlertTriangle className="w-12 h-12 text-red-500" />
               </div>
             </motion.div>
@@ -523,7 +445,7 @@ export function CheckoutSuccessContent({
                 Security Issue
               </Badge>
 
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight">
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
                 Security Validation Failed
               </h1>
 
@@ -537,7 +459,7 @@ export function CheckoutSuccessContent({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
-              className="rounded-2xl border border-red-500/20 bg-red-500/5 backdrop-blur-sm p-6 space-y-4"
+              className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6 space-y-4"
             >
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                 Transaction Details

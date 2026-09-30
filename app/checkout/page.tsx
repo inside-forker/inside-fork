@@ -16,9 +16,6 @@ export default function CheckoutPage() {
     <div className="min-h-screen bg-background relative">
       {/* Ambient Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-primary/5 via-primary/5 to-transparent" />
-        <div className="absolute -top-[200px] -right-[200px] w-[800px] h-[800px] bg-primary/10 rounded-full blur-[120px] opacity-40" />
-        <div className="absolute top-[20%] -left-[200px] w-[600px] h-[600px] bg-amber-500/5 rounded-full blur-[100px] opacity-30" />
       </div>
 
       <div className="container max-w-7xl pt-12 pb-20 relative z-10">

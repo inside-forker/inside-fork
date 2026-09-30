@@ -8,7 +8,7 @@ import {
   SectionHeading,
   containerClass,
   sectionClass,
-} from "@/components/homepage/SectionHeading";
+} from "@/components/shared/SectionHeading";
 
 interface Category {
   id: number;

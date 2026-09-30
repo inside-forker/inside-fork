@@ -108,24 +108,15 @@ export default function FeaturedEventsCarousel({
 
   return (
     <div className="w-full relative">
-      {/* Left fade */}
-      <div
-        className={`absolute left-0 top-0 bottom-4 w-20 z-20 pointer-events-none bg-gradient-to-r from-background md:via-background/80 md:to-transparent via-background/40 to-transparent`}
-      />
-      {/* Right fade */}
-      <div
-        className={`absolute right-0 top-0 bottom-4 w-20 z-20 pointer-events-none bg-gradient-to-l from-background md:via-background/80 md:to-transparent via-background/40 to-transparent`}
-      />
 
       {/* Left control */}
       {canScrollLeft && (
         <button
           onClick={scrollPrev}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 bg-background/95 backdrop-blur-md border border-border/50 rounded-full flex items-center justify-center shadow-xl hover:shadow-2xl hover:shadow-primary/20 hover:bg-background hover:scale-110 hover:border-primary/30 transition-all duration-300 group"
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-30 w-11 h-11 bg-card border border-border rounded-full flex items-center justify-center shadow-sm hover:border-primary/40 active:opacity-80 transition-colors group"
           aria-label="Scroll left"
         >
           <ArrowRight className="w-5 h-5 rotate-180 text-muted-foreground group-hover:text-primary transition-colors duration-300" />
-          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm" />
         </button>
       )}
 
@@ -133,11 +124,10 @@ export default function FeaturedEventsCarousel({
       {canScrollRight && (
         <button
           onClick={scrollNext}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 bg-background/95 backdrop-blur-md border border-border/50 rounded-full flex items-center justify-center shadow-xl hover:shadow-2xl hover:shadow-primary/20 hover:bg-background hover:scale-110 hover:border-primary/30 transition-all duration-300 group"
+          className="absolute right-4 top-1/2 -translate-y-1/2 z-30 w-11 h-11 bg-card border border-border rounded-full flex items-center justify-center shadow-sm hover:border-primary/40 active:opacity-80 transition-colors group"
           aria-label="Scroll right"
         >
           <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors duration-300" />
-          <div className="absolute inset-0 rounded-full bg-gradient-to-l from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm" />
         </button>
       )}
 

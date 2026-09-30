@@ -99,50 +99,39 @@ export function PremiumEventFilters({
   return (
     <>
       {/* Header with matching container width */}
-      <div className="relative mt-10 mb-6">
+      <div className="relative mb-6">
         <div className="w-full">
-          {/* Breadcrumb + Section Heading above the filter controls */}
+          {/* Section heading, app style */}
           <div className="mb-4">
-            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full">
-              <div className="p-2 sm:p-3 rounded-2xl bg-primary/10 border border-primary/20 flex-shrink-0 mb-2 sm:mb-0">
-                <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-              </div>
-              <div className="text-center sm:text-left">
-                <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight leading-tight mb-2">
-                  <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                    All <span className="gradient-text-primary">Events</span>
+            <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              All events{" "}
+              <span className="text-base font-normal text-muted-foreground">
+                ({eventsCount})
+              </span>
+            </h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {searchParams.search ? (
+                <>
+                  Results for{" "}
+                  <span className="font-medium text-foreground">
+                    &ldquo;{searchParams.search}&rdquo;
                   </span>
-                  <span className="text-lg font-normal text-muted-foreground ml-2">
-                    ({eventsCount} {eventsCount === 1 ? "event" : "events"})
+                </>
+              ) : searchParams.category ? (
+                <>
+                  Events in{" "}
+                  <span className="font-medium text-foreground capitalize">
+                    {searchParams.category}
                   </span>
-                </h1>
-                <p className="max-w-2xl mx-auto text-lg md:text-xl text-muted-foreground">
-                  {searchParams.search ? (
-                    <>
-                      Results for{" "}
-                      <span className="font-medium text-foreground">
-                        &ldquo;{searchParams.search}&rdquo;
-                      </span>
-                    </>
-                  ) : searchParams.category ? (
-                    <>
-                      Events in{" "}
-                      <span className="font-medium text-foreground capitalize">
-                        {searchParams.category}
-                      </span>
-                    </>
-                  ) : (
-                    "Discover amazing events happening in Karachi"
-                  )}
-                </p>
-              </div>
-            </div>
+                </>
+              ) : (
+                "Everything coming up in Karachi"
+              )}
+            </p>
           </div>
 
-          {/* Compact glassmorphism container with controls only */}
+          {/* Filter controls */}
           <div className="relative rounded-2xl bg-card border border-border shadow-sm overflow-hidden">
-            {/* Subtle gradient accent */}
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
 
             <div className="relative p-6 space-y-5">
               {/* Mobile compact bar: visible on xs only, prevents vertical stacking */}
@@ -280,7 +269,7 @@ export function PremiumEventFilters({
             className="overflow-hidden mb-6"
           >
             <div className="w-full">
-              <div className="p-6 bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl space-y-4">
+              <div className="p-6 bg-card border border-border/50 rounded-xl space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-primary" />
@@ -356,7 +345,7 @@ export function PremiumEventFilters({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search events..."
-                className="w-full h-12 pl-10 pr-10 text-sm rounded-xl bg-card/50 border-border/50 hover:border-border/80 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                className="w-full h-12 pl-10 pr-10 text-sm rounded-xl bg-card border-border/50 hover:border-border/80 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200"
               />
             </div>
           </motion.div>

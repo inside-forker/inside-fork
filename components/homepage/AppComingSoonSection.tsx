@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
-import { containerClass, sectionClass } from "@/components/homepage/SectionHeading";
+import { containerClass, sectionClass } from "@/components/shared/SectionHeading";
 import { Bell, QrCode, Tag, WifiOff } from "lucide-react";
 
 const appPerks = [

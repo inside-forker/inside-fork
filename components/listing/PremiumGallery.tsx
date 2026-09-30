@@ -323,12 +323,12 @@ export function PremiumGallery({
           {/* Mobile Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-3">
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium">
+              <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
                 <Camera className="h-6 w-6 text-primary" />
               </div>
               <div>
                 <PremiumHeading level={2} dense className="text-foreground">
-                  {_title} <span className="gradient-text-primary"></span>
+                  {_title} <span className="text-primary"></span>
                 </PremiumHeading>
                 <p className="text-sm sm:text-base md:text-lg text-muted-foreground md:mt-1">
                   Explore all {_title.toLowerCase()}
@@ -355,15 +355,14 @@ export function PremiumGallery({
               alt={`Gallery image ${mainImageIndex + 1}`}
               fill
               sizes="(max-width: 768px) 100vw, 90vw"
-              className="object-cover transition-all duration-300 hover:scale-105"
+              className="object-cover transition-all duration-300"
               priority
               instant
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
             <div className="absolute top-4 right-4">
               <Badge
                 variant="secondary"
-                className="bg-black/50 text-white border-0 backdrop-blur-sm"
+                className="bg-black/50 text-white border-0"
               >
                 {mainImageIndex + 1} / {galleryUrls.length}
               </Badge>
@@ -376,7 +375,7 @@ export function PremiumGallery({
                   e.stopPropagation();
                   openLightbox(mainImageIndex);
                 }}
-                className="w-full bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20"
+                className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20"
               >
                 <svg
                   className="w-4 h-4 mr-2"
@@ -459,12 +458,12 @@ export function PremiumGallery({
         <div className="hidden md:block">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-3">
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium">
+              <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
                 <Camera className="h-6 w-6 text-primary" />
               </div>
               <div>
                 <PremiumHeading level={2} dense className="text-foreground">
-                  {_title} <span className="gradient-text-primary"></span>
+                  {_title} <span className="text-primary"></span>
                 </PremiumHeading>
                 <p className="text-sm sm:text-base md:text-lg text-muted-foreground md:mt-1">
                   Explore all {_title.toLowerCase()}
@@ -506,14 +505,14 @@ export function PremiumGallery({
                     alt="Main gallery image"
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 75vw, 60vw"
-                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    className="object-cover transition-transform duration-500"
                     priority
                     instant
                   />
                 </motion.div>
               </AnimatePresence>
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
-              <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm text-white px-3 py-1 rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 View Full Size
               </div>
             </motion.div>
@@ -537,7 +536,7 @@ export function PremiumGallery({
                     alt={`Gallery image ${index + 1}`}
                     fill
                     sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw"
-                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    className="object-cover transition-transform duration-500"
                     instant
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
@@ -682,13 +681,13 @@ export function PremiumGallery({
             )}
 
             {/* Image Counter */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded-full text-sm">
               {selectedImage + 1} of {galleryUrls.length}
             </div>
 
             {/* Navigation Hint */}
             {galleryUrls.length > 1 && (
-              <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs opacity-70 z-20">
+              <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-xs opacity-70 z-20">
                 Click & drag or use ← → keys
               </div>
             )}
@@ -706,7 +705,7 @@ export function PremiumGallery({
             </div>
 
             {/* Thumbnail Navigation */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-2 bg-black/50 backdrop-blur-sm rounded-full p-2 max-w-md overflow-x-auto">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-2 bg-black/50 rounded-full p-2 max-w-md overflow-x-auto">
               {galleryUrls.map((image, index) => (
                 <button
                   key={index}

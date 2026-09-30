@@ -1,35 +1,21 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { ShieldCheck } from "lucide-react";
 
+/** Checkout page header: eyebrow, one display title, one line of context. */
 export function CheckoutHeader() {
     return (
-        <div className="flex flex-col items-center text-center space-y-6 mb-12">
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium ring-1 ring-primary/20 backdrop-blur-sm"
-            >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Secure Checkout</span>
-            </motion.div>
-
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
-                className="space-y-4 max-w-2xl px-4 sm:px-0"
-            >
-                <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
-                    Finalize Your <span className="text-primary">Experience</span>
-                </h1>
-                <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-xl mx-auto">
-                    Review your order details and complete your purchase securely.
-                    You&apos;re just a few steps away.
-                </p>
-            </motion.div>
+        <div className="mb-8 space-y-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-primary">
+                <ShieldCheck className="h-4 w-4" aria-hidden />
+                Secure checkout
+            </span>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                Checkout
+            </h1>
+            <p className="max-w-xl text-sm text-muted-foreground sm:text-base">
+                Review your order and pay securely. You&apos;re a few steps away.
+            </p>
         </div>
     );
 }

@@ -375,7 +375,7 @@ export function ShareButton({
         onClick={handleShareClick}
         variant="outline"
         className={cn(
-          "bg-gradient-to-r from-primary/10 to-primary-500/10 border-primary/20 hover:from-primary/20 hover:to-primary-500/20",
+          "bg-primary/10 border-primary/20 hover:bg-primary/15",
           className,
         )}
       >
@@ -453,7 +453,7 @@ function ShareModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999]"
+            className="fixed inset-0 bg-black/60 z-[9999]"
             onClick={() => {
               onClose();
             }}
@@ -465,7 +465,7 @@ function ShareModal({
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="pointer-events-auto relative w-full max-w-md bg-white dark:bg-background/95 backdrop-blur-xl border border-gray-200 dark:border-border/50 rounded-3xl shadow-2xl overflow-hidden"
+              className="pointer-events-auto relative w-full max-w-md bg-white dark:bg-background border border-gray-200 dark:border-border/50 rounded-3xl shadow-2xl overflow-hidden"
               onClick={(e) => {
                 e.stopPropagation();
               }}
@@ -541,7 +541,7 @@ function ShareModal({
                             >
                               <div
                                 className={cn(
-                                  "p-2.5 rounded-lg transition-transform duration-300 group-hover:scale-110",
+                                  "p-2.5 rounded-lg transition-transform duration-300",
                                   // Light/Dark Mode Bg
                                   "bg-gray-50 ring-1 ring-gray-100 dark:bg-background dark:ring-border/20",
                                   colorClass,
@@ -667,7 +667,7 @@ function ShareModal({
                             onUpload();
                           }}
                           disabled={isUploading}
-                          className="w-full bg-gradient-to-r from-primary to-rose-600 hover:from-primary/90 hover:to-rose-600/90"
+                          className="w-full bg-primary hover:bg-primary/90"
                         >
                           {isUploading ? (
                             <>
@@ -702,7 +702,7 @@ function ShareModal({
                       </div>
                     )}
 
-                    <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-rose-500/10 border border-primary/20">
+                    <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
                       <div className="flex items-start gap-3">
                         <Sparkles className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                         <p className="text-sm text-muted-foreground">
@@ -721,7 +721,7 @@ function ShareModal({
                     className="text-center space-y-4"
                   >
                     <div className="flex justify-center">
-                      <div className="p-4 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/20">
+                      <div className="p-4 rounded-full bg-emerald-500/10">
                         <CheckCircle2 className="w-12 h-12 text-green-500" />
                       </div>
                     </div>
@@ -737,7 +737,7 @@ function ShareModal({
                       onClick={() => {
                         onClose();
                       }}
-                      className="w-full bg-gradient-to-r from-primary to-rose-600 hover:from-primary/90 hover:to-rose-600/90"
+                      className="w-full bg-primary hover:bg-primary/90"
                     >
                       Done
                     </Button>
