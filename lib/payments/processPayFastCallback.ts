@@ -8,6 +8,7 @@ import { createNotification } from "@/lib/notifications/service";
 import { captureRouteError } from "@/lib/sentry/captureRouteError";
 import { resolveAssignedGateIndex } from "@/lib/ticketing/resolve-gate-assignment";
 import crypto from "crypto";
+import { scheduleParchiRedemptionReport } from "@/lib/parchi/service";
 
 export type PayFastProcessResult = {
   ok: boolean;
@@ -241,6 +242,15 @@ export async function processPayFastCallbackParams(
         status: 500,
         body: { error: "Failed to update booking" },
       };
+    }
+
+    // Parchi student discount: tell Parchi this discounted order was paid.
+    // Runs after the response; never affects the callback's outcome.
+    if (bookingPaymentStatus === "paid") {
+      scheduleParchiRedemptionReport(
+        Number(booking.id),
+        "/api/payments/payfast/callback",
+      );
     }
 
     // If payment successful, create ticket passes

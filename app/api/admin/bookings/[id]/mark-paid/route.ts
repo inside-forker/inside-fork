@@ -4,6 +4,7 @@ import { requireSuperAdmin, getAdminAuthErrorStatus } from "@/lib/auth/admin";
 import { createNotification } from "@/lib/notifications/service";
 import { resolveAssignedGateIndex } from "@/lib/ticketing/resolve-gate-assignment";
 import crypto from "crypto";
+import { scheduleParchiRedemptionReport } from "@/lib/parchi/service";
 
 /**
  * Admin API: Mark Booking as Paid
@@ -246,6 +247,8 @@ export async function POST(
             throw notifError;
           }
         }
+
+        scheduleParchiRedemptionReport(bookingId, "/api/admin/bookings/[id]/mark-paid");
 
         return NextResponse.json({
           success: true,
@@ -490,6 +493,8 @@ export async function POST(
         console.error("Failed to send notification:", notifError);
       }
     }
+
+    scheduleParchiRedemptionReport(bookingId, "/api/admin/bookings/[id]/mark-paid");
 
     return NextResponse.json({
       success: true,

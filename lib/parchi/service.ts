@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { after } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { query } from "@/lib/db";
@@ -6,6 +7,7 @@ import { captureRouteError } from "@/lib/sentry/captureRouteError";
 import {
   createParchiRequest,
   getParchiRequest,
+  recordParchiRedemption,
   isUuid,
   ParchiHttpError,
   type ParchiRequestData,
@@ -83,10 +85,6 @@ function toView(row: VerificationRow): ParchiVerificationView {
     used: row.booking_id != null,
   };
 }
-
-// Keep in step with claim_parchi_discount's 1-hour approval window (a little
-// shorter, so we never hand back an approval the RPC is about to refuse).
-const APPROVAL_REUSE_MS = 50 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Rate limit: our own cap on starting verifications, so shoppers can't probe
@@ -212,8 +210,9 @@ function eventLabel(name: string, startTime: Date | string | null): string {
 }
 
 /**
- * Starts (or resends) a Parchi verification for this user + event. Returns an
- * existing fresh approval instead of bothering the student again.
+ * Starts (or resends) a Parchi verification for this user + event. Every call
+ * asks Parchi again - an earlier approval is never reused, so each Verify
+ * needs a fresh confirmation in the Parchi app.
  */
 export async function startParchiVerification(input: {
   userId: string;
@@ -255,19 +254,11 @@ export async function startParchiVerification(input: {
   );
   const prev = prevRows[0] as VerificationRow | undefined;
 
-  if (
-    prev?.status === "approved" &&
-    prev.approved_at &&
-    Date.now() - new Date(prev.approved_at).getTime() < APPROVAL_REUSE_MS
-  ) {
-    return toView(prev);
-  }
-
   await enforceStartLimit(input.userId);
 
   // Reusing the reference while pending returns the same Parchi request
   // (safe retry); after expiry it's how "Resend" opens a fresh one. A
-  // rejection gets a new reference.
+  // rejection or an earlier approval gets a new reference, so a new request.
   const externalReference =
     prev && (prev.status === "pending" || prev.status === "expired")
       ? prev.external_reference
@@ -420,4 +411,67 @@ export async function previewParchiDiscount(input: {
     );
   }
   return computeParchiDiscount(offer, input.subtotal);
+}
+
+// ---------------------------------------------------------------------------
+// After payment - report the redemption to Parchi
+// ---------------------------------------------------------------------------
+
+/**
+ * Tells Parchi a paid booking used the student discount
+ * (POST /discount-redemptions). No-op unless the booking is paid, consumed an
+ * approved Parchi verification, and actually got a discount. Parchi dedups on
+ * verificationRequestId, so calling this twice for one booking is harmless.
+ */
+export async function reportParchiRedemption(bookingId: number): Promise<void> {
+  const { rows } = await query(
+    `SELECT v.request_id, v.parchi_id, v.external_reference,
+            b.payment_status, b.discount_amount, b.total_amount,
+            e.name AS event_name, e.start_time
+     FROM parchi_verifications v
+     JOIN bookings b ON b.id = v.booking_id
+     JOIN events e ON e.id = b.event_id
+     WHERE v.booking_id = $1 AND v.status = 'approved'`,
+    [bookingId],
+  );
+  const row = rows[0];
+  if (!row || row.payment_status !== "paid") return;
+  const discount = Number(row.discount_amount);
+  if (!(discount > 0)) return;
+
+  await recordParchiRedemption({
+    verificationRequestId: row.request_id,
+    externalReference: row.external_reference,
+    parchiId: row.parchi_id,
+    discountAmountPkr: Math.round(discount * 100) / 100,
+    orderTotalPkr: Math.round(Number(row.total_amount) * 100) / 100,
+    currency: "PKR",
+    eventLabel: eventLabel(row.event_name, row.start_time),
+    paidAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Reports the redemption after the current response is sent, so a slow or
+ * failing Parchi can never delay or fail a payment confirmation. Failures go
+ * to Sentry; a later re-report is safe (Parchi dedups).
+ */
+export function scheduleParchiRedemptionReport(
+  bookingId: number,
+  route: string,
+): void {
+  const run = () =>
+    reportParchiRedemption(bookingId).catch((err) =>
+      captureRouteError(err, {
+        route,
+        method: "POST",
+        extra: { parchi: "redemption", bookingId },
+      }),
+    );
+  try {
+    after(run);
+  } catch {
+    // Outside a request scope (e.g. a script) - just run it.
+    void run();
+  }
 }
