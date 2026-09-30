@@ -227,22 +227,13 @@ export function EventsManagementPage() {
         setIsModalOpen(false);
         setSelectedEvent(null);
         fetchEvents();
-        toast({
-          title: "Success",
-          description: `Event ${isUpdate ? "updated" : "created"} successfully`,
-        });
         // Return the created/updated event data for temp image handling
         return result.data;
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error || `Failed to ${isUpdate ? "update" : "create"} event`);
       }
     } catch (error) {
       console.error("Save event error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save event",
-        variant: "destructive",
-      });
       throw error;
     }
   };
