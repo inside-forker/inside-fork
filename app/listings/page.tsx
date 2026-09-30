@@ -51,8 +51,18 @@ export default async function ListingsPage({
 
   // The featured carousel (and excluding featured items from the main grid)
   // only applies to the default, unfiltered view.
-  const showFeaturedCarousel =
-    !resolvedSearchParams.search && !resolvedSearchParams.category;
+  const hasActiveFilters = Boolean(
+    resolvedSearchParams.search ||
+      resolvedSearchParams.category ||
+      resolvedSearchParams.sub ||
+      resolvedSearchParams.deals === "true" ||
+      resolvedSearchParams.bank ||
+      resolvedSearchParams.card ||
+      resolvedSearchParams.rating ||
+      resolvedSearchParams.open_now === "true" ||
+      resolvedSearchParams.near === "1",
+  );
+  const showFeaturedCarousel = !hasActiveFilters;
 
   const lat = resolvedSearchParams.lat
     ? parseFloat(resolvedSearchParams.lat)

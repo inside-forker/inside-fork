@@ -19,13 +19,16 @@ export const getSupportedBanks = unstable_cache(
     try {
       const { rows } = await query(
         `SELECT b.id, b.name, b.logo_url,
-                COUNT(DISTINCT d.listing_id)::integer AS offers
+                COUNT(DISTINCT l.id)::integer AS offers
          FROM banks b
          LEFT JOIN deals d
            ON d.bank_id = b.id
           AND d.is_active = true
           AND d.listing_id IS NOT NULL
           AND (d.end_date IS NULL OR d.end_date::timestamptz >= NOW())
+         LEFT JOIN listings l
+           ON l.id = d.listing_id
+          AND l.status = 'published'
          GROUP BY b.id, b.name, b.logo_url
          ORDER BY offers DESC, b.name ASC`,
       );
