@@ -6,25 +6,13 @@ import {
 } from "@/components/shared/SectionHeading";
 import {
   ArrowUpRight,
-  BarChart3,
-  Bell,
-  Building2,
   CreditCard,
-  Heart,
   LayoutGrid,
   MapPin,
-  MessageSquareText,
-  Share2,
   SlidersHorizontal,
   QrCode,
-  ScanLine,
   Search,
-  Sparkles,
-  Ticket,
-  Trophy,
-  UserPlus,
   Users,
-  Tag,
   CalendarDays,
   type LucideIcon,
 } from "lucide-react";
@@ -102,86 +90,6 @@ const groups: FeatureGroup[] = [
       },
     ],
   },
-  {
-    title: "Save & earn",
-    blurb: "Get more out of every outing.",
-    features: [
-      {
-        icon: Tag,
-        title: "Deals & coupons",
-        description: "Offers from local businesses, plus deals tied to your bank cards.",
-      },
-      {
-        icon: Trophy,
-        title: "XP, ranks & challenges",
-        description: "Earn XP as you explore, climb ranks and top the leaderboard.",
-        href: "/leaderboard",
-      },
-      {
-        icon: UserPlus,
-        title: "Invite friends",
-        description: "Bring friends along with referral invites.",
-      },
-      {
-        icon: Sparkles,
-        title: "Recommendations for you",
-        description: "Picks based on your interests and what you save.",
-      },
-    ],
-  },
-  {
-    title: "Community",
-    blurb: "Built by the people who live here.",
-    features: [
-      {
-        icon: MessageSquareText,
-        title: "Reviews with photos",
-        description: "Honest reviews from locals, with photos.",
-      },
-      {
-        icon: Heart,
-        title: "Favorites",
-        description: "Save places and events to come back to.",
-      },
-      {
-        icon: Bell,
-        title: "Reminders & alerts",
-        description: "Event reminders and updates you choose to get.",
-      },
-      {
-        icon: Share2,
-        title: "Share finds",
-        description: "Send places and events to friends in a tap.",
-      },
-    ],
-  },
-  {
-    title: "For businesses & organizers",
-    blurb: "Tools to get found and fill the room.",
-    features: [
-      {
-        icon: Building2,
-        title: "Get listed",
-        description: "Put your business in front of people looking for it, with membership plans for extra reach.",
-        href: "/get-listed",
-      },
-      {
-        icon: BarChart3,
-        title: "Dashboard & analytics",
-        description: "Track views, reviews and redemptions for your listings.",
-      },
-      {
-        icon: Ticket,
-        title: "Sell tickets",
-        description: "Ticket types, bookings and attendee lists for your events.",
-      },
-      {
-        icon: ScanLine,
-        title: "Gate check-in",
-        description: "Scan QR passes at the door, even when the signal drops.",
-      },
-    ],
-  },
 ];
 
 function FeatureCard({ feature }: { feature: Feature }) {
@@ -229,7 +137,7 @@ export function FeaturesSection() {
       <div className={containerClass}>
         <SectionHeading
           title="Everything you can do"
-          subtitle="Find what's good, go to it, and get rewarded for it. Plus the tools to be found if you run a business or host events."
+          subtitle="Find what's good in Karachi, then get your tickets and go."
         />
 
         <div className="space-y-8 sm:space-y-10">
