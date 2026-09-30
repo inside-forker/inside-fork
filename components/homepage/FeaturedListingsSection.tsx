@@ -11,7 +11,7 @@ import { getListingImageUrl } from "@/lib/utils/listing-images";
 import { useFavoritesStore } from "@/lib/context/favoritesStore";
 import { toggleFavorite } from "@/lib/favorites";
 import {
-  SectionHeading,
+  CalloutHeading,
   containerClass,
   sectionClass,
 } from "@/components/shared/SectionHeading";
@@ -68,9 +68,9 @@ export function FeaturedListingsSection({
   return (
     <section className={sectionClass}>
       <div className={containerClass}>
-        <SectionHeading
-          title="Featured places"
-          subtitle="Spots worth knowing about"
+        <CalloutHeading
+          title="Worth stepping out for."
+          subtitle="A few places to start."
           href="/listings"
           actionLabel="All places"
         />
