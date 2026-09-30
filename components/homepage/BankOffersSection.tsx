@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getSupportedBanks, type SupportedBank } from "@/lib/homepage/bank-offers";
 import {
-  CalloutHeading,
+  SectionHeading,
   containerClass,
   sectionClass,
 } from "@/components/shared/SectionHeading";
@@ -47,8 +47,8 @@ export async function BankOffersSection() {
   return (
     <section className={sectionClass}>
       <div className={containerClass}>
-        <CalloutHeading
-          title="Your card might get you more."
+        <SectionHeading
+          title="Your card might get you more"
           subtitle="Choose your bank to find available offers."
           href="/listings?deals=true"
           actionLabel="All deals"
