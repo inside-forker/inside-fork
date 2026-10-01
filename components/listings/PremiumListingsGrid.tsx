@@ -428,9 +428,15 @@ export function PremiumListingsGrid({
               ? `Found ${totalItems.toLocaleString()} ${
                   totalItems === 1 ? "place" : "places"
                 } matching your search`
-              : `Discover ${totalItems.toLocaleString()} amazing ${
-                  totalItems === 1 ? "place" : "places"
-                } in Karachi`}
+              : searchParams.deals === "true" ||
+                  searchParams.bank ||
+                  searchParams.card
+                ? `Discover ${totalItems.toLocaleString()} ${
+                    totalItems === 1 ? "place" : "places"
+                  } with active card discounts in Karachi`
+                : `Discover ${totalItems.toLocaleString()} amazing ${
+                    totalItems === 1 ? "place" : "places"
+                  } in Karachi`}
           </p>
         </div>
 
