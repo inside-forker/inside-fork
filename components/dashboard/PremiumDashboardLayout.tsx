@@ -75,7 +75,7 @@ export function PremiumDashboardLayout({
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10 dark:from-primary/10 dark:via-background dark:to-primary/20 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10 dark:from-primary/10 dark:via-background dark:to-primary/20 relative overflow-x-clip">
       {/* Background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Brand Color Geometric Shapes */}
