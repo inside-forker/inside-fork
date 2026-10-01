@@ -1,3 +1,5 @@
+import type { ParchiOffer } from "@/lib/parchi/discount";
+
 // Admin event type matching events_with_details view (snake_case)
 export type AdminEvent = {
   event_id: number;
@@ -117,6 +119,8 @@ export interface EventHeroProps {
 export interface EventTicketSectionProps {
   event: Event;
   ticketTypes: TicketType[];
+  /** Parchi student discount on this event, if any. */
+  parchiOffer?: ParchiOffer | null;
 }
 
 export interface EventOrganizerProps {

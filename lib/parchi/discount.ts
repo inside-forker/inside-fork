@@ -1,5 +1,10 @@
 /** Pure Parchi discount helpers - safe to import from client components. */
 
+// Parchi's own brand colours (sampled from their artwork), for anything that
+// should read as "a Parchi offer" at a glance.
+export const PARCHI_BLUE = "#0069DB";
+export const PARCHI_YELLOW = "#FDF12A";
+
 export interface ParchiOffer {
   discount_type: "percentage" | "fixed";
   discount_value: number;

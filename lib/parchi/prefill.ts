@@ -4,6 +4,8 @@
  * Parchi ID box. Only a convenience: the student still approves in the
  * Parchi app. Client-only; storage can be unavailable, so never throws.
  */
+import { useEffect, useState } from "react";
+
 const KEY = "ik:parchi-id";
 
 export function rememberParchiId(raw: string | null): void {
@@ -22,4 +24,18 @@ export function recallParchiId(): string {
   } catch {
     return "";
   }
+}
+
+/**
+ * True when this visitor came from the Parchi app (a `?parchiId=` now, or
+ * earlier in this tab). Used to preview the Parchi price on the event page -
+ * the discount itself still needs approval in the Parchi app at checkout.
+ */
+export function useArrivedFromParchi(): boolean {
+  const [arrived, setArrived] = useState(false);
+  useEffect(() => {
+    rememberParchiId(new URLSearchParams(window.location.search).get("parchiId"));
+    setArrived(recallParchiId() !== "");
+  }, []);
+  return arrived;
 }

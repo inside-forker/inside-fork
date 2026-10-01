@@ -142,7 +142,7 @@ export default async function EventPage({
 
             {/* Ticket Section */}
             <Suspense fallback={<TicketSkeleton />}>
-              <EventTicketsContainer event={event} />
+              <EventTicketsContainer event={event} parchiOffer={parchiOffer} />
             </Suspense>
 
             {/* Event Location */}

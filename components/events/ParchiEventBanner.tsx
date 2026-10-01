@@ -3,13 +3,13 @@
 import { useEffect } from "react";
 import Image from "next/image";
 import { ChevronRight } from "lucide-react";
-import { describeParchiOffer, type ParchiOffer } from "@/lib/parchi/discount";
+import {
+  describeParchiOffer,
+  PARCHI_BLUE,
+  PARCHI_YELLOW,
+  type ParchiOffer,
+} from "@/lib/parchi/discount";
 import { rememberParchiId } from "@/lib/parchi/prefill";
-
-// Parchi's own brand colours (sampled from their artwork), so the strip reads
-// as a Parchi offer at a glance.
-const PARCHI_BLUE = "#0069DB";
-const PARCHI_YELLOW = "#FDF12A";
 
 /**
  * "Students: 20% off with Parchi" on an event that has a Parchi discount.
