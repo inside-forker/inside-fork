@@ -71,7 +71,7 @@ export async function BankOffersSection() {
         {/* One scrolling row on phones (it reads as a filter, not a wall of
             logos); wraps on desktop, where a hidden overflow can't be swiped */}
         <ul
-          className="scrollbar-hide -mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:-mx-6 sm:px-6 lg:mx-auto lg:max-w-[var(--bank-row)] lg:flex-wrap lg:justify-center lg:gap-x-4 lg:gap-y-6 lg:overflow-visible lg:px-0"
+          className="scrollbar-hide -mx-6 flex gap-2 overflow-x-auto px-6 pb-1 lg:mx-auto lg:max-w-[var(--bank-row)] lg:flex-wrap lg:justify-center lg:gap-x-4 lg:gap-y-6 lg:overflow-visible lg:px-0"
           style={{ "--bank-row": `${rowWidth}px` } as React.CSSProperties}
         >
           {banks.map((bank) => {

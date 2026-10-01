@@ -147,7 +147,7 @@ export function FeaturesSection() {
         <SectionHeading title="Make the most of Inside" />
         {/* Swipeable row on phones so three cards don't stack into a wall;
             a plain three-up grid from tablet up */}
-        <ul className="scrollbar-hide -mx-5 flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:px-0">
+        <ul className="scrollbar-hide -mx-6 flex snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:px-0">
           {benefits.map((benefit) => (
             <li key={benefit.title} className="w-[82%] shrink-0 snap-start sm:w-auto">
               <BenefitCard benefit={benefit} />

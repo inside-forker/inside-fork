@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function FeaturedListingsSkeleton() {
   return (
-    <div className="container mx-auto px-6 lg:px-8 py-16">
+    <div className="mx-auto max-w-7xl px-6 lg:px-8 py-16">
       <div className="flex justify-between items-end mb-8 md:mb-12">
         <div className="space-y-2">
           <Skeleton className="h-4 w-24" />
@@ -36,7 +36,7 @@ export function FeaturedListingsSkeleton() {
 
 export function CategoriesSkeleton() {
   return (
-    <div className="container mx-auto px-6 lg:px-8 py-16">
+    <div className="mx-auto max-w-7xl px-6 lg:px-8 py-16">
       <div className="text-center space-y-4 mb-12">
         <Skeleton className="h-4 w-24 mx-auto" />
         <Skeleton className="h-8 md:h-10 w-64 mx-auto" />
@@ -79,7 +79,7 @@ export function PostsSkeleton() {
 
 export function EventsSkeleton() {
   return (
-    <div className="container mx-auto px-6 lg:px-8 py-16">
+    <div className="mx-auto max-w-7xl px-6 lg:px-8 py-16">
       <div className="text-center space-y-4 mb-12">
         <Skeleton className="h-8 w-64 mx-auto" />
       </div>

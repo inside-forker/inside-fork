@@ -96,4 +96,4 @@ export function CalloutHeading({
 
 /** Shared section shell: one vertical rhythm and one gutter for every section. */
 export const sectionClass = "py-8 sm:py-10";
-export const containerClass = "container mx-auto px-5 sm:px-6 lg:px-8";
+export const containerClass = "mx-auto max-w-7xl px-6 lg:px-8";

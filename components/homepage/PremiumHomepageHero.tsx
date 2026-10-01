@@ -144,7 +144,7 @@ export function PremiumHomepageHero() {
       }
     >
       {/* Main Content - CSS animations for entrance */}
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8 text-center">
         {/* Eyebrow */}
         {/* Flex so the small label doesn't sit in a taller line box (keeps
             the space above the hero content equal to the space below) */}
