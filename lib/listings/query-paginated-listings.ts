@@ -176,20 +176,25 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
 
     let targetCardName: string | null = null;
     let targetCardBankId: number | null = null;
+    let targetBankName: string | null = null;
 
     if (cardId != null && !Number.isNaN(cardId)) {
       const { rows: cardRows } = await query(
-        `SELECT id, bank_id, card_name FROM card_variants WHERE id = $1 LIMIT 1`,
+        `SELECT cv.id, cv.bank_id, cv.card_name, b.name AS bank_name
+         FROM card_variants cv
+         LEFT JOIN banks b ON b.id = cv.bank_id
+         WHERE cv.id = $1 LIMIT 1`,
         [cardId],
       );
       if (cardRows.length > 0) {
         targetCardName = String(cardRows[0].card_name || "").toLowerCase().replace(/\s+/g, " ").trim();
         targetCardBankId = cardRows[0].bank_id != null ? Number(cardRows[0].bank_id) : null;
+        targetBankName = cardRows[0].bank_name ? String(cardRows[0].bank_name).toLowerCase().replace(/\s+/g, " ").trim() : null;
       }
     }
 
     const { rows: dealRows } = await query(
-      `SELECT listing_id, discount_value, is_active, bank_id, valid_card_variants, metadata, end_date
+      `SELECT listing_id, discount_value, is_active, bank_id, valid_card_variants, metadata, start_date, end_date
        FROM deals`,
     );
 
@@ -201,11 +206,15 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
       const lid = Number(deal.listing_id);
       if (!Number.isFinite(lid) || lid <= 0) continue;
 
+      const startMs = deal.start_date
+        ? Date.parse(String(deal.start_date))
+        : Number.NEGATIVE_INFINITY;
       const endMs = deal.end_date
         ? Date.parse(String(deal.end_date))
         : Number.POSITIVE_INFINITY;
       const isActiveNow =
         Boolean(deal.is_active) &&
+        (isNaN(startMs) || startMs <= nowMs) &&
         (isNaN(endMs) || endMs >= nowMs);
 
       let maxDiscount = 0;
@@ -285,9 +294,13 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
                 .toLowerCase()
                 .replace(/\s+/g, " ")
                 .trim();
+              const strippedByBank = targetBankName
+                ? assocName.replace(new RegExp(`^${targetBankName.replace(/\\s*(bank|islamic)\\s*/gi, "").trim()}\\s*`, "i"), "").trim()
+                : assocName;
               if (
                 assocName === targetCardName ||
-                assocName.replace(/^(hbl|mcb)\s*/i, "").trim() === targetCardName
+                strippedByBank === targetCardName ||
+                assocName.replace(/^(hbl|mcb|meezan|ubl|abl|allied|askari|alfalah|faysal|habib\s*metro|soneri|bankislami|bank\s*al\s*habib|al\s*baraka|bop|standard\s*chartered)\s*(bank|islamic)?\s*/i, "").trim() === targetCardName
               ) {
                 cardMatch = true;
                 break;
