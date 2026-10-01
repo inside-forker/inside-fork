@@ -19,6 +19,7 @@ import { ListingsTable } from "./ListingsTable";
 import { ListingModal } from "./ListingModal";
 import { ExportImportModal } from "./ExportImportModal";
 import { SafeImportModal } from "./SafeImportModal";
+import { BulkCategoryModal } from "./BulkCategoryModal";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -35,6 +36,7 @@ import {
   CheckSquare,
   Square,
   FileText,
+  FolderInput,
 } from "lucide-react";
 import type { Listing } from "@/types/listing.types";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
@@ -154,6 +156,8 @@ export function ListingsManagementPage() {
     React.useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
   const [isBulkStatusUpdating, setIsBulkStatusUpdating] = React.useState(false);
+  const [isBulkCategoryModalOpen, setIsBulkCategoryModalOpen] =
+    React.useState(false);
   const [selectAllPages, setSelectAllPages] = React.useState(false);
   const [isLoadingAllIds, setIsLoadingAllIds] = React.useState(false);
 
@@ -221,7 +225,9 @@ export function ListingsManagementPage() {
   // Pagination
   const itemsPerPage = 20;
   const [totalListings, setTotalListings] = React.useState(0);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
   const totalPages = Math.ceil(totalListings / itemsPerPage);
+  const hasMore = listings.length < totalListings;
 
   // Paginated listings fetch. `silent` skips the loading skeleton for background/realtime refreshes.
   // Foreground and background fetches use separate abort controllers so they don't cancel each other.
@@ -232,6 +238,7 @@ export function ListingsManagementPage() {
       status: string = "",
       category: string = "",
       silent: boolean = false,
+      append: boolean = false,
     ) => {
       const abortRef = silent ? bgAbortRef : fgAbortRef;
       abortRef.current?.abort();
@@ -239,7 +246,13 @@ export function ListingsManagementPage() {
       abortRef.current = controller;
 
       try {
-        if (!silent) setIsLoading(true);
+        if (!silent) {
+          if (append) {
+            setIsLoadingMore(true);
+          } else {
+            setIsLoading(true);
+          }
+        }
 
         const params = new URLSearchParams({
           page: page.toString(),
@@ -259,7 +272,17 @@ export function ListingsManagementPage() {
         if (controller.signal.aborted) return;
 
         if (result.success) {
-          setListings(result.data.listings);
+          if (append) {
+            setListings((prev) => {
+              const existingIds = new Set(prev.map((l) => l.id));
+              const newItems = (result.data.listings || []).filter(
+                (l: Listing) => !existingIds.has(l.id),
+              );
+              return [...prev, ...newItems];
+            });
+          } else {
+            setListings(result.data.listings || []);
+          }
           setTotalListings(result.data.pagination.total);
           if (result.data.stats) {
             setStats(result.data.stats);
@@ -289,6 +312,7 @@ export function ListingsManagementPage() {
       } finally {
         if (!controller.signal.aborted && !silent) {
           setIsLoading(false);
+          setIsLoadingMore(false);
         }
       }
     },
@@ -300,38 +324,68 @@ export function ListingsManagementPage() {
   const refreshListings = React.useCallback(
     (silent = false) => {
       fetchListings(
-        currentPage,
+        1,
         debouncedSearchQuery,
         statusFilter,
         categoryFilter,
         silent,
+        false,
       );
+      setCurrentPage(1);
     },
     [
       fetchListings,
-      currentPage,
       debouncedSearchQuery,
       statusFilter,
       categoryFilter,
     ],
   );
 
-  // Re-fetch when any filter, page, or debounced search changes
+  // Handle Show More listings
+  const handleLoadMore = React.useCallback(() => {
+    if (isLoading || isLoadingMore || !hasMore) return;
+    const nextPage = currentPage + 1;
+    setCurrentPage(nextPage);
+    fetchListings(
+      nextPage,
+      debouncedSearchQuery,
+      statusFilter,
+      categoryFilter,
+      false,
+      true,
+    );
+  }, [
+    isLoading,
+    isLoadingMore,
+    hasMore,
+    currentPage,
+    fetchListings,
+    debouncedSearchQuery,
+    statusFilter,
+    categoryFilter,
+  ]);
+
+  // Re-fetch when any filter or debounced search changes
   React.useEffect(() => {
-    refreshListings();
-  }, [refreshListings]);
+    setCurrentPage(1);
+    fetchListings(
+      1,
+      debouncedSearchQuery,
+      statusFilter,
+      categoryFilter,
+      false,
+      false,
+    );
+  }, [fetchListings, debouncedSearchQuery, statusFilter, categoryFilter]);
 
   // Debounce search query - wait 500ms after user stops typing
   React.useEffect(() => {
     const searchTimer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
-      if (searchQuery !== debouncedSearchQuery) {
-        setCurrentPage(1);
-      }
     }, 500);
 
     return () => clearTimeout(searchTimer);
-  }, [searchQuery, debouncedSearchQuery]);
+  }, [searchQuery]);
 
   // Realtime: silent background refresh with 10s cooldown so the scraper's
   // bulk writes don't cause constant skeleton flashing for admins.
@@ -1129,7 +1183,17 @@ export function ListingsManagementPage() {
                     Clear Selection
                   </Button>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsBulkCategoryModalOpen(true)}
+                    disabled={isBulkStatusUpdating || isBulkDeleting}
+                    className="h-8 bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 font-medium shadow-sm"
+                  >
+                    <FolderInput className="h-3.5 w-3.5 mr-1.5" />
+                    Move Subcategory ({selectedListings.size})
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1174,11 +1238,11 @@ export function ListingsManagementPage() {
               </div>
             </div>
 
-            {/* Select All Pages Banner (shown when current page is fully selected but not all pages) */}
+            {/* Select All Pages Banner (shown when loaded listings are fully selected but not all database items) */}
             {!selectAllPages &&
               selectedListings.size === listings.length &&
               listings.length > 0 &&
-              stats.total > listings.length && (
+              totalListings > listings.length && (
                 <motion.div
                   initial={{ opacity: 0, y: -5 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -1186,8 +1250,8 @@ export function ListingsManagementPage() {
                 >
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-blue-900 dark:text-blue-100">
-                      All <strong>{listings.length}</strong> listings on this
-                      page are selected.{" "}
+                      All <strong>{listings.length}</strong> loaded listings on this
+                      screen are selected.{" "}
                       <button
                         onClick={handleSelectAllPages}
                         disabled={isLoadingAllIds}
@@ -1195,7 +1259,7 @@ export function ListingsManagementPage() {
                       >
                         {isLoadingAllIds
                           ? "Loading..."
-                          : `Select all ${stats.total} listings?`}
+                          : `Select all ${totalListings.toLocaleString()} matching listings?`}
                       </button>
                     </p>
                   </div>
@@ -1210,11 +1274,14 @@ export function ListingsManagementPage() {
         <ListingsTable
           listings={listings}
           isLoading={isLoading}
+          isLoadingMore={isLoadingMore}
           onEditListing={handleEditListing}
           onDeleteListing={handleDeleteListing}
+          totalListings={totalListings}
           currentPage={currentPage}
           totalPages={totalPages}
-          onPageChange={setCurrentPage}
+          hasMore={hasMore}
+          onLoadMore={handleLoadMore}
           selectedListings={selectedListings}
           onSelectListing={handleSelectListing}
           onSelectAll={handleSelectAll}
@@ -1223,6 +1290,31 @@ export function ListingsManagementPage() {
           editorsMap={editorsMap}
         />
       </motion.div>
+
+      {/* Bulk Category / Subcategory Modal */}
+      <BulkCategoryModal
+        isOpen={isBulkCategoryModalOpen}
+        onClose={() => setIsBulkCategoryModalOpen(false)}
+        selectedCount={selectedListings.size}
+        selectedIds={Array.from(selectedListings).map((id) => Number(id))}
+        categories={categories}
+        categoryGroups={categoryGroups}
+        onSuccess={async () => {
+          setSelectedListings(new Set());
+          setSelectAllPages(false);
+          refreshListings();
+          // Also refresh categories in background in case a new subcategory was created
+          try {
+            const catRes = await fetch("/api/categories?all=true");
+            const catData = await catRes.json();
+            if (catData.success) {
+              setCategories(catData.categories);
+            }
+          } catch (e) {
+            console.error("Failed to refresh categories:", e);
+          }
+        }}
+      />
 
       {/* Listing Modal */}
       <ListingModal
