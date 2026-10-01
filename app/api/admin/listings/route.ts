@@ -378,7 +378,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { ids, status } = body;
+    const { ids, status, category_id, category_ids } = body;
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json(
@@ -397,8 +397,71 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    // 1) Bulk Category / Subcategory reassignment
+    if (category_id !== undefined || category_ids !== undefined) {
+      const targetCategoryId = Number(
+        category_id ?? (Array.isArray(category_ids) ? category_ids[0] : null),
+      );
+      if (!Number.isFinite(targetCategoryId) || targetCategoryId <= 0) {
+        return NextResponse.json(
+          { error: "Invalid category_id specified" },
+          { status: 400 },
+        );
+      }
+
+      // Validate category exists
+      const { rows: catRows } = await query(
+        `SELECT id, name FROM categories WHERE id = $1`,
+        [targetCategoryId],
+      );
+      if (catRows.length === 0) {
+        return NextResponse.json(
+          { error: "Target category not found" },
+          { status: 404 },
+        );
+      }
+      const categoryName = catRows[0].name;
+
+      // Reassign each listing: wipes previous subcategories and assigns the new one
+      for (const listingId of validIds) {
+        await syncListingCategories(
+          listingId,
+          [targetCategoryId],
+          targetCategoryId,
+        );
+      }
+
+      // Audit log the reassignment
+      try {
+        const { logListingUpdate } = await import("@/lib/audit");
+        for (const listingId of validIds) {
+          await logListingUpdate(
+            session.userId,
+            listingId.toString(),
+            { id: listingId },
+            { id: listingId, category_id: targetCategoryId },
+            request.headers.get("x-forwarded-for") ||
+              request.headers.get("x-real-ip") ||
+              "unknown",
+            request.headers.get("user-agent") || undefined,
+          );
+        }
+      } catch (logError) {
+        console.error("Failed to log bulk listing category updates:", logError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `${validIds.length} listing(s) moved to subcategory "${categoryName}"`,
+        updatedCount: validIds.length,
+        categoryId: targetCategoryId,
+        categoryName,
+      });
+    }
+
+    // 2) Bulk status update
     const allowedStatuses = ["published", "draft", "archived"];
-    if (!allowedStatuses.includes(status)) {
+    if (!status || !allowedStatuses.includes(status)) {
       return NextResponse.json(
         { error: "Invalid request: status must be 'published', 'draft', or 'archived'" },
         { status: 400 },

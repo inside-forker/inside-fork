@@ -54,9 +54,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 403 });
     }
 
-    if (profile.role !== "super_admin") {
+    if (!["admin", "super_admin", "lister", "data_entry"].includes(profile.role)) {
       return NextResponse.json(
-        { error: "Access denied. Super admin role required." },
+        { error: "Access denied. Admin role required." },
         { status: 403 }
       );
     }
@@ -433,9 +433,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 403 });
     }
 
-    if (profile.role !== "super_admin") {
+    if (!["admin", "super_admin", "lister", "data_entry"].includes(profile.role)) {
       return NextResponse.json(
-        { error: "Access denied. Super admin role required." },
+        { error: "Access denied. Admin role required." },
         { status: 403 }
       );
     }
