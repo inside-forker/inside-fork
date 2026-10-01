@@ -29,8 +29,12 @@ export function EventTicketSection({
   // preview: the discount is applied at checkout once they approve in Parchi.
   const arrivedFromParchi = useArrivedFromParchi();
   const showParchiPrice = !!parchiOffer && arrivedFromParchi;
+  // Rounded for display, like the rest of the site's prices; the exact
+  // amount is charged at checkout.
   const parchiPrice = (amount: number) =>
-    parchiOffer ? amount - computeParchiDiscount(parchiOffer, amount) : amount;
+    parchiOffer
+      ? Math.round(amount - computeParchiDiscount(parchiOffer, amount))
+      : amount;
   const { addItem, clearCart } = useCartStore();
   const [selectedTickets, setSelectedTickets] = useState<
     Record<number, number>
