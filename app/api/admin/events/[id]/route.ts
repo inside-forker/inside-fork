@@ -226,12 +226,25 @@ export async function PATCH(
     };
 
     if (name !== undefined) {
-      pushField("name", name);
-      // Regenerate slug if name changed
-      const slug = name
+      pushField("name", name.trim());
+      // Regenerate slug if name changed, ensuring uniqueness
+      let baseSlug = name
         .toLowerCase()
+        .trim()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
+      if (!baseSlug) baseSlug = "event";
+      let slug = baseSlug;
+      let counter = 1;
+      while (true) {
+        const { rows: existing } = await query(
+          `SELECT id FROM events WHERE slug = $1 AND id != $2 LIMIT 1`,
+          [slug, eventId]
+        );
+        if (existing.length === 0) break;
+        counter++;
+        slug = `${baseSlug}-${counter}`;
+      }
       pushField("slug", slug);
     }
     if (description !== undefined) pushField("description", description);

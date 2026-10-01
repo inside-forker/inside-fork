@@ -21,6 +21,8 @@ import {
   MapPin,
   Phone,
   Globe,
+  ChevronDown,
+  Loader2,
 } from "lucide-react";
 import { Database } from "@/types/database";
 import type { ListingEditorInfo } from "@/lib/hooks/useListingEditors";
@@ -32,14 +34,19 @@ type Listing = Database["public"]["Tables"]["listings"]["Row"] & {
 interface ListingsTableProps {
   listings: Listing[];
   isLoading: boolean;
+  isLoadingMore?: boolean;
   onEditListing: (listing: Listing) => void;
   onDeleteListing: (listing: Listing) => void;
+  totalListings?: number;
   currentPage: number;
   totalPages: number;
-  onPageChange: (page: number) => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
   selectedListings?: Set<number>;
   onSelectListing?: (listingId: number, selected: boolean) => void;
   onSelectAll?: (selected: boolean) => void;
+  /** True when every listing matching the current filters is selected (may exceed loaded rows). */
+  selectAllPages?: boolean;
   isBulkMode?: boolean;
   userRole?: string;
   editorsMap?: Map<number, ListingEditorInfo[]>;
@@ -48,14 +55,18 @@ interface ListingsTableProps {
 export function ListingsTable({
   listings,
   isLoading,
+  isLoadingMore = false,
   onEditListing,
   onDeleteListing,
+  totalListings,
   currentPage,
   totalPages,
-  onPageChange,
+  hasMore = false,
+  onLoadMore,
   selectedListings = new Set(),
   onSelectListing,
   onSelectAll,
+  selectAllPages = false,
   isBulkMode = false,
   userRole,
   editorsMap,
@@ -255,15 +266,24 @@ export function ListingsTable({
           <div className="flex items-center gap-3">
             <Checkbox
               checked={
-                listings.length > 0 && selectedListings.size === listings.length
+                listings.length === 0
+                  ? false
+                  : selectAllPages ||
+                      selectedListings.size >= listings.length
+                    ? true
+                    : selectedListings.size > 0
+                      ? "indeterminate"
+                      : false
               }
-              onCheckedChange={(checked) => onSelectAll(checked as boolean)}
+              onCheckedChange={(checked) => onSelectAll(checked === true)}
               aria-label="Select all listings"
             />
             <span className="text-sm font-medium text-primary">
-              {selectedListings.size > 0
-                ? `${selectedListings.size} of ${listings.length} selected`
-                : `Select listings (${listings.length} total)`}
+              {selectAllPages
+                ? `All ${selectedListings.size.toLocaleString()} matching listing(s) selected`
+                : selectedListings.size > 0
+                  ? `${selectedListings.size} of ${listings.length} loaded selected`
+                  : `Select listings (${listings.length} loaded)`}
             </span>
           </div>
         </motion.div>
@@ -450,30 +470,56 @@ export function ListingsTable({
         })}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            Page {currentPage} of {totalPages}
+      {/* Show More / Continuous Pagination */}
+      {listings.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 pb-2 border-t border-border/60">
+          <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <span>
+              Showing <strong className="text-foreground">{listings.length}</strong> of{" "}
+              <strong className="text-foreground">
+                {totalListings != null
+                  ? totalListings.toLocaleString()
+                  : (totalPages * 20).toLocaleString()}
+              </strong>{" "}
+              listings
+            </span>
+            {isBulkMode && selectedListings.size > 0 && (
+              <Badge
+                variant="secondary"
+                className="text-xs px-2 py-0.5 font-semibold text-primary bg-primary/10 border border-primary/20"
+              >
+                {selectedListings.size} selected
+              </Badge>
+            )}
           </div>
-          <div className="flex gap-2">
+
+          {hasMore ? (
             <Button
               variant="outline"
-              size="sm"
-              onClick={() => onPageChange(currentPage - 1)}
-              disabled={currentPage === 1}
+              onClick={onLoadMore}
+              disabled={isLoading || isLoadingMore}
+              className="h-11 px-8 bg-background/90 hover:bg-accent border-primary/30 hover:border-primary/60 text-foreground font-semibold shadow-sm hover:shadow-md transition-all w-full sm:w-auto"
             >
-              Previous
+              {isLoadingMore ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin text-primary" />
+                  Loading More Listings...
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4 mr-2 text-primary" />
+                  Show More Listings{" "}
+                  {totalListings != null && totalListings > listings.length
+                    ? `(${(totalListings - listings.length).toLocaleString()} remaining)`
+                    : ""}
+                </>
+              )}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onPageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </Button>
-          </div>
+          ) : (
+            <div className="text-xs font-medium text-muted-foreground bg-muted/40 px-3.5 py-2 rounded-full border border-border/40">
+              ✓ All {listings.length.toLocaleString()} matching listings loaded
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -323,18 +323,23 @@ export function useFilterData(
           }
           const data = await response.json();
 
-          if (!data.success) {
-            throw new Error(data.error || "Failed to fetch card variants");
-          }
+          const rawCards = Array.isArray(data.cards) ? data.cards : [];
+          const normalizedCards: DropdownOption[] = rawCards.map(
+            (c: Record<string, unknown>) => ({
+              value: String(c.value ?? c.id ?? ""),
+              label: String(c.label ?? c.card_name ?? c.name ?? "Card"),
+              disabled: Boolean(c.disabled),
+            }),
+          );
 
           // Update cache - API already returns transformed data
           cache.cardVariants[bankId] = {
-            data: data.cards || [],
+            data: normalizedCards,
             timestamp: Date.now(),
             ttl: CACHE_CONFIG.cardVariants.ttl,
           };
 
-          return data.cards || [];
+          return normalizedCards;
         })
         .finally(() => {
           ongoingRequests.delete(cacheKey);

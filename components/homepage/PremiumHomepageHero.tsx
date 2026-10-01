@@ -2,29 +2,39 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import ReactDOM from "react-dom";
+import Image from "next/image";
+import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { HeroSectionStatic } from "@/components/ui/HeroSectionStatic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useSearch } from "@/hooks/useSearch";
 import {
   Search,
   MapPin,
   Calendar,
   ArrowRight,
+  ChevronDown,
+  LocateFixed,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { HOMEPAGE_AREAS, areaHref } from "@/lib/homepage/areas";
 
-
+const quickLinks = [
+  { label: "Places", href: "/listings" },
+  { label: "Bank discounts", href: "/listings?deals=true" },
+  { label: "Events", href: "/events" },
+];
 
 export function PremiumHomepageHero() {
-  const [location, setLocation] = useState("Karachi, Pakistan");
-  const [userCoordinates, setUserCoordinates] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
-  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const router = useRouter();
 
   // Ref for search container to calculate dropdown position
@@ -46,36 +56,25 @@ export function PremiumHomepageHero() {
     getResultUrl,
   } = useSearch();
 
-  // Function to get location name from coordinates
-  const getLocationFromCoords = useCallback(
-    async (lat: number, lng: number): Promise<string> => {
-      try {
-        const response = await fetch(`/api/location?lat=${lat}&lng=${lng}`);
-        if (!response.ok) return "Karachi, Pakistan";
-        const data = await response.json();
-        return data.location || "Karachi, Pakistan";
-      } catch {
-        return "Karachi, Pakistan";
-      }
-    },
-    [],
-  );
+  // "Near me": ask for location only when chosen, then list places by distance
+  const handleNearMe = useCallback(() => {
+    if (!navigator.geolocation || isLocating) {
+      router.push("/listings");
+      return;
+    }
 
-  // Request location only when user clicks the location display
-  const handleLocationClick = useCallback(() => {
-    if (!navigator.geolocation || isLoadingLocation) return;
-
-    setIsLoadingLocation(true);
+    setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
+      (position) => {
         const { latitude, longitude } = position.coords;
-        setUserCoordinates({ lat: latitude, lng: longitude });
-        const locationName = await getLocationFromCoords(latitude, longitude);
-        setLocation(locationName);
-        setIsLoadingLocation(false);
+        setIsLocating(false);
+        router.push(
+          `/listings?sort=distance&lat=${latitude.toFixed(6)}&lng=${longitude.toFixed(6)}`,
+        );
       },
       () => {
-        setIsLoadingLocation(false);
+        setIsLocating(false);
+        router.push("/listings");
       },
       {
         timeout: 10000,
@@ -83,7 +82,7 @@ export function PremiumHomepageHero() {
         maximumAge: 300000,
       },
     );
-  }, [getLocationFromCoords, isLoadingLocation]);
+  }, [isLocating, router]);
 
   // Lock body scroll and update dropdown position when showing results
   useEffect(() => {
@@ -118,23 +117,36 @@ export function PremiumHomepageHero() {
     if (searchQuery && searchQuery.trim().length > 0) {
       router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     } else {
-      // If user has selected location, navigate with distance sorting
-      if (userCoordinates) {
-        router.push(
-          `/listings?sort=distance&lat=${userCoordinates.lat.toFixed(6)}&lng=${userCoordinates.lng.toFixed(6)}`,
-        );
-      } else {
-        router.push("/listings");
-      }
+      router.push("/listings");
     }
   };
 
   return (
-    <HeroSectionStatic>
+    // Charcoal and cream, with the brand pink as the only accent
+    <HeroSectionStatic
+      className="bg-[#1f1b1a]"
+      floating={
+        // Karachi's streets as faint cream lines behind the search
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <Image
+            src="/assets/hero/karachi-streets.webp"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover opacity-30"
+          />
+          {/* Fades the map out behind the headline and search so they stay readable */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,#1f1b1a_25%,transparent_80%)] opacity-80" />
+        </div>
+      }
+    >
       {/* Main Content - CSS animations for entrance */}
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center">
         {/* Eyebrow */}
-        <div className="mb-4 animate-hero-fade-in">
+        {/* Flex so the small label doesn't sit in a taller line box (keeps
+            the space above the hero content equal to the space below) */}
+        <div className="mb-4 flex justify-center animate-hero-fade-in">
           <span className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
             Your guide to Karachi
           </span>
@@ -142,16 +154,12 @@ export function PremiumHomepageHero() {
 
         {/* Hero Heading */}
         <div className="space-y-3 sm:space-y-4 mb-8 sm:mb-10 animate-hero-fade-in-delay-1">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
-            Unlock the best of <span className="text-primary">Karachi</span>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[#f6f1e9]">
+            Your next plan starts <span className="text-primary">Inside</span>.
           </h1>
-          <p className="max-w-2xl mx-auto text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed">
-            Discover hidden gems, trending spots, and exclusive experiences in
-            Pakistan&apos;s vibrant metropolis.
-            <span className="hidden sm:inline">
-              {" "}
-              Your ultimate companion for exploring the city that never sleeps.
-            </span>
+          <p className="max-w-2xl mx-auto text-sm sm:text-base lg:text-lg text-[#f6f1e9]/70 leading-relaxed">
+            Discover places, find bank discounts, and book events across
+            Karachi.
           </p>
         </div>
 
@@ -164,7 +172,7 @@ export function PremiumHomepageHero() {
                 <Search className="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Search places, events, deals"
+                  placeholder="Try a café, a salon or a concert"
                   value={searchQuery}
                   onChange={handleSearchChange}
                   onFocus={() =>
@@ -175,21 +183,39 @@ export function PremiumHomepageHero() {
                 />
               </div>
 
-              <div
-                className="flex items-center px-4 sm:px-6 border-t sm:border-t-0 sm:border-l border-border/30 min-h-[48px] sm:min-h-[56px] md:min-h-[64px] cursor-pointer hover:bg-muted/30 transition-colors"
-                onClick={handleLocationClick}
-                title="Click to get your current location"
-              >
-                <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mr-2 sm:mr-3 flex-shrink-0" />
-                <div className="flex items-center space-x-2 min-w-0">
-                  {isLoadingLocation && (
-                    <div className="h-3 w-3 border-2 border-muted-foreground/30 border-t-primary rounded-full animate-spin flex-shrink-0" />
-                  )}
-                  <span className="text-xs sm:text-sm font-medium text-muted-foreground truncate">
-                    {location}
-                  </span>
-                </div>
-              </div>
+              {/* Area picker: a menu of area links, not a filter on the typed search */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center px-4 sm:px-6 border-t sm:border-t-0 sm:border-l border-border/30 min-h-[48px] sm:min-h-[56px] md:min-h-[64px] hover:bg-muted/30 transition-colors"
+                  >
+                    <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mr-2 sm:mr-3 flex-shrink-0" />
+                    {isLocating && (
+                      <span className="mr-2 h-3 w-3 border-2 border-muted-foreground/30 border-t-primary rounded-full animate-spin flex-shrink-0" />
+                    )}
+                    <span className="text-xs sm:text-sm font-medium text-muted-foreground truncate">
+                      Choose an area
+                    </span>
+                    <ChevronDown className="ml-auto sm:ml-2 h-4 w-4 text-muted-foreground" aria-hidden />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 rounded-xl p-1.5">
+                  <DropdownMenuItem
+                    onSelect={handleNearMe}
+                    className="rounded-lg py-2 font-medium"
+                  >
+                    <LocateFixed className="text-primary" />
+                    Near me
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {HOMEPAGE_AREAS.map((area) => (
+                    <DropdownMenuItem key={area} asChild className="rounded-lg py-2">
+                      <Link href={areaHref(area)}>{area}</Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <div className="sm:flex-shrink-0">
                 <Button
@@ -208,6 +234,22 @@ export function PremiumHomepageHero() {
               </div>
             </div>
           </div>
+
+          {/* Starting points for visitors without a name in mind */}
+          <nav
+            aria-label="Start browsing"
+            className="mt-5 flex flex-wrap items-center justify-center gap-2"
+          >
+            {quickLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded-full border border-[#f6f1e9]/25 px-4 py-1.5 text-sm font-medium text-[#f6f1e9] transition-colors hover:border-primary hover:text-primary active:opacity-80"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
         </div>
 
         {/* Search Results Dropdown - Portal to escape parent transform stacking context */}

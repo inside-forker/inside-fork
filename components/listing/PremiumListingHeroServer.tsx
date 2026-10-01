@@ -43,7 +43,6 @@ export function PremiumListingHero({
       <PremiumListingHeroClient
         listing={listing}
         images={images}
-        hasMultipleImages={images.length > 1}
         fallbackImage={fallbackImage}
       />
 

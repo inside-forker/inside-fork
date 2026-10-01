@@ -91,24 +91,17 @@ async function enrichAndGroupDeals(
   const imageByListingId = new Map<number, string>();
 
   const [cardsResult, covers] = await Promise.all([
-    bankIds.length > 0 || variantIdSet.size > 0
-      ? query(
-          `SELECT id, bank_id, card_name
-           FROM card_variants
-           WHERE is_active = true
-             AND (
-               bank_id = ANY($1::bigint[])
-               OR id = ANY($2::bigint[])
-             )`,
-          [bankIds.length ? bankIds : [0], [...variantIdSet].length ? [...variantIdSet] : [0]],
-        ).catch((error) => {
-          console.error(
-            "[mobile-api] deals card_variants lookup failed:",
-            error instanceof Error ? error.message : error,
-          );
-          return { rows: [] };
-        })
-      : Promise.resolve({ rows: [] }),
+    query(
+      `SELECT id, bank_id, card_name
+       FROM card_variants
+       WHERE is_active = true`,
+    ).catch((error) => {
+      console.error(
+        "[mobile-api] deals card_variants lookup failed:",
+        error instanceof Error ? error.message : error,
+      );
+      return { rows: [] };
+    }),
     uniqueListingIds.length > 0
       ? (async () => {
           const nameById = new Map<number, string | null>();
@@ -174,41 +167,17 @@ async function enrichAndGroupDeals(
     if (dto) mapped.push(dto);
   }
 
-  const dealsByListing = new Map<string, MobileDealPreviewDTO[]>();
-  for (const dto of mapped) {
-    const key =
-      dto.listingId != null ? `listing:${dto.listingId}` : `merchant:${dto.merchant}`;
-    const group = dealsByListing.get(key);
-    if (group) {
-      group.push(dto);
-    } else {
-      dealsByListing.set(key, [dto]);
-    }
-  }
-
-  const groupedDeals: MobileDealPreviewDTO[] = [];
-  for (const list of dealsByListing.values()) {
-    list.sort((a, b) => b.discountWeight - a.discountWeight);
-    const primary = { ...list[0] };
-    if (list.length > 1) {
-      const siblings = list.slice(1);
-      primary.otherDealsCount = siblings.length;
-      primary.otherDeals = siblings.map((d) => ({
-        id: d.id,
-        merchant: d.merchant,
-      }));
-    }
-    groupedDeals.push(primary);
-  }
-
-  return groupedDeals;
+  // Preserve all deals across banks and card tiers so bank filters and card matching
+  // work accurately for every card variant and bank.
+  mapped.sort((a, b) => b.discountWeight - a.discountWeight);
+  return mapped;
 }
 
 function etagForDeals(groupedDeals: MobileDealPreviewDTO[], prefix: string): string {
   // Bump when the serialized shape changes, not just the data: the hash below
   // only covers ids/labels, so without this a client holding a body from an
   // older shape would revalidate into a 304 and keep it.
-  const PAYLOAD_SHAPE_VERSION = "v3-location-name";
+  const PAYLOAD_SHAPE_VERSION = "v4-full-active-deals";
 
   const hashContent =
     `${PAYLOAD_SHAPE_VERSION}|${prefix}|` +
@@ -238,7 +207,7 @@ async function compileFullCatalog(): Promise<CompiledCatalog> {
        LEFT JOIN categories c ON c.id = l.category_id
        WHERE ${where.join(" AND ")}
        ORDER BY d.created_at DESC
-       LIMIT 3000`,
+       LIMIT 10000`,
       [],
     );
     dealRows = rows as DealSqlRow[];
