@@ -35,14 +35,14 @@ export default function Home() {
         <FeaturedListingsContainer />
       </Suspense>
 
-      {/* Bank discounts: every supported bank, plus a few live offers */}
-      <Suspense fallback={null}>
-        <BankOffersSection />
-      </Suspense>
-
       {/* Upcoming events (a single event gets the featured layout) */}
       <Suspense fallback={<EventsSkeleton />}>
         <TrendingEventsContainer />
+      </Suspense>
+
+      {/* Bank discounts: every supported bank */}
+      <Suspense fallback={null}>
+        <BankOffersSection />
       </Suspense>
 
       {/* Categories */}

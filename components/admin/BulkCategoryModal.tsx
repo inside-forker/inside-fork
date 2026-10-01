@@ -382,11 +382,11 @@ export function BulkCategoryModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && !isCreatingCategory && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden border border-border/80 shadow-2xl bg-background">
-        {/* Header */}
-        <DialogHeader className="p-6 pb-4 border-b border-border/60 bg-muted/20">
+      <DialogContent className="max-w-2xl max-h-[85vh] sm:max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden border border-border/80 shadow-2xl bg-background">
+        {/* Header - Fixed/Pinned */}
+        <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b border-border/60 bg-muted/20 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20">
+            <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0">
               <FolderInput className="h-5 w-5" />
             </div>
             <div>
@@ -400,7 +400,7 @@ export function BulkCategoryModal({
           </div>
 
           {/* Warning Banner */}
-          <div className="mt-4 flex items-start gap-2.5 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs">
+          <div className="mt-3 flex items-start gap-2.5 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs">
             <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <span>
               <strong>Note:</strong> All previously assigned categories and subcategories on these {selectedCount} listing(s) will be removed and replaced with the selected subcategory.
@@ -408,8 +408,8 @@ export function BulkCategoryModal({
           </div>
         </DialogHeader>
 
-        {/* Tab Selector */}
-        <div className="px-6 pt-4">
+        {/* Scrollable Body Content */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "select" | "create")}>
             <TabsList className="grid grid-cols-2 w-full h-10">
               <TabsTrigger value="select" className="flex items-center gap-2">
@@ -435,7 +435,7 @@ export function BulkCategoryModal({
               </div>
 
               {/* Subcategories List */}
-              <div className="max-h-[320px] overflow-y-auto border border-border/60 rounded-xl divide-y divide-border/40 p-1 bg-muted/10">
+              <div className="max-h-[240px] sm:max-h-[300px] overflow-y-auto border border-border/60 rounded-xl divide-y divide-border/40 p-1 bg-muted/10">
                 {displayGroups.length === 0 ? (
                   <div className="p-8 text-center text-sm text-muted-foreground">
                     No matching categories found for &ldquo;{searchQuery}&rdquo;.
@@ -542,8 +542,8 @@ export function BulkCategoryModal({
           </Tabs>
         </div>
 
-        {/* Footer */}
-        <DialogFooter className="p-6 pt-4 border-t border-border/60 bg-muted/20 flex flex-row items-center justify-between sm:justify-between">
+        {/* Footer - Fixed/Pinned */}
+        <DialogFooter className="p-4 sm:p-6 border-t border-border/60 bg-muted/20 shrink-0 flex flex-row items-center justify-between sm:justify-between">
           <Button
             type="button"
             variant="ghost"

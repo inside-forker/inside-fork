@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { motion } from "framer-motion";
+import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -160,6 +161,11 @@ export function ListingsManagementPage() {
     React.useState(false);
   const [selectAllPages, setSelectAllPages] = React.useState(false);
   const [isLoadingAllIds, setIsLoadingAllIds] = React.useState(false);
+  const [bulkDockMounted, setBulkDockMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setBulkDockMounted(true);
+  }, []);
 
   // User profile state for role-based access control
   const [userProfile, setUserProfile] = React.useState<{
@@ -240,6 +246,7 @@ export function ListingsManagementPage() {
       silent: boolean = false,
       append: boolean = false,
       customLimit?: number,
+      offsetOverride?: number,
     ) => {
       const abortRef = silent ? bgAbortRef : fgAbortRef;
       abortRef.current?.abort();
@@ -260,6 +267,9 @@ export function ListingsManagementPage() {
           page: page.toString(),
           limit: effectiveLimit.toString(),
         });
+        if (offsetOverride !== undefined) {
+          params.append("offset", offsetOverride.toString());
+        }
 
         if (search) params.append("search", search);
         if (status && status !== "all") params.append("status", status);
@@ -282,8 +292,10 @@ export function ListingsManagementPage() {
               );
               return [...prev, ...newItems];
             });
+            setCurrentPage(page);
           } else {
             setListings(result.data.listings || []);
+            setCurrentPage(1);
           }
           setTotalListings(result.data.pagination.total);
           if (result.data.stats) {
@@ -364,8 +376,8 @@ export function ListingsManagementPage() {
   // Handle Show More listings
   const handleLoadMore = React.useCallback(() => {
     if (isLoading || isLoadingMore || !hasMore) return;
-    const nextPage = currentPage + 1;
-    setCurrentPage(nextPage);
+    const currentOffset = listings.length;
+    const nextPage = Math.floor(currentOffset / itemsPerPage) + 1;
     fetchListings(
       nextPage,
       debouncedSearchQuery,
@@ -373,12 +385,15 @@ export function ListingsManagementPage() {
       categoryFilter,
       false,
       true,
+      itemsPerPage,
+      currentOffset,
     );
   }, [
     isLoading,
     isLoadingMore,
     hasMore,
-    currentPage,
+    listings.length,
+    itemsPerPage,
     fetchListings,
     debouncedSearchQuery,
     statusFilter,
@@ -1173,121 +1188,126 @@ export function ListingsManagementPage() {
             </Button>
           </div>
         </div>
-
-        {/* Bulk Actions */}
-        {isBulkMode && selectedListings.size > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="mt-4 space-y-3"
-          >
-            {/* Main Selection Bar */}
-            <div className="p-4 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 backdrop-blur-sm border border-primary/30 rounded-xl shadow-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <CheckSquare className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium text-primary">
-                      {selectAllPages
-                        ? `All ${selectedListings.size} listing(s) selected`
-                        : `${selectedListings.size} listing(s) selected`}
-                    </span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDeselectAll}
-                    className="h-8 bg-background/50 border-border/50 hover:bg-background/80"
-                  >
-                    Clear Selection
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsBulkCategoryModalOpen(true)}
-                    disabled={isBulkStatusUpdating || isBulkDeleting}
-                    className="h-8 bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 font-medium shadow-sm"
-                  >
-                    <FolderInput className="h-3.5 w-3.5 mr-1.5" />
-                    Move Subcategory ({selectedListings.size})
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleBulkStatusUpdate("published")}
-                    disabled={isBulkStatusUpdating || isBulkDeleting}
-                    className="h-8 bg-background/50 border-border/50 hover:bg-background/80"
-                  >
-                    <Eye className="h-3 w-3 mr-1" />
-                    Publish Selected
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleBulkStatusUpdate("draft")}
-                    disabled={isBulkStatusUpdating || isBulkDeleting}
-                    className="h-8 bg-background/50 border-border/50 hover:bg-background/80"
-                  >
-                    <Star className="h-3 w-3 mr-1" />
-                    Move to Draft
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleBulkStatusUpdate("archived")}
-                    disabled={isBulkStatusUpdating || isBulkDeleting}
-                    className="h-8 bg-background/50 border-border/50 hover:bg-background/80"
-                  >
-                    <Archive className="h-3 w-3 mr-1" />
-                    Archive Selected
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleBulkDelete}
-                    disabled={isBulkDeleting || isBulkStatusUpdating}
-                    className="h-8 bg-destructive hover:bg-destructive/90 shadow-sm hover:shadow-md"
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Delete Selected ({selectedListings.size})
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Select All Pages Banner (shown when loaded listings are fully selected but not all database items) */}
-            {!selectAllPages &&
-              selectedListings.size === listings.length &&
-              listings.length > 0 &&
-              totalListings > listings.length && (
-                <motion.div
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-blue-900 dark:text-blue-100">
-                      All <strong>{listings.length}</strong> loaded listings on this
-                      screen are selected.{" "}
-                      <button
-                        onClick={handleSelectAllPages}
-                        disabled={isLoadingAllIds}
-                        className="font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isLoadingAllIds
-                          ? "Loading..."
-                          : `Select all ${totalListings.toLocaleString()} matching listings?`}
-                      </button>
-                    </p>
-                  </div>
-                </motion.div>
-              )}
-          </motion.div>
-        )}
       </motion.div>
+
+      {/* Floating Action Dock — portaled to body so layout overflow-x-clip
+          cannot trap position:fixed (sticky/fixed both failed inside the shell). */}
+      {bulkDockMounted &&
+        createPortal(
+          <AnimatePresence>
+            {isBulkMode && selectedListings.size > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 30, scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                className="fixed bottom-6 right-4 sm:right-6 lg:right-8 z-[100] max-w-[calc(100vw-2rem)] pointer-events-none"
+              >
+                <div className="p-2.5 sm:p-3 bg-background/95 dark:bg-card/95 backdrop-blur-2xl border border-primary/30 rounded-2xl shadow-2xl shadow-primary/15 pointer-events-auto ring-1 ring-primary/20 flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Selected Count & Clear */}
+                    <div className="flex items-center gap-2 pr-2 border-r border-border/70">
+                      <div className="flex items-center gap-1.5 font-bold text-xs sm:text-sm text-primary whitespace-nowrap">
+                        <CheckSquare className="h-4 w-4 shrink-0 text-primary" />
+                        <span>
+                          {selectAllPages
+                            ? `All ${selectedListings.size.toLocaleString()}`
+                            : selectedListings.size.toLocaleString()}{" "}
+                          selected
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDeselectAll}
+                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                      >
+                        Clear
+                      </Button>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsBulkCategoryModalOpen(true)}
+                        disabled={isBulkStatusUpdating || isBulkDeleting}
+                        className="h-8 px-2.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 font-medium shadow-sm"
+                      >
+                        <FolderInput className="h-3.5 w-3.5 mr-1.5" />
+                        Move Subcategory ({selectedListings.size})
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleBulkStatusUpdate("published")}
+                        disabled={isBulkStatusUpdating || isBulkDeleting}
+                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background"
+                      >
+                        <Eye className="h-3 w-3 mr-1" />
+                        Publish
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleBulkStatusUpdate("draft")}
+                        disabled={isBulkStatusUpdating || isBulkDeleting}
+                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background"
+                      >
+                        <Star className="h-3 w-3 mr-1" />
+                        Draft
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleBulkStatusUpdate("archived")}
+                        disabled={isBulkStatusUpdating || isBulkDeleting}
+                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background"
+                      >
+                        <Archive className="h-3 w-3 mr-1" />
+                        Archive
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleBulkDelete}
+                        disabled={isBulkDeleting || isBulkStatusUpdating}
+                        className="h-8 px-2.5 text-xs bg-destructive hover:bg-destructive/90 shadow-md font-medium"
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Delete ({selectedListings.size})
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Select All Pages Banner */}
+                  {!selectAllPages &&
+                    selectedListings.size === listings.length &&
+                    listings.length > 0 &&
+                    totalListings > listings.length && (
+                      <div className="pt-2 border-t border-border/60 flex flex-wrap items-center justify-between gap-1.5 text-xs text-muted-foreground bg-primary/5 dark:bg-primary/10 rounded-lg px-2.5 py-1.5">
+                        <span>
+                          All <strong>{listings.length}</strong> loaded on this screen selected.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleSelectAllPages}
+                          disabled={isLoadingAllIds}
+                          className="font-semibold text-primary hover:underline disabled:opacity-50 cursor-pointer"
+                        >
+                          {isLoadingAllIds
+                            ? "Loading..."
+                            : `Select all ${totalListings.toLocaleString()} matching?`}
+                        </button>
+                      </div>
+                    )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
 
       {/* Listings Table */}
       <motion.div variants={itemVariants}>
