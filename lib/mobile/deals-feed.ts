@@ -198,8 +198,17 @@ export function resolveCardMatches(
     for (const assoc of associations) {
       const name = typeof assoc.name === "string" ? assoc.name.trim() : "";
       if (!name) continue;
-      const key = `${bankId}::${normalizeCardName(name)}`;
-      const cv = cardsByBankName.get(key);
+      const normalized = normalizeCardName(name);
+      const key = `${bankId}::${normalized}`;
+      let cv = cardsByBankName.get(key);
+      if (!cv && bankName) {
+        const strippedName = normalized
+          .replace(new RegExp(`^${normalizeCardName(bankName)}\\s*`, "i"), "")
+          .trim();
+        if (strippedName) {
+          cv = cardsByBankName.get(`${bankId}::${strippedName}`);
+        }
+      }
       if (cv) push(cv);
     }
 
