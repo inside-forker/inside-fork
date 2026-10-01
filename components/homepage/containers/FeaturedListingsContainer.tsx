@@ -3,6 +3,9 @@ import { query } from "@/lib/db";
 import { FeaturedListingsSection } from "@/components/homepage/FeaturedListingsSection";
 import { getFavoritedListingIdsForUser } from "@/lib/utils/favorites-server";
 import { Database } from "@/types/database";
+import { extractArea } from "@/lib/outing/templates";
+import { normalizeSearchText } from "@/lib/utils/places-search";
+import { formatStat, getPlatformStats } from "@/lib/homepage/platform-stats";
 
 /**
  * Going-out categories the fill draws from, besides food. Errand-type places
@@ -30,10 +33,11 @@ export async function FeaturedListingsContainer() {
     // a real photo, so the section never goes empty. The fill is a mix: one pick
     // per category (all of food counts as one) before any category repeats,
     // best-reviewed then newest within each.
+    const statsPromise = getPlatformStats();
     const { rows: featuredListings } = await query(
       `WITH candidates AS (
          SELECT lwd.*, COALESCE(parent.name, cat.name) AS category_group,
-                img.url AS primary_image_url,
+                img.url AS primary_image_url, offers.live_deals, offers.best_percent,
                 ROW_NUMBER() OVER (
                   PARTITION BY CASE WHEN parent.slug = 'food-dining' THEN 'food' ELSE cat.slug END
                   ORDER BY lwd.review_count DESC NULLS LAST, lwd.avg_rating DESC NULLS LAST,
@@ -48,6 +52,16 @@ export async function FeaturedListingsContainer() {
               ORDER BY li.is_primary DESC NULLS LAST, li.display_order ASC NULLS LAST, li.id ASC
               LIMIT 1
            ) img ON true
+           -- Live card offers, by the deals feed's rule, for the card's offer line
+           LEFT JOIN LATERAL (
+             SELECT COUNT(*)::integer AS live_deals,
+                    MAX((regexp_match(d.discount_value, '(\\d{1,3})\\s*%'))[1]::integer) AS best_percent
+               FROM deals d
+              WHERE d.listing_id = lwd.id
+                AND d.is_active = true
+                AND (d.start_date IS NULL OR d.start_date <= NOW())
+                AND (d.end_date IS NULL OR d.end_date >= NOW())
+           ) offers ON true
           WHERE lwd.status = 'published'
             AND (lwd.is_featured = true
                  OR (img.url IS NOT NULL
@@ -62,6 +76,9 @@ export async function FeaturedListingsContainer() {
 
     type ListingRow = Database["public"]["Views"]["listings_with_details"]["Row"] & {
       category_group?: string | null;
+      area?: string | null;
+      live_deals?: number;
+      best_percent?: number | null;
     };
     type HydratedListing = ListingRow & { favorited?: boolean };
     // node-pg returns bigint columns (id) as strings; normalize to number to
@@ -71,6 +88,10 @@ export async function FeaturedListingsContainer() {
     const listings = featuredListings.map(({ primary_image_url, kind_rank: _kindRank, ...row }) => ({
       ...row,
       id: row.id !== null && row.id !== undefined ? Number(row.id) : row.id,
+      // No area column; the neighbourhood is read off the street address
+      area: row.address ? extractArea(normalizeSearchText(String(row.address))) : null,
+      live_deals: Number(row.live_deals) || 0,
+      best_percent: row.best_percent != null ? Number(row.best_percent) : null,
       images: primary_image_url
         ? [{ url: primary_image_url, is_primary: true, display_order: 0 }]
         : undefined,
@@ -89,7 +110,14 @@ export async function FeaturedListingsContainer() {
       }
     }
 
-    return <FeaturedListingsSection listings={hydratedListings || []} />;
+    const { places } = await statsPromise;
+
+    return (
+      <FeaturedListingsSection
+        listings={hydratedListings || []}
+        totalPlaces={places ? formatStat(places) : null}
+      />
+    );
   } catch (error) {
     // Don't fail `next build` / ISR when Postgres is temporarily saturated.
     console.error("Featured listings fetch failed:", error);

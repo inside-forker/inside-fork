@@ -34,8 +34,9 @@ export function FeaturedCategoriesSection({
       <div className={containerClass}>
         <SectionHeading title="Explore categories" href="/listings" />
 
-        {/* Circle index, same shape as the app's category grid */}
-        <div className="grid grid-cols-4 gap-x-2 gap-y-5 sm:grid-cols-6 lg:grid-cols-8">
+        {/* Circle index, same shape as the app's category grid. On desktop the
+            columns stretch to fill the row, so a short list isn't left-heavy. */}
+        <div className="grid grid-cols-4 gap-x-2 gap-y-5 sm:grid-cols-6 lg:grid-cols-[repeat(auto-fit,minmax(7rem,1fr))]">
           {categories.map((category) => {
             const IconComponent = getCategoryIcon(category.icon_name);
             const count = category.published_listing_count ?? 0;
