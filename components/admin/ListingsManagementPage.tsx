@@ -1182,121 +1182,121 @@ export function ListingsManagementPage() {
             </Button>
           </div>
         </div>
+      </motion.div>
 
-        {/* Bulk Actions */}
-        {isBulkMode && selectedListings.size > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="mt-4 space-y-3"
-          >
-            {/* Main Selection Bar */}
-            <div className="p-4 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 backdrop-blur-sm border border-primary/30 rounded-xl shadow-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <CheckSquare className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium text-primary">
-                      {selectAllPages
-                        ? `All ${selectedListings.size} listing(s) selected`
-                        : `${selectedListings.size} listing(s) selected`}
-                    </span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDeselectAll}
-                    className="h-8 bg-background/50 border-border/50 hover:bg-background/80"
-                  >
-                    Clear Selection
-                  </Button>
+      {/* Floating Sticky Bulk Actions Bar */}
+      {isBulkMode && selectedListings.size > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="sticky top-20 sm:top-[84px] z-30 space-y-2 py-2"
+        >
+          {/* Main Selection Bar */}
+          <div className="p-3.5 sm:p-4 bg-background/95 backdrop-blur-xl border border-primary/40 rounded-xl shadow-2xl shadow-primary/10">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <CheckSquare className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-sm font-semibold text-primary whitespace-nowrap">
+                    {selectAllPages
+                      ? `All ${selectedListings.size.toLocaleString()} listing(s) selected`
+                      : `${selectedListings.size.toLocaleString()} listing(s) selected`}
+                  </span>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsBulkCategoryModalOpen(true)}
-                    disabled={isBulkStatusUpdating || isBulkDeleting}
-                    className="h-8 bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 font-medium shadow-sm"
-                  >
-                    <FolderInput className="h-3.5 w-3.5 mr-1.5" />
-                    Move Subcategory ({selectedListings.size})
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleBulkStatusUpdate("published")}
-                    disabled={isBulkStatusUpdating || isBulkDeleting}
-                    className="h-8 bg-background/50 border-border/50 hover:bg-background/80"
-                  >
-                    <Eye className="h-3 w-3 mr-1" />
-                    Publish Selected
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleBulkStatusUpdate("draft")}
-                    disabled={isBulkStatusUpdating || isBulkDeleting}
-                    className="h-8 bg-background/50 border-border/50 hover:bg-background/80"
-                  >
-                    <Star className="h-3 w-3 mr-1" />
-                    Move to Draft
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleBulkStatusUpdate("archived")}
-                    disabled={isBulkStatusUpdating || isBulkDeleting}
-                    className="h-8 bg-background/50 border-border/50 hover:bg-background/80"
-                  >
-                    <Archive className="h-3 w-3 mr-1" />
-                    Archive Selected
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleBulkDelete}
-                    disabled={isBulkDeleting || isBulkStatusUpdating}
-                    className="h-8 bg-destructive hover:bg-destructive/90 shadow-sm hover:shadow-md"
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Delete Selected ({selectedListings.size})
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDeselectAll}
+                  className="h-8 text-xs bg-background/60 border-border/60 hover:bg-background/90"
+                >
+                  Clear Selection
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsBulkCategoryModalOpen(true)}
+                  disabled={isBulkStatusUpdating || isBulkDeleting}
+                  className="h-8 text-xs bg-primary/15 hover:bg-primary/25 text-primary border-primary/40 font-semibold shadow-sm"
+                >
+                  <FolderInput className="h-3.5 w-3.5 mr-1.5" />
+                  Move Subcategory ({selectedListings.size})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBulkStatusUpdate("published")}
+                  disabled={isBulkStatusUpdating || isBulkDeleting}
+                  className="h-8 text-xs bg-background/60 border-border/60 hover:bg-background/90"
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  Publish Selected
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBulkStatusUpdate("draft")}
+                  disabled={isBulkStatusUpdating || isBulkDeleting}
+                  className="h-8 text-xs bg-background/60 border-border/60 hover:bg-background/90"
+                >
+                  <Star className="h-3 w-3 mr-1" />
+                  Move to Draft
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBulkStatusUpdate("archived")}
+                  disabled={isBulkStatusUpdating || isBulkDeleting}
+                  className="h-8 text-xs bg-background/60 border-border/60 hover:bg-background/90"
+                >
+                  <Archive className="h-3 w-3 mr-1" />
+                  Archive Selected
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  disabled={isBulkDeleting || isBulkStatusUpdating}
+                  className="h-8 text-xs bg-destructive hover:bg-destructive/90 shadow-sm"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Delete Selected ({selectedListings.size})
+                </Button>
               </div>
             </div>
+          </div>
 
-            {/* Select All Pages Banner (shown when loaded listings are fully selected but not all database items) */}
-            {!selectAllPages &&
-              selectedListings.size === listings.length &&
-              listings.length > 0 &&
-              totalListings > listings.length && (
-                <motion.div
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-blue-900 dark:text-blue-100">
-                      All <strong>{listings.length}</strong> loaded listings on this
-                      screen are selected.{" "}
-                      <button
-                        onClick={handleSelectAllPages}
-                        disabled={isLoadingAllIds}
-                        className="font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isLoadingAllIds
-                          ? "Loading..."
-                          : `Select all ${totalListings.toLocaleString()} matching listings?`}
-                      </button>
-                    </p>
-                  </div>
-                </motion.div>
-              )}
-          </motion.div>
-        )}
-      </motion.div>
+          {/* Select All Pages Banner (shown when loaded listings are fully selected but not all database items) */}
+          {!selectAllPages &&
+            selectedListings.size === listings.length &&
+            listings.length > 0 &&
+            totalListings > listings.length && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3 bg-blue-50/95 dark:bg-blue-950/90 backdrop-blur-md border border-blue-200 dark:border-blue-800 rounded-lg shadow-md"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-xs sm:text-sm text-blue-900 dark:text-blue-100">
+                    All <strong>{listings.length}</strong> loaded listings on this
+                    screen are selected.{" "}
+                    <button
+                      onClick={handleSelectAllPages}
+                      disabled={isLoadingAllIds}
+                      className="font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isLoadingAllIds
+                        ? "Loading..."
+                        : `Select all ${totalListings.toLocaleString()} matching listings?`}
+                    </button>
+                  </p>
+                </div>
+              </motion.div>
+            )}
+        </motion.div>
+      )}
 
       {/* Listings Table */}
       <motion.div variants={itemVariants}>
