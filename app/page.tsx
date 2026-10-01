@@ -66,3 +66,5 @@ export default function Home() {
 
 // Enable ISR with 5 minute revalidation for homepage
 export const revalidate = 300;
+
+export const revalidate = 300;
