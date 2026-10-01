@@ -240,6 +240,7 @@ export function ListingsManagementPage() {
       silent: boolean = false,
       append: boolean = false,
       customLimit?: number,
+      offsetOverride?: number,
     ) => {
       const abortRef = silent ? bgAbortRef : fgAbortRef;
       abortRef.current?.abort();
@@ -260,6 +261,9 @@ export function ListingsManagementPage() {
           page: page.toString(),
           limit: effectiveLimit.toString(),
         });
+        if (offsetOverride !== undefined) {
+          params.append("offset", offsetOverride.toString());
+        }
 
         if (search) params.append("search", search);
         if (status && status !== "all") params.append("status", status);
@@ -282,8 +286,10 @@ export function ListingsManagementPage() {
               );
               return [...prev, ...newItems];
             });
+            setCurrentPage(page);
           } else {
             setListings(result.data.listings || []);
+            setCurrentPage(1);
           }
           setTotalListings(result.data.pagination.total);
           if (result.data.stats) {
@@ -364,8 +370,8 @@ export function ListingsManagementPage() {
   // Handle Show More listings
   const handleLoadMore = React.useCallback(() => {
     if (isLoading || isLoadingMore || !hasMore) return;
-    const nextPage = currentPage + 1;
-    setCurrentPage(nextPage);
+    const currentOffset = listings.length;
+    const nextPage = Math.floor(currentOffset / itemsPerPage) + 1;
     fetchListings(
       nextPage,
       debouncedSearchQuery,
@@ -373,12 +379,15 @@ export function ListingsManagementPage() {
       categoryFilter,
       false,
       true,
+      itemsPerPage,
+      currentOffset,
     );
   }, [
     isLoading,
     isLoadingMore,
     hasMore,
-    currentPage,
+    listings.length,
+    itemsPerPage,
     fetchListings,
     debouncedSearchQuery,
     statusFilter,

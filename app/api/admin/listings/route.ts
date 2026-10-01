@@ -30,7 +30,11 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status") || "";
     const categoryId = searchParams.get("category_id") || "";
 
-    const offset = (page - 1) * limit;
+    const offsetParam = searchParams.get("offset");
+    const offset =
+      offsetParam !== null && !isNaN(parseInt(offsetParam, 10))
+        ? parseInt(offsetParam, 10)
+        : (page - 1) * limit;
 
     const whereParams: unknown[] = [];
     const whereClauses: string[] = [];
@@ -82,7 +86,7 @@ export async function GET(request: NextRequest) {
       const listParams = [...whereParams, limit, offset];
       const listingsResult = await query(
         `SELECT * FROM listings ${whereSql}
-         ORDER BY created_at DESC
+         ORDER BY created_at DESC, id DESC
          LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
         listParams,
       );
