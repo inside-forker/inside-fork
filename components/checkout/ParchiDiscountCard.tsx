@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { describeParchiOffer, type ParchiOffer } from "@/lib/parchi/discount";
+import { recallParchiId } from "@/lib/parchi/prefill";
 
 type Status = "pending" | "approved" | "rejected" | "expired";
 
@@ -21,6 +22,9 @@ interface Verification {
 interface ParchiDiscountCardProps {
   eventId: number;
   offer: ParchiOffer;
+  /** Verifying needs an account; logged out, the card offers a login. */
+  isLoggedIn: boolean;
+  onLogin: () => void;
   /** Approved verification id, or null when none / removed. */
   onApprovedChange: (verificationId: string | null) => void;
 }
@@ -34,9 +38,17 @@ interface ParchiDiscountCardProps {
 export function ParchiDiscountCard({
   eventId,
   offer,
+  isLoggedIn,
+  onLogin,
   onApprovedChange,
 }: ParchiDiscountCardProps) {
   const [parchiId, setParchiId] = useState("");
+  // Pre-fill from the Parchi app's link (?parchiId= on the event page). Read
+  // after mount: sessionStorage doesn't exist during server rendering.
+  useEffect(() => {
+    const remembered = recallParchiId();
+    if (remembered) setParchiId((current) => current || remembered);
+  }, []);
   const [verification, setVerification] = useState<Verification | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +140,11 @@ export function ParchiDiscountCard({
           </div>
         </div>
 
-        {status === "approved" ? (
+        {!isLoggedIn ? (
+          <Button variant="outline" className="w-full" onClick={onLogin}>
+            Log in to use your student discount
+          </Button>
+        ) : status === "approved" ? (
           <div className="flex items-center justify-between gap-3 rounded-xl bg-primary/5 p-4">
             <div className="flex items-center gap-2 font-medium">
               <CheckCircle2 className="h-5 w-5 text-primary" />

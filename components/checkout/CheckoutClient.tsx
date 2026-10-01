@@ -64,7 +64,7 @@ export function CheckoutClient() {
   useEffect(() => {
     setParchiOffer(null);
     setParchiVerificationId(null);
-    if (!userId || !parchiEventId) return;
+    if (!parchiEventId) return;
     let cancelled = false;
     fetch(`/api/parchi/offer?eventId=${parchiEventId}`)
       .then((res) => (res.ok ? res.json() : null))
@@ -420,6 +420,10 @@ export function CheckoutClient() {
             <ParchiDiscountCard
               eventId={parchiEventId}
               offer={parchiOffer}
+              isLoggedIn={!!user}
+              onLogin={() =>
+                router.push(`/login?next=${encodeURIComponent("/checkout")}`)
+              }
               onApprovedChange={setParchiVerificationId}
             />
           )}
