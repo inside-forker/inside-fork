@@ -2,10 +2,9 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PremiumHomepageHero } from "@/components/homepage/PremiumHomepageHero";
 import { CallToActionSections } from "@/components/homepage/CallToActionSections";
-import { PlatformStatsStrip } from "@/components/homepage/PlatformStatsStrip";
 import { FeaturesSection } from "@/components/homepage/FeaturesSection";
-import { AppComingSoonSection } from "@/components/homepage/AppComingSoonSection";
 import { BankOffersSection } from "@/components/homepage/BankOffersSection";
+import { AreasSection } from "@/components/homepage/AreasSection";
 
 // Containers
 import { CategoriesContainer } from "@/components/homepage/containers/CategoriesContainer";
@@ -28,41 +27,38 @@ export const metadata: Metadata = {
 export default function Home() {
   return (
     <main className="min-h-screen bg-background">
-      {/* Homepage hero section - renders immediately */}
+      {/* Hero, search and browsing shortcuts - renders immediately */}
       <PremiumHomepageHero />
 
-      {/* Real platform counts (hidden when there's nothing meaningful to show) */}
-      <Suspense fallback={null}>
-        <PlatformStatsStrip />
-      </Suspense>
-
-      {/* Trending Events Section */}
-      <Suspense fallback={<EventsSkeleton />}>
-        <TrendingEventsContainer />
-      </Suspense>
-
-      {/* Featured Categories Section */}
-      <Suspense fallback={<CategoriesSkeleton />}>
-        <CategoriesContainer />
-      </Suspense>
-
-      {/* Everything the platform does */}
-      <FeaturesSection />
-
-      {/* Featured Listings Section */}
+      {/* Curated places worth exploring */}
       <Suspense fallback={<FeaturedListingsSkeleton />}>
         <FeaturedListingsContainer />
       </Suspense>
 
-      {/* Every supported bank, with live offer counts */}
+      {/* Bank discounts: every supported bank, plus a few live offers */}
       <Suspense fallback={null}>
         <BankOffersSection />
       </Suspense>
 
-      {/* Mobile app teaser - store badges disabled until launch */}
-      <AppComingSoonSection />
+      {/* Upcoming events (a single event gets the featured layout) */}
+      <Suspense fallback={<EventsSkeleton />}>
+        <TrendingEventsContainer />
+      </Suspense>
 
-      {/* Call-to-Action Sections - Static Content */}
+      {/* Categories */}
+      <Suspense fallback={<CategoriesSkeleton />}>
+        <CategoriesContainer />
+      </Suspense>
+
+      {/* Neighbourhood shortcuts, with place counts */}
+      <Suspense fallback={null}>
+        <AreasSection />
+      </Suspense>
+
+      {/* Three short benefit blocks */}
+      <FeaturesSection />
+
+      {/* Account shortcuts or sign-up, app notification, business link */}
       <CallToActionSections />
     </main>
   );

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Heart, MapPin, Star } from "lucide-react";
+import { Heart, MapPin, Star, Tag } from "lucide-react";
 import { OptimizedImage } from "@/components/ui/optimized-image";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -18,14 +18,29 @@ import {
 
 type Listing = Database["public"]["Views"]["listings_with_details"]["Row"] & {
   category_group?: string | null;
+  /** Neighbourhood read off the address; null when none is recognised. */
+  area?: string | null;
+  /** Live card offers at this place. */
+  live_deals?: number;
+  best_percent?: number | null;
 };
 
 interface FeaturedListingsSectionProps {
   listings: Listing[];
+  /** Published places in total, already formatted ("3,600+"); null hides it. */
+  totalPlaces?: string | null;
+}
+
+function offerLine(listing: Listing): string | null {
+  const count = listing.live_deals ?? 0;
+  if (count === 0) return null;
+  if (listing.best_percent) return `Up to ${listing.best_percent}% off`;
+  return count === 1 ? "1 card offer" : `${count} card offers`;
 }
 
 export function FeaturedListingsSection({
   listings,
+  totalPlaces,
 }: FeaturedListingsSectionProps) {
   const { toast } = useToast();
   const favorites = useFavoritesStore((state) => state.favorites);
@@ -70,7 +85,11 @@ export function FeaturedListingsSection({
       <div className={containerClass}>
         <SectionHeading
           title="Worth stepping out for"
-          subtitle="A few places to start."
+          subtitle={
+            totalPlaces
+              ? `A few places to start, out of ${totalPlaces}.`
+              : "A few places to start."
+          }
           href="/listings"
           actionLabel="All places"
         />
@@ -82,6 +101,7 @@ export function FeaturedListingsSection({
             const isFavorite = favorites.some(
               (fav) => String(fav.id) === String(listing.id),
             );
+            const offer = offerLine(listing);
 
             return (
               <div
@@ -127,10 +147,17 @@ export function FeaturedListingsSection({
                         <span className="min-w-0 truncate"> · {listing.category_name}</span>
                       ) : null}
                     </p>
-                    {listing.address ? (
+                    {listing.area || listing.address ? (
                       <p className="flex items-center gap-1 text-xs text-muted-foreground">
                         <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        <span className="line-clamp-1">{listing.address}</span>
+                        {/* The neighbourhood when one is recognised, else the address */}
+                        <span className="line-clamp-1">{listing.area || listing.address}</span>
+                      </p>
+                    ) : null}
+                    {offer ? (
+                      <p className="flex items-center gap-1 text-xs font-medium text-primary">
+                        <Tag className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        <span className="line-clamp-1">{offer}</span>
                       </p>
                     ) : null}
                   </div>

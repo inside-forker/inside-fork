@@ -1,6 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getSupportedBanks, type SupportedBank } from "@/lib/homepage/bank-offers";
+import {
+  getHomepageOffers,
+  getSupportedBanks,
+  type HomepageOffer,
+  type SupportedBank,
+} from "@/lib/homepage/bank-offers";
+import { OptimizedImage } from "@/components/ui/optimized-image";
 import {
   SectionHeading,
   containerClass,
@@ -38,11 +44,87 @@ function BankCoin({ bank }: { bank: SupportedBank }) {
   );
 }
 
-/** Every supported bank; the ones with live offers link to their deals. */
-export async function BankOffersSection() {
-  const banks = await getSupportedBanks();
+// Pinned to Karachi time so the server render and the browser agree.
+const endFormat = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  timeZone: "Asia/Karachi",
+});
 
-  if (banks.length === 0) return null;
+function endsLabel(endDate: string | null): string | null {
+  if (!endDate) return null;
+  const end = new Date(endDate);
+  if (Number.isNaN(end.getTime())) return null;
+  const daysLeft = Math.ceil((end.getTime() - Date.now()) / 86_400_000);
+  if (daysLeft <= 7) return `Ends in ${daysLeft} ${daysLeft === 1 ? "day" : "days"}`;
+  return `Ends ${endFormat.format(end)}`;
+}
+
+function OfferCard({ offer }: { offer: HomepageOffer }) {
+  const facts = [
+    offer.days,
+    offer.cap ? `Capped at ${offer.cap}` : null,
+    endsLabel(offer.endDate),
+  ].filter(Boolean);
+
+  return (
+    <Link
+      href={`/listing/${offer.listingSlug}`}
+      className="group flex gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-primary/40 active:opacity-80"
+    >
+      <span className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-muted">
+        {offer.imageUrl ? (
+          <OptimizedImage
+            src={offer.imageUrl}
+            alt=""
+            fill
+            sizes="80px"
+            className="object-cover"
+          />
+        ) : offer.bankLogoUrl ? (
+          <Image
+            src={offer.bankLogoUrl}
+            alt=""
+            fill
+            sizes="80px"
+            className="bg-white object-contain p-3"
+          />
+        ) : null}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-lg font-bold leading-tight text-primary">
+          {offer.discountLabel}
+        </span>
+        <span className="mt-0.5 block line-clamp-1 text-sm font-semibold text-foreground">
+          {offer.merchant}
+          {offer.area ? (
+            <span className="font-normal text-muted-foreground"> · {offer.area}</span>
+          ) : null}
+        </span>
+        <span className="block line-clamp-1 text-xs text-muted-foreground">
+          {offer.bankName} · {offer.cardLabel}
+        </span>
+        {facts.length > 0 ? (
+          <span className="block line-clamp-1 text-xs text-muted-foreground">
+            {facts.join(" · ")}
+          </span>
+        ) : null}
+      </span>
+    </Link>
+  );
+}
+
+/**
+ * Bank discounts: a row of every supported bank (each one opens the deals
+ * list filtered to it) and a few live offers to show what's there.
+ */
+export async function BankOffersSection() {
+  const [banks, offers] = await Promise.all([
+    getSupportedBanks(),
+    getHomepageOffers(),
+  ]);
+
+  if (banks.length === 0 && offers.length === 0) return null;
 
   return (
     <section className={sectionClass}>
@@ -51,10 +133,12 @@ export async function BankOffersSection() {
           title="Your card might get you more"
           subtitle="Choose your bank to find available offers."
           href="/listings?deals=true"
-          actionLabel="All deals"
+          actionLabel="Browse all offers"
         />
 
-        <ul className="grid grid-cols-4 gap-x-2 gap-y-5 sm:grid-cols-6 lg:grid-cols-8">
+        {/* One scrolling row on phones (it reads as a filter, not a wall of
+            logos); wraps on desktop, where a hidden overflow can't be swiped */}
+        <ul className="scrollbar-hide -mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-wrap lg:gap-y-5 lg:overflow-visible lg:px-0">
           {banks.map((bank) => {
             const body = (
               <>
@@ -73,7 +157,7 @@ export async function BankOffersSection() {
             const className = "flex flex-col items-center gap-2 text-center";
 
             return (
-              <li key={bank.id}>
+              <li key={bank.id} className="w-20 shrink-0 sm:w-24">
                 {bank.dealsCount > 0 ? (
                   <Link
                     href={`/listings?deals=true&bank=${bank.id}`}
@@ -88,6 +172,14 @@ export async function BankOffersSection() {
             );
           })}
         </ul>
+
+        {offers.length > 0 ? (
+          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {offers.map((offer) => (
+              <OfferCard key={offer.id} offer={offer} />
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   );
