@@ -2,12 +2,11 @@ import Link from "next/link";
 import { ArrowRight, Store } from "lucide-react";
 import { containerClass, sectionClass } from "@/components/shared/SectionHeading";
 import { AccountPanel } from "@/components/homepage/AccountPanel";
-import { AppComingSoonCard } from "@/components/homepage/AppComingSoonCard";
 
 /**
  * The page's closing block, kept small so it doesn't compete with the
  * consumer sections above: the visitor's own shortcuts (or a sign-up nudge),
- * then the app and business links side by side.
+ * then the business link. The app has its own section above this one.
  */
 export function CallToActionSections() {
   return (
@@ -15,9 +14,7 @@ export function CallToActionSections() {
       <div className={`${containerClass} space-y-3 sm:space-y-4`}>
         <AccountPanel />
 
-        <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
-          <AppComingSoonCard />
-
+        <div>
           <Link
             href="/get-listed"
             className="group flex h-full flex-col gap-4 rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary/40 active:opacity-80 sm:p-6"

@@ -7,6 +7,9 @@ type SectionHeadingProps = {
   subtitle?: string;
   href?: string;
   actionLabel?: string;
+  /** "center" stacks title, subtitle and link centred from lg up, for
+   * sections whose content is itself centred. */
+  align?: "start" | "center";
 };
 
 /**
@@ -19,9 +22,14 @@ export function SectionHeading({
   subtitle,
   href,
   actionLabel = "View all",
+  align = "start",
 }: SectionHeadingProps) {
   return (
-    <div className="mb-4 flex items-end justify-between gap-3">
+    <div
+      className={`mb-4 flex items-end justify-between gap-3 ${
+        align === "center" ? "lg:mb-6 lg:flex-col lg:items-center lg:gap-2 lg:text-center" : ""
+      }`}
+    >
       <div className="min-w-0">
         <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
           {title}
@@ -88,4 +96,4 @@ export function CalloutHeading({
 
 /** Shared section shell: one vertical rhythm and one gutter for every section. */
 export const sectionClass = "py-8 sm:py-10";
-export const containerClass = "container mx-auto px-5 sm:px-6 lg:px-8";
+export const containerClass = "mx-auto max-w-7xl px-6 lg:px-8";
