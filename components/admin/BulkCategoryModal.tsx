@@ -53,6 +53,8 @@ interface BulkCategoryModalProps {
   categories: CategoryOption[];
   categoryGroups: CategoryGroup[];
   onSuccess: (newCategoryId: number, newCategoryName: string) => void;
+  /** Refresh category lists without closing the modal (e.g. after create-before-move). */
+  onCategoriesRefresh?: () => void | Promise<void>;
 }
 
 export function BulkCategoryModal({
@@ -63,6 +65,7 @@ export function BulkCategoryModal({
   categories,
   categoryGroups,
   onSuccess,
+  onCategoriesRefresh,
 }: BulkCategoryModalProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = React.useState<"select" | "create">("select");
@@ -75,6 +78,13 @@ export function BulkCategoryModal({
   const [newCategoryParentId, setNewCategoryParentId] = React.useState<string>("");
   const [newCategorySlug, setNewCategorySlug] = React.useState("");
   const [isCreatingCategory, setIsCreatingCategory] = React.useState(false);
+  /** Kept when create succeeds but move fails — shown on Select tab for retry. */
+  const [pendingCreated, setPendingCreated] = React.useState<{
+    id: number;
+    name: string;
+    parentId: string;
+    slug: string;
+  } | null>(null);
 
   // Root/parent categories for parent picker
   const parentCategories = React.useMemo(() => {
@@ -109,6 +119,59 @@ export function BulkCategoryModal({
       .filter((g): g is CategoryGroup => g !== null);
   }, [categoryGroups, searchQuery]);
 
+  // Merge a just-created subcategory so Select tab can show it before parent refresh lands
+  const displayGroups = React.useMemo(() => {
+    if (!pendingCreated) return filteredGroups;
+
+    const pendingOption: CategoryOption = {
+      value: String(pendingCreated.id),
+      label: pendingCreated.name,
+      slug: pendingCreated.slug,
+      parentId: pendingCreated.parentId,
+    };
+
+    const alreadyListed = filteredGroups.some((g) =>
+      g.subcategories.some((s) => s.value === pendingOption.value),
+    );
+    if (alreadyListed) return filteredGroups;
+
+    const parent = categories.find((c) => c.value === pendingCreated.parentId);
+    if (!parent) {
+      return [
+        ...filteredGroups,
+        {
+          parent: {
+            value: pendingCreated.parentId,
+            label: "New subcategory",
+            slug: "",
+            parentId: null,
+          },
+          subcategories: [pendingOption],
+        },
+      ];
+    }
+
+    let found = false;
+    const next = filteredGroups.map((group) => {
+      if (group.parent.value !== pendingCreated.parentId) return group;
+      found = true;
+      return {
+        ...group,
+        subcategories: [pendingOption, ...group.subcategories],
+      };
+    });
+
+    if (found) return next;
+
+    return [
+      {
+        parent,
+        subcategories: [pendingOption],
+      },
+      ...next,
+    ];
+  }, [filteredGroups, pendingCreated, categories]);
+
   // Auto-generate slug when typing category name
   React.useEffect(() => {
     if (newCategoryName) {
@@ -123,17 +186,24 @@ export function BulkCategoryModal({
     }
   }, [newCategoryName]);
 
-  // Reset state when opened
+  // Reset form state only when the modal opens (not when categories refresh mid-flow)
   React.useEffect(() => {
-    if (isOpen) {
-      setSelectedSubcategoryId("");
-      setSearchQuery("");
-      setNewCategoryName("");
-      setNewCategoryParentId(parentCategories[0]?.value || "");
-      setNewCategorySlug("");
-      setActiveTab("select");
-    }
-  }, [isOpen, parentCategories]);
+    if (!isOpen) return;
+    setSelectedSubcategoryId("");
+    setSearchQuery("");
+    setNewCategoryName("");
+    setNewCategorySlug("");
+    setActiveTab("select");
+    setPendingCreated(null);
+    setNewCategoryParentId(parentCategories[0]?.value || "");
+    // parentCategories intentionally omitted — refresh after create must not wipe pendingCreated
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (!isOpen || newCategoryParentId || parentCategories.length === 0) return;
+    setNewCategoryParentId(parentCategories[0].value);
+  }, [isOpen, newCategoryParentId, parentCategories]);
 
   // Handle submit for existing subcategory
   const handleMoveToExisting = async () => {
@@ -147,7 +217,16 @@ export function BulkCategoryModal({
     }
 
     const catIdNum = Number(selectedSubcategoryId);
-    const chosenCat = categories.find((c) => c.value === selectedSubcategoryId);
+    const chosenCat =
+      categories.find((c) => c.value === selectedSubcategoryId) ||
+      (pendingCreated && String(pendingCreated.id) === selectedSubcategoryId
+        ? {
+            label: pendingCreated.name,
+            value: String(pendingCreated.id),
+            slug: pendingCreated.slug,
+            parentId: pendingCreated.parentId,
+          }
+        : undefined);
 
     try {
       setIsSubmitting(true);
@@ -170,6 +249,7 @@ export function BulkCategoryModal({
         description: `${selectedCount} listing(s) successfully moved to "${chosenCat?.label || "new category"}" (all previous categories replaced).`,
       });
 
+      setPendingCreated(null);
       onSuccess(catIdNum, chosenCat?.label || "New Subcategory");
       onClose();
     } catch (err: unknown) {
@@ -205,6 +285,13 @@ export function BulkCategoryModal({
       return;
     }
 
+    const slug =
+      newCategorySlug ||
+      trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+    let createdCategoryId: number | null = null;
+    let createdCategoryName = trimmedName;
+
     try {
       setIsCreatingCategory(true);
 
@@ -214,7 +301,7 @@ export function BulkCategoryModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: trimmedName,
-          slug: newCategorySlug || trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          slug,
           parent_id: Number(newCategoryParentId),
           category_type: "listing",
           show_in_nav: true,
@@ -228,8 +315,16 @@ export function BulkCategoryModal({
         throw new Error(createData.error || "Failed to create new subcategory");
       }
 
-      const createdCategoryId = Number(createData.data.id);
-      const createdCategoryName = createData.data.name || trimmedName;
+      createdCategoryId = Number(createData.data.id);
+      createdCategoryName = createData.data.name || trimmedName;
+
+      setPendingCreated({
+        id: createdCategoryId,
+        name: createdCategoryName,
+        parentId: newCategoryParentId,
+        slug: createData.data.slug || slug,
+      });
+      void onCategoriesRefresh?.();
 
       // 2) Move selected listings into the newly created subcategory
       const patchRes = await fetch("/api/admin/listings", {
@@ -243,7 +338,10 @@ export function BulkCategoryModal({
 
       const patchData = await patchRes.json();
       if (!patchRes.ok || !patchData.success) {
-        throw new Error(patchData.error || "Subcategory created, but failed to move listings.");
+        throw new Error(
+          patchData.error ||
+            `Subcategory "${createdCategoryName}" was created, but listings were not moved.`,
+        );
       }
 
       toast({
@@ -251,15 +349,32 @@ export function BulkCategoryModal({
         description: `Created "${createdCategoryName}" and moved ${selectedCount} listing(s) into it.`,
       });
 
+      setPendingCreated(null);
       onSuccess(createdCategoryId, createdCategoryName);
       onClose();
     } catch (err: unknown) {
       console.error("Error creating subcategory or moving listings:", err);
-      toast({
-        title: "Error",
-        description: err instanceof Error ? err.message : "Failed to create subcategory and move listings",
-        variant: "destructive",
-      });
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to create subcategory and move listings";
+
+      // Create succeeded but move failed — stay open on Select with the new cat selected
+      if (createdCategoryId != null) {
+        setSelectedSubcategoryId(String(createdCategoryId));
+        setActiveTab("select");
+        toast({
+          title: "Subcategory created — move failed",
+          description: `${message} Use “Move ${selectedCount} Listing(s)” on the Select tab to retry without creating another subcategory.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: message,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsCreatingCategory(false);
     }
@@ -321,12 +436,12 @@ export function BulkCategoryModal({
 
               {/* Subcategories List */}
               <div className="max-h-[320px] overflow-y-auto border border-border/60 rounded-xl divide-y divide-border/40 p-1 bg-muted/10">
-                {filteredGroups.length === 0 ? (
+                {displayGroups.length === 0 ? (
                   <div className="p-8 text-center text-sm text-muted-foreground">
                     No matching categories found for &ldquo;{searchQuery}&rdquo;.
                   </div>
                 ) : (
-                  filteredGroups.map((group) => (
+                  displayGroups.map((group) => (
                     <div key={group.parent.value} className="p-2 space-y-1">
                       {/* Main Category Header */}
                       <div className="px-2.5 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">

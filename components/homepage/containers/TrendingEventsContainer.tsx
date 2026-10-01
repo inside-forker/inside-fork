@@ -3,6 +3,10 @@ import {
   fetchUpcomingPublishedEvents,
   type PrimaryEventImageRow,
 } from "@/lib/events/upcoming-query";
+import {
+  fetchPriceRangeByEventId,
+  type EventPriceRange,
+} from "@/lib/mobile/event-pricing";
 import { TrendingEventsSection } from "@/components/homepage/TrendingEventsSection";
 import type { Event, EventImage } from "@/types/events.types";
 
@@ -21,12 +25,17 @@ export async function TrendingEventsContainer() {
 
   const eventIds = upcomingRows.map((row) => row.event_id);
 
-  let primaryImageByEvent = new Map<number, PrimaryEventImageRow>();
-  try {
-    primaryImageByEvent = await fetchPrimaryEventImagesByEventIds(eventIds);
-  } catch (imageErr) {
-    console.warn("Error fetching images for trending events", imageErr);
-  }
+  const [primaryImageByEvent, priceByEvent] = await Promise.all([
+    fetchPrimaryEventImagesByEventIds(eventIds).catch((imageErr) => {
+      console.warn("Error fetching images for trending events", imageErr);
+      return new Map<number, PrimaryEventImageRow>();
+    }),
+    // A missing price only hides the price line
+    fetchPriceRangeByEventId(eventIds).catch((priceErr) => {
+      console.warn("Error fetching prices for trending events", priceErr);
+      return new Map<number, EventPriceRange>();
+    }),
+  ]);
 
   const formattedEvents: Event[] = upcomingRows.map((row) => {
     const primary = primaryImageByEvent.get(row.event_id);
@@ -63,5 +72,10 @@ export async function TrendingEventsContainer() {
     };
   });
 
-  return <TrendingEventsSection events={formattedEvents} />;
+  return (
+    <TrendingEventsSection
+      events={formattedEvents}
+      prices={Object.fromEntries(priceByEvent)}
+    />
+  );
 }

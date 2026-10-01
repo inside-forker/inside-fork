@@ -1,4 +1,5 @@
 import React from "react";
+import { cn } from "@/lib/utils";
 
 interface HeroSectionStaticProps {
     children: React.ReactNode;
@@ -20,7 +21,10 @@ export function HeroSectionStatic({
 }: HeroSectionStaticProps) {
     return (
         <section
-            className={`relative flex items-center justify-center overflow-hidden bg-background pt-10 pb-8 sm:pt-16 sm:pb-12 lg:pt-24 lg:pb-16 ${className}`}
+            className={cn(
+                "relative flex items-center justify-center overflow-hidden bg-background py-10 sm:py-14 lg:py-20",
+                className,
+            )}
         >
             {/* Floating slot (panels/icons) */}
             {floating}

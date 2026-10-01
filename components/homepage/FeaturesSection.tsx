@@ -1,162 +1,159 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import {
   SectionHeading,
   containerClass,
   sectionClass,
 } from "@/components/shared/SectionHeading";
-import {
-  ArrowUpRight,
-  CreditCard,
-  LayoutGrid,
-  MapPin,
-  SlidersHorizontal,
-  QrCode,
-  Search,
-  Users,
-  CalendarDays,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowRight, QrCode, Search, Ticket } from "lucide-react";
 
-type Feature = {
-  icon: LucideIcon;
+type Benefit = {
   title: string;
   description: string;
-  href?: string;
+  href: string;
+  action: string;
+  /** A small picture of the feature, shown rather than described. */
+  preview: ReactNode;
 };
 
-type FeatureGroup = {
-  title: string;
-  blurb: string;
-  features: Feature[];
-};
+const chip =
+  "rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-foreground";
 
-const groups: FeatureGroup[] = [
+/** A search in progress, with the filters places can be narrowed by. */
+function SearchPreview() {
+  return (
+    <div className="w-full max-w-[240px] space-y-2.5">
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-sm">
+        <Search className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs font-medium text-foreground">cafés</span>
+        <span className="-ml-1 h-3.5 w-px bg-primary motion-safe:animate-pulse" />
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <span className="rounded-full bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground">
+          Open now
+        </span>
+        <span className={chip}>Card offers</span>
+        <span className={chip}>Top rated</span>
+      </div>
+    </div>
+  );
+}
+
+/** A ticket stub with its QR pass, as issued at checkout. */
+function TicketPreview() {
+  return (
+    <div className="flex w-full max-w-[240px] overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="flex w-14 shrink-0 items-center justify-center bg-primary text-primary-foreground">
+        <Ticket className="h-6 w-6" />
+      </div>
+      {/* The tear line; its notches hang off it so they always sit on it */}
+      <div className="relative flex flex-1 items-center justify-between gap-2 border-l border-dashed border-border px-3 py-3">
+        <span className="absolute -top-2 left-0 h-4 w-4 -translate-x-1/2 rounded-full border border-border bg-muted" />
+        <span className="absolute -bottom-2 left-0 h-4 w-4 -translate-x-1/2 rounded-full border border-border bg-muted" />
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-foreground">Your ticket</p>
+          <p className="text-[11px] text-muted-foreground">Scan at the gate</p>
+        </div>
+        <QrCode className="h-8 w-8 shrink-0 text-foreground" />
+      </div>
+    </div>
+  );
+}
+
+/** Progress toward the next rank (Explorer → Local at 250 XP) and what earns it. */
+function XpPreview() {
+  return (
+    <div className="w-full max-w-[240px] rounded-xl border border-border bg-card p-3 shadow-sm">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs font-semibold text-foreground">Explorer</span>
+        <span className="text-[11px] tabular-nums text-muted-foreground">180 / 250 XP</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className="h-full w-[72%] rounded-full bg-primary" />
+      </div>
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+          +10 review
+        </span>
+        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+          +30 event
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// Three short promises, each with a picture of the thing itself. Feature
+// detail (QR passes, recommendations, analytics) lives where it's used.
+const benefits: Benefit[] = [
   {
-    title: "Discover the city",
-    blurb: "Everything worth knowing about Karachi, in one place.",
-    features: [
-      {
-        icon: LayoutGrid,
-        title: "Places in every category",
-        description:
-          "Food, shopping, beauty, health, fitness, services and more, with branches, menus and opening hours.",
-        href: "/listings",
-      },
-      {
-        icon: MapPin,
-        title: "Nearby & on the map",
-        description: "See what's around you and filter by area.",
-        href: "/listings",
-      },
-      {
-        icon: Search,
-        title: "One search for everything",
-        description: "Find places and events from a single search bar.",
-        href: "/search",
-      },
-      {
-        icon: SlidersHorizontal,
-        title: "Filter what matters",
-        description: "Narrow results by area, category and rating.",
-        href: "/listings",
-      },
-    ],
+    title: "Find your next spot",
+    description: "Places, menus, hours and card discounts, all in one search.",
+    href: "/listings",
+    action: "Browse places",
+    preview: <SearchPreview />,
   },
   {
-    title: "Events & tickets",
-    blurb: "From discovery to the gate, without the WhatsApp chase.",
-    features: [
-      {
-        icon: CalendarDays,
-        title: "What's on in Karachi",
-        description: "Concerts, pop-ups, workshops and more, all in one calendar.",
-        href: "/events",
-      },
-      {
-        icon: CreditCard,
-        title: "Buy tickets online",
-        description: "Secure checkout for ticketed events.",
-        href: "/events",
-      },
-      {
-        icon: QrCode,
-        title: "QR ticket passes",
-        description: "Every ticket gets its own signed QR pass, ready to scan at entry.",
-      },
-      {
-        icon: Users,
-        title: "Follow organizers",
-        description: "Keep up with the people behind the events you love.",
-      },
-    ],
+    title: "Make your next plan",
+    description: "Book event tickets online and get a QR pass for the gate.",
+    href: "/events",
+    action: "See what's on",
+    preview: <TicketPreview />,
+  },
+  {
+    title: "Make every visit count",
+    description: "Review places, save favourites and earn XP as you go.",
+    href: "/leaderboard",
+    action: "See the leaderboard",
+    preview: <XpPreview />,
   },
 ];
 
-function FeatureCard({ feature }: { feature: Feature }) {
-  const Icon = feature.icon;
-  const body = (
-    <>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:h-10 sm:w-10">
-          <Icon className="h-5 w-5" aria-hidden />
-        </div>
-        {feature.href && (
-          <ArrowUpRight
-            className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary"
+function BenefitCard({ benefit }: { benefit: Benefit }) {
+  return (
+    <Link
+      href={benefit.href}
+      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-primary/40 active:opacity-80"
+    >
+      <div
+        aria-hidden
+        className="flex h-32 items-center justify-center border-b border-border bg-muted px-5 sm:h-36"
+      >
+        {benefit.preview}
+      </div>
+      <div className="flex flex-1 flex-col p-4 sm:p-5">
+        <h3 className="text-base font-semibold tracking-tight text-foreground">
+          {benefit.title}
+        </h3>
+        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+          {benefit.description}
+        </p>
+        <span className="mt-auto inline-flex items-center gap-1 pt-3 text-sm font-semibold text-primary">
+          {benefit.action}
+          <ArrowRight
+            className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
             aria-hidden
           />
-        )}
+        </span>
       </div>
-      <h4 className="mt-3 text-sm font-semibold tracking-tight text-foreground sm:mt-4 sm:text-base">
-        {feature.title}
-      </h4>
-      <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-        {feature.description}
-      </p>
-    </>
-  );
-
-  const className =
-    "group block h-full rounded-2xl border border-border bg-card p-4 transition-colors sm:p-5";
-
-  return feature.href ? (
-    <Link
-      href={feature.href}
-      className={`${className} hover:border-primary/40 active:opacity-80`}
-    >
-      {body}
     </Link>
-  ) : (
-    <div className={className}>{body}</div>
   );
 }
 
 export function FeaturesSection() {
   return (
-    <section className={`${sectionClass} bg-muted`}>
+    <section className={sectionClass}>
       <div className={containerClass}>
-        <SectionHeading
-          title="Everything you can do"
-          subtitle="Find what's good in Karachi, then get your tickets and go."
-        />
-
-        <div className="space-y-8 sm:space-y-10">
-          {groups.map((group) => (
-            <div key={group.title}>
-              <div className="mb-3 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
-                <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-foreground">
-                  {group.title}
-                </h3>
-                <p className="text-sm text-muted-foreground">{group.blurb}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-                {group.features.map((feature) => (
-                  <FeatureCard key={feature.title} feature={feature} />
-                ))}
-              </div>
-            </div>
+        <SectionHeading title="Make the most of Inside" />
+        {/* Swipeable row on phones so three cards don't stack into a wall;
+            a plain three-up grid from tablet up */}
+        <ul className="scrollbar-hide -mx-5 flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:px-0">
+          {benefits.map((benefit) => (
+            <li key={benefit.title} className="w-[82%] shrink-0 snap-start sm:w-auto">
+              <BenefitCard benefit={benefit} />
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );
