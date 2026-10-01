@@ -65,7 +65,7 @@ export async function BankOffersSection() {
                 {/* Foreground ink, not pink: a count on every coin isn't an accent */}
                 <span className="-mt-1 text-xs tabular-nums text-muted-foreground">
                   {bank.dealsCount > 0
-                    ? `${bank.dealsCount} ${bank.dealsCount === 1 ? "deal" : "deals"}`
+                    ? `${bank.places} places · ${bank.dealsCount} deals`
                     : "No offers yet"}
                 </span>
               </>
