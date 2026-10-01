@@ -1285,6 +1285,7 @@ export function ListingsManagementPage() {
           selectedListings={selectedListings}
           onSelectListing={handleSelectListing}
           onSelectAll={handleSelectAll}
+          selectAllPages={selectAllPages}
           isBulkMode={isBulkMode}
           userRole={userProfile?.role}
           editorsMap={editorsMap}
@@ -1299,6 +1300,17 @@ export function ListingsManagementPage() {
         selectedIds={Array.from(selectedListings).map((id) => Number(id))}
         categories={categories}
         categoryGroups={categoryGroups}
+        onCategoriesRefresh={async () => {
+          try {
+            const catRes = await fetch("/api/categories?all=true");
+            const catData = await catRes.json();
+            if (catData.success) {
+              setCategories(catData.categories);
+            }
+          } catch (e) {
+            console.error("Failed to refresh categories:", e);
+          }
+        }}
         onSuccess={async () => {
           setSelectedListings(new Set());
           setSelectAllPages(false);

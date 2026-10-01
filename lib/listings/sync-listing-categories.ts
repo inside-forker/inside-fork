@@ -108,6 +108,78 @@ export async function syncListingCategories(
   return { categoryIds, primaryCategoryId };
 }
 
+/**
+ * Assign one category to many listings in a single transaction: wipe prior
+ * listing_categories rows, insert the new primary, and sync listings.category_id.
+ */
+export async function syncListingCategoriesBulk(
+  listingIds: number[],
+  categoryId: number,
+): Promise<{ listingIds: number[]; categoryId: number }> {
+  const ids = [
+    ...new Set(
+      listingIds
+        .map((id) => Number(id))
+        .filter((n) => Number.isFinite(n) && n > 0),
+    ),
+  ];
+  const targetCategoryId = Number(categoryId);
+  if (
+    ids.length === 0 ||
+    !Number.isFinite(targetCategoryId) ||
+    targetCategoryId <= 0
+  ) {
+    return { listingIds: ids, categoryId: targetCategoryId };
+  }
+
+  const { pool } = await import("@/lib/db");
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    await client.query(
+      `DELETE FROM listing_categories WHERE listing_id = ANY($1::bigint[])`,
+      [ids],
+    );
+
+    // Chunk inserts to keep parameter lists bounded
+    const CHUNK = 500;
+    for (let offset = 0; offset < ids.length; offset += CHUNK) {
+      const slice = ids.slice(offset, offset + CHUNK);
+      const values: unknown[] = [];
+      const placeholders: string[] = [];
+      slice.forEach((listingId, i) => {
+        const base = i * 3;
+        placeholders.push(`($${base + 1}, $${base + 2}, $${base + 3})`);
+        values.push(listingId, targetCategoryId, true);
+      });
+      await client.query(
+        `INSERT INTO listing_categories (listing_id, category_id, is_primary)
+         VALUES ${placeholders.join(", ")}`,
+        values,
+      );
+    }
+
+    await client.query(
+      `UPDATE listings SET category_id = $1 WHERE id = ANY($2::bigint[])`,
+      [targetCategoryId, ids],
+    );
+
+    await client.query("COMMIT");
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // ignore
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return { listingIds: ids, categoryId: targetCategoryId };
+}
+
 export async function getListingCategoryIds(
   listingId: number,
 ): Promise<number[]> {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
-import { syncListingCategories, normalizeCategoryIds, getListingCategoryIdsMap } from "@/lib/listings/sync-listing-categories";
+import { syncListingCategories, syncListingCategoriesBulk, normalizeCategoryIds, getListingCategoryIdsMap } from "@/lib/listings/sync-listing-categories";
 import { deleteListingsBulk } from "@/lib/utils/listing-deletion";
 import { resolveCategoryIdScope } from "@/lib/listings/category-scope";
 
@@ -422,14 +422,8 @@ export async function PATCH(request: NextRequest) {
       }
       const categoryName = catRows[0].name;
 
-      // Reassign each listing: wipes previous subcategories and assigns the new one
-      for (const listingId of validIds) {
-        await syncListingCategories(
-          listingId,
-          [targetCategoryId],
-          targetCategoryId,
-        );
-      }
+      // Reassign all listings in one transaction: wipes previous subcategories
+      await syncListingCategoriesBulk(validIds, targetCategoryId);
 
       // Audit log the reassignment
       try {

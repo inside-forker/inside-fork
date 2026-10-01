@@ -42,10 +42,11 @@ interface ListingsTableProps {
   totalPages: number;
   hasMore?: boolean;
   onLoadMore?: () => void;
-  onPageChange?: (page: number) => void;
   selectedListings?: Set<number>;
   onSelectListing?: (listingId: number, selected: boolean) => void;
   onSelectAll?: (selected: boolean) => void;
+  /** True when every listing matching the current filters is selected (may exceed loaded rows). */
+  selectAllPages?: boolean;
   isBulkMode?: boolean;
   userRole?: string;
   editorsMap?: Map<number, ListingEditorInfo[]>;
@@ -62,10 +63,10 @@ export function ListingsTable({
   totalPages,
   hasMore = false,
   onLoadMore,
-  onPageChange,
   selectedListings = new Set(),
   onSelectListing,
   onSelectAll,
+  selectAllPages = false,
   isBulkMode = false,
   userRole,
   editorsMap,
@@ -265,15 +266,24 @@ export function ListingsTable({
           <div className="flex items-center gap-3">
             <Checkbox
               checked={
-                listings.length > 0 && selectedListings.size === listings.length
+                listings.length === 0
+                  ? false
+                  : selectAllPages ||
+                      selectedListings.size >= listings.length
+                    ? true
+                    : selectedListings.size > 0
+                      ? "indeterminate"
+                      : false
               }
-              onCheckedChange={(checked) => onSelectAll(checked as boolean)}
+              onCheckedChange={(checked) => onSelectAll(checked === true)}
               aria-label="Select all listings"
             />
             <span className="text-sm font-medium text-primary">
-              {selectedListings.size > 0
-                ? `${selectedListings.size} of ${listings.length} selected`
-                : `Select listings (${listings.length} total)`}
+              {selectAllPages
+                ? `All ${selectedListings.size.toLocaleString()} matching listing(s) selected`
+                : selectedListings.size > 0
+                  ? `${selectedListings.size} of ${listings.length} loaded selected`
+                  : `Select listings (${listings.length} loaded)`}
             </span>
           </div>
         </motion.div>
