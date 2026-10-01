@@ -239,6 +239,7 @@ export function ListingsManagementPage() {
       category: string = "",
       silent: boolean = false,
       append: boolean = false,
+      customLimit?: number,
     ) => {
       const abortRef = silent ? bgAbortRef : fgAbortRef;
       abortRef.current?.abort();
@@ -254,9 +255,10 @@ export function ListingsManagementPage() {
           }
         }
 
+        const effectiveLimit = customLimit ?? itemsPerPage;
         const params = new URLSearchParams({
           page: page.toString(),
-          limit: itemsPerPage.toString(),
+          limit: effectiveLimit.toString(),
         });
 
         if (search) params.append("search", search);
@@ -319,10 +321,22 @@ export function ListingsManagementPage() {
     [toast, itemsPerPage],
   );
 
-  // Refresh listings - pass `silent: true` for background/realtime refreshes
-  // to avoid showing a loading skeleton while admins are working.
+  // Refresh listings - preserves currently loaded depth so multi-page bulk selections aren't wiped
   const refreshListings = React.useCallback(
     (silent = false) => {
+      // If silent background refresh and user is working in bulk mode or modal is open, skip
+      if (
+        silent &&
+        (isBulkMode ||
+          selectedListings.size > 0 ||
+          isModalOpen ||
+          isBulkCategoryModalOpen)
+      ) {
+        return;
+      }
+
+      // Preserve currently loaded item count on refresh
+      const loadedCount = listings.length > 0 ? listings.length : itemsPerPage;
       fetchListings(
         1,
         debouncedSearchQuery,
@@ -330,14 +344,20 @@ export function ListingsManagementPage() {
         categoryFilter,
         silent,
         false,
+        loadedCount,
       );
-      setCurrentPage(1);
     },
     [
       fetchListings,
       debouncedSearchQuery,
       statusFilter,
       categoryFilter,
+      isBulkMode,
+      selectedListings.size,
+      isModalOpen,
+      isBulkCategoryModalOpen,
+      listings.length,
+      itemsPerPage,
     ],
   );
 
@@ -365,7 +385,7 @@ export function ListingsManagementPage() {
     categoryFilter,
   ]);
 
-  // Re-fetch when any filter or debounced search changes
+  // Re-fetch when any filter or debounced search changes (resets to page 1)
   React.useEffect(() => {
     setCurrentPage(1);
     fetchListings(
@@ -393,7 +413,7 @@ export function ListingsManagementPage() {
     "admin-listings-realtime",
     [{ table: "listings" }],
     () => {
-      if (isModalOpen) {
+      if (isModalOpen || isBulkCategoryModalOpen) {
         pendingRefreshRef.current = true;
         return;
       }
