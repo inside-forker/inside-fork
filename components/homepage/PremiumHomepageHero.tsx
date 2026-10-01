@@ -122,9 +122,9 @@ export function PremiumHomepageHero() {
   };
 
   return (
-    // White hero; Karachi's streets sit behind it as a faint grey shade
+    // Brand cream hero; Karachi's streets sit behind it as a faint ink shade
     <HeroSectionStatic
-      className="bg-background pb-8 sm:pb-10 lg:pb-10"
+      className="bg-cream pb-8 sm:pb-10 lg:pb-10"
       floating={
         <div aria-hidden className="pointer-events-none absolute inset-0">
           {/* The map's lines are cream on transparent; brightness-0 turns them
@@ -137,9 +137,9 @@ export function PremiumHomepageHero() {
             sizes="100vw"
             className="object-cover brightness-0 opacity-[0.14]"
           />
-          {/* White overlay: clear at the top, solid at the bottom, so the map
+          {/* Cream overlay: clear at the top, solid at the bottom, so the map
               is strongest up top and fades out into the page */}
-          <div className="absolute inset-0 bg-gradient-to-b from-background/0 via-background/60 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-cream/0 via-cream/60 to-cream" />
         </div>
       }
     >

@@ -24,6 +24,9 @@ const config = {
   			sans: ['var(--font-sans)', 'system-ui', 'sans-serif']
   		},
   		colors: {
+  			// Brand palette (logo): cream surfaces and ink text alongside the pink primary
+  			cream: 'hsl(var(--cream) / <alpha-value>)',
+  			ink: 'hsl(var(--ink) / <alpha-value>)',
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',
