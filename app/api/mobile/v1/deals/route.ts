@@ -91,24 +91,17 @@ async function enrichAndGroupDeals(
   const imageByListingId = new Map<number, string>();
 
   const [cardsResult, covers] = await Promise.all([
-    bankIds.length > 0 || variantIdSet.size > 0
-      ? query(
-          `SELECT id, bank_id, card_name
-           FROM card_variants
-           WHERE is_active = true
-             AND (
-               bank_id = ANY($1::bigint[])
-               OR id = ANY($2::bigint[])
-             )`,
-          [bankIds.length ? bankIds : [0], [...variantIdSet].length ? [...variantIdSet] : [0]],
-        ).catch((error) => {
-          console.error(
-            "[mobile-api] deals card_variants lookup failed:",
-            error instanceof Error ? error.message : error,
-          );
-          return { rows: [] };
-        })
-      : Promise.resolve({ rows: [] }),
+    query(
+      `SELECT id, bank_id, card_name
+       FROM card_variants
+       WHERE is_active = true`,
+    ).catch((error) => {
+      console.error(
+        "[mobile-api] deals card_variants lookup failed:",
+        error instanceof Error ? error.message : error,
+      );
+      return { rows: [] };
+    }),
     uniqueListingIds.length > 0
       ? (async () => {
           const nameById = new Map<number, string | null>();

@@ -176,20 +176,25 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
 
     let targetCardName: string | null = null;
     let targetCardBankId: number | null = null;
+    let targetBankName: string | null = null;
 
     if (cardId != null && !Number.isNaN(cardId)) {
       const { rows: cardRows } = await query(
-        `SELECT id, bank_id, card_name FROM card_variants WHERE id = $1 LIMIT 1`,
+        `SELECT cv.id, cv.bank_id, cv.card_name, b.name AS bank_name
+         FROM card_variants cv
+         LEFT JOIN banks b ON b.id = cv.bank_id
+         WHERE cv.id = $1 LIMIT 1`,
         [cardId],
       );
       if (cardRows.length > 0) {
         targetCardName = String(cardRows[0].card_name || "").toLowerCase().replace(/\s+/g, " ").trim();
         targetCardBankId = cardRows[0].bank_id != null ? Number(cardRows[0].bank_id) : null;
+        targetBankName = cardRows[0].bank_name ? String(cardRows[0].bank_name).toLowerCase().replace(/\s+/g, " ").trim() : null;
       }
     }
 
     const { rows: dealRows } = await query(
-      `SELECT listing_id, discount_value, is_active, bank_id, valid_card_variants, metadata, end_date
+      `SELECT listing_id, discount_value, is_active, bank_id, valid_card_variants, metadata, start_date, end_date
        FROM deals`,
     );
 
@@ -201,11 +206,15 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
       const lid = Number(deal.listing_id);
       if (!Number.isFinite(lid) || lid <= 0) continue;
 
+      const startMs = deal.start_date
+        ? Date.parse(String(deal.start_date))
+        : Number.NEGATIVE_INFINITY;
       const endMs = deal.end_date
         ? Date.parse(String(deal.end_date))
         : Number.POSITIVE_INFINITY;
       const isActiveNow =
         Boolean(deal.is_active) &&
+        (isNaN(startMs) || startMs <= nowMs) &&
         (isNaN(endMs) || endMs >= nowMs);
 
       let maxDiscount = 0;
@@ -222,10 +231,31 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
         deal.bank_id != null && deal.bank_id !== ""
           ? Number(deal.bank_id)
           : null;
-      const bankMatch =
-        bankId != null && !Number.isNaN(bankId)
-          ? dealBankId === bankId
-          : true;
+
+      const metadata = deal.metadata as Record<string, unknown> | null;
+      const associations = Array.isArray(metadata?.card_associations)
+        ? (metadata.card_associations as Array<{ name?: string }>)
+        : [];
+
+      // Check if this deal is for bankId or an affiliated/Islamic division
+      let bankMatch = true;
+      if (bankId != null && !Number.isNaN(bankId)) {
+        if (dealBankId === bankId) {
+          bankMatch = true;
+        } else if (bankId === 16 && dealBankId === 1) {
+          // HBL Islamic deals stored under HBL Bank
+          bankMatch = associations.some((a) =>
+            typeof a?.name === "string" && /islamic/i.test(a.name),
+          );
+        } else if (bankId === 9 && dealBankId === 5) {
+          // MCB Islamic deals stored under MCB Bank
+          bankMatch = associations.some((a) =>
+            typeof a?.name === "string" && /(islamic|niswan|qadar)/i.test(a.name),
+          );
+        } else {
+          bankMatch = false;
+        }
+      }
 
       let cardMatch = true;
       if (cardId != null && !Number.isNaN(cardId)) {
@@ -246,28 +276,34 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
           }
         }
 
-        // 2) Name match via Peekaboo metadata.card_associations within bank
-        if (
-          !cardMatch &&
-          targetCardName &&
-          (targetCardBankId == null || targetCardBankId === dealBankId)
-        ) {
-          const metadata = deal.metadata as Record<string, unknown> | null;
-          if (metadata && Array.isArray(metadata.card_associations)) {
-            for (const assoc of metadata.card_associations) {
+        // 2) Name match via Peekaboo metadata.card_associations within bank (or sister bank)
+        const isBankCompatible =
+          targetCardBankId == null ||
+          targetCardBankId === dealBankId ||
+          (targetCardBankId === 16 && dealBankId === 1) ||
+          (targetCardBankId === 9 && dealBankId === 5);
+
+        if (!cardMatch && targetCardName && isBankCompatible) {
+          for (const assoc of associations) {
+            if (
+              assoc &&
+              typeof assoc === "object" &&
+              typeof assoc.name === "string"
+            ) {
+              const assocName = assoc.name
+                .toLowerCase()
+                .replace(/\s+/g, " ")
+                .trim();
+              const strippedByBank = targetBankName
+                ? assocName.replace(new RegExp(`^${targetBankName.replace(/\\s*(bank|islamic)\\s*/gi, "").trim()}\\s*`, "i"), "").trim()
+                : assocName;
               if (
-                assoc &&
-                typeof assoc === "object" &&
-                typeof (assoc as { name?: string }).name === "string"
+                assocName === targetCardName ||
+                strippedByBank === targetCardName ||
+                assocName.replace(/^(hbl|mcb|meezan|ubl|abl|allied|askari|alfalah|faysal|habib\s*metro|soneri|bankislami|bank\s*al\s*habib|al\s*baraka|bop|standard\s*chartered)\s*(bank|islamic)?\s*/i, "").trim() === targetCardName
               ) {
-                const assocName = (assoc as { name: string }).name
-                  .toLowerCase()
-                  .replace(/\s+/g, " ")
-                  .trim();
-                if (assocName === targetCardName) {
-                  cardMatch = true;
-                  break;
-                }
+                cardMatch = true;
+                break;
               }
             }
           }
