@@ -155,6 +155,13 @@ export function cardAssociationsFromMetadata(
   ) as CardAssociation[];
 }
 
+export const SISTER_BANK_MAP: Record<number, number[]> = {
+  1: [16], // HBL Bank includes HBL Islamic Banking
+  16: [1], // HBL Islamic Banking deals ingested under HBL Bank
+  5: [9],  // MCB Bank includes MCB Islamic Bank
+  9: [5],  // MCB Islamic Bank deals ingested under MCB Bank
+};
+
 /**
  * Resolve Peekaboo / local card refs into `cardMatches` using our catalog.
  */
@@ -193,27 +200,27 @@ export function resolveCardMatches(
     if (cv) push(cv);
   }
 
-  // 2) Name match via Peekaboo associations within this bank
+  // 2) Name match via Peekaboo associations within this bank and any affiliated/Islamic sister divisions
   if (bankId != null && Number.isFinite(bankId)) {
-    for (const assoc of associations) {
-      const name = typeof assoc.name === "string" ? assoc.name.trim() : "";
-      if (!name) continue;
-      const normalized = normalizeCardName(name);
-      const key = `${bankId}::${normalized}`;
-      let cv = cardsByBankName.get(key);
-      if (!cv && bankName) {
-        const strippedName = normalized
-          .replace(new RegExp(`^${normalizeCardName(bankName)}\\s*`, "i"), "")
-          .trim();
-        if (strippedName) {
-          cv = cardsByBankName.get(`${bankId}::${strippedName}`);
+    const candidateBankIds = [bankId, ...(SISTER_BANK_MAP[bankId] || [])];
+    for (const bid of candidateBankIds) {
+      for (const assoc of associations) {
+        const name = typeof assoc.name === "string" ? assoc.name.trim() : "";
+        if (!name) continue;
+        const normalized = normalizeCardName(name);
+        const key = `${bid}::${normalized}`;
+        let cv = cardsByBankName.get(key);
+        if (!cv && bankName) {
+          const strippedName = normalized
+            .replace(new RegExp(`^${normalizeCardName(bankName)}\\s*`, "i"), "")
+            .trim();
+          if (strippedName) {
+            cv = cardsByBankName.get(`${bid}::${strippedName}`);
+          }
         }
+        if (cv) push(cv);
       }
-      if (cv) push(cv);
     }
-
-    // 3) If ids missed but associations listed typeIds, try name-only across
-    //    the bank when the association name is present (already done above).
   }
 
   // 4) Still empty — surface bank for display; For You matches any card at bank
