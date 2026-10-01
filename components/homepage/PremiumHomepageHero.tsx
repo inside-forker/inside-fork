@@ -122,22 +122,24 @@ export function PremiumHomepageHero() {
   };
 
   return (
-    // Charcoal and cream, with the brand pink as the only accent
+    // White hero; Karachi's streets sit behind it as a faint grey shade
     <HeroSectionStatic
-      className="bg-[#1f1b1a]"
+      className="bg-background pb-8 sm:pb-10 lg:pb-10"
       floating={
-        // Karachi's streets as faint cream lines behind the search
         <div aria-hidden className="pointer-events-none absolute inset-0">
+          {/* The map's lines are cream on transparent; brightness-0 turns them
+              dark so they show on white, and the low opacity keeps them a shade */}
           <Image
             src="/assets/hero/karachi-streets.webp"
             alt=""
             fill
             priority
             sizes="100vw"
-            className="object-cover opacity-30"
+            className="object-cover brightness-0 opacity-[0.14]"
           />
-          {/* Fades the map out behind the headline and search so they stay readable */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,#1f1b1a_25%,transparent_80%)] opacity-80" />
+          {/* White overlay: clear at the top, solid at the bottom, so the map
+              is strongest up top and fades out into the page */}
+          <div className="absolute inset-0 bg-gradient-to-b from-background/0 via-background/60 to-background" />
         </div>
       }
     >
@@ -154,10 +156,10 @@ export function PremiumHomepageHero() {
 
         {/* Hero Heading */}
         <div className="space-y-3 sm:space-y-4 mb-8 sm:mb-10 animate-hero-fade-in-delay-1">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[#f6f1e9]">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
             Your next plan starts <span className="text-primary">Inside</span>.
           </h1>
-          <p className="max-w-2xl mx-auto text-sm sm:text-base lg:text-lg text-[#f6f1e9]/70 leading-relaxed">
+          <p className="max-w-2xl mx-auto text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed">
             Discover places, find bank discounts, and book events across
             Karachi.
           </p>
@@ -244,7 +246,7 @@ export function PremiumHomepageHero() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-full border border-[#f6f1e9]/25 px-4 py-1.5 text-sm font-medium text-[#f6f1e9] transition-colors hover:border-primary hover:text-primary active:opacity-80"
+                className="rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary active:opacity-80"
               >
                 {link.label}
               </Link>

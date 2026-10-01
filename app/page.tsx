@@ -30,14 +30,14 @@ export default function Home() {
       {/* Hero, search and browsing shortcuts - renders immediately */}
       <PremiumHomepageHero />
 
-      {/* Curated places worth exploring */}
-      <Suspense fallback={<FeaturedListingsSkeleton />}>
-        <FeaturedListingsContainer />
-      </Suspense>
-
       {/* Upcoming events (a single event gets the featured layout) */}
       <Suspense fallback={<EventsSkeleton />}>
         <TrendingEventsContainer />
+      </Suspense>
+
+      {/* Curated places worth exploring */}
+      <Suspense fallback={<FeaturedListingsSkeleton />}>
+        <FeaturedListingsContainer />
       </Suspense>
 
       {/* Bank discounts: every supported bank */}
