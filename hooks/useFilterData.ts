@@ -119,22 +119,23 @@ export function useFilterData(
   const fetchCategories = useCallback(async (): Promise<void> => {
     const cacheKey = "categories";
 
-    // Check cache first
-    if (isCacheValid(cache.categories) && cache.categories.data.length > 0) {
+    // Use cached data immediately if available
+    if (cache.categories.data && cache.categories.data.length > 0) {
       if (isMountedRef.current) {
-        setCategories(cache.categories.data); // Cache already contains DropdownOption[] format
+        setCategories(cache.categories.data);
       }
-      return;
+      if (isCacheValid(cache.categories)) {
+        return;
+      }
     }
 
     // Check for ongoing request
-    if (ongoingRequests.has(cacheKey)) {
+    const ongoing = ongoingRequests.get(cacheKey);
+    if (ongoing) {
       try {
-        const result = (await ongoingRequests.get(
-          cacheKey
-        )) as DropdownOption[];
-        if (isMountedRef.current) {
-          setCategories(result); // API already returns DropdownOption[] format
+        const result = (await ongoing) as DropdownOption[];
+        if (isMountedRef.current && Array.isArray(result) && result.length > 0) {
+          setCategories(result);
         }
       } catch (err) {
         console.error("Error waiting for ongoing categories request:", err);
@@ -148,8 +149,9 @@ export function useFilterData(
       setError(null);
     }
 
-    const requestPromise = fetch("/api/categories")
-      .then(async (response) => {
+    const requestPromise = (async () => {
+      try {
+        const response = await fetch("/api/categories");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -159,28 +161,30 @@ export function useFilterData(
           throw new Error(data.error || "Failed to fetch categories");
         }
 
-        // Update cache - API already returns transformed data
+        const categoryOptions = data.categories || [];
+
+        // Update cache
         cache.categories = {
-          data: data.categories || [],
+          data: categoryOptions,
           timestamp: Date.now(),
           ttl: CACHE_CONFIG.categories.ttl,
         };
 
-        return data.categories || [];
-      })
-      .finally(() => {
+        return categoryOptions;
+      } finally {
         ongoingRequests.delete(cacheKey);
         if (isMountedRef.current) {
           setLoading("categories", false);
         }
-      });
+      }
+    })();
 
     ongoingRequests.set(cacheKey, requestPromise);
 
     try {
       const result = await requestPromise;
-      if (isMountedRef.current) {
-        setCategories(result); // API already returns DropdownOption[] format
+      if (isMountedRef.current && Array.isArray(result)) {
+        setCategories(result);
       }
     } catch (err) {
       console.error("Error fetching categories:", err);
@@ -196,22 +200,23 @@ export function useFilterData(
   const fetchBanks = useCallback(async (): Promise<void> => {
     const cacheKey = "banks";
 
-    // Check cache first
-    if (isCacheValid(cache.banks) && cache.banks.data.length > 0) {
+    // Use cached data immediately if available
+    if (cache.banks.data && cache.banks.data.length > 0) {
       if (isMountedRef.current) {
-        setBanks(cache.banks.data); // Cache already contains DropdownOption[] format
+        setBanks(cache.banks.data);
       }
-      return;
+      if (isCacheValid(cache.banks)) {
+        return;
+      }
     }
 
     // Check for ongoing request
-    if (ongoingRequests.has(cacheKey)) {
+    const ongoing = ongoingRequests.get(cacheKey);
+    if (ongoing) {
       try {
-        const result = (await ongoingRequests.get(
-          cacheKey
-        )) as DropdownOption[];
-        if (isMountedRef.current) {
-          setBanks(result); // API already returns DropdownOption[] format
+        const result = (await ongoing) as DropdownOption[];
+        if (isMountedRef.current && Array.isArray(result) && result.length > 0) {
+          setBanks(result);
         }
       } catch (err) {
         console.error("Error waiting for ongoing banks request:", err);
@@ -225,8 +230,9 @@ export function useFilterData(
       setError(null);
     }
 
-    const requestPromise = fetch("/api/banks")
-      .then(async (response) => {
+    const requestPromise = (async () => {
+      try {
+        const response = await fetch("/api/banks");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -236,28 +242,30 @@ export function useFilterData(
           throw new Error(data.error || "Failed to fetch banks");
         }
 
-        // Update cache - API already returns transformed data
+        const bankList = data.banks || [];
+
+        // Update cache
         cache.banks = {
-          data: data.banks || [],
+          data: bankList,
           timestamp: Date.now(),
           ttl: CACHE_CONFIG.banks.ttl,
         };
 
-        return data.banks || [];
-      })
-      .finally(() => {
+        return bankList;
+      } finally {
         ongoingRequests.delete(cacheKey);
         if (isMountedRef.current) {
           setLoading("filterApply", false);
         }
-      });
+      }
+    })();
 
     ongoingRequests.set(cacheKey, requestPromise);
 
     try {
       const result = await requestPromise;
-      if (isMountedRef.current) {
-        setBanks(result); // API already returns DropdownOption[] format
+      if (isMountedRef.current && Array.isArray(result)) {
+        setBanks(result);
       }
     } catch (err) {
       console.error("Error fetching banks:", err);
@@ -281,25 +289,22 @@ export function useFilterData(
 
       // Check cache first
       const cachedCardVariants = cache.cardVariants[bankId];
-      if (
-        cachedCardVariants &&
-        isCacheValid(cachedCardVariants) &&
-        cachedCardVariants.data.length > 0
-      ) {
+      if (cachedCardVariants && cachedCardVariants.data?.length > 0) {
         if (isMountedRef.current) {
-          setCardVariants(cachedCardVariants.data); // Cache already contains DropdownOption[] format
+          setCardVariants(cachedCardVariants.data);
         }
-        return;
+        if (isCacheValid(cachedCardVariants)) {
+          return;
+        }
       }
 
       // Check for ongoing request
-      if (ongoingRequests.has(cacheKey)) {
+      const ongoing = ongoingRequests.get(cacheKey);
+      if (ongoing) {
         try {
-          const result = (await ongoingRequests.get(
-            cacheKey
-          )) as DropdownOption[];
-          if (isMountedRef.current) {
-            setCardVariants(result); // API already returns DropdownOption[] format
+          const result = (await ongoing) as DropdownOption[];
+          if (isMountedRef.current && Array.isArray(result)) {
+            setCardVariants(result);
           }
         } catch (err) {
           console.error(
@@ -316,8 +321,9 @@ export function useFilterData(
         setError(null);
       }
 
-      const requestPromise = fetch(`/api/cards?bankId=${bankId}`)
-        .then(async (response) => {
+      const requestPromise = (async () => {
+        try {
+          const response = await fetch(`/api/cards?bankId=${bankId}`);
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
@@ -332,7 +338,7 @@ export function useFilterData(
             }),
           );
 
-          // Update cache - API already returns transformed data
+          // Update cache
           cache.cardVariants[bankId] = {
             data: normalizedCards,
             timestamp: Date.now(),
@@ -340,20 +346,20 @@ export function useFilterData(
           };
 
           return normalizedCards;
-        })
-        .finally(() => {
+        } finally {
           ongoingRequests.delete(cacheKey);
           if (isMountedRef.current) {
             setLoading("cardVariants", false);
           }
-        });
+        }
+      })();
 
       ongoingRequests.set(cacheKey, requestPromise);
 
       try {
         const result = await requestPromise;
-        if (isMountedRef.current) {
-          setCardVariants(result); // API already returns DropdownOption[] format
+        if (isMountedRef.current && Array.isArray(result)) {
+          setCardVariants(result);
         }
       } catch (err) {
         console.error("Error fetching card variants:", err);

@@ -352,7 +352,7 @@ export function PremiumListingsHeaderInline({
     sortOptions,
     loading: filterLoading,
     error: filterError,
-  } = useFilterData(currentFilters.bank);
+  } = useFilterData(localFilters.bank);
 
   const selectedCategorySlug = searchParams.get("category") || "all";
   const parentCategory =
