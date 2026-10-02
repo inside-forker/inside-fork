@@ -1061,12 +1061,11 @@ div[style*="border: "] {
    Offsets only the closed Crisp chat bubble above the mobile BottomNav bar
    ============================================ */
 @media (max-width: 768px) {
-  body .crisp-client:not([data-full-view="true"]):not([data-is-open="true"]) [data-full-view="false"],
-  body .crisp-client:not([data-full-view="true"]):not([data-is-open="true"]) .cc-ns4v,
-  body .crisp-client:not([data-full-view="true"]):not([data-is-open="true"]) .cc-k8b2,
-  body .crisp-client:not([data-full-view="true"]):not([data-is-open="true"]) [data-hover="false"],
-  body .crisp-client:not([data-full-view="true"]):not([data-is-open="true"]) button[data-is-open="false"] {
-    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
+  /* On phones Crisp flags the chatbox data-full-view="true" even while
+     closed, so target the launcher button itself; it reports
+     data-maximized="true" once the chat is open */
+  body #crisp-chatbox [role="button"][data-maximized="false"] {
+    bottom: calc(6rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   /* Open chatbox must take standard full mobile view without clipping */

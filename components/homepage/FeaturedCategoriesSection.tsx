@@ -34,10 +34,9 @@ export function FeaturedCategoriesSection({
       <div className={containerClass}>
         <SectionHeading title="Explore categories" href="/listings" />
 
-        {/* Circle index, same shape as the app's category grid. One scrolling
-            row on phones; a grid from sm up, whose columns stretch on desktop
-            so a short list isn't left-heavy. */}
-        <div className="scrollbar-hide -mx-6 flex gap-4 overflow-x-auto px-6 pb-1 sm:mx-0 sm:grid sm:grid-cols-6 sm:gap-x-2 sm:gap-y-5 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-[repeat(auto-fit,minmax(7rem,1fr))]">
+        {/* Circle index, same shape as the app's category grid. On desktop the
+            columns stretch to fill the row, so a short list isn't left-heavy. */}
+        <div className="grid grid-cols-4 gap-x-2 gap-y-5 sm:grid-cols-6 lg:grid-cols-[repeat(auto-fit,minmax(7rem,1fr))]">
           {categories.map((category) => {
             const IconComponent = getCategoryIcon(category.icon_name);
             const count = category.published_listing_count ?? 0;
@@ -50,12 +49,12 @@ export function FeaturedCategoriesSection({
               <Link
                 key={category.id}
                 href={href}
-                className="group flex shrink-0 flex-col items-center gap-2 text-center active:opacity-80"
+                className="group flex flex-col items-center gap-2 text-center active:opacity-80"
               >
                 <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 transition-colors group-hover:bg-primary/15 sm:h-20 sm:w-20">
                   <IconComponent className="h-7 w-7 text-primary sm:h-8 sm:w-8" aria-hidden />
                 </span>
-                <span className="whitespace-nowrap text-xs font-semibold sm:line-clamp-2 sm:whitespace-normal leading-tight text-foreground sm:text-sm">
+                <span className="line-clamp-2 text-xs font-semibold leading-tight text-foreground sm:text-sm">
                   {category.name}
                 </span>
                 {count > 0 ? (
