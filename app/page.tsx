@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { PremiumHomepageHero } from "@/components/homepage/PremiumHomepageHero";
 import { CallToActionSections } from "@/components/homepage/CallToActionSections";
 import { FeaturesSection } from "@/components/homepage/FeaturesSection";
+import { AppShowcaseSection } from "@/components/homepage/AppShowcaseSection";
 import { BankOffersSection } from "@/components/homepage/BankOffersSection";
 import { AreasSection } from "@/components/homepage/AreasSection";
 
@@ -30,14 +31,14 @@ export default function Home() {
       {/* Hero, search and browsing shortcuts - renders immediately */}
       <PremiumHomepageHero />
 
-      {/* Curated places worth exploring */}
-      <Suspense fallback={<FeaturedListingsSkeleton />}>
-        <FeaturedListingsContainer />
-      </Suspense>
-
       {/* Upcoming events (a single event gets the featured layout) */}
       <Suspense fallback={<EventsSkeleton />}>
         <TrendingEventsContainer />
+      </Suspense>
+
+      {/* Curated places worth exploring */}
+      <Suspense fallback={<FeaturedListingsSkeleton />}>
+        <FeaturedListingsContainer />
       </Suspense>
 
       {/* Bank discounts: every supported bank */}
@@ -58,7 +59,10 @@ export default function Home() {
       {/* Three short benefit blocks */}
       <FeaturesSection />
 
-      {/* Account shortcuts or sign-up, app notification, business link */}
+      {/* The app: phones, perks, notify me (store badges off until launch) */}
+      <AppShowcaseSection />
+
+      {/* Account shortcuts or sign-up, business link */}
       <CallToActionSections />
     </main>
   );

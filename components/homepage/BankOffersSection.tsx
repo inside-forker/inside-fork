@@ -1,3 +1,4 @@
+import type React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { getSupportedBanks, type SupportedBank } from "@/lib/homepage/bank-offers";
@@ -47,6 +48,15 @@ export async function BankOffersSection() {
 
   if (banks.length === 0) return null;
 
+  // Desktop rows: as few as fit at most 10 per row, split evenly, so 18 banks
+  // become 9 + 9 rather than 12 + 6. The row is capped at that width and
+  // centred, so a shorter last row sits in the middle.
+  const rows = Math.ceil(banks.length / 10);
+  const perRow = Math.ceil(banks.length / rows);
+  const ITEM = 112; // lg:w-28
+  const GAP = 16; // lg:gap-x-4
+  const rowWidth = perRow * ITEM + (perRow - 1) * GAP;
+
   return (
     <section className={sectionClass}>
       <div className={containerClass}>
@@ -55,11 +65,15 @@ export async function BankOffersSection() {
           subtitle="Choose your bank to find available offers."
           href="/listings?deals=true"
           actionLabel="Browse all offers"
+          align="center"
         />
 
         {/* One scrolling row on phones (it reads as a filter, not a wall of
             logos); wraps on desktop, where a hidden overflow can't be swiped */}
-        <ul className="scrollbar-hide -mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-wrap lg:gap-y-5 lg:overflow-visible lg:px-0">
+        <ul
+          className="scrollbar-hide -mx-6 flex gap-2 overflow-x-auto px-6 pb-1 lg:mx-auto lg:max-w-[var(--bank-row)] lg:flex-wrap lg:justify-center lg:gap-x-4 lg:gap-y-6 lg:overflow-visible lg:px-0"
+          style={{ "--bank-row": `${rowWidth}px` } as React.CSSProperties}
+        >
           {banks.map((bank) => {
             const body = (
               <>
@@ -84,7 +98,7 @@ export async function BankOffersSection() {
             const className = "flex flex-col items-center gap-2 text-center";
 
             return (
-              <li key={bank.id} className="w-20 shrink-0 sm:w-24">
+              <li key={bank.id} className="w-20 shrink-0 sm:w-24 lg:w-28">
                 {bank.dealsCount > 0 ? (
                   <Link
                     href={`/listings?deals=true&bank=${bank.id}`}
