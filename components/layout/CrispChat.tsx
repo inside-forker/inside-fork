@@ -104,5 +104,39 @@ export function CrispChat({ visible }: CrispChatProps) {
     ]);
   }, [userId, email, name, role, isLoading, visible]);
 
+  // Actively adjust mobile bottom offset so closed chat bubble floats above BottomNav
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const adjustCrispPosition = () => {
+      const isMobile = window.innerWidth <= 768;
+      const offset = isMobile
+        ? "calc(5.5rem + env(safe-area-inset-bottom, 0px))"
+        : "";
+
+      const elements = document.querySelectorAll(
+        ".crisp-client, #crisp-chatbox, .crisp-client > div, .crisp-client iframe, .crisp-client [data-full-view='false']",
+      );
+      elements.forEach((el) => {
+        if (el instanceof HTMLElement) {
+          if (isMobile) {
+            el.style.setProperty("bottom", offset, "important");
+          } else {
+            el.style.removeProperty("bottom");
+          }
+        }
+      });
+    };
+
+    adjustCrispPosition();
+    const interval = setInterval(adjustCrispPosition, 1000);
+    window.addEventListener("resize", adjustCrispPosition);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("resize", adjustCrispPosition);
+    };
+  }, []);
+
   return null;
 }
