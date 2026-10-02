@@ -92,21 +92,21 @@ export function useSecurityAlerts(
   // Request notification permission
   const requestNotificationPermission =
     React.useCallback(async (): Promise<NotificationPermission> => {
-      if (!("Notification" in window)) {
+      if (typeof window === "undefined" || !("Notification" in window)) {
         console.warn("[SECURITY ALERTS] Notifications not supported");
         return "denied";
       }
 
-      if (Notification.permission === "granted") {
+      if (window.Notification.permission === "granted") {
         return "granted";
       }
 
-      if (Notification.permission === "denied") {
+      if (window.Notification.permission === "denied") {
         return "denied";
       }
 
       try {
-        const permission = await Notification.requestPermission();
+        const permission = await window.Notification.requestPermission();
         return permission;
       } catch (error) {
         console.error("[SECURITY ALERTS] Permission error:", error);
@@ -117,7 +117,12 @@ export function useSecurityAlerts(
   // Show browser notification
   const showNotification = React.useCallback(
     (alert: SecurityAlert) => {
-      if (!enableNotifications || Notification.permission !== "granted") {
+      if (
+        !enableNotifications ||
+        typeof window === "undefined" ||
+        !("Notification" in window) ||
+        window.Notification.permission !== "granted"
+      ) {
         return;
       }
 
@@ -130,25 +135,29 @@ export function useSecurityAlerts(
         alert.user_email || alert.ip_address || "Unknown source"
       }`;
 
-      const notification = new Notification(title, {
-        body,
-        icon: "/favicon.ico",
-        badge: "/favicon.ico",
-        tag: `security-alert-${alert.id}`,
-        requireInteraction: alert.severity === "critical",
-        silent: false,
-      });
+      try {
+        const notification = new window.Notification(title, {
+          body,
+          icon: "/favicon.ico",
+          badge: "/favicon.ico",
+          tag: `security-alert-${alert.id}`,
+          requireInteraction: alert.severity === "critical",
+          silent: false,
+        });
 
-      // Auto-close notification
-      setTimeout(() => {
-        notification.close();
-      }, 10000);
+        // Auto-close notification
+        setTimeout(() => {
+          notification.close();
+        }, 10000);
 
-      // Click handler to focus window
-      notification.onclick = () => {
-        window.focus();
-        notification.close();
-      };
+        // Click handler to focus window
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+        };
+      } catch (e) {
+        console.warn("[SECURITY ALERTS] Notification creation failed:", e);
+      }
     },
     [enableNotifications]
   );
@@ -195,9 +204,14 @@ export function useSecurityAlerts(
   React.useEffect(() => {
     let mounted = true;
 
-    // Request notification permission on mount
-    if (enableNotifications && Notification.permission === "default") {
-      requestNotificationPermission();
+    // Request notification permission on mount if supported
+    if (
+      enableNotifications &&
+      typeof window !== "undefined" &&
+      "Notification" in window &&
+      window.Notification.permission === "default"
+    ) {
+      void requestNotificationPermission();
     }
 
     const fetchAlerts = async () => {
