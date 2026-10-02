@@ -10,19 +10,17 @@ import { AreasSection } from "@/components/homepage/AreasSection";
 // Containers
 import { CategoriesContainer } from "@/components/homepage/containers/CategoriesContainer";
 import { FeaturedListingsContainer } from "@/components/homepage/containers/FeaturedListingsContainer";
-import { TrendingEventsContainer } from "@/components/homepage/containers/TrendingEventsContainer";
 
 // Skeletons
 import {
   CategoriesSkeleton,
   FeaturedListingsSkeleton,
-  EventsSkeleton,
 } from "@/components/listing/skeletons";
 
 export const metadata: Metadata = {
-  title: "Inside Karachi - Places, Events & Deals in Karachi",
+  title: "Inside Karachi - Places & Deals in Karachi",
   description:
-    "Find places to eat, shop and unwind, book tickets to events, and unlock deals across Karachi.",
+    "Find places to eat, shop and unwind, and unlock discounts across Karachi.",
 };
 
 export default function Home() {
@@ -31,24 +29,19 @@ export default function Home() {
       {/* Hero, search and browsing shortcuts - renders immediately */}
       <PremiumHomepageHero />
 
-      {/* Upcoming events (a single event gets the featured layout) */}
-      <Suspense fallback={<EventsSkeleton />}>
-        <TrendingEventsContainer />
+      {/* 1. Explore categories */}
+      <Suspense fallback={<CategoriesSkeleton />}>
+        <CategoriesContainer />
       </Suspense>
 
-      {/* Curated places worth exploring */}
-      <Suspense fallback={<FeaturedListingsSkeleton />}>
-        <FeaturedListingsContainer />
-      </Suspense>
-
-      {/* Bank discounts: every supported bank */}
+      {/* 2. Bank discounts */}
       <Suspense fallback={null}>
         <BankOffersSection />
       </Suspense>
 
-      {/* Categories */}
-      <Suspense fallback={<CategoriesSkeleton />}>
-        <CategoriesContainer />
+      {/* 3. Featured listings */}
+      <Suspense fallback={<FeaturedListingsSkeleton />}>
+        <FeaturedListingsContainer />
       </Suspense>
 
       {/* Neighbourhood shortcuts, with place counts */}

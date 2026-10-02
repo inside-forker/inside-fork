@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRole } from "@/lib/context/RoleContext";
 
 // Crisp live-chat widget (support chat with an operator).
@@ -61,6 +61,7 @@ interface CrispChatProps {
 
 export function CrispChat({ visible }: CrispChatProps) {
   const { user, isLoading } = useRole();
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Load lazily the first time a public page is shown; after that just
   // toggle visibility so client-side navigation doesn't reload the widget.
@@ -75,8 +76,18 @@ export function CrispChat({ visible }: CrispChatProps) {
     }
   }, [visible]);
 
+  // Track chat open/close events from Crisp SDK
+  useEffect(() => {
+    if (!CRISP_WEBSITE_ID) return;
+    crisp("on", "chat:opened", () => {
+      setIsChatOpen(true);
+    });
+    crisp("on", "chat:closed", () => {
+      setIsChatOpen(false);
+    });
+  }, []);
+
   // Attach the signed-in user so operators see who they're talking to.
-  // Depend on fields, not the object: RoleContext refetches on every focus.
   const userId = user?.id ?? null;
   const email = user?.email;
   const name = user?.full_name;
@@ -104,18 +115,33 @@ export function CrispChat({ visible }: CrispChatProps) {
     ]);
   }, [userId, email, name, role, isLoading, visible]);
 
-  // Actively adjust mobile bottom offset so closed chat bubble floats above BottomNav
+  // Actively adjust mobile bottom offset ONLY when chat is closed
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const adjustCrispPosition = () => {
       const isMobile = window.innerWidth <= 768;
+
+      if (isChatOpen) {
+        // Chat is open: ensure standard fullscreen view without clipping
+        const elements = document.querySelectorAll(
+          ".crisp-client, #crisp-chatbox, .crisp-client > div, .crisp-client iframe, .crisp-client [data-full-view='true']",
+        );
+        elements.forEach((el) => {
+          if (el instanceof HTMLElement) {
+            el.style.removeProperty("bottom");
+          }
+        });
+        return;
+      }
+
+      // Chat is closed: offset only closed bubble
       const offset = isMobile
         ? "calc(5.5rem + env(safe-area-inset-bottom, 0px))"
         : "";
 
       const elements = document.querySelectorAll(
-        ".crisp-client, #crisp-chatbox, .crisp-client > div, .crisp-client iframe, .crisp-client [data-full-view='false']",
+        ".crisp-client:not([data-full-view='true']) [data-full-view='false'], .crisp-client:not([data-full-view='true']) [data-hover='false']",
       );
       elements.forEach((el) => {
         if (el instanceof HTMLElement) {
@@ -129,14 +155,14 @@ export function CrispChat({ visible }: CrispChatProps) {
     };
 
     adjustCrispPosition();
-    const interval = setInterval(adjustCrispPosition, 1000);
+    const interval = setInterval(adjustCrispPosition, 500);
     window.addEventListener("resize", adjustCrispPosition);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener("resize", adjustCrispPosition);
     };
-  }, []);
+  }, [isChatOpen]);
 
   return null;
 }

@@ -1048,27 +1048,26 @@ div[style*="border: "] {
 }
 
 /* ============================================
-   Crisp Chat Mobile Floating Offset
-   Offsets Crisp chat bubble so it cleanly floats above the mobile BottomNav bar
+   Crisp Chat Mobile Floating Offset (Closed Bubble Only)
+   Offsets only the closed Crisp chat bubble above the mobile BottomNav bar
    ============================================ */
 @media (max-width: 768px) {
-  :root {
-    --crisp-offset-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
+  body .crisp-client:not([data-full-view="true"]):not([data-is-open="true"]) [data-full-view="false"],
+  body .crisp-client:not([data-full-view="true"]):not([data-is-open="true"]) .cc-ns4v,
+  body .crisp-client:not([data-full-view="true"]):not([data-is-open="true"]) .cc-k8b2,
+  body .crisp-client:not([data-full-view="true"]):not([data-is-open="true"]) [data-hover="false"],
+  body .crisp-client:not([data-full-view="true"]):not([data-is-open="true"]) button[data-is-open="false"] {
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
-  body .crisp-client,
-  body #crisp-chatbox,
-  body .crisp-client > div,
-  body .crisp-client iframe,
-  body .crisp-client [data-full-view="false"],
-  body .crisp-client [data-is-open="false"],
-  body .crisp-client [data-docked-view="true"],
-  body .crisp-client .cc-1x6k,
-  body .crisp-client .cc-tst4,
-  body .crisp-client [data-hover="false"],
-  body .crisp-client .cc-ns4v,
-  body .crisp-client .cc-k8b2,
-  body .crisp-client [class*="cc-"] {
-    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
+  /* Open chatbox must take standard full mobile view without clipping */
+  body .crisp-client[data-full-view="true"],
+  body .crisp-client[data-is-open="true"],
+  body .crisp-client [data-full-view="true"],
+  body .crisp-client [data-is-open="true"] {
+    bottom: 0 !important;
+    top: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
   }
 }
