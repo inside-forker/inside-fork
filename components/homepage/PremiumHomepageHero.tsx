@@ -24,6 +24,7 @@ import {
   ChevronDown,
   LocateFixed,
   CreditCard,
+  Ticket,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { HOMEPAGE_AREAS, areaHref } from "@/lib/homepage/areas";
@@ -31,6 +32,7 @@ import { HOMEPAGE_AREAS, areaHref } from "@/lib/homepage/areas";
 const quickLinks = [
   { label: "Places", href: "/listings", icon: MapPin },
   { label: "Bank discounts", href: "/listings?deals=true", icon: CreditCard },
+  { label: "Events", href: "/events", icon: Ticket },
 ];
 
 export function PremiumHomepageHero() {
@@ -160,7 +162,7 @@ export function PremiumHomepageHero() {
             Your next plan starts <span className="text-primary">Inside</span>.
           </h1>
           <p className="max-w-2xl mx-auto text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed">
-            Discover places and unlock bank discounts across Karachi.
+            Discover places across Karachi.
           </p>
         </div>
 
