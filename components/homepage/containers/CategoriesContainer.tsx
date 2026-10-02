@@ -4,7 +4,7 @@ import type { GradientStyle } from "@/lib/utils/gradientStyles";
 
 export async function CategoriesContainer() {
   try {
-    const [viewResult, tableResult, eventCountResult] = await Promise.all([
+    const [viewResult, tableResult] = await Promise.all([
       query(
         `SELECT id, name, slug, parent_id, icon_name, published_listing_count
        FROM categories_with_published_listing_count
@@ -13,14 +13,9 @@ export async function CategoriesContainer() {
       query(
         `SELECT id, parent_id, show_in_featured, is_enabled, icon_name, category_type, display_order, slug, gradient_style
        FROM categories
-       WHERE show_in_featured = true AND is_enabled = true AND category_type = ANY($1)
+       WHERE show_in_featured = true AND is_enabled = true AND category_type = ANY($1) AND slug != 'events'
        ORDER BY display_order ASC NULLS LAST, name ASC`,
-        [["listing", "event", "both"]],
-      ),
-      query(
-        `SELECT COUNT(*)::integer AS count FROM events_with_details
-       WHERE event_status = 'published' AND start_time >= $1`,
-        [new Date().toISOString()],
+        [["listing", "both"]],
       ),
     ]);
 
@@ -45,7 +40,6 @@ export async function CategoriesContainer() {
           ? Number(row.parent_id)
           : row.parent_id,
     }));
-    const eventCount = Number(eventCountResult.rows[0]?.count || 0);
 
     // Build a map of category counts including subcategory aggregation
     const categoryCountMap = new Map<number, number>();
@@ -93,9 +87,7 @@ export async function CategoriesContainer() {
               name: cat.name as string,
               slug: cat.slug as string,
               published_listing_count:
-                meta.category_type === "event"
-                  ? eventCount || 0
-                  : categoryCountMap.get(cat.id as number) || 0,
+                categoryCountMap.get(cat.id as number) || 0,
               icon_name: meta.icon_name,
               category_type: meta.category_type,
               gradient_style:

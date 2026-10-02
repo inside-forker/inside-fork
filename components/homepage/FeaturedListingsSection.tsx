@@ -84,11 +84,11 @@ export function FeaturedListingsSection({
     <section className={sectionClass}>
       <div className={containerClass}>
         <SectionHeading
-          title="Worth stepping out for"
+          title="Featured Listings"
           subtitle={
             totalPlaces
-              ? `A few places to start, out of ${totalPlaces}.`
-              : "A few places to start."
+              ? `Handpicked places to explore, out of ${totalPlaces}.`
+              : "Handpicked places flagged as featured by our team."
           }
           href="/listings"
           actionLabel="All places"

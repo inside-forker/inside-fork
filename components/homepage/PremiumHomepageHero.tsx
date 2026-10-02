@@ -30,7 +30,6 @@ import { HOMEPAGE_AREAS, areaHref } from "@/lib/homepage/areas";
 const quickLinks = [
   { label: "Places", href: "/listings" },
   { label: "Bank discounts", href: "/listings?deals=true" },
-  { label: "Events", href: "/events" },
 ];
 
 export function PremiumHomepageHero() {
@@ -160,8 +159,7 @@ export function PremiumHomepageHero() {
             Your next plan starts <span className="text-primary">Inside</span>.
           </h1>
           <p className="max-w-2xl mx-auto text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed">
-            Discover places, find bank discounts, and book events across
-            Karachi.
+            Discover places and unlock bank discounts across Karachi.
           </p>
         </div>
 
@@ -174,7 +172,7 @@ export function PremiumHomepageHero() {
                 <Search className="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Try a café, a salon or a concert"
+                  placeholder="Try a café, salon or restaurant"
                   value={searchQuery}
                   onChange={handleSearchChange}
                   onFocus={() =>

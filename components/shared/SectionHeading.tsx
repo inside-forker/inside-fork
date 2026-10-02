@@ -26,12 +26,14 @@ export function SectionHeading({
 }: SectionHeadingProps) {
   return (
     <div
-      className={`mb-4 flex items-end justify-between gap-3 ${
+      className={`mb-4 flex ${
+        subtitle ? "flex-col sm:flex-row sm:items-end" : "items-end"
+      } justify-between gap-2 sm:gap-3 ${
         align === "center" ? "lg:mb-6 lg:flex-col lg:items-center lg:gap-2 lg:text-center" : ""
       }`}
     >
       <div className="min-w-0">
-        <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+        <h2 className="whitespace-nowrap text-lg font-bold tracking-tight text-foreground sm:text-2xl">
           {title}
         </h2>
         {subtitle ? (
@@ -41,7 +43,7 @@ export function SectionHeading({
       {href ? (
         <Link
           href={href}
-          className="inline-flex shrink-0 items-center gap-0.5 text-sm font-semibold text-primary hover:opacity-80"
+          className="inline-flex shrink-0 items-center gap-0.5 text-sm font-semibold text-primary hover:opacity-80 self-start sm:self-auto"
         >
           {actionLabel}
           <ChevronRight className="h-4 w-4" aria-hidden />
