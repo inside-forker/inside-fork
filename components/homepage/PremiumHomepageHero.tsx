@@ -23,13 +23,14 @@ import {
   ArrowRight,
   ChevronDown,
   LocateFixed,
+  CreditCard,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { HOMEPAGE_AREAS, areaHref } from "@/lib/homepage/areas";
 
 const quickLinks = [
-  { label: "Places", href: "/listings" },
-  { label: "Bank discounts", href: "/listings?deals=true" },
+  { label: "Places", href: "/listings", icon: MapPin },
+  { label: "Bank discounts", href: "/listings?deals=true", icon: CreditCard },
 ];
 
 export function PremiumHomepageHero() {
@@ -244,8 +245,9 @@ export function PremiumHomepageHero() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary active:opacity-80"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary active:opacity-80"
               >
+                <link.icon className="h-4 w-4 text-primary" aria-hidden />
                 {link.label}
               </Link>
             ))}
