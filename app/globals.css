@@ -1052,13 +1052,23 @@ div[style*="border: "] {
    Offsets Crisp chat bubble so it cleanly floats above the mobile BottomNav bar
    ============================================ */
 @media (max-width: 768px) {
-  #crisp-chatbox,
-  .crisp-client,
-  .crisp-client .cc-1x6k,
-  .crisp-client .cc-tst4,
-  .crisp-client [data-hover="false"],
-  .crisp-client .cc-ns4v,
-  .crisp-client .cc-k8b2 {
+  :root {
+    --crisp-offset-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  body .crisp-client,
+  body #crisp-chatbox,
+  body .crisp-client > div,
+  body .crisp-client iframe,
+  body .crisp-client [data-full-view="false"],
+  body .crisp-client [data-is-open="false"],
+  body .crisp-client [data-docked-view="true"],
+  body .crisp-client .cc-1x6k,
+  body .crisp-client .cc-tst4,
+  body .crisp-client [data-hover="false"],
+  body .crisp-client .cc-ns4v,
+  body .crisp-client .cc-k8b2,
+  body .crisp-client [class*="cc-"] {
     bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
