@@ -23,7 +23,10 @@ export async function GET(request: NextRequest) {
       search: searchParams.get("search"),
       sort: searchParams.get("sort") || "featured",
       minRating: searchParams.get("rating"),
-      dealsOnly: searchParams.get("deals") === "true",
+      dealsOnly:
+        searchParams.get("deals") === "true" ||
+        searchParams.get("deals") === "1" ||
+        (searchParams.has("deals") && searchParams.get("deals") === ""),
       bankParam: searchParams.get("bank"),
       cardParam: searchParams.get("card"),
       openNow: searchParams.get("open_now") === "true",

@@ -270,11 +270,11 @@ export function PremiumDropdown({
             exit={{ opacity: 0, y: openUpward ? 10 : -10, scale: 0.95 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
             className={cn(
-              "absolute z-[100] rounded-xl border bg-popover shadow-xl left-0",
-              "backdrop-blur-xl bg-background/95 border-border/50",
+              "absolute z-[999] rounded-xl border bg-white dark:bg-popover shadow-2xl left-0",
+              "border-border/80 ring-1 ring-black/5 dark:ring-white/10",
               openUpward ? "bottom-full mb-2" : "top-full mt-2",
               variantStyles.content,
-              "shadow-2xl shadow-black/10 dark:shadow-black/20"
+              "shadow-2xl shadow-black/20 dark:shadow-black/40"
             )}
             style={{ minWidth: triggerRef.current?.offsetWidth || "auto" }}
           >
