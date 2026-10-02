@@ -241,15 +241,15 @@ export function PremiumHomepageHero() {
           {/* Starting points for visitors without a name in mind */}
           <nav
             aria-label="Start browsing"
-            className="mt-5 flex flex-wrap items-center justify-center gap-2"
+            className="-mx-6 mt-5 flex flex-wrap items-center justify-center gap-1.5 sm:mx-0 sm:gap-2"
           >
             {quickLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary active:opacity-80"
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium sm:gap-1.5 sm:px-4 sm:text-sm text-foreground transition-colors hover:border-primary hover:text-primary active:opacity-80"
               >
-                <link.icon className="h-4 w-4 text-primary" aria-hidden />
+                <link.icon className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4" aria-hidden />
                 {link.label}
               </Link>
             ))}
