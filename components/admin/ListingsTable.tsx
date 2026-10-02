@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -87,6 +88,31 @@ function formatDate(dateString: string) {
     month: "short",
     day: "numeric",
   });
+}
+
+function useGridColumnCount() {
+  const [columns, setColumns] = React.useState(3);
+
+  React.useEffect(() => {
+    const mdQuery = window.matchMedia("(min-width: 768px)");
+    const lgQuery = window.matchMedia("(min-width: 1024px)");
+
+    const update = () => {
+      if (lgQuery.matches) setColumns(3);
+      else if (mdQuery.matches) setColumns(2);
+      else setColumns(1);
+    };
+
+    update();
+    mdQuery.addEventListener("change", update);
+    lgQuery.addEventListener("change", update);
+    return () => {
+      mdQuery.removeEventListener("change", update);
+      lgQuery.removeEventListener("change", update);
+    };
+  }, []);
+
+  return columns;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -182,9 +208,9 @@ const ListingCardItem = React.memo(function ListingCardItem({
   );
 
   return (
-    <div className="transition-transform duration-200 hover:-translate-y-0.5 will-change-transform h-full">
+    <div className="transition-transform duration-200 hover:-translate-y-0.5 h-full">
       <Card
-        className={`group relative overflow-hidden flex flex-col h-full bg-background/90 backdrop-blur-md border border-border/60 shadow-premium hover:shadow-premium-lg transition-all duration-300 ${glow} ${
+        className={`group relative overflow-hidden flex flex-col h-full bg-background/95 border border-border/60 shadow-premium hover:shadow-premium-lg transition-all duration-300 ${glow} ${
           isSelected ? "ring-2 ring-primary border-primary/60 bg-primary/[0.03]" : ""
         }`}
       >
@@ -325,7 +351,10 @@ const ListingCardItem = React.memo(function ListingCardItem({
   );
 });
 
-export function ListingsTable({
+const ROW_GAP_PX = 24;
+const ESTIMATED_ROW_HEIGHT = 320;
+
+function ListingsTableInner({
   listings,
   isLoading,
   isLoadingMore = false,
@@ -342,6 +371,25 @@ export function ListingsTable({
   userRole,
   editorsMap,
 }: ListingsTableProps) {
+  const columns = useGridColumnCount();
+  const listRef = React.useRef<HTMLDivElement>(null);
+  const [scrollMargin, setScrollMargin] = React.useState(0);
+
+  const rowCount = Math.ceil(listings.length / columns);
+
+  React.useLayoutEffect(() => {
+    if (listRef.current) {
+      setScrollMargin(listRef.current.offsetTop);
+    }
+  }, [listings.length, isBulkMode, isLoading]);
+
+  const rowVirtualizer = useWindowVirtualizer({
+    count: rowCount,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT + ROW_GAP_PX,
+    overscan: 3,
+    scrollMargin,
+  });
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 min-h-[600px]">
@@ -384,6 +432,8 @@ export function ListingsTable({
     );
   }
 
+  const virtualRows = rowVirtualizer.getVirtualItems();
+
   return (
     <div className="space-y-6 min-h-[600px]">
       {/* Bulk Selection Header */}
@@ -419,26 +469,64 @@ export function ListingsTable({
         </motion.div>
       )}
 
-      {/* Listings Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr items-start">
-        {listings.map((listing) => {
-          const isSelected = selectedListings.has(listing.id);
-          const editors = editorsMap?.get(listing.id);
+      {/* Virtualized listings grid (row-based for 1/2/3 columns) */}
+      <div ref={listRef}>
+        <div
+          style={{
+            height: `${rowVirtualizer.getTotalSize()}px`,
+            width: "100%",
+            position: "relative",
+          }}
+        >
+          {virtualRows.map((virtualRow) => {
+            const startIndex = virtualRow.index * columns;
+            const rowListings = listings.slice(startIndex, startIndex + columns);
 
-          return (
-            <ListingCardItem
-              key={listing.id}
-              listing={listing}
-              isSelected={isSelected}
-              isBulkMode={isBulkMode}
-              userRole={userRole}
-              editors={editors}
-              onEditListing={onEditListing}
-              onDeleteListing={onDeleteListing}
-              onSelectListing={onSelectListing}
-            />
-          );
-        })}
+            return (
+              <div
+                key={virtualRow.key}
+                data-index={virtualRow.index}
+                ref={rowVirtualizer.measureElement}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${
+                    virtualRow.start - rowVirtualizer.options.scrollMargin
+                  }px)`,
+                  paddingBottom: ROW_GAP_PX,
+                }}
+              >
+                <div
+                  className="grid gap-6 items-start"
+                  style={{
+                    gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {rowListings.map((listing) => {
+                    const isSelected = selectedListings.has(listing.id);
+                    const editors = editorsMap?.get(listing.id);
+
+                    return (
+                      <ListingCardItem
+                        key={listing.id}
+                        listing={listing}
+                        isSelected={isSelected}
+                        isBulkMode={isBulkMode}
+                        userRole={userRole}
+                        editors={editors}
+                        onEditListing={onEditListing}
+                        onDeleteListing={onDeleteListing}
+                        onSelectListing={onSelectListing}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Show More / Continuous Pagination */}
@@ -496,3 +584,5 @@ export function ListingsTable({
     </div>
   );
 }
+
+export const ListingsTable = React.memo(ListingsTableInner);

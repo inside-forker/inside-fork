@@ -29,6 +29,9 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status") || "";
     const categoryId = searchParams.get("category_id") || "";
+    const skipStats =
+      searchParams.get("skip_stats") === "1" ||
+      searchParams.get("skip_stats") === "true";
 
     const offsetParam = searchParams.get("offset");
     const offset =
@@ -128,9 +131,24 @@ export async function GET(request: NextRequest) {
     const creatorById = new Map(creatorsResult.rows.map((c) => [c.id, c]));
     const categoryById = new Map(categoriesResult.rows.map((c) => [c.id, c]));
 
-    // Get accurate stats counts using database count queries
-    const [totalResult, publishedResult, draftResult, featuredResult, archivedResult] =
-      await Promise.all([
+    // Skip global tab stats on Show More appends — counts don't change per page
+    let stats:
+      | {
+          total: number;
+          published: number;
+          draft: number;
+          featured: number;
+          archived: number;
+        }
+      | undefined;
+    if (!skipStats) {
+      const [
+        totalResult,
+        publishedResult,
+        draftResult,
+        featuredResult,
+        archivedResult,
+      ] = await Promise.all([
         query(`SELECT COUNT(*) FROM listings`),
         query(`SELECT COUNT(*) FROM listings WHERE status = 'published'`),
         query(`SELECT COUNT(*) FROM listings WHERE status = 'draft'`),
@@ -138,13 +156,14 @@ export async function GET(request: NextRequest) {
         query(`SELECT COUNT(*) FROM listings WHERE status = 'archived'`),
       ]);
 
-    const stats = {
-      total: parseInt(totalResult.rows[0].count, 10) || 0,
-      published: parseInt(publishedResult.rows[0].count, 10) || 0,
-      draft: parseInt(draftResult.rows[0].count, 10) || 0,
-      featured: parseInt(featuredResult.rows[0].count, 10) || 0,
-      archived: parseInt(archivedResult.rows[0].count, 10) || 0,
-    };
+      stats = {
+        total: parseInt(totalResult.rows[0].count, 10) || 0,
+        published: parseInt(publishedResult.rows[0].count, 10) || 0,
+        draft: parseInt(draftResult.rows[0].count, 10) || 0,
+        featured: parseInt(featuredResult.rows[0].count, 10) || 0,
+        archived: parseInt(archivedResult.rows[0].count, 10) || 0,
+      };
+    }
 
     return NextResponse.json({
       success: true,
@@ -170,7 +189,7 @@ export async function GET(request: NextRequest) {
           total: count || 0,
           totalPages: Math.ceil((count || 0) / limit),
         },
-        stats,
+        ...(stats ? { stats } : {}),
         currentUser: {
           id: session.userId,
           full_name: profile.full_name || session.email || "Staff",

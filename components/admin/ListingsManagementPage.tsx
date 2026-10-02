@@ -275,6 +275,8 @@ export function ListingsManagementPage() {
         if (status && status !== "all") params.append("status", status);
         if (category && category !== "all")
           params.append("category_id", category);
+        // Append loads don't need global tab counts — skip 5 COUNT(*) queries
+        if (append) params.append("skip_stats", "1");
 
         const response = await fetch(
           `/api/admin/listings?${params.toString()}`,
@@ -333,12 +335,14 @@ export function ListingsManagementPage() {
     [toast, itemsPerPage],
   );
 
-  // Refresh listings - preserves currently loaded depth so multi-page bulk selections aren't wiped
+  // Refresh listings - preserves currently loaded depth so multi-page bulk selections aren't wiped.
+  // `force` allows a silent post-action sync even while bulk mode is still on (avoids skeleton remount).
   const refreshListings = React.useCallback(
-    (silent = false) => {
+    (silent = false, force = false) => {
       // If silent background refresh and user is working in bulk mode or modal is open, skip
       if (
         silent &&
+        !force &&
         (isBulkMode ||
           selectedListings.size > 0 ||
           isModalOpen ||
@@ -372,6 +376,37 @@ export function ListingsManagementPage() {
       itemsPerPage,
     ],
   );
+
+  /** Remove listings from local state without remounting the grid (no skeleton). */
+  const removeListingsLocally = React.useCallback((removed: Listing[]) => {
+    if (removed.length === 0) return;
+    const idSet = new Set(removed.map((l) => l.id));
+    setListings((prev) => prev.filter((l) => !idSet.has(l.id)));
+    setTotalListings((prev) => Math.max(0, prev - removed.length));
+    setSelectedListings((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set(prev);
+      idSet.forEach((id) => next.delete(id));
+      return next;
+    });
+    setStats((prev) => {
+      const next = { ...prev };
+      next.total = Math.max(0, next.total - removed.length);
+      for (const listing of removed) {
+        if (listing.status === "published") {
+          next.published = Math.max(0, next.published - 1);
+        } else if (listing.status === "draft") {
+          next.draft = Math.max(0, next.draft - 1);
+        } else if (listing.status === "archived") {
+          next.archived = Math.max(0, next.archived - 1);
+        }
+        if (listing.is_featured) {
+          next.featured = Math.max(0, next.featured - 1);
+        }
+      }
+      return next;
+    });
+  }, []);
 
   // Handle Show More listings
   const handleLoadMore = React.useCallback(() => {
@@ -658,7 +693,8 @@ export function ListingsManagementPage() {
       const result = await response.json();
 
       if (result.success) {
-        refreshListings();
+        // Optimistic local remove — avoids full-grid skeleton remount during bulk work
+        removeListingsLocally([listingToDelete]);
         toast({
           title: "Success",
           description: "Listing deleted successfully",
@@ -772,6 +808,7 @@ export function ListingsManagementPage() {
     try {
       setIsBulkStatusUpdating(true);
       const selectedCount = selectedListings.size;
+      const selectedIds = Array.from(selectedListings).map((id) => Number(id));
 
       const response = await fetch("/api/admin/listings", {
         method: "PATCH",
@@ -779,7 +816,7 @@ export function ListingsManagementPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          ids: Array.from(selectedListings).map((id) => Number(id)),
+          ids: selectedIds,
           status: nextStatus,
         }),
       });
@@ -787,9 +824,22 @@ export function ListingsManagementPage() {
       const result = await response.json();
 
       if (result.success) {
+        const idSet = new Set(selectedIds);
+        // If current status filter no longer matches, drop those rows locally
+        if (statusFilter !== "all" && statusFilter !== nextStatus) {
+          const removed = listings.filter((l) => idSet.has(l.id));
+          removeListingsLocally(removed);
+        } else {
+          setListings((prev) =>
+            prev.map((l) =>
+              idSet.has(l.id) ? { ...l, status: nextStatus } : l,
+            ),
+          );
+        }
         setSelectedListings(new Set());
         setSelectAllPages(false);
-        refreshListings();
+        // Silent force refresh to resync totals without skeleton remount
+        refreshListings(true, true);
 
         toast({
           title: "Success",
@@ -815,19 +865,28 @@ export function ListingsManagementPage() {
 
     try {
       setIsBulkDeleting(true);
+      const selectedIds = Array.from(selectedListings).map((id) => Number(id));
+      const idSet = new Set(selectedIds);
+      const removedLocal = listings.filter((l) => idSet.has(l.id));
+
       const response = await fetch("/api/admin/listings", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ids: Array.from(selectedListings).map((id) => Number(id)) }),
+        body: JSON.stringify({ ids: selectedIds }),
       });
 
       const result = await response.json();
 
       if (result.success) {
+        removeListingsLocally(removedLocal);
         setSelectedListings(new Set());
-        refreshListings();
+        setSelectAllPages(false);
+        // Silent force refresh when select-all-pages deleted more than loaded rows
+        if (selectAllPages || selectedIds.length > removedLocal.length) {
+          refreshListings(true, true);
+        }
         toast({
           title: "Success",
           description: `${result.deletedCount} listing(s) deleted successfully`,
@@ -847,6 +906,11 @@ export function ListingsManagementPage() {
       setIsBulkDeleteDialogOpen(false);
     }
   };
+
+  const selectedIds = React.useMemo(
+    () => Array.from(selectedListings).map((id) => Number(id)),
+    [selectedListings],
+  );
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -1334,7 +1398,7 @@ export function ListingsManagementPage() {
         isOpen={isBulkCategoryModalOpen}
         onClose={() => setIsBulkCategoryModalOpen(false)}
         selectedCount={selectedListings.size}
-        selectedIds={Array.from(selectedListings).map((id) => Number(id))}
+        selectedIds={selectedIds}
         categories={categories}
         categoryGroups={categoryGroups}
         onCategoriesRefresh={async () => {
@@ -1351,7 +1415,8 @@ export function ListingsManagementPage() {
         onSuccess={async () => {
           setSelectedListings(new Set());
           setSelectAllPages(false);
-          refreshListings();
+          // Silent force — keep grid mounted while bulk mode is still on
+          refreshListings(true, true);
           // Also refresh categories in background in case a new subcategory was created
           try {
             const catRes = await fetch("/api/categories?all=true");
