@@ -483,11 +483,11 @@ export function ListingsManagementPage() {
     setCurrentPage(1);
   };
 
-  const handleEditListing = (listing: Listing) => {
+  const handleEditListing = React.useCallback((listing: Listing) => {
     setSelectedListing(listing);
     setIsModalOpen(true);
     trackEditing(listing.id);
-  };
+  }, [trackEditing]);
 
   const handleCreateListing = () => {
     setSelectedListing(null);
@@ -638,10 +638,10 @@ export function ListingsManagementPage() {
     }
   };
 
-  const handleDeleteListing = (listing: Listing) => {
+  const handleDeleteListing = React.useCallback((listing: Listing) => {
     setListingToDelete(listing);
     setIsDeleteDialogOpen(true);
-  };
+  }, []);
 
   const handleConfirmDelete = async () => {
     if (!listingToDelete) return;
@@ -689,8 +689,7 @@ export function ListingsManagementPage() {
     }
   };
 
-  const handleSelectListing = (listingId: number, selected: boolean) => {
-    if (!isBulkMode) return;
+  const handleSelectListing = React.useCallback((listingId: number, selected: boolean) => {
     setSelectedListings((prev) => {
       const newSet = new Set(prev);
       if (selected) {
@@ -700,11 +699,9 @@ export function ListingsManagementPage() {
       }
       return newSet;
     });
-  };
+  }, []);
 
-  const handleSelectAll = (selected: boolean) => {
-    if (!isBulkMode) return;
-
+  const handleSelectAll = React.useCallback((selected: boolean) => {
     // Reset "select all pages" when toggling
     setSelectAllPages(false);
 
@@ -715,7 +712,7 @@ export function ListingsManagementPage() {
       // Deselect all
       setSelectedListings(new Set());
     }
-  };
+  }, [listings]);
 
   const handleSelectAllPages = async () => {
     if (!isBulkMode) return;
