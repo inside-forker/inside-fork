@@ -81,16 +81,17 @@ export function PremiumDropdown({
       const spaceBelow = viewportHeight - triggerRect.bottom;
       const spaceAbove = triggerRect.top;
 
-      const estimatedHeight = searchable ? 300 : 260;
+      const isCompact = variant === "compact";
+      const estimatedHeight = isCompact ? (searchable ? 220 : 160) : (searchable ? 300 : 240);
       setOpenUpward(
-        spaceBelow < estimatedHeight && spaceAbove > estimatedHeight
+        spaceBelow < Math.min(estimatedHeight, 180) && spaceAbove > spaceBelow
       );
 
       if (searchable && searchInputRef.current) {
         setTimeout(() => searchInputRef.current?.focus(), 100);
       }
     }
-  }, [isOpen, searchable]);
+  }, [isOpen, searchable, variant]);
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (!isOpen) {
@@ -269,7 +270,7 @@ export function PremiumDropdown({
             exit={{ opacity: 0, y: openUpward ? 10 : -10, scale: 0.95 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
             className={cn(
-              "absolute z-[100] rounded-xl border bg-popover shadow-xl",
+              "absolute z-[100] rounded-xl border bg-popover shadow-xl left-0",
               "backdrop-blur-xl bg-background/95 border-border/50",
               openUpward ? "bottom-full mb-2" : "top-full mt-2",
               variantStyles.content,
@@ -316,13 +317,25 @@ export function PremiumDropdown({
                 variantStyles.padding
               )}
             >
-              {filteredOptions.length === 0 ? (
+              {loading ? (
+                <div
+                  className={cn(
+                    "flex items-center justify-center gap-2 text-muted-foreground",
+                    variant === "compact"
+                      ? "px-3 py-3 text-xs"
+                      : "px-4 py-4 text-sm"
+                  )}
+                >
+                  <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  <span>Loading options...</span>
+                </div>
+              ) : filteredOptions.length === 0 ? (
                 <div
                   className={cn(
                     "text-muted-foreground text-center",
                     variant === "compact"
-                      ? "px-2 py-1.5 text-xs"
-                      : "px-3 py-2 text-sm"
+                      ? "px-3 py-2 text-xs"
+                      : "px-4 py-3 text-sm"
                   )}
                 >
                   {searchQuery ? "No options found" : "No options available"}

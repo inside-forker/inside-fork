@@ -84,13 +84,13 @@ export function AuthImmersiveBackground({
       {/* Content */}
       <div className="relative z-10 min-h-screen">{children}</div>
 
-      {/* Now showing credit + indicators */}
+      {/* Now showing credit + indicators (desktop only to prevent mobile overlap) */}
       {isLoaded && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="absolute bottom-5 right-5 z-20 flex items-center gap-3 text-white/75"
+          className="hidden md:flex absolute bottom-5 right-5 z-20 items-center gap-3 text-white/75"
         >
           <div className="text-right">
             <p className="text-[13px] font-medium leading-tight">
