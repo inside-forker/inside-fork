@@ -179,7 +179,7 @@ export function PremiumHomepageHero() {
                     searchQuery.length >= 2 && setShowResults(true)
                   }
                   onBlur={() => setTimeout(() => setShowResults(false), 200)}
-                  className="h-12 sm:h-14 md:h-16 pl-11 sm:pl-12 md:pl-14 pr-4 sm:pr-6 text-sm sm:text-base md:text-lg bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70"
+                  className="h-12 sm:h-14 md:h-16 pl-11 sm:pl-12 md:pl-14 pr-4 sm:pr-6 text-base md:text-lg bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70"
                 />
               </div>
 
