@@ -38,6 +38,7 @@ import {
   Square,
   FileText,
   FolderInput,
+  GripVertical,
 } from "lucide-react";
 import type { Listing } from "@/types/listing.types";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
@@ -1258,16 +1259,26 @@ export function ListingsManagementPage() {
           <AnimatePresence>
             {isBulkMode && selectedListings.size > 0 && (
               <motion.div
+                drag
+                dragMomentum={false}
+                dragElastic={0.08}
+                whileDrag={{ scale: 1.02, opacity: 0.95, cursor: "grabbing" }}
                 initial={{ opacity: 0, y: 30, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 30, scale: 0.95 }}
                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                className="fixed bottom-6 right-4 sm:right-6 lg:right-8 z-[100] max-w-[calc(100vw-2rem)] pointer-events-none"
+                className="fixed bottom-6 right-4 sm:right-6 lg:right-8 z-[100] max-w-[calc(100vw-2rem)] select-none touch-none will-change-transform"
               >
-                <div className="p-2.5 sm:p-3 bg-background/95 dark:bg-card/95 backdrop-blur-2xl border border-primary/30 rounded-2xl shadow-2xl shadow-primary/15 pointer-events-auto ring-1 ring-primary/20 flex flex-col gap-2">
+                <div className="p-2.5 sm:p-3 bg-background/95 dark:bg-card/95 backdrop-blur-2xl border border-primary/30 rounded-2xl shadow-2xl shadow-primary/15 ring-1 ring-primary/20 flex flex-col gap-2 cursor-grab active:cursor-grabbing">
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* Selected Count & Clear */}
-                    <div className="flex items-center gap-2 pr-2 border-r border-border/70">
+                    {/* Drag Handle & Selected Count */}
+                    <div
+                      className="flex items-center gap-1.5 pr-2 border-r border-border/70"
+                      title="Drag to reposition anywhere on the screen"
+                    >
+                      <div className="p-0.5 -ml-1 text-muted-foreground/60 hover:text-primary transition-colors">
+                        <GripVertical className="h-4 w-4 shrink-0" />
+                      </div>
                       <div className="flex items-center gap-1.5 font-bold text-xs sm:text-sm text-primary whitespace-nowrap">
                         <CheckSquare className="h-4 w-4 shrink-0 text-primary" />
                         <span>
@@ -1281,7 +1292,7 @@ export function ListingsManagementPage() {
                         variant="ghost"
                         size="sm"
                         onClick={handleDeselectAll}
-                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 cursor-pointer"
                       >
                         Clear
                       </Button>
@@ -1294,7 +1305,7 @@ export function ListingsManagementPage() {
                         size="sm"
                         onClick={() => setIsBulkCategoryModalOpen(true)}
                         disabled={isBulkStatusUpdating || isBulkDeleting}
-                        className="h-8 px-2.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 font-medium shadow-sm"
+                        className="h-8 px-2.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 font-medium shadow-sm cursor-pointer"
                       >
                         <FolderInput className="h-3.5 w-3.5 mr-1.5" />
                         Move Subcategory ({selectedListings.size})
@@ -1304,7 +1315,7 @@ export function ListingsManagementPage() {
                         size="sm"
                         onClick={() => handleBulkStatusUpdate("published")}
                         disabled={isBulkStatusUpdating || isBulkDeleting}
-                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background"
+                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background cursor-pointer"
                       >
                         <Eye className="h-3 w-3 mr-1" />
                         Publish
@@ -1314,7 +1325,7 @@ export function ListingsManagementPage() {
                         size="sm"
                         onClick={() => handleBulkStatusUpdate("draft")}
                         disabled={isBulkStatusUpdating || isBulkDeleting}
-                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background"
+                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background cursor-pointer"
                       >
                         <Star className="h-3 w-3 mr-1" />
                         Draft
@@ -1324,7 +1335,7 @@ export function ListingsManagementPage() {
                         size="sm"
                         onClick={() => handleBulkStatusUpdate("archived")}
                         disabled={isBulkStatusUpdating || isBulkDeleting}
-                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background"
+                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background cursor-pointer"
                       >
                         <Archive className="h-3 w-3 mr-1" />
                         Archive
@@ -1334,7 +1345,7 @@ export function ListingsManagementPage() {
                         size="sm"
                         onClick={handleBulkDelete}
                         disabled={isBulkDeleting || isBulkStatusUpdating}
-                        className="h-8 px-2.5 text-xs bg-destructive hover:bg-destructive/90 shadow-md font-medium"
+                        className="h-8 px-2.5 text-xs bg-destructive hover:bg-destructive/90 shadow-md font-medium cursor-pointer"
                       >
                         <Trash2 className="h-3 w-3 mr-1" />
                         Delete ({selectedListings.size})
