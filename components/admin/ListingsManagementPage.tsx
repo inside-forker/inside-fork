@@ -38,6 +38,7 @@ import {
   Square,
   FileText,
   FolderInput,
+  GripVertical,
 } from "lucide-react";
 import type { Listing } from "@/types/listing.types";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
@@ -275,6 +276,8 @@ export function ListingsManagementPage() {
         if (status && status !== "all") params.append("status", status);
         if (category && category !== "all")
           params.append("category_id", category);
+        // Append loads don't need global tab counts — skip 5 COUNT(*) queries
+        if (append) params.append("skip_stats", "1");
 
         const response = await fetch(
           `/api/admin/listings?${params.toString()}`,
@@ -333,12 +336,14 @@ export function ListingsManagementPage() {
     [toast, itemsPerPage],
   );
 
-  // Refresh listings - preserves currently loaded depth so multi-page bulk selections aren't wiped
+  // Refresh listings - preserves currently loaded depth so multi-page bulk selections aren't wiped.
+  // `force` allows a silent post-action sync even while bulk mode is still on (avoids skeleton remount).
   const refreshListings = React.useCallback(
-    (silent = false) => {
+    (silent = false, force = false) => {
       // If silent background refresh and user is working in bulk mode or modal is open, skip
       if (
         silent &&
+        !force &&
         (isBulkMode ||
           selectedListings.size > 0 ||
           isModalOpen ||
@@ -372,6 +377,37 @@ export function ListingsManagementPage() {
       itemsPerPage,
     ],
   );
+
+  /** Remove listings from local state without remounting the grid (no skeleton). */
+  const removeListingsLocally = React.useCallback((removed: Listing[]) => {
+    if (removed.length === 0) return;
+    const idSet = new Set(removed.map((l) => l.id));
+    setListings((prev) => prev.filter((l) => !idSet.has(l.id)));
+    setTotalListings((prev) => Math.max(0, prev - removed.length));
+    setSelectedListings((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set(prev);
+      idSet.forEach((id) => next.delete(id));
+      return next;
+    });
+    setStats((prev) => {
+      const next = { ...prev };
+      next.total = Math.max(0, next.total - removed.length);
+      for (const listing of removed) {
+        if (listing.status === "published") {
+          next.published = Math.max(0, next.published - 1);
+        } else if (listing.status === "draft") {
+          next.draft = Math.max(0, next.draft - 1);
+        } else if (listing.status === "archived") {
+          next.archived = Math.max(0, next.archived - 1);
+        }
+        if (listing.is_featured) {
+          next.featured = Math.max(0, next.featured - 1);
+        }
+      }
+      return next;
+    });
+  }, []);
 
   // Handle Show More listings
   const handleLoadMore = React.useCallback(() => {
@@ -483,11 +519,11 @@ export function ListingsManagementPage() {
     setCurrentPage(1);
   };
 
-  const handleEditListing = (listing: Listing) => {
+  const handleEditListing = React.useCallback((listing: Listing) => {
     setSelectedListing(listing);
     setIsModalOpen(true);
     trackEditing(listing.id);
-  };
+  }, [trackEditing]);
 
   const handleCreateListing = () => {
     setSelectedListing(null);
@@ -638,10 +674,10 @@ export function ListingsManagementPage() {
     }
   };
 
-  const handleDeleteListing = (listing: Listing) => {
+  const handleDeleteListing = React.useCallback((listing: Listing) => {
     setListingToDelete(listing);
     setIsDeleteDialogOpen(true);
-  };
+  }, []);
 
   const handleConfirmDelete = async () => {
     if (!listingToDelete) return;
@@ -658,7 +694,8 @@ export function ListingsManagementPage() {
       const result = await response.json();
 
       if (result.success) {
-        refreshListings();
+        // Optimistic local remove — avoids full-grid skeleton remount during bulk work
+        removeListingsLocally([listingToDelete]);
         toast({
           title: "Success",
           description: "Listing deleted successfully",
@@ -689,8 +726,7 @@ export function ListingsManagementPage() {
     }
   };
 
-  const handleSelectListing = (listingId: number, selected: boolean) => {
-    if (!isBulkMode) return;
+  const handleSelectListing = React.useCallback((listingId: number, selected: boolean) => {
     setSelectedListings((prev) => {
       const newSet = new Set(prev);
       if (selected) {
@@ -700,11 +736,9 @@ export function ListingsManagementPage() {
       }
       return newSet;
     });
-  };
+  }, []);
 
-  const handleSelectAll = (selected: boolean) => {
-    if (!isBulkMode) return;
-
+  const handleSelectAll = React.useCallback((selected: boolean) => {
     // Reset "select all pages" when toggling
     setSelectAllPages(false);
 
@@ -715,7 +749,7 @@ export function ListingsManagementPage() {
       // Deselect all
       setSelectedListings(new Set());
     }
-  };
+  }, [listings]);
 
   const handleSelectAllPages = async () => {
     if (!isBulkMode) return;
@@ -775,6 +809,7 @@ export function ListingsManagementPage() {
     try {
       setIsBulkStatusUpdating(true);
       const selectedCount = selectedListings.size;
+      const selectedIds = Array.from(selectedListings).map((id) => Number(id));
 
       const response = await fetch("/api/admin/listings", {
         method: "PATCH",
@@ -782,7 +817,7 @@ export function ListingsManagementPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          ids: Array.from(selectedListings).map((id) => Number(id)),
+          ids: selectedIds,
           status: nextStatus,
         }),
       });
@@ -790,9 +825,22 @@ export function ListingsManagementPage() {
       const result = await response.json();
 
       if (result.success) {
+        const idSet = new Set(selectedIds);
+        // If current status filter no longer matches, drop those rows locally
+        if (statusFilter !== "all" && statusFilter !== nextStatus) {
+          const removed = listings.filter((l) => idSet.has(l.id));
+          removeListingsLocally(removed);
+        } else {
+          setListings((prev) =>
+            prev.map((l) =>
+              idSet.has(l.id) ? { ...l, status: nextStatus } : l,
+            ),
+          );
+        }
         setSelectedListings(new Set());
         setSelectAllPages(false);
-        refreshListings();
+        // Silent force refresh to resync totals without skeleton remount
+        refreshListings(true, true);
 
         toast({
           title: "Success",
@@ -818,19 +866,28 @@ export function ListingsManagementPage() {
 
     try {
       setIsBulkDeleting(true);
+      const selectedIds = Array.from(selectedListings).map((id) => Number(id));
+      const idSet = new Set(selectedIds);
+      const removedLocal = listings.filter((l) => idSet.has(l.id));
+
       const response = await fetch("/api/admin/listings", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ids: Array.from(selectedListings).map((id) => Number(id)) }),
+        body: JSON.stringify({ ids: selectedIds }),
       });
 
       const result = await response.json();
 
       if (result.success) {
+        removeListingsLocally(removedLocal);
         setSelectedListings(new Set());
-        refreshListings();
+        setSelectAllPages(false);
+        // Silent force refresh when select-all-pages deleted more than loaded rows
+        if (selectAllPages || selectedIds.length > removedLocal.length) {
+          refreshListings(true, true);
+        }
         toast({
           title: "Success",
           description: `${result.deletedCount} listing(s) deleted successfully`,
@@ -850,6 +907,11 @@ export function ListingsManagementPage() {
       setIsBulkDeleteDialogOpen(false);
     }
   };
+
+  const selectedIds = React.useMemo(
+    () => Array.from(selectedListings).map((id) => Number(id)),
+    [selectedListings],
+  );
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -1197,16 +1259,26 @@ export function ListingsManagementPage() {
           <AnimatePresence>
             {isBulkMode && selectedListings.size > 0 && (
               <motion.div
+                drag
+                dragMomentum={false}
+                dragElastic={0.08}
+                whileDrag={{ scale: 1.02, opacity: 0.95, cursor: "grabbing" }}
                 initial={{ opacity: 0, y: 30, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 30, scale: 0.95 }}
                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                className="fixed bottom-6 right-4 sm:right-6 lg:right-8 z-[100] max-w-[calc(100vw-2rem)] pointer-events-none"
+                className="fixed bottom-6 right-4 sm:right-6 lg:right-8 z-[100] max-w-[calc(100vw-2rem)] select-none touch-none will-change-transform"
               >
-                <div className="p-2.5 sm:p-3 bg-background/95 dark:bg-card/95 backdrop-blur-2xl border border-primary/30 rounded-2xl shadow-2xl shadow-primary/15 pointer-events-auto ring-1 ring-primary/20 flex flex-col gap-2">
+                <div className="p-2.5 sm:p-3 bg-background/95 dark:bg-card/95 backdrop-blur-2xl border border-primary/30 rounded-2xl shadow-2xl shadow-primary/15 ring-1 ring-primary/20 flex flex-col gap-2 cursor-grab active:cursor-grabbing">
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* Selected Count & Clear */}
-                    <div className="flex items-center gap-2 pr-2 border-r border-border/70">
+                    {/* Drag Handle & Selected Count */}
+                    <div
+                      className="flex items-center gap-1.5 pr-2 border-r border-border/70"
+                      title="Drag to reposition anywhere on the screen"
+                    >
+                      <div className="p-0.5 -ml-1 text-muted-foreground/60 hover:text-primary transition-colors">
+                        <GripVertical className="h-4 w-4 shrink-0" />
+                      </div>
                       <div className="flex items-center gap-1.5 font-bold text-xs sm:text-sm text-primary whitespace-nowrap">
                         <CheckSquare className="h-4 w-4 shrink-0 text-primary" />
                         <span>
@@ -1220,7 +1292,7 @@ export function ListingsManagementPage() {
                         variant="ghost"
                         size="sm"
                         onClick={handleDeselectAll}
-                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 cursor-pointer"
                       >
                         Clear
                       </Button>
@@ -1233,7 +1305,7 @@ export function ListingsManagementPage() {
                         size="sm"
                         onClick={() => setIsBulkCategoryModalOpen(true)}
                         disabled={isBulkStatusUpdating || isBulkDeleting}
-                        className="h-8 px-2.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 font-medium shadow-sm"
+                        className="h-8 px-2.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 font-medium shadow-sm cursor-pointer"
                       >
                         <FolderInput className="h-3.5 w-3.5 mr-1.5" />
                         Move Subcategory ({selectedListings.size})
@@ -1243,7 +1315,7 @@ export function ListingsManagementPage() {
                         size="sm"
                         onClick={() => handleBulkStatusUpdate("published")}
                         disabled={isBulkStatusUpdating || isBulkDeleting}
-                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background"
+                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background cursor-pointer"
                       >
                         <Eye className="h-3 w-3 mr-1" />
                         Publish
@@ -1253,7 +1325,7 @@ export function ListingsManagementPage() {
                         size="sm"
                         onClick={() => handleBulkStatusUpdate("draft")}
                         disabled={isBulkStatusUpdating || isBulkDeleting}
-                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background"
+                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background cursor-pointer"
                       >
                         <Star className="h-3 w-3 mr-1" />
                         Draft
@@ -1263,7 +1335,7 @@ export function ListingsManagementPage() {
                         size="sm"
                         onClick={() => handleBulkStatusUpdate("archived")}
                         disabled={isBulkStatusUpdating || isBulkDeleting}
-                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background"
+                        className="h-8 px-2.5 text-xs bg-background/80 border-border/80 hover:bg-background cursor-pointer"
                       >
                         <Archive className="h-3 w-3 mr-1" />
                         Archive
@@ -1273,7 +1345,7 @@ export function ListingsManagementPage() {
                         size="sm"
                         onClick={handleBulkDelete}
                         disabled={isBulkDeleting || isBulkStatusUpdating}
-                        className="h-8 px-2.5 text-xs bg-destructive hover:bg-destructive/90 shadow-md font-medium"
+                        className="h-8 px-2.5 text-xs bg-destructive hover:bg-destructive/90 shadow-md font-medium cursor-pointer"
                       >
                         <Trash2 className="h-3 w-3 mr-1" />
                         Delete ({selectedListings.size})
@@ -1337,7 +1409,7 @@ export function ListingsManagementPage() {
         isOpen={isBulkCategoryModalOpen}
         onClose={() => setIsBulkCategoryModalOpen(false)}
         selectedCount={selectedListings.size}
-        selectedIds={Array.from(selectedListings).map((id) => Number(id))}
+        selectedIds={selectedIds}
         categories={categories}
         categoryGroups={categoryGroups}
         onCategoriesRefresh={async () => {
@@ -1354,7 +1426,8 @@ export function ListingsManagementPage() {
         onSuccess={async () => {
           setSelectedListings(new Set());
           setSelectAllPages(false);
-          refreshListings();
+          // Silent force — keep grid mounted while bulk mode is still on
+          refreshListings(true, true);
           // Also refresh categories in background in case a new subcategory was created
           try {
             const catRes = await fetch("/api/categories?all=true");
