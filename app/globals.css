@@ -13,17 +13,21 @@
 
   :root {
     color-scheme: light;
+    /* Brand palette, from the logo: pink #FF184E, ink #13181C, cream #F3F0DF */
+    --cream: 51 45% 91%; /* #F3F0DF */
+    --ink: 207 19% 9%; /* #13181C */
+
     --background: 0 0% 100%; /* Light mode background */
-    --foreground: 224 71.4% 4.1%;
+    --foreground: var(--ink);
 
     --card: 0 0% 100%;
-    --card-foreground: 224 71.4% 4.1%;
+    --card-foreground: var(--ink);
 
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71.4% 4.1%;
+    --popover-foreground: var(--ink);
 
-    --primary: 349 100% 55%; /* Brand color: #ff184d */
-    --primary-rgb: 255, 24, 77; /* RGB values for primary color */
+    --primary: 346 100% 55%; /* Brand pink: #FF184E */
+    --primary-rgb: 255, 24, 78; /* RGB values for primary color */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 14.3% 95.9%;
@@ -33,14 +37,14 @@
     --muted-foreground: 220 8.9% 40.1%;
 
     --accent: 220 14.3% 95.9%;
-    --accent-foreground: 224 71.4% 4.1%;
+    --accent-foreground: var(--ink);
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 349 100% 55%;
+    --ring: 346 100% 55%;
 
     --radius: 0.75rem; /* Slightly larger radius for a softer look */
   }

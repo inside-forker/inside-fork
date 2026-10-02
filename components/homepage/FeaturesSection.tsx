@@ -48,8 +48,8 @@ function TicketPreview() {
       </div>
       {/* The tear line; its notches hang off it so they always sit on it */}
       <div className="relative flex flex-1 items-center justify-between gap-2 border-l border-dashed border-border px-3 py-3">
-        <span className="absolute -top-2 left-0 h-4 w-4 -translate-x-1/2 rounded-full border border-border bg-muted" />
-        <span className="absolute -bottom-2 left-0 h-4 w-4 -translate-x-1/2 rounded-full border border-border bg-muted" />
+        <span className="absolute -top-2 left-0 h-4 w-4 -translate-x-1/2 rounded-full border border-border bg-cream" />
+        <span className="absolute -bottom-2 left-0 h-4 w-4 -translate-x-1/2 rounded-full border border-border bg-cream" />
         <div className="min-w-0">
           <p className="text-xs font-semibold text-foreground">Your ticket</p>
           <p className="text-[11px] text-muted-foreground">Scan at the gate</p>
@@ -117,7 +117,7 @@ function BenefitCard({ benefit }: { benefit: Benefit }) {
     >
       <div
         aria-hidden
-        className="flex h-32 items-center justify-center border-b border-border bg-muted px-5 sm:h-36"
+        className="flex h-32 items-center justify-center border-b border-border bg-cream px-5 sm:h-36"
       >
         {benefit.preview}
       </div>
@@ -147,7 +147,7 @@ export function FeaturesSection() {
         <SectionHeading title="Make the most of Inside" />
         {/* Swipeable row on phones so three cards don't stack into a wall;
             a plain three-up grid from tablet up */}
-        <ul className="scrollbar-hide -mx-5 flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:px-0">
+        <ul className="scrollbar-hide -mx-6 flex snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:px-0">
           {benefits.map((benefit) => (
             <li key={benefit.title} className="w-[82%] shrink-0 snap-start sm:w-auto">
               <BenefitCard benefit={benefit} />
