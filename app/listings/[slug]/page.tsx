@@ -2,14 +2,11 @@ import { notFound, redirect } from "next/navigation";
 import { PremiumListingsGrid } from "@/components/listings/PremiumListingsGrid";
 import { FeaturedListingsCarousel } from "@/components/listings/FeaturedListingsCarousel";
 import { PremiumListingsHeaderInline as PremiumListingsHeader } from "@/components/listings/PremiumListingsHeaderInline";
-import { getNearbyListings } from "@/app/actions/nearby-listings";
-import { sanitizeSearchTerm } from "@/lib/utils/search-sanitization";
 import { buildGridSearchParams } from "@/lib/utils/listings-filters";
 import {
-  compareSearchRankThenIds,
-  stableReorderBySearchRank,
-} from "@/lib/listings/search-relevance";
-import { OPEN_NOW_EXISTS_CLAUSE } from "@/lib/listings/query-paginated-listings";
+  queryPaginatedListings,
+  attachListingImages,
+} from "@/lib/listings/query-paginated-listings";
 import {
   resolveCategoryIdScope,
   listingCategoriesExistsClause,
@@ -43,10 +40,6 @@ export default async function CategoryListingsPage({
   const { slug } = await params;
   const resolvedSearchParams = await searchParams;
 
-  const searchTermResolved = resolvedSearchParams.search
-    ? sanitizeSearchTerm(resolvedSearchParams.search)
-    : "";
-
   // 1. Fetch the category
   const { rows: categories } = await query(
     "SELECT * FROM categories WHERE slug = $1 LIMIT 1",
@@ -68,279 +61,80 @@ export default async function CategoryListingsPage({
     notFound();
   }
 
-  // Pre-compute category ids in scope (self + subcategories if a parent) for
-  // filtering via the listing_categories junction table - a listing tagged
-  // with this category only as a secondary category must still match.
-  const categoryIdsForFilter = await resolveCategoryIdScope(category.id);
+  const categorySlugForQuery = resolvedSearchParams.sub || slug;
 
-  // Build the WHERE clause dynamically
-  const whereClauses: string[] = ["status = 'published'", "is_featured = false"];
-  const queryParams: unknown[] = [];
-
-  // Filter by category ids via the junction table
-  queryParams.push(categoryIdsForFilter);
-  whereClauses.push(
-    listingCategoriesExistsClause(
-      "listings_with_details.id",
-      queryParams.length,
-    ),
-  );
-
-  // Apply search filter
-  if (resolvedSearchParams.search && searchTermResolved) {
-    queryParams.push(`%${searchTermResolved}%`);
-    const idx = queryParams.length;
-    whereClauses.push(`(name ILIKE $${idx} OR description ILIKE $${idx} OR address ILIKE $${idx})`);
-  }
-
-  // Apply rating filter
-  if (resolvedSearchParams.rating) {
-    const rating = parseFloat(resolvedSearchParams.rating);
-    if (!Number.isNaN(rating)) {
-      queryParams.push(rating);
-      whereClauses.push(`avg_rating >= $${queryParams.length}`);
-    }
-  }
-
-  // Apply open-now filter
-  if (resolvedSearchParams.open_now === "true") {
-    whereClauses.push(OPEN_NOW_EXISTS_CLAUSE);
-  }
-
-  // Apply deals filter
-  const sortRequiresDeals = (sortKey: string | undefined): boolean => {
-    return sortKey === "max-discount" || sortKey === "best-deals";
-  };
-
-  const needsDealsFilter =
+  const isDealsFilterActive =
     resolvedSearchParams.deals === "true" ||
-    !!resolvedSearchParams.bank ||
-    !!resolvedSearchParams.card ||
-    sortRequiresDeals(resolvedSearchParams.sort);
+    resolvedSearchParams.deals === "1" ||
+    resolvedSearchParams.deals === "";
 
-  const maxDiscountByListingId: Record<number, number> = {};
-  let dealFilteredIdsForFilter: number[] | null = null;
+  const hasActiveFilters = Boolean(
+    resolvedSearchParams.search ||
+      resolvedSearchParams.sub ||
+      isDealsFilterActive ||
+      resolvedSearchParams.bank ||
+      resolvedSearchParams.card ||
+      resolvedSearchParams.rating ||
+      resolvedSearchParams.open_now === "true" ||
+      resolvedSearchParams.near === "1",
+  );
+  const showFeaturedCarousel = !hasActiveFilters;
 
-  if (needsDealsFilter) {
-    const { rows: dealRows } = await query(
-      "SELECT listing_id, discount_value, is_active, bank_id, valid_card_variants, end_date FROM deals"
-    );
-
-    const nowMs = Date.now();
-    const bankId = resolvedSearchParams.bank
-      ? parseInt(resolvedSearchParams.bank, 10)
-      : null;
-    const cardId = resolvedSearchParams.card
-      ? parseInt(resolvedSearchParams.card, 10)
-      : null;
-
-    const filteredListingIds = new Set<number>();
-
-    dealRows.forEach((deal) => {
-      if (deal.listing_id == null) return;
-
-      const lid = deal.listing_id;
-      const endMs = deal.end_date
-        ? Date.parse(deal.end_date)
-        : Number.POSITIVE_INFINITY;
-      const isActiveNow = deal.is_active && endMs >= nowMs;
-
-      let numericDiscount = 0;
-      if (deal.discount_value) {
-        const m = String(deal.discount_value).match(/(\d+)(?=%)/);
-        if (m) numericDiscount = parseInt(m[1], 10);
-      }
-      maxDiscountByListingId[lid] = Math.max(
-        maxDiscountByListingId[lid] || 0,
-        numericDiscount,
-      );
-
-      const bankMatch =
-        bankId != null && !Number.isNaN(bankId)
-          ? deal.bank_id === bankId
-          : true;
-      const cardMatch =
-        cardId != null && !Number.isNaN(cardId)
-          ? Array.isArray(deal.valid_card_variants) &&
-            deal.valid_card_variants.includes(cardId)
-          : true;
-      const dealsMatch =
-        resolvedSearchParams.deals === "true" ? isActiveNow : true;
-
-      if (dealsMatch && bankMatch && cardMatch) {
-        filteredListingIds.add(lid);
-      }
-    });
-
-    dealFilteredIdsForFilter = Array.from(filteredListingIds);
-    if (dealFilteredIdsForFilter.length === 0) {
-      whereClauses.push("id = -1");
-    } else {
-      queryParams.push(dealFilteredIdsForFilter);
-      whereClauses.push(`id = ANY($${queryParams.length})`);
-    }
-  }
-
-  // Count query helper
-  const getFilteredCount = async () => {
-    const countWhere = [...whereClauses].join(" AND ");
-    const { rows } = await query(
-      `SELECT COUNT(*)::integer AS total FROM listings_with_details WHERE ${countWhere}`,
-      queryParams
-    );
-    return rows[0]?.total || 0;
-  };
-
-  // Determine Sorting & Pagination
-  let orderByClause = "ORDER BY is_featured DESC, avg_rating DESC, id ASC";
-  switch (resolvedSearchParams.sort) {
-    case "rating":
-      orderByClause = "ORDER BY avg_rating DESC, id ASC";
-      break;
-    case "newest":
-      orderByClause = "ORDER BY created_at DESC, id ASC";
-      break;
-    case "name":
-      orderByClause = "ORDER BY name ASC, id ASC";
-      break;
-  }
+  const lat = resolvedSearchParams.lat
+    ? parseFloat(resolvedSearchParams.lat)
+    : undefined;
+  const lng = resolvedSearchParams.lng
+    ? parseFloat(resolvedSearchParams.lng)
+    : undefined;
 
   const INITIAL_PAGE_SIZE = 12;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let listings: any[] = [];
-  let totalCount = 0;
 
-  // Fetch listings (Distance sort requires PostGIS flow)
-  if (
-    resolvedSearchParams.sort === "distance" &&
-    resolvedSearchParams.lat &&
-    resolvedSearchParams.lng
-  ) {
-    const lat = parseFloat(resolvedSearchParams.lat);
-    const lng = parseFloat(resolvedSearchParams.lng);
-
-    if (!isNaN(lat) && !isNaN(lng)) {
-      const nearbyResult = await getNearbyListings({
-        lat,
-        lng,
-        radius: 50000,
-        limit: INITIAL_PAGE_SIZE,
-      });
-
-      if (nearbyResult.success && nearbyResult.data.length > 0) {
-        const nearbyIds = nearbyResult.data.map((item) => item.id);
-        
-        // Fetch detailed listings for nearby IDs
-        const nearbyParams = [...queryParams, nearbyIds];
-        const nearbyWhere = [...whereClauses, `id = ANY($${nearbyParams.length})`].join(" AND ");
-        
-        const { rows: nearbyListings } = await query(
-          `SELECT * FROM listings_with_details WHERE ${nearbyWhere}`,
-          nearbyParams
-        );
-
-        const distanceMap = new Map(
-          nearbyResult.data.map((item) => [item.id, item.distance_meters])
-        );
-
-        listings = nearbyListings.map((listing) => ({
-          ...listing,
-          distance_meters: distanceMap.get(listing.id as number),
-        }));
-
-        listings.sort((a, b) => {
-          const distA = (a.distance_meters as number | undefined) ?? Infinity;
-          const distB = (b.distance_meters as number | undefined) ?? Infinity;
-          return compareSearchRankThenIds(
-            a,
-            b,
-            resolvedSearchParams.search,
-            distA - distB,
-          );
-        });
-
-        totalCount = await getFilteredCount();
-      }
-    }
-  } else {
-    // Normal query with pagination
-    totalCount = await getFilteredCount();
-
-    const normalWhere = whereClauses.join(" AND ");
-    const { rows } = await query(
-      `SELECT * FROM listings_with_details WHERE ${normalWhere} ${orderByClause} LIMIT ${INITIAL_PAGE_SIZE}`,
-      queryParams
-    );
-    listings = rows;
-  }
-
-  // Handle deals sort and search relevance
-  if (sortRequiresDeals(resolvedSearchParams.sort)) {
-    listings = [...listings].sort((a, b) => {
-      const discountA = a.id != null ? maxDiscountByListingId[a.id] || 0 : 0;
-      const discountB = b.id != null ? maxDiscountByListingId[b.id] || 0 : 0;
-      return compareSearchRankThenIds(
-        a,
-        b,
-        resolvedSearchParams.search,
-        discountB - discountA,
-      );
-    });
-  }
-
-  if (
-    resolvedSearchParams.search &&
-    resolvedSearchParams.sort !== "distance" &&
-    !sortRequiresDeals(resolvedSearchParams.sort)
-  ) {
-    listings = stableReorderBySearchRank(listings, resolvedSearchParams.search);
-  }
-
-  // Fetch featured listings separately
-  const { rows: featuredListingsRaw } = await query(
-    `SELECT * FROM listings_with_details
-     WHERE status = 'published' AND is_featured = true AND ${listingCategoriesExistsClause("listings_with_details.id", 1)}
-     ORDER BY avg_rating DESC LIMIT 20`,
-    [categoryIdsForFilter]
-  );
-
-  // Fetch images for all listed items
-  const allListingIds = new Array<number>();
-  listings.forEach((l) => l.id && allListingIds.push(l.id));
-  featuredListingsRaw.forEach((l) => l.id && allListingIds.push(l.id));
+  const mainResult = await queryPaginatedListings({
+    page: 1,
+    limit: INITIAL_PAGE_SIZE,
+    categorySlug: categorySlugForQuery,
+    search: resolvedSearchParams.search,
+    sort: resolvedSearchParams.sort,
+    minRating: resolvedSearchParams.rating,
+    dealsOnly: isDealsFilterActive,
+    bankParam: resolvedSearchParams.bank,
+    cardParam: resolvedSearchParams.card,
+    openNow: resolvedSearchParams.open_now === "true",
+    excludeFeatured: showFeaturedCarousel,
+    lat: Number.isNaN(lat) ? undefined : lat,
+    lng: Number.isNaN(lng) ? undefined : lng,
+  });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const imagesMap: Record<number, any[]> = {};
+  let gridListings: any[] = mainResult.listings as any[];
+  const totalCount = mainResult.totalItems;
 
-  if (allListingIds.length > 0) {
-    const { rows: allImages } = await query(
-      "SELECT * FROM listing_images WHERE listing_id = ANY($1) ORDER BY display_order ASC",
-      [allListingIds]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let featuredListings: any[] = [];
+  if (showFeaturedCarousel) {
+    const categoryIdsForFilter = await resolveCategoryIdScope(category.id);
+    const { rows: featuredRows } = await query(
+      `SELECT * FROM listings_with_details
+       WHERE status = 'published' AND is_featured = true AND ${listingCategoriesExistsClause("listings_with_details.id", 1)}
+       ORDER BY avg_rating DESC LIMIT 20`,
+      [categoryIdsForFilter]
     );
-    allImages.forEach((img) => {
-      if (!imagesMap[img.listing_id]) {
-        imagesMap[img.listing_id] = [];
-      }
-      imagesMap[img.listing_id].push(img);
-    });
+    const normalizedFeaturedRows = featuredRows.map((row) => ({
+      ...row,
+      id: row.id !== null && row.id !== undefined ? Number(row.id) : row.id,
+    }));
+    featuredListings = (await attachListingImages(
+      normalizedFeaturedRows as Array<Record<string, unknown> & { id?: number | null }>,
+    )) as unknown as any[];
   }
-
-  // Enrich listings
-  let gridListings = listings.map((l) => ({
-    ...l,
-    images: imagesMap[l.id] || [],
-    favorited: false,
-  }));
-
-  let featuredListings = featuredListingsRaw.map((l) => ({
-    ...l,
-    images: imagesMap[l.id] || [],
-    favorited: false,
-  }));
 
   // Hydrate favorites
   try {
     const session = await getSessionFromCookies();
+    const allListingIds = [
+      ...gridListings.map((l) => l.id),
+      ...featuredListings.map((l) => l.id),
+    ].filter(Boolean);
     if (session && allListingIds.length > 0) {
       const { rows: favRows } = await query(
         "SELECT listing_id FROM favorite_listings WHERE user_id = $1 AND listing_id = ANY($2)",

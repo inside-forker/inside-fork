@@ -49,13 +49,18 @@ export default async function ListingsPage({
   const categorySlugForQuery =
     resolvedSearchParams.sub || resolvedSearchParams.category;
 
+  const isDealsFilterActive =
+    resolvedSearchParams.deals === "true" ||
+    resolvedSearchParams.deals === "1" ||
+    resolvedSearchParams.deals === "";
+
   // The featured carousel (and excluding featured items from the main grid)
   // only applies to the default, unfiltered view.
   const hasActiveFilters = Boolean(
     resolvedSearchParams.search ||
       resolvedSearchParams.category ||
       resolvedSearchParams.sub ||
-      resolvedSearchParams.deals === "true" ||
+      isDealsFilterActive ||
       resolvedSearchParams.bank ||
       resolvedSearchParams.card ||
       resolvedSearchParams.rating ||
@@ -78,7 +83,7 @@ export default async function ListingsPage({
     search: resolvedSearchParams.search,
     sort: resolvedSearchParams.sort,
     minRating: resolvedSearchParams.rating,
-    dealsOnly: resolvedSearchParams.deals === "true",
+    dealsOnly: isDealsFilterActive,
     bankParam: resolvedSearchParams.bank,
     cardParam: resolvedSearchParams.card,
     openNow: resolvedSearchParams.open_now === "true",

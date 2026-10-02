@@ -183,6 +183,11 @@ const CategoryIcon = ({
   return <Icon className="h-4 w-4" />;
 };
 
+function isDealsActive(params: { get: (k: string) => string | null; has?: (k: string) => boolean }) {
+  const val = params.get("deals");
+  return val === "true" || val === "1" || val === "" || (params.has ? params.has("deals") : false);
+}
+
 export function PremiumListingsHeaderInline({
   categories,
   currentCategory,
@@ -233,7 +238,7 @@ export function PremiumListingsHeaderInline({
       currentCategory?.parent_id !== undefined;
     const initialState = {
       sort: searchParams.get("sort"),
-      deals: searchParams.get("deals") === "true",
+      deals: isDealsActive(searchParams),
       open_now: searchParams.get("open_now") === "true",
       near: searchParams.get("near") === "1",
       bank: searchParams.get("bank"),
@@ -253,7 +258,7 @@ export function PremiumListingsHeaderInline({
   const hasPendingChanges = (() => {
     const urlFilters: FilterState = {
       sort: searchParams.get("sort"),
-      deals: searchParams.get("deals") === "true",
+      deals: isDealsActive(searchParams),
       open_now: searchParams.get("open_now") === "true",
       near: searchParams.get("near") === "1",
       bank: searchParams.get("bank"),
@@ -295,7 +300,7 @@ export function PremiumListingsHeaderInline({
 
     const newFilters = {
       sort: urlSort,
-      deals: searchParams.get("deals") === "true",
+      deals: isDealsActive(searchParams),
       open_now: searchParams.get("open_now") === "true",
       near: searchParams.get("near") === "1",
       bank: searchParams.get("bank"),
@@ -335,7 +340,7 @@ export function PremiumListingsHeaderInline({
   // Convert current URL params to filter state for display
   const currentFilters: FilterState = {
     sort: searchParams.get("sort"),
-    deals: searchParams.get("deals") === "true",
+    deals: isDealsActive(searchParams),
     open_now: searchParams.get("open_now") === "true",
     near: searchParams.get("near") === "1",
     bank: searchParams.get("bank"),
