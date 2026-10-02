@@ -162,7 +162,7 @@ export function PremiumHomepageHero() {
             Your next plan starts <span className="text-primary">Inside</span>.
           </h1>
           <p className="max-w-2xl mx-auto text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed">
-            Discover places across Karachi.
+            Discover places, discounts, and events across Karachi.
           </p>
         </div>
 
