@@ -10,13 +10,10 @@ import {
   LayoutGrid,
   LogIn,
   BarChart3,
-  ScanLine,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { User as SupabaseUser } from "@supabase/supabase-js";
-import { QRScanner } from "@/components/gamification/QRScanner";
-import { useRouter } from "next/navigation";
 
 interface ProfileShape {
   role?: string;
@@ -28,25 +25,8 @@ interface BottomNavProps {
   profile?: ProfileShape | null;
 }
 
-export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
+export function BottomNav({ onMenuOpen, user }: BottomNavProps) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [showScanner, setShowScanner] = React.useState(false);
-
-  // Check if user is an organizer - they should use ticket verification scanner
-  const isOrganizer =
-    profile?.role === "organizer" ||
-    profile?.role === "super_admin" ||
-    profile?.role === "admin";
-
-  // Handle scan button click - organizers go to ticket verification
-  const handleScanClick = () => {
-    if (isOrganizer) {
-      router.push("/dashboard/scan");
-    } else {
-      setShowScanner(true);
-    }
-  };
 
   // Smart navigation based on user state and current page
   const navLinks = [
@@ -57,11 +37,6 @@ export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
       ? { href: "/dashboard", label: "Dashboard", icon: BarChart3 }
       : { href: "/login", label: "Sign In", icon: LogIn },
   ];
-
-  // Handle QR scan success
-  const handleScanSuccess = () => {
-    setShowScanner(false);
-  };
 
   return (
     <>
@@ -145,97 +120,47 @@ export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
             })}
           </div>
 
-          {/* Center QR Scanner Button - Only for logged-in users */}
-          {user ? (
-            <div className="relative z-20 flex items-center justify-center -mt-6">
-              <motion.button
+          {/* Center Deals Button */}
+          <div className="relative z-10 flex items-center justify-center w-16">
+            <Link
+              href="/listings?deals=true"
+              className="flex flex-col items-center justify-center gap-1 text-xs group"
+            >
+              <motion.div
                 whileTap={{ scale: 0.9 }}
                 whileHover={{ scale: 1.05 }}
-                initial={{ scale: 0, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 400,
-                  damping: 20,
-                  delay: 0.2,
-                }}
-                onClick={handleScanClick}
-                className="group relative w-14 h-14 rounded-full bg-primary shadow-xl shadow-primary/40 hover:shadow-2xl hover:shadow-primary/50 transition-all duration-300"
+                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200"
               >
-                {/* Glow effect */}
-                <div className="absolute inset-0 rounded-full bg-primary blur-md opacity-40 group-hover:opacity-60 transition-opacity" />
-
-                {/* Outer ring */}
-                <div className="absolute -inset-1 rounded-full border-2 border-primary/30 group-hover:border-primary/50 transition-colors" />
-
-                {/* Inner gradient */}
-                <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-primary via-primary to-primary/80" />
-
-                {/* Icon */}
-                <div className="relative z-10 flex items-center justify-center w-full h-full">
-                  <ScanLine className="h-6 w-6 text-primary-foreground" />
-                </div>
-
-                {/* Pulse animation */}
-                <motion.div
-                  animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                  className="absolute inset-0 rounded-full border-2 border-primary"
-                />
-              </motion.button>
-
-              {/* Label below - Different for organizers */}
-              <span className="absolute -bottom-4 text-[10px] font-semibold text-primary tracking-wide">
-                {isOrganizer ? "VERIFY" : "SCAN"}
-              </span>
-            </div>
-          ) : (
-            /* Deals button for non-logged in users */
-            <div className="relative z-10 flex items-center justify-center w-16">
-              <Link
-                href="/listings?deals=true"
-                className="flex flex-col items-center justify-center gap-1 text-xs group"
-              >
-                <motion.div
-                  whileTap={{ scale: 0.9 }}
-                  whileHover={{ scale: 1.05 }}
-                  className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200"
+                <div
+                  className={cn(
+                    "p-1.5 rounded-lg transition-all duration-200",
+                    pathname === "/listings"
+                      ? "bg-primary/20 shadow-lg shadow-primary/25"
+                      : "group-hover:bg-primary/10",
+                  )}
                 >
-                  <div
+                  <Ticket
                     className={cn(
-                      "p-1.5 rounded-lg transition-all duration-200",
-                      pathname === "/listings"
-                        ? "bg-primary/20 shadow-lg shadow-primary/25"
-                        : "group-hover:bg-primary/10",
-                    )}
-                  >
-                    <Ticket
-                      className={cn(
-                        "h-4 w-4 transition-all duration-200",
-                        pathname === "/listings"
-                          ? "text-primary"
-                          : "text-muted-foreground group-hover:text-primary",
-                      )}
-                    />
-                  </div>
-                  <span
-                    className={cn(
-                      "font-medium transition-all duration-200 text-xs",
+                      "h-4 w-4 transition-all duration-200",
                       pathname === "/listings"
                         ? "text-primary"
-                        : "text-muted-foreground group-hover:text-foreground",
+                        : "text-muted-foreground group-hover:text-primary",
                     )}
-                  >
-                    Deals
-                  </span>
-                </motion.div>
-              </Link>
-            </div>
-          )}
+                  />
+                </div>
+                <span
+                  className={cn(
+                    "font-medium transition-all duration-200 text-xs",
+                    pathname === "/listings"
+                      ? "text-primary"
+                      : "text-muted-foreground group-hover:text-foreground",
+                  )}
+                >
+                  Deals
+                </span>
+              </motion.div>
+            </Link>
+          </div>
 
           {/* Right side nav items */}
           <div className="flex-1 grid grid-cols-2 h-full">
@@ -311,16 +236,6 @@ export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
           </div>
         </div>
       </motion.nav>
-
-      {/* QR Scanner Modal */}
-      <AnimatePresence>
-        {showScanner && (
-          <QRScanner
-            onClose={() => setShowScanner(false)}
-            onScanSuccess={handleScanSuccess}
-          />
-        )}
-      </AnimatePresence>
     </>
   );
 }
