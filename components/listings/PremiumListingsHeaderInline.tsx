@@ -612,27 +612,27 @@ export function PremiumListingsHeaderInline({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
-        className="relative mt-10 mb-6"
+        className="relative mt-3 sm:mt-6 mb-3 sm:mb-6"
       >
-        <div className="container mx-auto px-6 lg:px-8">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           {/* Compact glassmorphism container */}
           <div className="relative rounded-2xl bg-card border border-border shadow-sm overflow-hidden">
             {/* Subtle gradient accent */}
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
 
-            <div className="relative p-6 space-y-5">
+            <div className="relative p-4 sm:p-6 space-y-3 sm:space-y-4">
               {/* Compact Breadcrumbs */}
-              <div className="flex flex-wrap items-center justify-center sm:justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm">
+              <div className="flex flex-wrap items-center justify-start sm:justify-between gap-2 sm:gap-3">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-sm">
                   <button
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-200"
+                    className="flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-200"
                     onClick={() => router.push("/")}
                   >
-                    <Home className="h-3.5 w-3.5" />
-                    <span className="text-xs font-medium">Home</span>
+                    <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    <span className="text-[11px] sm:text-xs font-medium">Home</span>
                   </button>
                   <span className="text-muted-foreground/50 text-xs">/</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary font-semibold text-xs border border-primary/20">
+                  <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-primary/10 text-primary font-semibold text-[11px] sm:text-xs border border-primary/20">
                     Listings
                   </span>
                   {parentCategory && parentCategory.slug !== "all" && (
@@ -640,7 +640,7 @@ export function PremiumListingsHeaderInline({
                       <span className="text-muted-foreground/50 text-xs">
                         /
                       </span>
-                      <span className="px-2.5 py-1 rounded-lg bg-muted/30 text-foreground/80 text-xs">
+                      <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-muted/30 text-foreground/80 text-[11px] sm:text-xs">
                         {parentCategory.name}
                       </span>
                     </>
@@ -649,24 +649,24 @@ export function PremiumListingsHeaderInline({
               </div>
 
               {/* Compact Title + Controls */}
-              <div className="space-y-4">
-                <div className="text-center lg:text-left">
-                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight leading-tight mb-2">
+              <div className="space-y-3 sm:space-y-4">
+                <div className="text-left">
+                  <h1 className="text-xl sm:text-3xl md:text-4xl font-bold tracking-tight leading-tight mb-1 sm:mb-2">
                     <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
                       {displayTitle}
                     </span>
                   </h1>
-                  <p className="text-sm text-muted-foreground max-w-xl mx-auto lg:mx-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground max-w-xl line-clamp-1 sm:line-clamp-none">
                     {displayDescription}
                   </p>
                 </div>
 
                 {/* Search & Filter Toggle */}
-                <div className="flex items-center gap-3 max-w-2xl mx-auto lg:mx-0">
+                <div className="flex items-center gap-2 sm:gap-3 max-w-2xl">
                   {/* Refined Search */}
                   <form onSubmit={handleSearch} className="flex-1">
                     <div className="relative">
-                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Search className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                       <input
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -674,13 +674,13 @@ export function PremiumListingsHeaderInline({
                           siteSettings.search_placeholder ||
                           "Search restaurants, hotels, attractions..."
                         }
-                        className="w-full h-11 pl-10 pr-10 text-sm rounded-xl bg-background border border-border hover:border-border/80 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                        className="w-full h-10 sm:h-11 pl-9 sm:pl-10 pr-9 sm:pr-10 text-xs sm:text-sm rounded-xl bg-background border border-border hover:border-border/80 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                       />
                       {searchQuery && (
                         <button
                           type="button"
                           onClick={() => setSearchQuery("")}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-all"
+                          className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-all"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -696,16 +696,16 @@ export function PremiumListingsHeaderInline({
                         : setShowFilters(!showFilters)
                     }
                     className={cn(
-                      "flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 border",
+                      "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 h-10 sm:h-11 rounded-xl font-medium text-xs sm:text-sm transition-all duration-200 border flex-shrink-0",
                       showFilters || activeFilterCount > 0
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-background hover:bg-muted/50 border-border hover:border-border/80",
                     )}
                   >
-                    <SlidersHorizontal className="h-4 w-4" />
+                    <SlidersHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     <span>Filters</span>
                     {activeFilterCount > 0 && (
-                      <div className="flex items-center justify-center w-5 h-5 rounded-full bg-background/20 text-xs font-bold">
+                      <div className="flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-background/20 text-[10px] sm:text-xs font-bold">
                         {activeFilterCount}
                       </div>
                     )}

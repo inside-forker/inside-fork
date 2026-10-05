@@ -395,22 +395,22 @@ export function PremiumListingsGrid({
   }
 
   return (
-    <div id="listings-grid" className="space-y-8 scroll-mt-24">
+    <div id="listings-grid" className="space-y-4 sm:space-y-8 scroll-mt-24">
       {/* Section Header with Inline Controls */}
       <div
-        className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 animate-fade-in"
+        className="flex flex-row items-center justify-between gap-3 animate-fade-in"
         style={{ animationDelay: "0.1s" }}
       >
-        <div className="text-center lg:text-left">
-          <div className="flex flex-col items-center justify-center lg:flex-row lg:items-center lg:justify-start gap-2 lg:gap-3 w-full mb-2">
-            <div className="p-2 lg:p-3 rounded-2xl bg-primary/10 border border-primary/20 flex-shrink-0 mb-2 lg:mb-0">
-              <Building2 className="h-5 w-5 lg:h-6 lg:w-6 text-primary" />
+        <div className="text-left">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2.5 lg:p-3 rounded-xl sm:rounded-2xl bg-primary/10 border border-primary/20 flex-shrink-0">
+              <Building2 className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-primary" />
             </div>
-            <div className="text-center lg:text-left">
-              <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight">
+            <div>
+              <h2 className="text-base sm:text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 {searchParams.search ? (
                   <>
-                    Search Results for{" "}
+                    Results for{" "}
                     <span className="gradient-text-primary">
                       &ldquo;{searchParams.search}&rdquo;
                     </span>
@@ -420,10 +420,13 @@ export function PremiumListingsGrid({
                     All <span className="gradient-text-primary">Listings</span>
                   </>
                 )}
+                <span className="text-[11px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/60">
+                  {totalItems.toLocaleString()}
+                </span>
               </h2>
             </div>
           </div>
-          <p className="max-w-2xl mx-auto text-lg md:text-xl text-muted-foreground leading-relaxed">
+          <p className="hidden sm:block max-w-2xl text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed mt-1">
             {searchParams.search
               ? `Found ${totalItems.toLocaleString()} ${
                   totalItems === 1 ? "place" : "places"
@@ -441,10 +444,10 @@ export function PremiumListingsGrid({
         </div>
 
         {/* Controls */}
-        <div className="flex items-center gap-4 justify-center lg:justify-end">
+        <div className="flex items-center gap-2 sm:gap-4 justify-end flex-shrink-0">
           {/* Items per page selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground font-medium">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="text-xs sm:text-sm text-muted-foreground font-medium">
               Show:
             </span>
             <DropdownMenu modal={false}>
@@ -452,11 +455,11 @@ export function PremiumListingsGrid({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 px-3 bg-background/80 backdrop-blur-sm border-border/50 hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/30 hover:shadow-md transition-all duration-200 font-medium"
+                  className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm bg-background/80 backdrop-blur-sm border-border/50 hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/30 hover:shadow-md transition-all duration-200 font-medium"
                   disabled={isLoading}
                 >
                   {itemsPerPage}
-                  <ChevronDown className="h-4 w-4 ml-1" />
+                  <ChevronDown className="h-3.5 w-3.5 ml-1" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -536,7 +539,7 @@ export function PremiumListingsGrid({
       {/* Current page info */}
       {totalPages > 1 && (
         <div
-          className="flex items-center justify-between text-sm text-muted-foreground bg-muted/20 rounded-lg px-4 py-2 animate-fade-in"
+          className="flex items-center justify-between text-xs sm:text-sm text-muted-foreground bg-muted/20 rounded-lg px-3 sm:px-4 py-1.5 sm:py-2 animate-fade-in"
           style={{ animationDelay: "0.25s" }}
         >
           <span>
@@ -564,7 +567,7 @@ export function PremiumListingsGrid({
         <div
           key={`${currentPage}-${itemsPerPage}-${cardsPerRow}`}
           className={cn(
-            "grid gap-6",
+            "grid gap-4 sm:gap-6",
             CARDS_PER_ROW_OPTIONS.find((option) => option.value === cardsPerRow)
               ?.grid ||
               "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
