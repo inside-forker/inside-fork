@@ -21,7 +21,7 @@ interface ProfileShape {
 
 interface BottomNavProps {
   onMenuOpen: () => void;
-  user?: SupabaseUser | null;
+  user?: SupabaseUser | { id: string; email?: string } | null;
   profile?: ProfileShape | null;
 }
 
@@ -121,98 +121,116 @@ export function BottomNav({ onMenuOpen, user }: BottomNavProps) {
           </div>
 
           {/* Center Deals Button */}
-          <div className="relative z-10 flex items-center justify-center w-16">
-            <Link
-              href="/listings?deals=true"
-              className="flex flex-col items-center justify-center gap-1 text-xs group"
-            >
-              <motion.div
-                whileTap={{ scale: 0.9 }}
-                whileHover={{ scale: 1.05 }}
-                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200"
-              >
-                <div
-                  className={cn(
-                    "p-1.5 rounded-lg transition-all duration-200",
-                    pathname === "/listings"
-                      ? "bg-primary/20 shadow-lg shadow-primary/25"
-                      : "group-hover:bg-primary/10",
-                  )}
+          {(() => {
+            const isDealsActive =
+              pathname === "/listings" || pathname?.startsWith("/listings");
+            return (
+              <div className="relative z-10 flex items-center justify-center w-16">
+                <Link
+                  href="/listings?deals=true"
+                  className="flex flex-col items-center justify-center gap-1 text-xs group"
                 >
-                  <Ticket
-                    className={cn(
-                      "h-4 w-4 transition-all duration-200",
-                      pathname === "/listings"
-                        ? "text-primary"
-                        : "text-muted-foreground group-hover:text-primary",
-                    )}
-                  />
-                </div>
-                <span
-                  className={cn(
-                    "font-medium transition-all duration-200 text-xs",
-                    pathname === "/listings"
-                      ? "text-primary"
-                      : "text-muted-foreground group-hover:text-foreground",
-                  )}
-                >
-                  Deals
-                </span>
-              </motion.div>
-            </Link>
-          </div>
+                  <motion.div
+                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.05 }}
+                    className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200"
+                  >
+                    <div
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all duration-200",
+                        isDealsActive
+                          ? "bg-primary/20 shadow-lg shadow-primary/25"
+                          : "group-hover:bg-primary/10",
+                      )}
+                    >
+                      <Ticket
+                        className={cn(
+                          "h-4 w-4 transition-all duration-200",
+                          isDealsActive
+                            ? "text-primary"
+                            : "text-muted-foreground group-hover:text-primary",
+                        )}
+                      />
+                    </div>
+                    <span
+                      className={cn(
+                        "font-medium transition-all duration-200 text-xs",
+                        isDealsActive
+                          ? "text-primary"
+                          : "text-muted-foreground group-hover:text-foreground",
+                      )}
+                    >
+                      Deals
+                    </span>
+                  </motion.div>
+                </Link>
+              </div>
+            );
+          })()}
 
           {/* Right side nav items */}
           <div className="flex-1 grid grid-cols-2 h-full">
             {/* Dashboard/Sign In */}
-            <Link
-              href={navLinks[2].href}
-              className="relative z-10 flex h-full flex-col items-center justify-center gap-1 text-xs group"
-            >
-              <motion.div
-                whileTap={{ scale: 0.9 }}
-                whileHover={{ scale: 1.05 }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
-                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200"
-              >
-                <div
-                  className={cn(
-                    "p-1.5 rounded-lg transition-all duration-200",
-                    pathname === navLinks[2].href
-                      ? "bg-primary/20 shadow-lg shadow-primary/25"
-                      : "group-hover:bg-primary/10",
-                  )}
+            {(() => {
+              const isDashboardActive =
+                pathname === navLinks[2].href ||
+                (navLinks[2].href !== "/" &&
+                  pathname?.startsWith(navLinks[2].href));
+              return (
+                <Link
+                  href={navLinks[2].href}
+                  className="relative z-10 flex h-full flex-col items-center justify-center gap-1 text-xs group"
                 >
-                  {React.createElement(navLinks[2].icon, {
-                    className: cn(
-                      "h-4 w-4 transition-all duration-200",
-                      pathname === navLinks[2].href
-                        ? "text-primary"
-                        : "text-muted-foreground group-hover:text-primary",
-                    ),
-                  })}
-                </div>
-                <span
-                  className={cn(
-                    "font-medium transition-all duration-200 text-xs",
-                    pathname === navLinks[2].href
-                      ? "text-primary"
-                      : "text-muted-foreground group-hover:text-foreground",
+                  <motion.div
+                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.05 }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.3 }}
+                    className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200"
+                  >
+                    <div
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all duration-200",
+                        isDashboardActive
+                          ? "bg-primary/20 shadow-lg shadow-primary/25"
+                          : "group-hover:bg-primary/10",
+                      )}
+                    >
+                      {React.createElement(navLinks[2].icon, {
+                        className: cn(
+                          "h-4 w-4 transition-all duration-200",
+                          isDashboardActive
+                            ? "text-primary"
+                            : "text-muted-foreground group-hover:text-primary",
+                        ),
+                      })}
+                    </div>
+                    <span
+                      className={cn(
+                        "font-medium transition-all duration-200 text-xs",
+                        isDashboardActive
+                          ? "text-primary"
+                          : "text-muted-foreground group-hover:text-foreground",
+                      )}
+                    >
+                      {navLinks[2].label}
+                    </span>
+                  </motion.div>
+                  {isDashboardActive && (
+                    <motion.div
+                      layoutId="bottom-nav-active-pill"
+                      className="absolute inset-0 rounded-xl bg-gradient-to-t from-primary/10 via-primary/5 to-transparent border border-primary/20"
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 25,
+                      }}
+                    />
                   )}
-                >
-                  {navLinks[2].label}
-                </span>
-              </motion.div>
-              {pathname === navLinks[2].href && (
-                <motion.div
-                  layoutId="bottom-nav-active-pill"
-                  className="absolute inset-0 rounded-xl bg-gradient-to-t from-primary/10 via-primary/5 to-transparent border border-primary/20"
-                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                />
-              )}
-            </Link>
+                </Link>
+              );
+            })()}
 
             {/* Menu Button */}
             <div className="relative z-10 flex h-full flex-col items-center justify-center gap-1 text-xs group">
