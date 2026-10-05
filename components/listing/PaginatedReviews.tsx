@@ -43,7 +43,7 @@ interface Review {
   rating: number;
   comment: string | null;
   created_at: string;
-  branch_id?: number;
+  branch_id?: number | null;
   branch_name?: string;
   helpful_count?: number | null;
   comment_count?: number | null;

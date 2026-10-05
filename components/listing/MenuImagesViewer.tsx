@@ -435,8 +435,8 @@ export function MenuImagesViewer({
         {/* Mobile Header */}
         <div className="md:hidden">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium flex-shrink-0">
                 <ChefHat className="h-6 w-6 text-primary" />
               </div>
               <div>
@@ -459,8 +459,8 @@ export function MenuImagesViewer({
 
         {/* Desktop Header */}
         <div className="hidden md:flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium flex-shrink-0">
               <ChefHat className="h-6 w-6 text-primary" />
             </div>
             <div>

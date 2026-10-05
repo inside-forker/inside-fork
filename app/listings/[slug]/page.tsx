@@ -315,7 +315,7 @@ export default async function CategoryListingsPage({
         pageDescription={pageDescription}
       />
 
-      <div className="container mx-auto px-6 lg:px-8 py-12 space-y-12">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 lg:py-12 space-y-5 sm:space-y-8 lg:space-y-12">
         {featuredListings.length > 0 && !resolvedSearchParams.search && (
           <FeaturedListingsCarousel featuredListings={featuredListings} />
         )}

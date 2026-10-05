@@ -28,7 +28,7 @@ interface Review {
   rating: number;
   comment: string | null;
   created_at: string;
-  branch_id: number;
+  branch_id?: number | null;
   branch_name?: string;
   helpful_count?: number | null;
   comment_count?: number | null;
@@ -36,6 +36,11 @@ interface Review {
     full_name: string | null;
     avatar_url: string | null;
   } | null;
+  review_images?: Array<{
+    id: number;
+    image_url: string;
+    created_at: string;
+  }> | null;
 }
 
 interface Branch {
@@ -75,15 +80,10 @@ export function ReviewsSection({
   useListingReviewsRealtime(listingId);
 
   // Use reviews from store, fallback to initial reviews if store is empty
-  const allReviews =
+  const displayReviews =
     currentListingId === listingId && storeReviews.length > 0
       ? storeReviews
       : initialReviews;
-
-  // Filter by selected branch
-  const displayReviews = selectedBranchId
-    ? allReviews.filter((review) => review.branch_id === selectedBranchId)
-    : allReviews;
 
   const handleWriteReview = () => {
     if (!_currentUser) {
@@ -106,9 +106,10 @@ export function ReviewsSection({
     });
   };
 
-  // Get selected branch details
+  // Get selected branch details for review creation modal
   const selectedBranch =
-    branches.find((b) => b.id === selectedBranchId) || branches[0];
+    (selectedBranchId ? branches.find((b) => b.id === selectedBranchId) : null) ||
+    branches[0] || { id: 0, name: "" };
 
   const hasUserReviewed = React.useMemo(() => {
     if (!_currentUser || !displayReviews) return false;
@@ -127,8 +128,8 @@ export function ReviewsSection({
       >
         {/* Header Section (Unified) */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 shadow-premium flex-shrink-0">
               <Star className="h-6 w-6 text-primary" />
             </div>
             <div>
