@@ -8,7 +8,6 @@ import { ListingContact } from "@/components/listing/ListingContact";
 import { ListingMap } from "@/components/listing/ListingMap";
 import { ListingBranches } from "@/components/listing/ListingBranches";
 import { ListingPageWrapper } from "@/components/listing/ListingPageWrapper";
-import { QuickNavigation } from "@/components/listing/QuickNavigation";
 import { MenuImagesViewer } from "@/components/listing/MenuImagesViewer";
 import { getListingHeroImages } from "@/lib/utils/listing-images";
 import { isRestaurantCategory } from "@/lib/utils/category-helpers";
@@ -306,15 +305,6 @@ export default async function ListingPage({ params }: ListingPageProps) {
 
             {/* Right Column - Sticky Sidebar */}
             <div className="lg:sticky lg:top-20 lg:self-start space-y-8 md:space-y-10 lg:space-y-12">
-              {/* Quick Navigation - Only shows links to sections that actually have data */}
-              <QuickNavigation
-                listing={listing}
-                hasMenu={hasMenu}
-                hasDeals={hasDeals}
-                hasOpeningHours={hasOpeningHours}
-                hasReviews={hasReviews}
-              />
-
               {/* Contact Section */}
               <ListingContact listing={listing} branches={branches} />
 
