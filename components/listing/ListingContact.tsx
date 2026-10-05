@@ -19,14 +19,32 @@ import {
   viewportSettings,
 } from "@/lib/utils/listing-animations";
 
+import { useBranchSelection } from "@/lib/context/BranchSelectionContext";
+import { Badge } from "@/components/ui/badge";
+
 type Listing = Database["public"]["Views"]["listings_with_details"]["Row"];
+type ListingBranch = Database["public"]["Tables"]["listing_branches"]["Row"];
 
 interface ListingContactProps {
   listing: Listing;
+  branches?: ListingBranch[];
 }
 
-export function ListingContact({ listing }: ListingContactProps) {
+export function ListingContact({ listing, branches = [] }: ListingContactProps) {
+  const { selectedBranchId } = useBranchSelection();
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Active selected branch
+  const activeBranch =
+    branches.length > 0
+      ? branches.find((b) => b.id === selectedBranchId) ||
+        branches.find((b) => b.is_primary) ||
+        branches[0]
+      : null;
+
+  const currentPhoneNumber = activeBranch?.phone_number || listing.phone_number;
+  const currentEmail = listing.email;
+  const currentWebsite = listing.website;
 
   const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -60,30 +78,30 @@ export function ListingContact({ listing }: ListingContactProps) {
     {
       id: "phone",
       icon: Phone,
-      label: "Phone",
-      displayValue: listing.phone_number ? formatPhoneNumber(listing.phone_number) : null,
-      rawValue: listing.phone_number,
-      action: () => window.open(`tel:${listing.phone_number}`),
+      label: activeBranch ? `Phone (${activeBranch.name})` : "Phone",
+      displayValue: currentPhoneNumber ? formatPhoneNumber(currentPhoneNumber) : null,
+      rawValue: currentPhoneNumber,
+      action: () => window.open(`tel:${currentPhoneNumber}`),
       actionLabel: "Call",
     },
     {
       id: "email",
       icon: Mail,
       label: "Email",
-      displayValue: listing.email,
-      rawValue: listing.email,
-      action: () => window.open(`mailto:${listing.email}`),
+      displayValue: currentEmail,
+      rawValue: currentEmail,
+      action: () => window.open(`mailto:${currentEmail}`),
       actionLabel: "Email",
     },
     {
       id: "website",
       icon: Globe,
       label: "Website",
-      displayValue: listing.website
-        ? listing.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")
+      displayValue: currentWebsite
+        ? currentWebsite.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")
         : null,
-      rawValue: listing.website,
-      action: () => listing.website && window.open(listing.website, "_blank"),
+      rawValue: currentWebsite,
+      action: () => currentWebsite && window.open(currentWebsite, "_blank"),
       actionLabel: "Visit",
     },
   ].filter((method) => Boolean(method.displayValue && method.rawValue));
@@ -156,18 +174,28 @@ export function ListingContact({ listing }: ListingContactProps) {
       {/* Unified Contact & Social Card */}
       <div className="relative overflow-hidden rounded-2xl p-5 sm:p-6 bg-card/70 backdrop-blur-xl border border-border/60 shadow-sm space-y-5">
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-border/40 pb-4">
-          <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary flex-shrink-0">
-            <MessageSquare className="h-5 w-5" />
+        <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary flex-shrink-0">
+              <MessageSquare className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-base sm:text-lg font-bold text-foreground tracking-tight">
+                Contact & Social
+              </h3>
+              <p className="text-xs text-muted-foreground font-normal truncate">
+                {activeBranch ? `Details for ${activeBranch.name}` : "Get in touch directly or connect online"}
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-base sm:text-lg font-bold text-foreground tracking-tight">
-              Contact & Social
-            </h3>
-            <p className="text-xs text-muted-foreground font-normal">
-              Get in touch directly or connect online
-            </p>
-          </div>
+          {activeBranch && (
+            <Badge
+              variant="outline"
+              className="text-[11px] font-semibold bg-primary/10 text-primary border-primary/25 px-2.5 py-0.5 rounded-lg flex-shrink-0 truncate max-w-[130px]"
+            >
+              {activeBranch.name}
+            </Badge>
+          )}
         </div>
 
         {/* Action Rows (Phone, Email, Website) */}

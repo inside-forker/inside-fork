@@ -181,74 +181,77 @@ export function PremiumListingHero({
               </p>
             )}
 
-            {/* Action Buttons - Distinct, Unified, Touch-friendly */}
-            <div className="flex items-center gap-2.5 sm:gap-3.5 pt-2 sm:pt-3 pr-24 sm:pr-0 flex-wrap">
-              {listing.phone_number && (
+            {/* Action Row: Buttons on Left & Photo Counter on Right (Exact Same Baseline) */}
+            <div className="flex items-center justify-between gap-3 pt-2 sm:pt-3 w-full">
+              {/* Left Action Buttons */}
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap flex-1 min-w-0">
+                {listing.phone_number && (
+                  <Button
+                    size="sm"
+                    onClick={() => window.open(`tel:${listing.phone_number}`)}
+                    className="h-10 sm:h-11 px-3.5 sm:px-5 bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl shadow-lg text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-transform active:scale-95 flex-shrink-0"
+                  >
+                    <Phone className="h-4 w-4" />
+                    <span>Call</span>
+                  </Button>
+                )}
+
                 <Button
+                  variant="outline"
                   size="sm"
-                  onClick={() => window.open(`tel:${listing.phone_number}`)}
-                  className="h-11 px-4 sm:px-6 bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl shadow-lg text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-transform active:scale-95 flex-1 sm:flex-none"
+                  onClick={() => {
+                    const query = encodeURIComponent(
+                      listing.address || listing.name || "",
+                    );
+                    window.open(
+                      `https://www.google.com/maps/search/?api=1&query=${query}`,
+                      "_blank",
+                    );
+                  }}
+                  className="h-10 sm:h-11 px-3.5 sm:px-5 bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-md font-semibold rounded-xl shadow-lg text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-transform active:scale-95 flex-shrink-0"
                 >
-                  <Phone className="h-4 w-4" />
-                  <span>Call</span>
+                  <MapPin className="h-4 w-4" />
+                  <span>Directions</span>
                 </Button>
+
+                <ShareButton
+                  contentType="listing"
+                  contentId={listing.id!}
+                  contentTitle={listing.name || "Listing"}
+                  contentUrl={`/listing/${listing.slug}`}
+                  variant="default"
+                  className="h-10 sm:h-11 px-3 sm:px-4 bg-white/15 hover:bg-white/25 text-white border border-white/25 backdrop-blur-md font-semibold rounded-xl shadow-lg text-xs sm:text-sm flex items-center justify-center transition-transform active:scale-95 flex-shrink-0"
+                />
+              </div>
+
+              {/* Right Photo Indicator - Perfectly aligned on the exact same line */}
+              {images.length > 1 && (
+                <div className="flex-shrink-0">
+                  <div className="flex items-center gap-2 bg-black/75 backdrop-blur-xl rounded-full px-3 py-1.5 border border-white/25 shadow-xl h-9 sm:h-10">
+                    <div className="flex items-center gap-1">
+                      {images.slice(0, 5).map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentImageIndex(index)}
+                          aria-label={`Go to image ${index + 1}`}
+                          className={`h-1.5 rounded-full transition-all duration-300 ${
+                            index === currentImageIndex
+                              ? "w-3.5 bg-primary"
+                              : "w-1.5 bg-white/40 hover:bg-white/70"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-white text-xs font-bold tracking-wide ml-0.5">
+                      {currentImageIndex + 1}/{images.length}
+                    </span>
+                  </div>
+                </div>
               )}
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const query = encodeURIComponent(
-                    listing.address || listing.name || "",
-                  );
-                  window.open(
-                    `https://www.google.com/maps/search/?api=1&query=${query}`,
-                    "_blank",
-                  );
-                }}
-                className="h-11 px-4 sm:px-6 bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-md font-semibold rounded-xl shadow-lg text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-transform active:scale-95 flex-1 sm:flex-none"
-              >
-                <MapPin className="h-4 w-4" />
-                <span>Directions</span>
-              </Button>
-
-              <ShareButton
-                contentType="listing"
-                contentId={listing.id!}
-                contentTitle={listing.name || "Listing"}
-                contentUrl={`/listing/${listing.slug}`}
-                variant="default"
-                className="h-11 px-3.5 sm:px-5 bg-white/15 hover:bg-white/25 text-white border border-white/25 backdrop-blur-md font-semibold rounded-xl shadow-lg text-xs sm:text-sm flex items-center justify-center transition-transform active:scale-95 flex-1 sm:flex-none"
-              />
             </div>
           </motion.div>
         </div>
       </div>
-
-      {/* Floating Photo Indicator in Bottom Right */}
-      {images.length > 1 && (
-        <div className="absolute bottom-6 right-4 sm:bottom-8 sm:right-6 lg:right-8 z-20 pointer-events-auto">
-          <div className="flex items-center gap-2 bg-black/75 backdrop-blur-xl rounded-full px-3.5 py-1.5 border border-white/25 shadow-xl">
-            <div className="flex items-center gap-1.5">
-              {images.slice(0, 5).map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentImageIndex(index)}
-                  aria-label={`Go to image ${index + 1}`}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    index === currentImageIndex
-                      ? "w-4 bg-primary"
-                      : "w-1.5 bg-white/40 hover:bg-white/70"
-                  }`}
-                />
-              ))}
-            </div>
-            <span className="text-white text-xs font-bold tracking-wide ml-0.5">
-              {currentImageIndex + 1}/{images.length}
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Gradient Orbs */}
       <div className="absolute top-1/3 left-1/4 hidden xl:block">
