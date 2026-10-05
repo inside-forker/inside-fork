@@ -67,21 +67,21 @@ interface PremiumListingsGridProps {
 
 const ITEMS_PER_PAGE_OPTIONS = [9, 12, 18, 24];
 const CARDS_PER_ROW_OPTIONS = [
-  { value: 2, label: "2 per row", grid: "grid-cols-1 md:grid-cols-2" },
+  { value: 2, label: "2 per row", grid: "grid-cols-2 md:grid-cols-2" },
   {
     value: 3,
     label: "3 per row",
-    grid: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
+    grid: "grid-cols-2 md:grid-cols-2 lg:grid-cols-3",
   },
   {
     value: 4,
     label: "4 per row",
-    grid: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+    grid: "grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
   },
   {
     value: 5,
     label: "5 per row",
-    grid: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-5",
+    grid: "grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-5",
   },
 ];
 
@@ -567,10 +567,10 @@ export function PremiumListingsGrid({
         <div
           key={`${currentPage}-${itemsPerPage}-${cardsPerRow}`}
           className={cn(
-            "grid gap-4 sm:gap-6",
+            "grid gap-3 sm:gap-6",
             CARDS_PER_ROW_OPTIONS.find((option) => option.value === cardsPerRow)
               ?.grid ||
-              "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+              "grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           )}
         >
           {listings.map((listing, index) => (
