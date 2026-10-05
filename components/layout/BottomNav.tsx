@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home,
-  Search,
+  Calendar,
   Ticket,
   LayoutGrid,
   LogIn,
@@ -51,7 +51,7 @@ export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
   // Smart navigation based on user state and current page
   const navLinks = [
     { href: "/", label: "Home", icon: Home },
-    { href: "/search", label: "Search", icon: Search },
+    { href: "/events", label: "Events", icon: Calendar },
     // Always show Dashboard for logged-in users on public pages
     user
       ? { href: "/dashboard", label: "Dashboard", icon: BarChart3 }
@@ -84,7 +84,9 @@ export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
           {/* Left side nav items */}
           <div className="flex-1 grid grid-cols-2 h-full">
             {navLinks.slice(0, 2).map((link, index) => {
-              const isActive = pathname === link.href;
+              const isActive =
+                pathname === link.href ||
+                (link.href !== "/" && pathname?.startsWith(link.href));
               return (
                 <Link
                   key={link.label}
