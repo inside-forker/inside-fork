@@ -168,16 +168,19 @@ export async function processPayFastCallbackParams(
           ? "pending"
           : "failed";
 
-    // Record payment event idempotently when the unique index exists.
-    // Some environments lack provider_transaction_id uniqueness yet — never
-    // block marking the booking paid / sending ticket email on that.
+    // Record payment event idempotently. The arbiter is the partial unique
+    // index idx_payments_provider_txn_unique — ON CONFLICT must carry the same
+    // WHERE predicate or Postgres raises 42P10. Never block marking the
+    // booking paid / sending ticket email if the audit row insert fails.
     if (validation.transactionId) {
       try {
         await query(
           `INSERT INTO payments
              (booking_id, gateway_code, amount, currency, status, normalized_status, provider_transaction_id, raw_request)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
-           ON CONFLICT (provider_transaction_id) DO NOTHING`,
+           ON CONFLICT (provider_transaction_id)
+           WHERE (provider_transaction_id IS NOT NULL)
+           DO NOTHING`,
           [
             booking.id,
             "payfast",
