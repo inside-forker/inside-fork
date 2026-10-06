@@ -24,7 +24,7 @@ import {
   Search,
   ArrowRight,
 } from "lucide-react";
-import { SearchResult } from "@/hooks/useSearch";
+import { formatDistance, SearchResult } from "@/hooks/useSearch";
 
 interface CategoryData {
   id: number;
@@ -343,9 +343,23 @@ export function PremiumDiscoveryPanel({
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-foreground group-hover:text-primary transition-colors">
-                            {result.name}
-                          </h3>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-medium text-foreground group-hover:text-primary transition-colors">
+                              {result.name}
+                            </h3>
+                            {result.avg_rating != null &&
+                              result.avg_rating > 0 && (
+                                <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground">
+                                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                                  {result.avg_rating.toFixed(1)}
+                                </span>
+                              )}
+                            {formatDistance(result.distance_meters) && (
+                              <span className="text-xs text-muted-foreground">
+                                {formatDistance(result.distance_meters)}
+                              </span>
+                            )}
+                          </div>
                           {result.category && (
                             <p className="text-sm text-primary/80 mt-1">
                               {result.category}

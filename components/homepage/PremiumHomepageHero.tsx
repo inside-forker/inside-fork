@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useSearch } from "@/hooks/useSearch";
+import { formatDistance, useSearch } from "@/hooks/useSearch";
 import {
   Search,
   MapPin,
@@ -25,9 +25,15 @@ import {
   LocateFixed,
   CreditCard,
   Ticket,
+  Star,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { HOMEPAGE_AREAS, areaHref } from "@/lib/homepage/areas";
+import {
+  HOMEPAGE_AREAS,
+  areaBrowseHref,
+  type HomepageArea,
+} from "@/lib/homepage/areas";
 
 const quickLinks = [
   { label: "Places", href: "/listings", icon: MapPin },
@@ -35,11 +41,19 @@ const quickLinks = [
   { label: "Events", href: "/events", icon: Ticket },
 ];
 
+type LocationPin = {
+  label: string;
+  lat: number;
+  lng: number;
+  /** Named area (for browse deep-link); null for Near me */
+  area: string | null;
+};
+
 export function PremiumHomepageHero() {
   const [isLocating, setIsLocating] = useState(false);
+  const [locationPin, setLocationPin] = useState<LocationPin | null>(null);
   const router = useRouter();
 
-  // Ref for search container to calculate dropdown position
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const [dropdownPosition, setDropdownPosition] = useState({
     top: 0,
@@ -47,7 +61,6 @@ export function PremiumHomepageHero() {
     width: 0,
   });
 
-  // Use the production-ready search hook
   const {
     searchQuery,
     setSearchQuery,
@@ -56,27 +69,28 @@ export function PremiumHomepageHero() {
     showResults,
     setShowResults,
     getResultUrl,
-  } = useSearch();
+  } = useSearch({
+    lat: locationPin?.lat ?? null,
+    lng: locationPin?.lng ?? null,
+  });
 
-  // "Near me": ask for location only when chosen, then list places by distance
   const handleNearMe = useCallback(() => {
-    if (!navigator.geolocation || isLocating) {
-      router.push("/listings");
-      return;
-    }
+    if (!navigator.geolocation || isLocating) return;
 
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
         setIsLocating(false);
-        router.push(
-          `/listings?sort=distance&lat=${latitude.toFixed(6)}&lng=${longitude.toFixed(6)}`,
-        );
+        setLocationPin({
+          label: "Near me",
+          lat: latitude,
+          lng: longitude,
+          area: null,
+        });
       },
       () => {
         setIsLocating(false);
-        router.push("/listings");
       },
       {
         timeout: 10000,
@@ -84,17 +98,27 @@ export function PremiumHomepageHero() {
         maximumAge: 300000,
       },
     );
-  }, [isLocating, router]);
+  }, [isLocating]);
 
-  // Lock body scroll and update dropdown position when showing results
+  const handleSelectArea = useCallback((area: HomepageArea) => {
+    setLocationPin({
+      label: area.label,
+      lat: area.center.lat,
+      lng: area.center.lng,
+      area: area.label,
+    });
+  }, []);
+
+  const clearLocationPin = useCallback(() => {
+    setLocationPin(null);
+  }, []);
+
   useEffect(() => {
     if (!showResults) return;
 
-    // Lock body scroll
     const originalStyle = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    // Update dropdown position (using viewport coordinates for fixed positioning)
     if (searchContainerRef.current) {
       const rect = searchContainerRef.current.getBoundingClientRect();
       setDropdownPosition({
@@ -109,28 +133,37 @@ export function PremiumHomepageHero() {
     };
   }, [showResults]);
 
-  // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   };
 
-  // Handler for Explore button
   const handleExplore = () => {
-    if (searchQuery && searchQuery.trim().length > 0) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-    } else {
-      router.push("/listings");
+    const trimmed = searchQuery.trim();
+    if (trimmed.length > 0) {
+      const params = new URLSearchParams({ q: trimmed });
+      if (locationPin) {
+        params.set("lat", locationPin.lat.toFixed(6));
+        params.set("lng", locationPin.lng.toFixed(6));
+        if (locationPin.area) params.set("area", locationPin.area);
+      }
+      router.push(`/search?${params.toString()}`);
+      return;
     }
+
+    router.push(
+      areaBrowseHref({
+        area: locationPin?.area ?? null,
+        lat: locationPin?.lat ?? null,
+        lng: locationPin?.lng ?? null,
+      }),
+    );
   };
 
   return (
-    // Brand cream hero; Karachi's streets sit behind it as a faint ink shade
     <HeroSectionStatic
       className="bg-cream pb-8 sm:pb-10 lg:pb-10"
       floating={
         <div aria-hidden className="pointer-events-none absolute inset-0">
-          {/* The map's lines are cream on transparent; brightness-0 turns them
-              dark so they show on white, and the low opacity keeps them a shade */}
           <Image
             src="/assets/hero/karachi-streets.webp"
             alt=""
@@ -139,24 +172,17 @@ export function PremiumHomepageHero() {
             sizes="100vw"
             className="object-cover brightness-0 opacity-[0.14]"
           />
-          {/* Cream overlay: clear at the top, solid at the bottom, so the map
-              is strongest up top and fades out into the page */}
           <div className="absolute inset-0 bg-gradient-to-b from-cream/0 via-cream/60 to-cream" />
         </div>
       }
     >
-      {/* Main Content - CSS animations for entrance */}
       <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8 text-center">
-        {/* Eyebrow */}
-        {/* Flex so the small label doesn't sit in a taller line box (keeps
-            the space above the hero content equal to the space below) */}
         <div className="mb-4 flex justify-center animate-hero-fade-in">
           <span className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
             Your guide to Karachi
           </span>
         </div>
 
-        {/* Hero Heading */}
         <div className="space-y-3 sm:space-y-4 mb-8 sm:mb-10 animate-hero-fade-in-delay-1">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
             Your next plan starts <span className="text-primary">Inside</span>.
@@ -166,10 +192,8 @@ export function PremiumHomepageHero() {
           </p>
         </div>
 
-        {/* Search Bar */}
         <div className="max-w-2xl mx-auto animate-hero-fade-in-delay-2">
           <div className="relative group" ref={searchContainerRef}>
-            {/* Search Container */}
             <div className="relative flex flex-col sm:flex-row bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
               <div className="relative flex-1">
                 <Search className="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -182,25 +206,43 @@ export function PremiumHomepageHero() {
                     searchQuery.length >= 2 && setShowResults(true)
                   }
                   onBlur={() => setTimeout(() => setShowResults(false), 200)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleExplore();
+                    }
+                  }}
                   className="h-12 sm:h-14 md:h-16 pl-11 sm:pl-12 md:pl-14 pr-4 sm:pr-6 text-base md:text-lg bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/70"
                 />
               </div>
 
-              {/* Area picker: a menu of area links, not a filter on the typed search */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
                     className="flex items-center px-4 sm:px-6 border-t sm:border-t-0 sm:border-l border-border/30 min-h-[48px] sm:min-h-[56px] md:min-h-[64px] hover:bg-muted/30 transition-colors"
                   >
-                    <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mr-2 sm:mr-3 flex-shrink-0" />
+                    <MapPin
+                      className={`h-4 w-4 sm:h-5 sm:w-5 mr-2 sm:mr-3 flex-shrink-0 ${
+                        locationPin ? "text-primary" : "text-muted-foreground"
+                      }`}
+                    />
                     {isLocating && (
                       <span className="mr-2 h-3 w-3 border-2 border-muted-foreground/30 border-t-primary rounded-full animate-spin flex-shrink-0" />
                     )}
-                    <span className="text-xs sm:text-sm font-medium text-muted-foreground truncate">
-                      Choose an area
+                    <span
+                      className={`text-xs sm:text-sm font-medium truncate ${
+                        locationPin
+                          ? "text-foreground"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {locationPin?.label ?? "Choose an area"}
                     </span>
-                    <ChevronDown className="ml-auto sm:ml-2 h-4 w-4 text-muted-foreground" aria-hidden />
+                    <ChevronDown
+                      className="ml-auto sm:ml-2 h-4 w-4 text-muted-foreground"
+                      aria-hidden
+                    />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 rounded-xl p-1.5">
@@ -213,10 +255,26 @@ export function PremiumHomepageHero() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {HOMEPAGE_AREAS.map((area) => (
-                    <DropdownMenuItem key={area} asChild className="rounded-lg py-2">
-                      <Link href={areaHref(area)}>{area}</Link>
+                    <DropdownMenuItem
+                      key={area.label}
+                      className="rounded-lg py-2"
+                      onSelect={() => handleSelectArea(area)}
+                    >
+                      {area.label}
                     </DropdownMenuItem>
                   ))}
+                  {locationPin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onSelect={clearLocationPin}
+                        className="rounded-lg py-2 text-muted-foreground"
+                      >
+                        <X className="h-4 w-4" />
+                        Clear area
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -238,7 +296,6 @@ export function PremiumHomepageHero() {
             </div>
           </div>
 
-          {/* Starting points for visitors without a name in mind */}
           <nav
             aria-label="Start browsing"
             className="-mx-6 mt-5 flex flex-wrap items-center justify-center gap-1.5 sm:mx-0 sm:gap-2"
@@ -249,14 +306,16 @@ export function PremiumHomepageHero() {
                 href={link.href}
                 className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium sm:gap-1.5 sm:px-4 sm:text-sm text-foreground transition-colors hover:border-primary hover:text-primary active:opacity-80"
               >
-                <link.icon className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4" aria-hidden />
+                <link.icon
+                  className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4"
+                  aria-hidden
+                />
                 {link.label}
               </Link>
             ))}
           </nav>
         </div>
 
-        {/* Search Results Dropdown - Portal to escape parent transform stacking context */}
         {typeof document !== "undefined" &&
           ReactDOM.createPortal(
             <AnimatePresence>
@@ -281,67 +340,86 @@ export function PremiumHomepageHero() {
                       </div>
                     </div>
                   ) : searchResults.length > 0 ? (
-                    <div className="max-h-64 overflow-y-auto">
-                      {searchResults.map((result) => (
-                        <button
-                          key={`${result.type}-${result.id}`}
-                          onClick={() => {
-                            setSearchQuery(result.name);
-                            setShowResults(false);
-                            try {
-                              window.dispatchEvent(
-                                new Event("insidekhi:closeDiscovery"),
-                              );
-                            } catch {
-                              /* ignore */
-                            }
-                            try {
-                              router.push(getResultUrl(result));
-                            } catch {
-                              window.location.href = getResultUrl(result);
-                            }
-                          }}
-                          className="w-full px-4 py-3 text-left hover:bg-primary/5 dark:hover:bg-primary/10 transition-colors duration-200 border-b border-border/20 last:border-b-0"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className="flex-shrink-0">
-                              {result.type === "listing" && (
-                                <MapPin className="h-4 w-4 text-primary" />
-                              )}
-                              {result.type === "category" && (
-                                <Search className="h-4 w-4 text-primary" />
-                              )}
-                              {result.type === "event" && (
-                                <Calendar className="h-4 w-4 text-primary" />
-                              )}
-                              {result.type === "post" && (
-                                <Search className="h-4 w-4 text-primary" />
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm font-medium text-foreground">
-                                {result.name}
+                    <div className="max-h-72 overflow-y-auto">
+                      {searchResults.map((result) => {
+                        const distance = formatDistance(
+                          result.distance_meters,
+                        );
+                        return (
+                          <button
+                            key={`${result.type}-${result.id}`}
+                            onClick={() => {
+                              setSearchQuery(result.name);
+                              setShowResults(false);
+                              try {
+                                window.dispatchEvent(
+                                  new Event("insidekhi:closeDiscovery"),
+                                );
+                              } catch {
+                                /* ignore */
+                              }
+                              try {
+                                router.push(getResultUrl(result));
+                              } catch {
+                                window.location.href = getResultUrl(result);
+                              }
+                            }}
+                            className="w-full px-4 py-3 text-left hover:bg-primary/5 dark:hover:bg-primary/10 transition-colors duration-200 border-b border-border/20 last:border-b-0"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="flex-shrink-0">
+                                {result.type === "listing" && (
+                                  <MapPin className="h-4 w-4 text-primary" />
+                                )}
+                                {result.type === "category" && (
+                                  <Search className="h-4 w-4 text-primary" />
+                                )}
+                                {result.type === "event" && (
+                                  <Calendar className="h-4 w-4 text-primary" />
+                                )}
+                                {result.type === "post" && (
+                                  <Search className="h-4 w-4 text-primary" />
+                                )}
                               </div>
-                              {result.category && (
-                                <div className="text-xs text-muted-foreground">
-                                  {result.category}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="text-sm font-medium text-foreground truncate">
+                                    {result.name}
+                                  </div>
+                                  {result.avg_rating != null &&
+                                    result.avg_rating > 0 && (
+                                      <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground flex-shrink-0">
+                                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                                        {result.avg_rating.toFixed(1)}
+                                      </span>
+                                    )}
+                                  {distance && (
+                                    <span className="text-xs text-muted-foreground flex-shrink-0">
+                                      {distance}
+                                    </span>
+                                  )}
                                 </div>
-                              )}
-                              {result.address && (
-                                <div className="text-xs text-muted-foreground">
-                                  {result.address}
-                                </div>
-                              )}
-                              {result.description && (
-                                <div className="text-xs text-muted-foreground truncate">
-                                  {result.description}
-                                </div>
-                              )}
+                                {result.category && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {result.category}
+                                  </div>
+                                )}
+                                {result.address && (
+                                  <div className="text-xs text-muted-foreground truncate">
+                                    {result.address}
+                                  </div>
+                                )}
+                                {result.description && (
+                                  <div className="text-xs text-muted-foreground truncate">
+                                    {result.description}
+                                  </div>
+                                )}
+                              </div>
+                              <ArrowRight className="h-3 w-3 text-muted-foreground" />
                             </div>
-                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                          </div>
-                        </button>
-                      ))}
+                          </button>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="p-4 text-center text-muted-foreground">
@@ -355,7 +433,6 @@ export function PremiumHomepageHero() {
             </AnimatePresence>,
             document.body,
           )}
-
       </div>
     </HeroSectionStatic>
   );

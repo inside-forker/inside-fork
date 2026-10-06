@@ -11,7 +11,9 @@ import { formatStat } from "@/lib/homepage/platform-stats";
 
 /** Neighbourhood shortcuts as a full-width row of cards, each with its place count. */
 export async function AreasSection() {
-  const counts = await getAreaPlaceCounts(HOMEPAGE_AREAS);
+  const counts = await getAreaPlaceCounts(
+    HOMEPAGE_AREAS.map((a) => a.label),
+  );
 
   return (
     <section className={sectionClass}>
@@ -22,16 +24,16 @@ export async function AreasSection() {
         />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {HOMEPAGE_AREAS.map((area) => {
-            const places = counts[area];
+            const places = counts[area.label];
             return (
               <Link
-                key={area}
-                href={areaHref(area)}
+                key={area.label}
+                href={areaHref(area.label)}
                 className="group flex items-start justify-between gap-2 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/40 active:opacity-80"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground group-hover:text-primary sm:text-base">
-                    {area}
+                    {area.label}
                   </p>
                   {places ? (
                     <p className="mt-0.5 text-xs text-muted-foreground">
