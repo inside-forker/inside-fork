@@ -223,8 +223,16 @@ export function resolveCardMatches(
     }
   }
 
-  // 4) Still empty — surface bank for display; For You matches any card at bank
+  // 4) Still empty after resolve attempts.
+  // True bank-level deals (no Peekaboo typeIds / associations) stay bank-wide.
+  // Card-specific refs that failed to map must NOT fall open to every card at
+  // the bank — that stamped one saved card onto multiple discount tiers.
   if (matches.length === 0 && bankId != null && Number.isFinite(bankId)) {
+    const hadSpecificRefs =
+      variantIds.length > 0 || associations.length > 0;
+    if (hadSpecificRefs) {
+      return { matches: [], matchByBank: false };
+    }
     matches.push({
       cardVariantId: 0,
       bankId,

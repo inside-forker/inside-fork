@@ -16,6 +16,12 @@ import {
 import { isRestaurantCategory } from "@/lib/utils/category-helpers";
 import { getListingCategoryIds } from "@/lib/listings/sync-listing-categories";
 import { resolveListingHeaderImage } from "@/lib/mobile/listing-covers";
+import {
+  normalizeCardName,
+  resolveCardMatches,
+  type CardVariantLookup,
+  type DealFeedRow,
+} from "@/lib/mobile/deals-feed";
 
 export const dynamic = "force-dynamic";
 
@@ -112,7 +118,7 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
       : Promise.resolve({ rows: [] as Array<Record<string, unknown>> }),
     query(
       `SELECT d.id, d.title, d.description, d.discount_value, d.deal_type, d.end_date,
-              d.bank_id, d.valid_card_variants,
+              d.bank_id, d.valid_card_variants, d.metadata,
               b.name AS bank_name, b.logo_url AS bank_logo_url
        FROM deals d
        LEFT JOIN banks b ON b.id = d.bank_id
@@ -252,28 +258,105 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
     end_date: Date | string | null;
     bank_id: number | string | null;
     valid_card_variants: number[] | null;
+    metadata: unknown;
     bank_name: string | null;
     bank_logo_url: string | null;
   }>;
 
-  const deals = dealsRows.map((deal) => ({
-    id: Number(deal.id),
-    title: deal.title,
-    description: deal.description,
-    discount_value: deal.discount_value,
-    deal_type: deal.deal_type,
-    end_date:
-      deal.end_date instanceof Date
-        ? deal.end_date.toISOString()
-        : deal.end_date,
-    bank_id: deal.bank_id != null ? Number(deal.bank_id) : null,
-    valid_card_variants: Array.isArray(deal.valid_card_variants)
+  // Peekaboo stores foreign typeIds in valid_card_variants. Resolve to local
+  // card_variants.id (same path as the deals feed) so the listing sheet can
+  // exact-match the user's saved cards instead of falling back bank-wide.
+  const cardById = new Map<number, CardVariantLookup>();
+  const cardsByBankName = new Map<string, CardVariantLookup>();
+  if (dealsRows.length > 0) {
+    try {
+      const { rows: cardRows } = await query(
+        `SELECT id, bank_id, card_name
+         FROM card_variants
+         WHERE is_active = true`,
+      );
+      for (const c of cardRows) {
+        const id = Number(c.id);
+        const lookup: CardVariantLookup = {
+          id,
+          bankId: Number(c.bank_id),
+          label: String(c.card_name ?? "Card"),
+        };
+        cardById.set(id, lookup);
+        cardsByBankName.set(
+          `${lookup.bankId}::${normalizeCardName(lookup.label)}`,
+          lookup,
+        );
+      }
+    } catch (error) {
+      console.error(
+        "[mobile-api] listing deals card_variants lookup failed:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  const deals = dealsRows.map((deal) => {
+    const rawVariants = Array.isArray(deal.valid_card_variants)
       ? deal.valid_card_variants.map(Number).filter((n) => Number.isFinite(n))
-      : [],
-    bank: deal.bank_name
-      ? { name: deal.bank_name, logo_url: deal.bank_logo_url }
-      : null,
-  }));
+      : [];
+
+    const feedRow = {
+      id: deal.id,
+      title: deal.title,
+      description: deal.description,
+      discount_value: deal.discount_value,
+      bank_id: deal.bank_id,
+      bank_name: deal.bank_name,
+      valid_card_variants: rawVariants,
+      metadata: deal.metadata,
+      end_date: deal.end_date,
+      merchant: null,
+      listing_slug: null,
+      latitude: null,
+      longitude: null,
+      category_name: null,
+      address: null,
+      category_slug: null,
+    } satisfies DealFeedRow;
+
+    const { matches, matchByBank } = resolveCardMatches(
+      feedRow,
+      cardById,
+      cardsByBankName,
+    );
+
+    // Bank-wide deals keep an empty list (any card at the bank unlocks).
+    // Specific products become local ids so RN matchSavedCard can exact-match.
+    // If Peekaboo refs existed but nothing resolved to a local product, keep
+    // the foreign ids (non-empty) so the client treats the deal as other-card
+    // instead of bank-wide "yours".
+    const localIds = matches
+      .map((m) => m.cardVariantId)
+      .filter((id) => id > 0);
+    const resolvedVariants = matchByBank
+      ? []
+      : localIds.length > 0
+        ? localIds
+        : rawVariants;
+
+    return {
+      id: Number(deal.id),
+      title: deal.title,
+      description: deal.description,
+      discount_value: deal.discount_value,
+      deal_type: deal.deal_type,
+      end_date:
+        deal.end_date instanceof Date
+          ? deal.end_date.toISOString()
+          : deal.end_date,
+      bank_id: deal.bank_id != null ? Number(deal.bank_id) : null,
+      valid_card_variants: resolvedVariants,
+      bank: deal.bank_name
+        ? { name: deal.bank_name, logo_url: deal.bank_logo_url }
+        : null,
+    };
+  });
 
   const openingHours = (
     hoursRes.rows as Array<{
