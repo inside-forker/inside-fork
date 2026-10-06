@@ -4,7 +4,7 @@ import * as React from "react";
 import { AnimatePresence } from "framer-motion";
 import { useScroll } from "@/lib/context/scroll-context";
 import { BottomNav } from "./BottomNav";
-import { FullScreenNav } from "./FullScreenNav";
+import { PremiumSidebar } from "@/components/dashboard/PremiumSidebar";
 import { FloatingActionButton } from "./FloatingActionButton";
 import { User } from "@supabase/supabase-js";
 
@@ -16,7 +16,12 @@ type NavItem = {
 };
 
 interface ProfileShape {
+  id: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  points?: number | null;
   role?: string;
+  active_role?: string;
 }
 
 interface MobileNavProps {
@@ -27,8 +32,8 @@ interface MobileNavProps {
 }
 
 export function MobileNav({
-  categoryNavItems,
-  simpleNavLinks,
+  categoryNavItems: _categoryNavItems,
+  simpleNavLinks: _simpleNavLinks,
   user,
   profile,
 }: MobileNavProps) {
@@ -85,16 +90,20 @@ export function MobileNav({
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {isMenuOpen && (
-          <FullScreenNav
-            categoryNavItems={categoryNavItems}
-            simpleNavLinks={simpleNavLinks}
-            onClose={closeMenu}
-            user={user}
-          />
-        )}
-      </AnimatePresence>
+      <PremiumSidebar
+        isOpen={isMenuOpen}
+        onClose={closeMenu}
+        user={user}
+        profile={profile}
+      />
+
+      {/* Backdrop for mobile */}
+      {isMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 lg:hidden"
+          onClick={closeMenu}
+        />
+      )}
     </>
   );
 }

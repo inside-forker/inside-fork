@@ -17,6 +17,7 @@ import {
   Sparkles,
   PenSquare,
   LogOut,
+  LogIn,
   ChevronRight,
 } from "lucide-react";
 import {
@@ -64,8 +65,8 @@ interface SidebarUser {
 interface PremiumSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  user: SidebarUser;
-  profile: ProfileShape | null;
+  user?: SidebarUser | { id: string; email?: string } | null;
+  profile?: ProfileShape | null;
   stats?: SidebarStats;
   loadingStats?: boolean;
 }
@@ -75,15 +76,67 @@ export function PremiumSidebar({
   onClose,
   user,
   profile,
-  stats = {},
-  loadingStats = false,
+  stats,
+  loadingStats,
 }: PremiumSidebarProps) {
   const pathname = usePathname();
   const { user: roleUser, switchRole } = useRole();
   const [isSwitching, setIsSwitching] = React.useState(false);
 
+  // Auto-fetch stats if not provided by parent
+  const [internalStats, setInternalStats] = React.useState<SidebarStats>(stats || {});
+  const [internalLoadingStats, setInternalLoadingStats] = React.useState<boolean>(
+    loadingStats ?? true,
+  );
+
+  React.useEffect(() => {
+    if (stats && Object.keys(stats).length > 0) {
+      setInternalStats(stats);
+      setInternalLoadingStats(loadingStats ?? false);
+      return;
+    }
+
+    if (!user?.id || !isOpen) {
+      setInternalLoadingStats(false);
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      const cached = sessionStorage.getItem("sidebar_stats");
+      if (cached) {
+        try {
+          setInternalStats(JSON.parse(cached));
+          setInternalLoadingStats(false);
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+
+    const fetchStats = async () => {
+      try {
+        const response = await fetch("/api/dashboard/sidebar-stats");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.stats) {
+            setInternalStats(data.stats);
+            if (typeof window !== "undefined") {
+              sessionStorage.setItem("sidebar_stats", JSON.stringify(data.stats));
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch sidebar stats:", error);
+      } finally {
+        setInternalLoadingStats(false);
+      }
+    };
+
+    fetchStats();
+  }, [stats, loadingStats, user?.id, isOpen]);
+
   // Use active_role for navigation and display
-  const activeRole = (profile?.active_role || profile?.role) as string;
+  const activeRole = (profile?.active_role || profile?.role || "public_user") as string;
   const permanentRole = profile?.role as string;
   const canSwitchRoles = roleUser?.canSwitchRoles || false;
 
@@ -97,6 +150,7 @@ export function PremiumSidebar({
 
   // Only fetch gamification data for regular users
   const shouldShowGamification =
+    Boolean(user?.id) &&
     !isAdmin &&
     !isLister &&
     !isDataEntry &&
@@ -104,7 +158,7 @@ export function PremiumSidebar({
     !isBusinessOwner &&
     !isWriter;
   const { xpTotal, rank } = useUserGamification(
-    shouldShowGamification ? user.id : "",
+    shouldShowGamification && user?.id ? user.id : "",
   );
 
   // Calculate progress to next rank - show current rank dynamically
@@ -236,14 +290,14 @@ export function PremiumSidebar({
     <AnimatePresence>
       {isOpen && (
         <motion.aside
-          initial={{ x: -320, opacity: 0 }}
+          initial={{ x: 320, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
-          exit={{ x: -320, opacity: 0 }}
+          exit={{ x: 320, opacity: 0 }}
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          className="fixed left-0 top-20 bottom-0 z-40 w-80 lg:w-80"
+          className="fixed right-0 top-20 bottom-0 z-40 w-80 lg:w-80"
           data-user-id={_userId}
         >
-          <div className="h-full bg-background/95 backdrop-blur-xl border-r border-border/50 shadow-premium-lg flex flex-col">
+          <div className="h-full bg-background/95 backdrop-blur-xl border-l border-border/50 shadow-premium-lg flex flex-col">
             {/* User Profile Section - Fixed */}
             <div className="flex-shrink-0 p-6 border-b border-border/50">
               <motion.div
@@ -289,38 +343,42 @@ export function PremiumSidebar({
                     </div>
                     <div>
                       <h3 className="font-bold text-foreground">
-                        {activeRole === "public_user"
-                          ? currentRankDisplay || "Explorer"
-                          : isAdmin
-                            ? "Administrator"
-                            : isLister
-                              ? "Content Manager"
-                              : isDataEntry
-                                ? "Data Entry"
-                                : isOrganizer
-                                  ? "Event Organizer"
-                                  : isBusinessOwner
-                                    ? "Business Owner"
-                                    : isWriter
-                                      ? "Writer"
-                                      : currentRankDisplay || "Unranked"}
+                        {!user
+                          ? "Guest Explorer"
+                          : activeRole === "public_user"
+                            ? currentRankDisplay || "Explorer"
+                            : isAdmin
+                              ? "Administrator"
+                              : isLister
+                                ? "Content Manager"
+                                : isDataEntry
+                                  ? "Data Entry"
+                                  : isOrganizer
+                                    ? "Event Organizer"
+                                    : isBusinessOwner
+                                      ? "Business Owner"
+                                      : isWriter
+                                        ? "Writer"
+                                        : currentRankDisplay || "Unranked"}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        {activeRole === "public_user"
-                          ? `${xpTotal || profile?.points || 0} XP`
-                          : isAdmin
-                            ? "Staff Account"
-                            : isLister
-                              ? "Lister Account"
-                              : isDataEntry
-                                ? "Listing Capacity"
-                                : isOrganizer
-                                  ? "Organizer Account"
-                                  : isBusinessOwner
-                                    ? "Business Account"
-                                    : isWriter
-                                      ? "Writer Account"
-                                      : `${xpTotal || profile?.points || 0} XP`}
+                        {!user
+                          ? "Sign in to earn XP & track visits"
+                          : activeRole === "public_user"
+                            ? `${xpTotal || profile?.points || 0} XP`
+                            : isAdmin
+                              ? "Staff Account"
+                              : isLister
+                                ? "Lister Account"
+                                : isDataEntry
+                                  ? "Listing Capacity"
+                                  : isOrganizer
+                                    ? "Organizer Account"
+                                    : isBusinessOwner
+                                      ? "Business Account"
+                                      : isWriter
+                                        ? "Writer Account"
+                                        : `${xpTotal || profile?.points || 0} XP`}
                       </p>
                     </div>
                   </div>
@@ -387,7 +445,7 @@ export function PremiumSidebar({
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-3 gap-3">
-                  {loadingStats ? (
+                  {internalLoadingStats ? (
                     // Loading skeleton
                     <>
                       <div className="text-center p-3 rounded-xl bg-accent/30 animate-pulse">
@@ -408,19 +466,19 @@ export function PremiumSidebar({
                     <>
                       <div className="text-center p-3 rounded-xl bg-accent/30">
                         <p className="text-lg font-bold text-foreground">
-                          {stats.users || 0}
+                          {internalStats.users || 0}
                         </p>
                         <p className="text-xs text-muted-foreground">Users</p>
                       </div>
                       <div className="text-center p-3 rounded-xl bg-accent/30">
                         <p className="text-lg font-bold text-foreground">
-                          {stats.events || 0}
+                          {internalStats.events || 0}
                         </p>
                         <p className="text-xs text-muted-foreground">Events</p>
                       </div>
                       <div className="text-center p-3 rounded-xl bg-accent/30">
                         <p className="text-lg font-bold text-foreground">
-                          {stats.listings || 0}
+                          {internalStats.listings || 0}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Listings
@@ -432,7 +490,7 @@ export function PremiumSidebar({
                     <>
                       <div className="text-center p-3 rounded-xl bg-accent/30">
                         <p className="text-lg font-bold text-foreground">
-                          {stats.listings || 0}
+                          {internalStats.listings || 0}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Listings
@@ -440,13 +498,13 @@ export function PremiumSidebar({
                       </div>
                       <div className="text-center p-3 rounded-xl bg-accent/30">
                         <p className="text-lg font-bold text-foreground">
-                          {stats.events || 0}
+                          {internalStats.events || 0}
                         </p>
                         <p className="text-xs text-muted-foreground">Events</p>
                       </div>
                       <div className="text-center p-3 rounded-xl bg-accent/30">
                         <p className="text-lg font-bold text-foreground">
-                          {stats.reviews || 0}
+                          {internalStats.reviews || 0}
                         </p>
                         <p className="text-xs text-muted-foreground">Reviews</p>
                       </div>
@@ -456,7 +514,7 @@ export function PremiumSidebar({
                     <>
                       <div className="text-center p-3 rounded-xl bg-accent/30">
                         <p className="text-lg font-bold text-foreground">
-                          {stats.listings || 0}
+                          {internalStats.listings || 0}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Listings
@@ -464,13 +522,13 @@ export function PremiumSidebar({
                       </div>
                       <div className="text-center p-3 rounded-xl bg-accent/30">
                         <p className="text-lg font-bold text-foreground">
-                          {stats.reviews || 0}
+                          {internalStats.reviews || 0}
                         </p>
                         <p className="text-xs text-muted-foreground">Reviews</p>
                       </div>
                       <div className="text-center p-3 rounded-xl bg-accent/30">
                         <p className="text-lg font-bold text-foreground">
-                          {stats.bookings || 0}
+                          {internalStats.bookings || 0}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Bookings
@@ -482,13 +540,13 @@ export function PremiumSidebar({
                     <>
                       <div className="text-center p-3 rounded-xl bg-accent/30">
                         <p className="text-lg font-bold text-foreground">
-                          {stats.reviews || 0}
+                          {internalStats.reviews || 0}
                         </p>
                         <p className="text-xs text-muted-foreground">Reviews</p>
                       </div>
                       <div className="text-center p-3 rounded-xl bg-accent/30">
                         <p className="text-lg font-bold text-foreground">
-                          {stats.bookings || 0}
+                          {internalStats.bookings || 0}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Bookings
@@ -496,7 +554,7 @@ export function PremiumSidebar({
                       </div>
                       <div className="text-center p-3 rounded-xl bg-accent/30">
                         <p className="text-lg font-bold text-foreground">
-                          {stats.favorites || 0}
+                          {internalStats.favorites || 0}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Favorites
@@ -732,16 +790,30 @@ export function PremiumSidebar({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
               >
-                <Button
-                  onClick={handleSignOut}
-                  variant="ghost"
-                  className="w-full justify-start gap-3 rounded-xl px-3 h-10 text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all duration-300"
-                >
-                  <div className="flex h-5 w-5 items-center justify-center rounded-md">
-                    <LogOut className="h-4 w-4" />
-                  </div>
-                  <span>Sign Out</span>
-                </Button>
+                {user ? (
+                  <Button
+                    onClick={handleSignOut}
+                    variant="ghost"
+                    className="w-full justify-start gap-3 rounded-xl px-3 h-10 text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all duration-300"
+                  >
+                    <div className="flex h-5 w-5 items-center justify-center rounded-md">
+                      <LogOut className="h-4 w-4" />
+                    </div>
+                    <span>Sign Out</span>
+                  </Button>
+                ) : (
+                  <Link href="/login" onClick={onClose} className="block w-full">
+                    <Button
+                      variant="default"
+                      className="w-full justify-start gap-3 rounded-xl px-3 h-10 text-sm font-medium transition-all duration-300 shadow-md shadow-primary/25"
+                    >
+                      <div className="flex h-5 w-5 items-center justify-center rounded-md">
+                        <LogIn className="h-4 w-4" />
+                      </div>
+                      <span>Sign In</span>
+                    </Button>
+                  </Link>
+                )}
               </motion.div>
             </div>
           </div>

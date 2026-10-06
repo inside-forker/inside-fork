@@ -110,7 +110,7 @@ export function PremiumDashboardLayout({
         className={cn(
           "relative z-10 transition-all duration-500 ease-out",
           "pt-20 pb-24 lg:pb-8 min-h-screen",
-          sidebarOpen ? "lg:ml-80" : "lg:ml-0",
+          sidebarOpen ? "lg:mr-80" : "lg:mr-0",
         )}
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
