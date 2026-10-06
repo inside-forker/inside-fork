@@ -567,7 +567,7 @@ export function PremiumSidebar({
             </div>
 
             {/* Navigation - Scrollable */}
-            <div className="flex-1 overflow-y-auto py-6 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent min-h-0">
+            <div className="flex-1 overflow-y-auto py-6 pb-28 md:pb-6 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent min-h-0">
               {/* Main Navigation */}
               <div className="px-6 mb-8">
                 <div className="space-y-2">
@@ -733,6 +733,47 @@ export function PremiumSidebar({
                       </motion.div>
                     );
                   })}
+
+                  {/* Direct Sign Out / Sign In inside Account section */}
+                  {user ? (
+                    <motion.div
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{
+                        delay: 0.3 + dynamicSecondaryNavigation.length * 0.05,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={handleSignOut}
+                        className="w-full group flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-300 text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:scale-[1.02] text-left cursor-pointer"
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-300 bg-red-500/10 text-red-600 dark:text-red-400 group-hover:bg-red-500/20">
+                          <LogOut className="h-4 w-4" />
+                        </div>
+                        <span className="flex-1">Sign Out</span>
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{
+                        delay: 0.3 + dynamicSecondaryNavigation.length * 0.05,
+                      }}
+                    >
+                      <Link
+                        href="/login"
+                        onClick={onClose}
+                        className="group flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-300 bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:opacity-95"
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 text-primary-foreground">
+                          <LogIn className="h-4 w-4" />
+                        </div>
+                        <span className="flex-1">Sign In</span>
+                      </Link>
+                    </motion.div>
+                  )}
                 </div>
               </div>
             </div>

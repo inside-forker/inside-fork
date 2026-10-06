@@ -132,43 +132,8 @@ export function PremiumHeader({
               )}
             {/* Notification Bell for all logged-in users */}
             {user && <NotificationBell variant="mobile" />}
-            {/* User Authentication Section - Mobile */}
-            {user ? (
-              /* Authenticated User - Mobile */
-              <div className="relative">
-                <div
-                  onClick={handleAvatarClick}
-                  className={cn(
-                    "flex items-center justify-center cursor-pointer",
-                    "w-12 h-12 rounded-2xl transition-all duration-300",
-                    "bg-background/95 backdrop-blur-xl border border-border/50",
-                    "shadow-xl shadow-black/10 dark:shadow-black/30",
-                    "hover:shadow-2xl hover:shadow-primary/20",
-                    "hover:scale-105 active:scale-95",
-                    sidebarOpen &&
-                      "bg-primary/10 border-primary/30 ring-2 ring-primary/20",
-                  )}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl" />
-                  <Avatar
-                    className={cn(
-                      "relative z-10 h-8 w-8 ring-2 shadow-sm transition-all duration-300",
-                      sidebarOpen
-                        ? "ring-primary/60 shadow-primary/25"
-                        : "ring-primary/30",
-                    )}
-                  >
-                    <AvatarImage src={profile?.avatar_url || undefined} />
-                    <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-sm">
-                      {profile?.full_name?.charAt(0) ||
-                        user?.email?.charAt(0).toUpperCase() ||
-                        "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
-              </div>
-            ) : (
-              /* Unauthenticated User - Mobile Login/Join */
+            {/* Unauthenticated User - Mobile Login/Join */}
+            {!user && (
               <div className="flex items-center space-x-2">
                 <Button
                   asChild
