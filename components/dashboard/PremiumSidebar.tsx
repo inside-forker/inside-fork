@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuthLinks } from "@/lib/auth/return-to";
 import { Button } from "@/components/ui/button";
 import { useUserGamification } from "@/hooks/useUserGamification";
 import { useRole } from "@/lib/context/RoleContext";
@@ -80,6 +81,7 @@ export function PremiumSidebar({
   loadingStats,
 }: PremiumSidebarProps) {
   const pathname = usePathname();
+  const { loginHref } = useAuthLinks();
   const { user: roleUser, switchRole } = useRole();
   const [isSwitching, setIsSwitching] = React.useState(false);
 
@@ -763,7 +765,7 @@ export function PremiumSidebar({
                       }}
                     >
                       <Link
-                        href="/login"
+                        href={loginHref}
                         onClick={onClose}
                         className="group flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-300 bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:opacity-95"
                       >
@@ -843,7 +845,7 @@ export function PremiumSidebar({
                     <span>Sign Out</span>
                   </Button>
                 ) : (
-                  <Link href="/login" onClick={onClose} className="block w-full">
+                  <Link href={loginHref} onClick={onClose} className="block w-full">
                     <Button
                       variant="default"
                       className="w-full justify-start gap-3 rounded-xl px-3 h-10 text-sm font-medium transition-all duration-300 shadow-md shadow-primary/25"

@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuthLinks } from "@/lib/auth/return-to";
 import {
   Home,
   Calendar,
@@ -31,6 +32,7 @@ interface BottomNavProps {
 
 export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
   const pathname = usePathname();
+  const { loginHref } = useAuthLinks();
 
   // Smart navigation based on user state and current page
   const navLinks = [
@@ -39,7 +41,7 @@ export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
     // Always show Dashboard for logged-in users on public pages
     user
       ? { href: "/dashboard", label: "Dashboard", icon: BarChart3 }
-      : { href: "/login", label: "Sign In", icon: LogIn },
+      : { href: loginHref, label: "Sign In", icon: LogIn },
   ];
 
   return (
