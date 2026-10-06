@@ -7,15 +7,19 @@ import {
   Home,
   Calendar,
   Ticket,
-  LayoutGrid,
   LogIn,
   BarChart3,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { User as SupabaseUser } from "@supabase/supabase-js";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface ProfileShape {
+  id?: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
   role?: string;
 }
 
@@ -25,7 +29,7 @@ interface BottomNavProps {
   profile?: ProfileShape | null;
 }
 
-export function BottomNav({ onMenuOpen, user }: BottomNavProps) {
+export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
   const pathname = usePathname();
 
   // Smart navigation based on user state and current page
@@ -232,7 +236,7 @@ export function BottomNav({ onMenuOpen, user }: BottomNavProps) {
               );
             })()}
 
-            {/* Menu Button */}
+            {/* Profile Button */}
             <div className="relative z-10 flex h-full flex-col items-center justify-center gap-1 text-xs group">
               <motion.button
                 whileTap={{ scale: 0.9 }}
@@ -243,11 +247,19 @@ export function BottomNav({ onMenuOpen, user }: BottomNavProps) {
                 onClick={onMenuOpen}
                 className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200 group-hover:bg-primary/10"
               >
-                <div className="p-1.5 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-lg shadow-primary/25 group-hover:from-primary/30 group-hover:to-primary/20 transition-all duration-200">
-                  <LayoutGrid className="h-4 w-4 text-primary" />
+                <div className="p-0.5 rounded-full ring-2 ring-primary/30 group-hover:ring-primary transition-all duration-200 shadow-sm">
+                  <Avatar className="h-5 w-5">
+                    <AvatarImage src={profile?.avatar_url || undefined} />
+                    <AvatarFallback className="bg-primary/20 text-primary font-semibold text-[10px]">
+                      {profile?.full_name?.charAt(0) ||
+                        user?.email?.charAt(0).toUpperCase() || (
+                          <User className="h-3 w-3 text-primary" />
+                        )}
+                    </AvatarFallback>
+                  </Avatar>
                 </div>
                 <span className="font-medium text-primary group-hover:text-primary/80 transition-colors duration-200 text-xs">
-                  Menu
+                  Profile
                 </span>
               </motion.button>
             </div>
