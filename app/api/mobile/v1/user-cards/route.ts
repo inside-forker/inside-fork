@@ -48,7 +48,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const { user } = await requireMobileUser(request);
 
   const { rows } = await query(
-    `${CARD_SELECT} WHERE uc.user_id = $1 ORDER BY uc.is_primary DESC, uc.created_at ASC`,
+    `${CARD_SELECT} WHERE uc.user_id = $1 ORDER BY uc.created_at ASC`,
     [user.id],
   );
 
