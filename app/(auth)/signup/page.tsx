@@ -23,6 +23,7 @@ import { AuthBackground } from "@/components/auth/AuthBackground";
 import { AuthFormPanel, WelcomePanel } from "@/components/auth/GlassPanel";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { AppleSignInButton } from "@/components/auth/AppleSignInButton";
+import { safeNextPath } from "@/lib/auth/return-to";
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useRecaptcha } from "@/hooks/useRecaptcha";
@@ -31,6 +32,8 @@ import { SignupRequest, UsernameCheckResponse } from "@/types/auth.types";
 function SignupContent() {
   const searchParams = useSearchParams();
   const inviteCode = searchParams.get("invite");
+  // Where to land after verifying (e.g. back to an event from the Parchi app).
+  const next = safeNextPath(searchParams.get("next"));
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -253,7 +256,10 @@ function SignupContent() {
           ? "Check your email for a verification code."
           : "Welcome to Inside Karachi!",
       });
-      window.location.href = data.redirectTo;
+      window.location.href =
+        next && data.redirectTo
+          ? `${data.redirectTo}${data.redirectTo.includes("?") ? "&" : "?"}next=${encodeURIComponent(next)}`
+          : data.redirectTo;
     } catch (error) {
       console.error("Signup error:", error);
       setError("An unexpected error occurred. Please try again.");
@@ -665,6 +671,7 @@ function SignupContent() {
               >
                 <GoogleSignInButton
                   invite={inviteCode || undefined}
+                  next={next || undefined}
                   label="Sign up with Google"
                 />
               </motion.div>
@@ -678,6 +685,7 @@ function SignupContent() {
               >
                 <AppleSignInButton
                   invite={inviteCode || undefined}
+                  next={next || undefined}
                   label="Sign up with Apple"
                 />
               </motion.div>
@@ -692,7 +700,7 @@ function SignupContent() {
                 <p className="text-white/70 text-sm">
                   Already have an account?{" "}
                   <Link
-                    href="/login"
+                    href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}
                     className="text-white font-semibold hover:text-white/80 transition-colors underline"
                   >
                     Sign in

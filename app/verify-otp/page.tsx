@@ -12,12 +12,15 @@ import { AlertCircle, ArrowLeft, Loader2, ArrowRight } from "lucide-react";
 import { AuthBackground } from "@/components/auth/AuthBackground";
 import { AuthFormPanel, WelcomePanel } from "@/components/auth/GlassPanel";
 import { useToast } from "@/hooks/use-toast";
+import { safeNextPath } from "@/lib/auth/return-to";
 
 function VerifyOtpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const email = searchParams.get("email") || "";
+  // Set by signup when the visitor started from a page (e.g. an event).
+  const next = safeNextPath(searchParams.get("next"));
 
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +50,7 @@ function VerifyOtpContent() {
         title: "Email Verified",
         description: "Welcome to Inside Karachi!",
       });
-      window.location.href = data.redirectTo || "/dashboard";
+      window.location.href = next || data.redirectTo || "/dashboard";
     } catch {
       setError("An unexpected error occurred. Please try again.");
       setIsLoading(false);
