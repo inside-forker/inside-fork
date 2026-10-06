@@ -46,6 +46,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
      FROM coupons
      WHERE code = $1
        AND is_active = true
+       AND requires_parchi = false
        AND (event_id IS NULL OR event_id = $2)
        AND (starts_at IS NULL OR starts_at <= NOW())
        AND (ends_at IS NULL OR ends_at >= NOW())`,

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { query } from "@/lib/db";
 import { MobileApiError } from "@/lib/mobile/errors";
 import { resolveAssignedGateIndex } from "@/lib/ticketing/resolve-gate-assignment";
+import { scheduleParchiRedemptionReport } from "@/lib/parchi/service";
 
 /**
  * Confirming a booking without a PayFast round trip.
@@ -134,6 +135,12 @@ export async function confirmBookingWithoutPayment(
     `UPDATE bookings SET payment_status = 'paid', status = 'confirmed' WHERE id = $1`,
     [bookingId],
   );
+
+  // A discount that brought the total to zero is still a redeemed Parchi
+  // discount. The review-time skip switch is not a real payment - don't report.
+  if (reason === "free_order") {
+    scheduleParchiRedemptionReport(bookingId, "/api/mobile/v1/checkout");
+  }
 
   await query(
     `UPDATE payments

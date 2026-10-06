@@ -29,7 +29,7 @@ import {
   type ListingImageDTO,
 } from "@/lib/mobile/mappers";
 
-const OPEN_NOW_CATEGORY_SLUG = "fast-food-street-food";
+const OPEN_NOW_CATEGORY_SLUG = "food-drinks";
 const OPEN_NOW_LIMIT = 12;
 const SPINE_LIMIT = 6;
 const FOR_YOU_LIMIT = 8;

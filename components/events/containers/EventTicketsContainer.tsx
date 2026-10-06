@@ -2,13 +2,16 @@
 import { query } from "@/lib/db";
 import { EventTicketSection } from "@/components/events/EventTicketSection";
 import { Event } from "@/types/events.types";
+import type { ParchiOffer } from "@/lib/parchi/discount";
 
 interface EventTicketsContainerProps {
     event: Event;
+    parchiOffer?: ParchiOffer | null;
 }
 
 export async function EventTicketsContainer({
     event,
+    parchiOffer,
 }: EventTicketsContainerProps) {
     const { rows } = await query(
         `SELECT * FROM ticket_types WHERE event_id = $1 ORDER BY price ASC`,
@@ -33,6 +36,10 @@ export async function EventTicketsContainer({
     }));
 
     return (
-        <EventTicketSection event={event} ticketTypes={ticketTypes} />
+        <EventTicketSection
+            event={event}
+            ticketTypes={ticketTypes}
+            parchiOffer={parchiOffer}
+        />
     );
 }
