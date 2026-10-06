@@ -1,5 +1,4 @@
 import {
-  LayoutDashboard,
   MapPin,
   Calendar,
   Heart,
@@ -9,7 +8,6 @@ import {
   CreditCard,
   Settings,
   Bell,
-  Home,
   Shield,
   BarChart3,
   Users,
@@ -49,8 +47,6 @@ export interface RoleNavItem {
 
 // ---- Public user (default consumer role) ----
 export const publicUserNavigation: RoleNavItem[] = [
-  { name: "Home", href: "/", icon: Home, description: "Back to the homepage" },
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Your personal overview" },
   { name: "Scan QR", href: "/dashboard/scan", icon: ScanLine, description: "Check in with a QR code" },
   { name: "Explore", href: "/dashboard/explore", icon: MapPin, description: "Discover places nearby" },
   { name: "My Bookings", href: "/dashboard/bookings", icon: Calendar, description: "Manage your bookings" },
@@ -68,8 +64,6 @@ export const publicUserSecondaryNavigation: RoleNavItem[] = [
 
 // ---- Business owner ----
 export const businessOwnerNavigation: RoleNavItem[] = [
-  { name: "Home", href: "/", icon: Home, description: "Back to the homepage" },
-  { name: "Dashboard", href: "/dashboard/business", icon: LayoutDashboard, description: "Your business overview" },
   { name: "My Listings", href: "/dashboard/business/listings", icon: Store, description: "Manage your listings" },
   { name: "Redeem offers", href: "/dashboard/business/redemptions", icon: Ticket, description: "Validate guest offer codes" },
   { name: "Analytics", href: "/dashboard/business/analytics", icon: BarChart3, description: "Track your performance" },
@@ -85,8 +79,6 @@ export const businessOwnerSecondaryNavigation: RoleNavItem[] = [
 
 // ---- Writer ----
 export const writerNavigation: RoleNavItem[] = [
-  { name: "Home", href: "/", icon: Home, description: "Back to the homepage" },
-  { name: "Dashboard", href: "/dashboard/writer", icon: LayoutDashboard, description: "Your writer overview" },
   { name: "My Posts", href: "/dashboard/writer/blogs", icon: PenSquare, description: "Manage your posts" },
 ];
 
@@ -98,8 +90,6 @@ export const writerSecondaryNavigation: RoleNavItem[] = [
 
 // ---- Admin / Super admin (main + secondary) ----
 export const adminMainNavigation: RoleNavItem[] = [
-  { name: "Home", href: "/", icon: Home, description: "Back to the homepage" },
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Platform overview" },
   { name: "Scan QR", href: "/dashboard/scan", icon: ScanLine, description: "Check in with a QR code" },
 ];
 
@@ -142,8 +132,6 @@ export const adminNavigation: RoleNavItem[] = [
 
 // ---- Lister ----
 export const listerNavigation: RoleNavItem[] = [
-  { name: "Home", href: "/", icon: Home, description: "Back to the homepage" },
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Your content overview" },
   { name: "Scan QR", href: "/dashboard/scan", icon: ScanLine, description: "Check in with a QR code" },
   { name: "Listing Management", href: "/admin/listings", icon: MapPin, description: "Manage all listings" },
   { name: "Listing Approvals", href: "/admin/listings/approvals", icon: ClipboardCheck, description: "Review pending listings" },
@@ -174,8 +162,6 @@ export const dataEntrySecondaryNavigation: RoleNavItem[] = [];
 
 // ---- Organizer ----
 export const organizerMainNavigation: RoleNavItem[] = [
-  { name: "Home", href: "/", icon: Home, description: "Back to the homepage" },
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Your events overview" },
   { name: "My Events", href: "/dashboard/events", icon: Calendar, description: "Manage your events" },
   { name: "Gate & Device Hub", href: "/admin/accounts", icon: UserPlus, description: "Manage Gate Pass operators and device gate allocations" },
   { name: "Scan Tickets", href: "/dashboard/scan", icon: ScanLine, description: "Check in attendees" },
