@@ -10,7 +10,6 @@ import { motion } from "framer-motion";
 
 import { Search, Sparkles } from "lucide-react";
 import { ThemeAwareLogo } from "@/components/layout/ThemeAwareLogo";
-import { UserDropdown } from "@/components/layout/UserDropdown";
 import { NotificationBell } from "@/components/layout/notifications/NotificationBell";
 import { SecurityAlertsBadge } from "@/components/admin/SecurityAlertsBadge";
 import { useRouter } from "next/navigation";
@@ -51,6 +50,14 @@ export function PremiumHeader({
 }: PremiumHeaderProps) {
   const [isDiscoveryOpen, setIsDiscoveryOpen] = React.useState(false);
   const router = useRouter();
+
+  const handleAvatarClick = () => {
+    if (onMenuClick) {
+      onMenuClick();
+    } else if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("insidekhi:toggle-sidebar"));
+    }
+  };
 
   // Real-time search integration
   const {
@@ -125,61 +132,8 @@ export function PremiumHeader({
               )}
             {/* Notification Bell for all logged-in users */}
             {user && <NotificationBell variant="mobile" />}
-            {/* User Authentication Section - Mobile */}
-            {user ? (
-              /* Authenticated User - Mobile */
-              <div className="relative">
-                {context === "dashboard" ? (
-                  /* Dashboard: Avatar Button for Sidebar */
-                  <div
-                    onClick={onMenuClick}
-                    className={cn(
-                      "flex items-center justify-center cursor-pointer",
-                      "w-12 h-12 rounded-2xl transition-all duration-300",
-                      "bg-background/95 backdrop-blur-xl border border-border/50",
-                      "shadow-xl shadow-black/10 dark:shadow-black/30",
-                      "hover:shadow-2xl hover:shadow-primary/20",
-                      "hover:scale-105 active:scale-95",
-                      sidebarOpen &&
-                        "bg-primary/10 border-primary/30 ring-2 ring-primary/20",
-                    )}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl" />
-                    <Avatar
-                      className={cn(
-                        "relative z-10 h-8 w-8 ring-2 shadow-sm transition-all duration-300",
-                        sidebarOpen
-                          ? "ring-primary/60 shadow-primary/25"
-                          : "ring-primary/30",
-                      )}
-                    >
-                      <AvatarImage src={profile?.avatar_url || undefined} />
-                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-sm">
-                        {profile?.full_name?.charAt(0) ||
-                          user?.email?.charAt(0).toUpperCase() ||
-                          "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                ) : (
-                  /* Public Pages: Dropdown Menu */
-                  <UserDropdown
-                    user={user}
-                    profile={
-                      profile
-                        ? {
-                            full_name: profile.full_name,
-                            avatar_url: profile.avatar_url,
-                            role: profile.role,
-                            active_role: profile.active_role,
-                          }
-                        : null
-                    }
-                  />
-                )}
-              </div>
-            ) : (
-              /* Unauthenticated User - Mobile Login/Join */
+            {/* Unauthenticated User - Mobile Login/Join */}
+            {!user && (
               <div className="flex items-center space-x-2">
                 <Button
                   asChild
@@ -324,87 +278,72 @@ export function PremiumHeader({
               {user ? (
                 /* Authenticated User - Desktop */
                 <div className="relative">
-                  {context === "dashboard" ? (
-                    /* Dashboard: Clickable Profile Card for Sidebar */
-                    <div
-                      onClick={onMenuClick}
+                  {/* Clickable Profile Card for Sidebar */}
+                  <div
+                    onClick={handleAvatarClick}
+                    className={cn(
+                      "hidden md:flex items-center space-x-3 cursor-pointer p-2 pr-4 rounded-2xl transition-all duration-300",
+                      "bg-background/95 backdrop-blur-xl border border-border/50 hover:border-border/80",
+                      "shadow-md hover:shadow-lg backdrop-blur-sm hover:scale-[1.02]",
+                      "dark:bg-card/90 dark:border-border/70 dark:hover:border-border/90",
+                      "dark:shadow-lg dark:shadow-black/20",
+                      sidebarOpen &&
+                        "bg-primary/10 border-primary/30 ring-2 ring-primary/20",
+                    )}
+                  >
+                    <Avatar
                       className={cn(
-                        "hidden md:flex items-center space-x-3 cursor-pointer p-2 pr-4 rounded-2xl transition-all duration-300",
-                        "bg-background/95 backdrop-blur-xl border border-border/50 hover:border-border/80",
-                        "shadow-md hover:shadow-lg backdrop-blur-sm hover:scale-[1.02]",
-                        "dark:bg-card/90 dark:border-border/70 dark:hover:border-border/90",
-                        "dark:shadow-lg dark:shadow-black/20",
-                        sidebarOpen &&
-                          "bg-primary/10 border-primary/30 ring-2 ring-primary/20",
+                        "h-10 w-10 ring-1 shadow-sm transition-all duration-300",
+                        sidebarOpen
+                          ? "ring-primary/60 ring-2 shadow-primary/25"
+                          : "ring-border/40",
                       )}
                     >
-                      <Avatar
-                        className={cn(
-                          "h-10 w-10 ring-1 shadow-sm transition-all duration-300",
-                          sidebarOpen
-                            ? "ring-primary/60 ring-2 shadow-primary/25"
-                            : "ring-border/40",
-                        )}
-                      >
-                        <AvatarImage src={profile?.avatar_url || undefined} />
-                        <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                          {profile?.full_name?.charAt(0) ||
-                            user?.email?.charAt(0).toUpperCase() ||
-                            "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="hidden lg:block text-left">
-                        <p className="text-sm font-semibold text-foreground">
-                          {profile?.full_name ||
-                            user?.email?.split("@")[0] ||
-                            "User"}
-                        </p>
-                        <p className="text-xs text-muted-foreground flex items-center">
-                          <Sparkles className="h-3 w-3 mr-1 text-primary" />
-                          {(() => {
-                            const activeRole =
-                              profile?.active_role || profile?.role;
+                      <AvatarImage src={profile?.avatar_url || undefined} />
+                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                        {profile?.full_name?.charAt(0) ||
+                          user?.email?.charAt(0).toUpperCase() ||
+                          "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="hidden lg:block text-left">
+                      <p className="text-sm font-semibold text-foreground">
+                        {profile?.full_name ||
+                          user?.email?.split("@")[0] ||
+                          "User"}
+                      </p>
+                      <p className="text-xs text-muted-foreground flex items-center">
+                        <Sparkles className="h-3 w-3 mr-1 text-primary" />
+                        {(() => {
+                          const activeRole =
+                            profile?.active_role || profile?.role;
 
-                            if (activeRole === "super_admin") {
-                              return "Super Admin";
-                            }
-                            if (activeRole === "admin") {
-                              return "Admin";
-                            }
-                            if (activeRole === "lister") {
-                              return "Lister";
-                            }
-                            if (activeRole === "data_entry") {
-                              return "Data Entry";
-                            }
-                            if (activeRole === "organizer") {
-                              return "Organizer";
-                            }
-                            if (activeRole === "business_owner") {
-                              return "Business Owner";
-                            }
-                            if (activeRole === "writer") {
-                              return "Writer";
-                            }
-                            return `${profile?.points || 0} XP`;
-                          })()}
-                        </p>
-                      </div>
+                          if (activeRole === "super_admin") {
+                            return "Super Admin";
+                          }
+                          if (activeRole === "admin") {
+                            return "Admin";
+                          }
+                          if (activeRole === "lister") {
+                            return "Lister";
+                          }
+                          if (activeRole === "data_entry") {
+                            return "Data Entry";
+                          }
+                          if (activeRole === "organizer") {
+                            return "Organizer";
+                          }
+                          if (activeRole === "business_owner") {
+                            return "Business Owner";
+                          }
+                          if (activeRole === "writer") {
+                            return "Writer";
+                          }
+                          return `${profile?.points || 0} XP`;
+                        })()}
+                      </p>
                     </div>
-                  ) : (
-                    /* Public Pages: UserDropdown for Desktop */
-                    <UserDropdown
-                      user={user}
-                      profile={
-                        profile
-                          ? {
-                              full_name: profile.full_name,
-                              avatar_url: profile.avatar_url,
-                            }
-                          : null
-                      }
-                    />
-                  )}
+                  </div>
                 </div>
               ) : (
                 /* Non-authenticated User - Desktop */

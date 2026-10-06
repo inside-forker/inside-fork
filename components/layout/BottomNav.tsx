@@ -5,63 +5,42 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home,
-  Search,
+  Calendar,
   Ticket,
-  LayoutGrid,
   LogIn,
   BarChart3,
-  ScanLine,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { User as SupabaseUser } from "@supabase/supabase-js";
-import { QRScanner } from "@/components/gamification/QRScanner";
-import { useRouter } from "next/navigation";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface ProfileShape {
+  id?: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
   role?: string;
 }
 
 interface BottomNavProps {
   onMenuOpen: () => void;
-  user?: SupabaseUser | null;
+  user?: SupabaseUser | { id: string; email?: string } | null;
   profile?: ProfileShape | null;
 }
 
 export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [showScanner, setShowScanner] = React.useState(false);
-
-  // Check if user is an organizer - they should use ticket verification scanner
-  const isOrganizer =
-    profile?.role === "organizer" ||
-    profile?.role === "super_admin" ||
-    profile?.role === "admin";
-
-  // Handle scan button click - organizers go to ticket verification
-  const handleScanClick = () => {
-    if (isOrganizer) {
-      router.push("/dashboard/scan");
-    } else {
-      setShowScanner(true);
-    }
-  };
 
   // Smart navigation based on user state and current page
   const navLinks = [
     { href: "/", label: "Home", icon: Home },
-    { href: "/search", label: "Search", icon: Search },
+    { href: "/events", label: "Events", icon: Calendar },
     // Always show Dashboard for logged-in users on public pages
     user
       ? { href: "/dashboard", label: "Dashboard", icon: BarChart3 }
       : { href: "/login", label: "Sign In", icon: LogIn },
   ];
-
-  // Handle QR scan success
-  const handleScanSuccess = () => {
-    setShowScanner(false);
-  };
 
   return (
     <>
@@ -84,7 +63,9 @@ export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
           {/* Left side nav items */}
           <div className="flex-1 grid grid-cols-2 h-full">
             {navLinks.slice(0, 2).map((link, index) => {
-              const isActive = pathname === link.href;
+              const isActive =
+                pathname === link.href ||
+                (link.href !== "/" && pathname?.startsWith(link.href));
               return (
                 <Link
                   key={link.label}
@@ -143,151 +124,119 @@ export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
             })}
           </div>
 
-          {/* Center QR Scanner Button - Only for logged-in users */}
-          {user ? (
-            <div className="relative z-20 flex items-center justify-center -mt-6">
-              <motion.button
-                whileTap={{ scale: 0.9 }}
-                whileHover={{ scale: 1.05 }}
-                initial={{ scale: 0, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 400,
-                  damping: 20,
-                  delay: 0.2,
-                }}
-                onClick={handleScanClick}
-                className="group relative w-14 h-14 rounded-full bg-primary shadow-xl shadow-primary/40 hover:shadow-2xl hover:shadow-primary/50 transition-all duration-300"
-              >
-                {/* Glow effect */}
-                <div className="absolute inset-0 rounded-full bg-primary blur-md opacity-40 group-hover:opacity-60 transition-opacity" />
-
-                {/* Outer ring */}
-                <div className="absolute -inset-1 rounded-full border-2 border-primary/30 group-hover:border-primary/50 transition-colors" />
-
-                {/* Inner gradient */}
-                <div className="absolute inset-0.5 rounded-full bg-gradient-to-br from-primary via-primary to-primary/80" />
-
-                {/* Icon */}
-                <div className="relative z-10 flex items-center justify-center w-full h-full">
-                  <ScanLine className="h-6 w-6 text-primary-foreground" />
-                </div>
-
-                {/* Pulse animation */}
-                <motion.div
-                  animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                  className="absolute inset-0 rounded-full border-2 border-primary"
-                />
-              </motion.button>
-
-              {/* Label below - Different for organizers */}
-              <span className="absolute -bottom-4 text-[10px] font-semibold text-primary tracking-wide">
-                {isOrganizer ? "VERIFY" : "SCAN"}
-              </span>
-            </div>
-          ) : (
-            /* Deals button for non-logged in users */
-            <div className="relative z-10 flex items-center justify-center w-16">
-              <Link
-                href="/listings?deals=true"
-                className="flex flex-col items-center justify-center gap-1 text-xs group"
-              >
-                <motion.div
-                  whileTap={{ scale: 0.9 }}
-                  whileHover={{ scale: 1.05 }}
-                  className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200"
+          {/* Center Deals Button */}
+          {(() => {
+            const isDealsActive =
+              pathname === "/listings" || pathname?.startsWith("/listings");
+            return (
+              <div className="relative z-10 flex items-center justify-center w-16">
+                <Link
+                  href="/listings?deals=true"
+                  className="flex flex-col items-center justify-center gap-1 text-xs group"
                 >
-                  <div
-                    className={cn(
-                      "p-1.5 rounded-lg transition-all duration-200",
-                      pathname === "/listings"
-                        ? "bg-primary/20 shadow-lg shadow-primary/25"
-                        : "group-hover:bg-primary/10",
-                    )}
+                  <motion.div
+                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.05 }}
+                    className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200"
                   >
-                    <Ticket
+                    <div
                       className={cn(
-                        "h-4 w-4 transition-all duration-200",
-                        pathname === "/listings"
-                          ? "text-primary"
-                          : "text-muted-foreground group-hover:text-primary",
+                        "p-1.5 rounded-lg transition-all duration-200",
+                        isDealsActive
+                          ? "bg-primary/20 shadow-lg shadow-primary/25"
+                          : "group-hover:bg-primary/10",
                       )}
-                    />
-                  </div>
-                  <span
-                    className={cn(
-                      "font-medium transition-all duration-200 text-xs",
-                      pathname === "/listings"
-                        ? "text-primary"
-                        : "text-muted-foreground group-hover:text-foreground",
-                    )}
-                  >
-                    Deals
-                  </span>
-                </motion.div>
-              </Link>
-            </div>
-          )}
+                    >
+                      <Ticket
+                        className={cn(
+                          "h-4 w-4 transition-all duration-200",
+                          isDealsActive
+                            ? "text-primary"
+                            : "text-muted-foreground group-hover:text-primary",
+                        )}
+                      />
+                    </div>
+                    <span
+                      className={cn(
+                        "font-medium transition-all duration-200 text-xs",
+                        isDealsActive
+                          ? "text-primary"
+                          : "text-muted-foreground group-hover:text-foreground",
+                      )}
+                    >
+                      Deals
+                    </span>
+                  </motion.div>
+                </Link>
+              </div>
+            );
+          })()}
 
           {/* Right side nav items */}
           <div className="flex-1 grid grid-cols-2 h-full">
             {/* Dashboard/Sign In */}
-            <Link
-              href={navLinks[2].href}
-              className="relative z-10 flex h-full flex-col items-center justify-center gap-1 text-xs group"
-            >
-              <motion.div
-                whileTap={{ scale: 0.9 }}
-                whileHover={{ scale: 1.05 }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
-                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200"
-              >
-                <div
-                  className={cn(
-                    "p-1.5 rounded-lg transition-all duration-200",
-                    pathname === navLinks[2].href
-                      ? "bg-primary/20 shadow-lg shadow-primary/25"
-                      : "group-hover:bg-primary/10",
-                  )}
+            {(() => {
+              const isDashboardActive =
+                pathname === navLinks[2].href ||
+                (navLinks[2].href !== "/" &&
+                  pathname?.startsWith(navLinks[2].href));
+              return (
+                <Link
+                  href={navLinks[2].href}
+                  className="relative z-10 flex h-full flex-col items-center justify-center gap-1 text-xs group"
                 >
-                  {React.createElement(navLinks[2].icon, {
-                    className: cn(
-                      "h-4 w-4 transition-all duration-200",
-                      pathname === navLinks[2].href
-                        ? "text-primary"
-                        : "text-muted-foreground group-hover:text-primary",
-                    ),
-                  })}
-                </div>
-                <span
-                  className={cn(
-                    "font-medium transition-all duration-200 text-xs",
-                    pathname === navLinks[2].href
-                      ? "text-primary"
-                      : "text-muted-foreground group-hover:text-foreground",
+                  <motion.div
+                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.05 }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.3 }}
+                    className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200"
+                  >
+                    <div
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all duration-200",
+                        isDashboardActive
+                          ? "bg-primary/20 shadow-lg shadow-primary/25"
+                          : "group-hover:bg-primary/10",
+                      )}
+                    >
+                      {React.createElement(navLinks[2].icon, {
+                        className: cn(
+                          "h-4 w-4 transition-all duration-200",
+                          isDashboardActive
+                            ? "text-primary"
+                            : "text-muted-foreground group-hover:text-primary",
+                        ),
+                      })}
+                    </div>
+                    <span
+                      className={cn(
+                        "font-medium transition-all duration-200 text-xs",
+                        isDashboardActive
+                          ? "text-primary"
+                          : "text-muted-foreground group-hover:text-foreground",
+                      )}
+                    >
+                      {navLinks[2].label}
+                    </span>
+                  </motion.div>
+                  {isDashboardActive && (
+                    <motion.div
+                      layoutId="bottom-nav-active-pill"
+                      className="absolute inset-0 rounded-xl bg-gradient-to-t from-primary/10 via-primary/5 to-transparent border border-primary/20"
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 25,
+                      }}
+                    />
                   )}
-                >
-                  {navLinks[2].label}
-                </span>
-              </motion.div>
-              {pathname === navLinks[2].href && (
-                <motion.div
-                  layoutId="bottom-nav-active-pill"
-                  className="absolute inset-0 rounded-xl bg-gradient-to-t from-primary/10 via-primary/5 to-transparent border border-primary/20"
-                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                />
-              )}
-            </Link>
+                </Link>
+              );
+            })()}
 
-            {/* Menu Button */}
+            {/* Profile Button */}
             <div className="relative z-10 flex h-full flex-col items-center justify-center gap-1 text-xs group">
               <motion.button
                 whileTap={{ scale: 0.9 }}
@@ -298,27 +247,25 @@ export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
                 onClick={onMenuOpen}
                 className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200 group-hover:bg-primary/10"
               >
-                <div className="p-1.5 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 shadow-lg shadow-primary/25 group-hover:from-primary/30 group-hover:to-primary/20 transition-all duration-200">
-                  <LayoutGrid className="h-4 w-4 text-primary" />
+                <div className="p-0.5 rounded-full ring-2 ring-primary/30 group-hover:ring-primary transition-all duration-200 shadow-sm">
+                  <Avatar className="h-5 w-5">
+                    <AvatarImage src={profile?.avatar_url || undefined} />
+                    <AvatarFallback className="bg-primary/20 text-primary font-semibold text-[10px]">
+                      {profile?.full_name?.charAt(0) ||
+                        user?.email?.charAt(0).toUpperCase() || (
+                          <User className="h-3 w-3 text-primary" />
+                        )}
+                    </AvatarFallback>
+                  </Avatar>
                 </div>
                 <span className="font-medium text-primary group-hover:text-primary/80 transition-colors duration-200 text-xs">
-                  Menu
+                  Profile
                 </span>
               </motion.button>
             </div>
           </div>
         </div>
       </motion.nav>
-
-      {/* QR Scanner Modal */}
-      <AnimatePresence>
-        {showScanner && (
-          <QRScanner
-            onClose={() => setShowScanner(false)}
-            onScanSuccess={handleScanSuccess}
-          />
-        )}
-      </AnimatePresence>
     </>
   );
 }

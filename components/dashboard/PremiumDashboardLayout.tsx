@@ -4,6 +4,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { PremiumSidebar } from "./PremiumSidebar";
 import { PremiumHeader } from "./PremiumHeader";
+import { BottomNav } from "@/components/layout/BottomNav";
 
 interface ProfileShape {
   id: string;
@@ -108,14 +109,21 @@ export function PremiumDashboardLayout({
       <main
         className={cn(
           "relative z-10 transition-all duration-500 ease-out",
-          "pt-20 min-h-screen",
-          sidebarOpen ? "lg:ml-80" : "lg:ml-0",
+          "pt-20 pb-24 lg:pb-8 min-h-screen",
+          sidebarOpen ? "lg:mr-80" : "lg:mr-0",
         )}
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
           <div>{children}</div>
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNav
+        onMenuOpen={() => setSidebarOpen(true)}
+        user={user}
+        profile={profile}
+      />
 
       {/* Sidebar Backdrop */}
       {sidebarOpen && (
