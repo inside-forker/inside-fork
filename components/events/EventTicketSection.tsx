@@ -10,6 +10,8 @@ import { EventTicketSectionProps, TicketType } from "@/types/events.types";
 import { PremiumHeading } from "@/components/brand/Typography";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/context/cartStore";
+import { computeParchiDiscount, PARCHI_BLUE } from "@/lib/parchi/discount";
+import { useArrivedFromParchi } from "@/lib/parchi/prefill";
 import {
   sectionVariants,
   cardGridVariants,
@@ -20,8 +22,19 @@ import {
 export function EventTicketSection({
   event,
   ticketTypes,
+  parchiOffer,
 }: EventTicketSectionProps) {
   const router = useRouter();
+  // Visitors from the Parchi app see the student price up front. It's a
+  // preview: the discount is applied at checkout once they approve in Parchi.
+  const arrivedFromParchi = useArrivedFromParchi();
+  const showParchiPrice = !!parchiOffer && arrivedFromParchi;
+  // Rounded for display, like the rest of the site's prices; the exact
+  // amount is charged at checkout.
+  const parchiPrice = (amount: number) =>
+    parchiOffer
+      ? Math.round(amount - computeParchiDiscount(parchiOffer, amount))
+      : amount;
   const { addItem, clearCart } = useCartStore();
   const [selectedTickets, setSelectedTickets] = useState<
     Record<number, number>
@@ -160,13 +173,32 @@ export function EventTicketSection({
                         <Badge variant={status.variant} className="mb-1">
                           {status.text}
                         </Badge>
-                        <div className="text-xl sm:text-2xl md:text-3xl font-bold whitespace-nowrap">
-                          {formatPrice(ticket.price)}
-                        </div>
-                        {ticket.price > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            per ticket
-                          </div>
+                        {showParchiPrice && ticket.price > 0 ? (
+                          <>
+                            <div className="text-sm text-muted-foreground line-through whitespace-nowrap">
+                              {formatPrice(ticket.price)}
+                            </div>
+                            <div
+                              className="text-xl sm:text-2xl md:text-3xl font-bold whitespace-nowrap"
+                              style={{ color: PARCHI_BLUE }}
+                            >
+                              {formatPrice(parchiPrice(ticket.price))}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Parchi student price
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-xl sm:text-2xl md:text-3xl font-bold whitespace-nowrap">
+                              {formatPrice(ticket.price)}
+                            </div>
+                            {ticket.price > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                per ticket
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -255,9 +287,24 @@ export function EventTicketSection({
                 </h4>
                 <p className="text-muted-foreground">
                   Total:{" "}
-                  <span className="font-semibold text-foreground">
-                    {formatPrice(getTotalPrice())}
-                  </span>
+                  {showParchiPrice && getTotalPrice() > 0 ? (
+                    <>
+                      <span className="line-through mr-2">
+                        {formatPrice(getTotalPrice())}
+                      </span>
+                      <span
+                        className="font-semibold"
+                        style={{ color: PARCHI_BLUE }}
+                      >
+                        {formatPrice(parchiPrice(getTotalPrice()))}
+                      </span>{" "}
+                      <span className="text-xs">with Parchi</span>
+                    </>
+                  ) : (
+                    <span className="font-semibold text-foreground">
+                      {formatPrice(getTotalPrice())}
+                    </span>
+                  )}
                 </p>
               </div>
 

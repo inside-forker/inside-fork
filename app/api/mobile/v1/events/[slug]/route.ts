@@ -14,6 +14,7 @@ import {
 } from "@/lib/mobile/mappers";
 import { getAttendeesPreviewByEvent } from "@/lib/mobile/attendees";
 import { formatDiscount } from "@/lib/mobile/deal-format";
+import { getParchiOffer, type ParchiOffer } from "@/lib/parchi/service";
 
 export const dynamic = "force-dynamic";
 
@@ -188,6 +189,16 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
     console.error("[mobile-api] event detail attendees query failed:", error);
   }
 
+  // Parchi student discount for this event (null when none) - drives the
+  // detail screen's Parchi banner. Public like the rest of this route, so
+  // guests see it too. Never let it break the screen.
+  let parchiOffer: ParchiOffer | null = null;
+  try {
+    parchiOffer = await getParchiOffer(eventId);
+  } catch (error) {
+    console.error("[mobile-api] event detail Parchi offer failed:", error);
+  }
+
   return ok({
     event: {
       ...toEventCard(
@@ -210,5 +221,6 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
     },
     images: images.map(toEventImage),
     ticket_types: tickets.map(toTicketType),
+    parchi_offer: parchiOffer,
   });
 });
