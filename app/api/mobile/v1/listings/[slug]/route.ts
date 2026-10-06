@@ -328,11 +328,17 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
 
     // Bank-wide deals keep an empty list (any card at the bank unlocks).
     // Specific products become local ids so RN matchSavedCard can exact-match.
+    // If Peekaboo refs existed but nothing resolved to a local product, keep
+    // the foreign ids (non-empty) so the client treats the deal as other-card
+    // instead of bank-wide "yours".
+    const localIds = matches
+      .map((m) => m.cardVariantId)
+      .filter((id) => id > 0);
     const resolvedVariants = matchByBank
       ? []
-      : matches
-          .map((m) => m.cardVariantId)
-          .filter((id) => id > 0);
+      : localIds.length > 0
+        ? localIds
+        : rawVariants;
 
     return {
       id: Number(deal.id),
