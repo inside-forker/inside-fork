@@ -124,6 +124,7 @@ export function EventsGrid({ events, searchParams }: EventsGridProps) {
   const [cardsPerRow] = useState(3);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(9);
+  const gridContainerRef = React.useRef<HTMLDivElement>(null);
 
   // Calculate pagination
   const totalItems = events.length;
@@ -134,6 +135,23 @@ export function EventsGrid({ events, searchParams }: EventsGridProps) {
     () => events.slice(startIndex, endIndex),
     [events, startIndex, endIndex]
   );
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    if (gridContainerRef.current) {
+      const headerOffset = 90;
+      const elementPosition =
+        gridContainerRef.current.getBoundingClientRect().top;
+      const offsetPosition =
+        elementPosition + window.pageYOffset - headerOffset;
+      window.scrollTo({
+        top: Math.max(0, offsetPosition),
+        behavior: "smooth",
+      });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   // Reset to first page when events change (filters, etc.)
   React.useEffect(() => {
@@ -166,9 +184,9 @@ export function EventsGrid({ events, searchParams }: EventsGridProps) {
         </h3>
         <p className="text-muted-foreground mb-6">
           {searchParams?.search ||
-            searchParams?.location ||
-            searchParams?.date ||
-            searchParams?.category
+          searchParams?.location ||
+          searchParams?.date ||
+          searchParams?.category
             ? "Try adjusting your search criteria"
             : "Check back soon for upcoming events in Karachi"}
         </p>
@@ -177,7 +195,7 @@ export function EventsGrid({ events, searchParams }: EventsGridProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div ref={gridContainerRef} className="space-y-6">
       {/* Events Grid */}
       <motion.div
         variants={containerVariants}
@@ -199,7 +217,7 @@ export function EventsGrid({ events, searchParams }: EventsGridProps) {
         totalPages={totalPages}
         totalItems={totalItems}
         itemsPerPage={itemsPerPage}
-        onPageChange={setCurrentPage}
+        onPageChange={handlePageChange}
       />
     </div>
   );
