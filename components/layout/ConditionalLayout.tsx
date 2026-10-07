@@ -31,6 +31,9 @@ export function ConditionalLayout({
   // Check if we're on an admin page
   const isAdminPage = pathname.includes("/admin");
 
+  // Check if we're on a checkout page (clean, distraction-free flow without floating chat bubble covering CTA)
+  const isCheckoutPage = pathname.startsWith("/checkout");
+
   // Robust 404 detection: recursively scan children for the not-found marker
   type NotFoundProps = {
     "data-nextjs-not-found"?: unknown;
@@ -72,7 +75,12 @@ export function ConditionalLayout({
     pathname.endsWith("/maintenance");
 
   // Support chat only on regular user-facing pages
-  const showChat = !isAuthPage && !isDashboardPage && !isAdminPage && !is404Page;
+  const showChat =
+    !isAuthPage &&
+    !isDashboardPage &&
+    !isAdminPage &&
+    !is404Page &&
+    !isCheckoutPage;
 
   return (
     <>
