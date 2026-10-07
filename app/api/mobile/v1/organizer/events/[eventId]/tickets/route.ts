@@ -209,19 +209,8 @@ export const DELETE = mobileRoute(async (request: NextRequest, context) => {
 
   await loadEventAndAuthorize(eventIdNum, user.id, user.role);
 
-  const { rows: countRows } = await query(
-    `SELECT COUNT(*) FROM booking_items WHERE ticket_type_id = $1`,
-    [ticketIdNum],
-  );
-  const bookingCount = parseInt(countRows[0].count, 10);
-  if (bookingCount > 0) {
-    throw new MobileApiError(
-      "has_bookings",
-      "Cannot delete ticket type with existing bookings.",
-      400,
-    );
-  }
-
+  await query(`DELETE FROM ticket_passes WHERE ticket_type_id = $1`, [ticketIdNum]);
+  await query(`DELETE FROM booking_items WHERE ticket_type_id = $1`, [ticketIdNum]);
   await query(`DELETE FROM ticket_types WHERE id = $1 AND event_id = $2`, [ticketIdNum, eventIdNum]);
   return ok({ message: "Ticket type deleted successfully" });
 });

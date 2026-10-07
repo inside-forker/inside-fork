@@ -392,24 +392,9 @@ export async function DELETE(
       );
     }
 
-    // Check if ticket has any bookings
-    const { rows: countRows } = await query(
-      `SELECT COUNT(*) FROM booking_items WHERE ticket_type_id = $1`,
-      [ticketIdNum]
-    );
-    const bookingCount = parseInt(countRows[0].count, 10);
-
-    if (bookingCount > 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Cannot delete ticket type with existing bookings",
-        },
-        { status: 400 }
-      );
-    }
-
     try {
+      await query(`DELETE FROM ticket_passes WHERE ticket_type_id = $1`, [ticketIdNum]);
+      await query(`DELETE FROM booking_items WHERE ticket_type_id = $1`, [ticketIdNum]);
       await query(
         `DELETE FROM ticket_types WHERE id = $1 AND event_id = $2`,
         [ticketIdNum, eventIdNum]
