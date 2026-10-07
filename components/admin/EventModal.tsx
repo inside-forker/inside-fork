@@ -755,16 +755,22 @@ export function EventModal({
           async (imageId) => {
             try {
               const response = await fetch(
-                `/api/admin/events/${effectiveEventId}/images?imageId=${imageId}`,
+                `/api/admin/events/${effectiveEventId}/images/${imageId}`,
                 { method: "DELETE" },
               );
               if (!response.ok) {
-                const error = await response.json();
+                let errorMsg = "Delete failed";
+                try {
+                  const error = await response.json();
+                  errorMsg = error.error || errorMsg;
+                } catch {
+                  // ignore non-JSON response
+                }
                 console.error(
                   `[EventModal] Failed to delete image ${imageId}:`,
-                  error,
+                  errorMsg,
                 );
-                return { imageId, success: false, error: error.error };
+                return { imageId, success: false, error: errorMsg };
               }
               return { imageId, success: true };
             } catch (err) {

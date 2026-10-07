@@ -427,6 +427,45 @@ export async function PATCH(
       }
     }
 
+    if (
+      body.address !== undefined ||
+      body.latitude !== undefined ||
+      body.longitude !== undefined
+    ) {
+      try {
+        const branchSetClauses: string[] = [];
+        const branchValues: unknown[] = [];
+
+        if (body.address !== undefined) {
+          branchValues.push(body.address?.trim() || null);
+          branchSetClauses.push(`address = $${branchValues.length}`);
+        }
+        if (body.latitude !== undefined) {
+          branchValues.push(
+            body.latitude ? parseFloat(String(body.latitude)) : null,
+          );
+          branchSetClauses.push(`latitude = $${branchValues.length}`);
+        }
+        if (body.longitude !== undefined) {
+          branchValues.push(
+            body.longitude ? parseFloat(String(body.longitude)) : null,
+          );
+          branchSetClauses.push(`longitude = $${branchValues.length}`);
+        }
+
+        if (branchSetClauses.length > 0) {
+          branchValues.push(listingId);
+          await query(
+            `UPDATE listing_branches SET ${branchSetClauses.join(", ")}
+             WHERE listing_id = $${branchValues.length} AND (is_primary = true OR (SELECT count(*) FROM listing_branches WHERE listing_id = $${branchValues.length}) = 1)`,
+            branchValues,
+          );
+        }
+      } catch (branchSyncErr) {
+        console.error("Failed to sync primary branch address:", branchSyncErr);
+      }
+    }
+
     // Log the admin action
     try {
       const { logListingUpdate } = await import("@/lib/audit");

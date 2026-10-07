@@ -333,18 +333,27 @@ export function EventGalleryUpload({
     if (!eventId) return;
 
     try {
-      const response = await fetch(
-        `${apiBasePath}/${eventId}/images?imageId=${imageId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ is_primary: true }),
-        }
-      );
+      // Admin route is /api/admin/events/[id]/images/[imageId]
+      // Organizer route supports /api/organizer/events/[id]/images?imageId=[imageId]
+      const url = apiBasePath.includes("/organizer")
+        ? `${apiBasePath}/${eventId}/images?imageId=${imageId}`
+        : `${apiBasePath}/${eventId}/images/${imageId}`;
+
+      const response = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_primary: true }),
+      });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Update failed");
+        let errorMessage = "Update failed";
+        try {
+          const error = await response.json();
+          errorMessage = error.error || error.message || errorMessage;
+        } catch {
+          // ignore JSON parse error on non-JSON responses
+        }
+        throw new Error(errorMessage);
       }
 
       // Update local state

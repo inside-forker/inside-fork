@@ -21,9 +21,146 @@ interface ListingMapProps {
   listing: Listing;
 }
 
+function detectAreaFromAddress(address: string | null | undefined): string | null {
+  if (!address) return null;
+  const addr = address.toLowerCase();
+
+  if (
+    addr.includes("gulshan") ||
+    addr.includes("gulshan-e-iqbal") ||
+    addr.includes("gulshan e iqbal")
+  ) {
+    return "Gulshan-e-Iqbal";
+  }
+  if (
+    addr.includes("johar") ||
+    addr.includes("gulistan-e-johar") ||
+    addr.includes("gulistan e johar")
+  ) {
+    return "Gulistan-e-Johar";
+  }
+  if (addr.includes("dha") || addr.includes("defence") || addr.includes("phase ")) {
+    return "DHA";
+  }
+  if (
+    addr.includes("clifton") ||
+    addr.includes("boat basin") ||
+    addr.includes("sea view")
+  ) {
+    return "Clifton";
+  }
+  if (addr.includes("bahadurabad")) {
+    return "Bahadurabad";
+  }
+  if (addr.includes("north nazimabad") || addr.includes("nazimabad")) {
+    return "North Nazimabad";
+  }
+  if (addr.includes("pechs") || addr.includes("p.e.c.h.s")) {
+    return "PECHS";
+  }
+  if (
+    addr.includes("saddar") ||
+    addr.includes("burns road") ||
+    addr.includes("i.i. chundrigar")
+  ) {
+    return "Saddar";
+  }
+  if (addr.includes("tariq road")) {
+    return "Tariq Road";
+  }
+  if (addr.includes("tipu sultan")) {
+    return "Tipu Sultan";
+  }
+  if (
+    addr.includes("fb area") ||
+    addr.includes("federal b") ||
+    addr.includes("f.b area")
+  ) {
+    return "Federal B Area";
+  }
+  if (addr.includes("gulberg")) {
+    return "Gulberg";
+  }
+  if (addr.includes("malir") || addr.includes("malir cantt")) {
+    return "Malir";
+  }
+  if (addr.includes("korangi")) {
+    return "Korangi";
+  }
+  if (addr.includes("north karachi") || addr.includes("new karachi")) {
+    return "North Karachi";
+  }
+  if (addr.includes("scheme 33")) {
+    return "Scheme 33";
+  }
+  if (addr.includes("shahrah-e-faisal") || addr.includes("shahrah e faisal")) {
+    return "Shahrah-e-Faisal";
+  }
+  return null;
+}
+
+const AREA_LANDMARKS: Record<
+  string,
+  Array<{ name: string; distance: string; icon: string }>
+> = {
+  "Gulshan-e-Iqbal": [
+    { name: "Maskan Chowrangi", distance: "Nearby", icon: "🏙️" },
+    { name: "Expo Centre", distance: "Nearby", icon: "🏛️" },
+    { name: "Disco Bakery", distance: "Nearby", icon: "🥐" },
+    { name: "Karachi University", distance: "Nearby", icon: "🎓" },
+  ],
+  "Gulistan-e-Johar": [
+    { name: "Johar Chowrangi", distance: "Nearby", icon: "🏙️" },
+    { name: "Darul Sehat", distance: "Nearby", icon: "🏥" },
+    { name: "Millennium Mall", distance: "Nearby", icon: "🛍️" },
+    { name: "Safari Park", distance: "Nearby", icon: "🌳" },
+  ],
+  DHA: [
+    { name: "DHA Phase 5 / 6", distance: "Nearby", icon: "🏢" },
+    { name: "Bukhari Commercial", distance: "Nearby", icon: "☕" },
+    { name: "Dolmen Mall Clifton", distance: "Nearby", icon: "🛍️" },
+    { name: "Sea View", distance: "Nearby", icon: "🌊" },
+  ],
+  Clifton: [
+    { name: "Boat Basin", distance: "Nearby", icon: "🍲" },
+    { name: "Dolmen Mall Clifton", distance: "Nearby", icon: "🛍️" },
+    { name: "Clifton Block 2 / 4", distance: "Nearby", icon: "🏢" },
+    { name: "Sea View", distance: "Nearby", icon: "🌊" },
+  ],
+  PECHS: [
+    { name: "Tariq Road", distance: "Nearby", icon: "🛍️" },
+    { name: "Khalid Bin Walid Rd", distance: "Nearby", icon: "🚗" },
+    { name: "Sindhi Muslim (SMCHS)", distance: "Nearby", icon: "🍔" },
+    { name: "Shahrah-e-Faisal", distance: "Nearby", icon: "🛣️" },
+  ],
+  "North Nazimabad": [
+    { name: "Hyderi Market", distance: "Nearby", icon: "🛍️" },
+    { name: "Five Star Chowrangi", distance: "Nearby", icon: "⭐" },
+    { name: "KDA Chowrangi", distance: "Nearby", icon: "🏙️" },
+    { name: "Ziauddin Hospital", distance: "Nearby", icon: "🏥" },
+  ],
+  Bahadurabad: [
+    { name: "Char Minar Chowrangi", distance: "Nearby", icon: "🏛️" },
+    { name: "Tariq Road", distance: "Nearby", icon: "🛍️" },
+    { name: "Alamgir Road", distance: "Nearby", icon: "☕" },
+    { name: "Shaheed-e-Millat", distance: "Nearby", icon: "🛣️" },
+  ],
+};
+
+const DEFAULT_LANDMARKS = [
+  { name: "Karachi Central", distance: "City Centre", icon: "🏙️" },
+  { name: "Shahrah-e-Faisal", distance: "Main Arterial", icon: "🛣️" },
+  { name: "Airport Route", distance: "Connecting Road", icon: "✈️" },
+  { name: "City Hub", distance: "Metro Area", icon: "📍" },
+];
+
 export function ListingMap({ listing }: ListingMapProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mapLoadError, setMapLoadError] = useState(false);
+
+  const detectedArea = detectAreaFromAddress(listing.address);
+  const nearbyPlaces =
+    (detectedArea && AREA_LANDMARKS[detectedArea]) || DEFAULT_LANDMARKS;
 
   // Prefer precise coordinates if present; otherwise fallback to address; otherwise Karachi default
   const hasCoords = !!(listing.latitude && listing.longitude);
@@ -49,13 +186,6 @@ export function ListingMap({ listing }: ListingMapProps) {
         listing.address
       )}&z=16&output=embed`
     : `https://www.google.com/maps?q=loc:${latitude},${longitude}&z=12&output=embed`;
-
-  const nearbyPlaces = [
-    { name: "DHA Phase 2", distance: "0.5 km", icon: "🏢" },
-    { name: "Clifton Bridge", distance: "2.1 km", icon: "🌉" },
-    { name: "Dolmen Mall", distance: "3.2 km", icon: "🛍️" },
-    { name: "Sea View", distance: "4.5 km", icon: "🌊" },
-  ];
 
   return (
     <motion.div
@@ -296,9 +426,11 @@ export function ListingMap({ listing }: ListingMapProps) {
               <Badge variant="secondary" className="px-2 md:px-3 py-1 text-xs">
                 📍 Karachi
               </Badge>
-              <Badge variant="secondary" className="px-2 md:px-3 py-1 text-xs">
-                🏙️ DHA
-              </Badge>
+              {detectedArea && (
+                <Badge variant="secondary" className="px-2 md:px-3 py-1 text-xs">
+                  🏙️ {detectedArea}
+                </Badge>
+              )}
             </div>
           </div>
         </div>

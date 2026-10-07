@@ -321,50 +321,6 @@ export function ListingModal({
     }
   }, [listing?.id, toast]);
 
-  // Auto-sync location from primary branch
-  React.useEffect(() => {
-    const primaryBranch = branches.find((b) => b.is_primary);
-    if (primaryBranch) {
-      setFormData((prev) => {
-        // Only update if values differ to avoid unnecessary renders
-        if (
-          prev.address === primaryBranch.address &&
-          prev.latitude === String(primaryBranch.latitude) &&
-          prev.longitude === String(primaryBranch.longitude)
-        ) {
-          return prev;
-        }
-
-        return {
-          ...prev,
-          address: primaryBranch.address,
-          latitude: String(primaryBranch.latitude),
-          longitude: String(primaryBranch.longitude),
-        };
-      });
-
-      // Sync opening hours if they exist on the primary branch
-      // We do a deep comparison or basic check to see if update is needed,
-      // but simpler to just set it if we trust the branch data is fresh.
-      // To avoid infinite loops or unnecessary updates, we can check if they are different.
-      if (
-        primaryBranch.opening_hours &&
-        primaryBranch.opening_hours.length > 0
-      ) {
-        const nextHours = getNormalizedOpeningHours(
-          primaryBranch.opening_hours,
-        );
-        setOpeningHours((prev) => {
-          const currentHours = getNormalizedOpeningHours(prev);
-          if (JSON.stringify(currentHours) === JSON.stringify(nextHours)) {
-            return prev;
-          }
-          return primaryBranch.opening_hours as OpeningHour[];
-        });
-      }
-    }
-  }, [branches, getNormalizedOpeningHours]);
-
   const modalRef = React.useRef<HTMLDivElement>(null);
 
   // Remember the modal mode to prevent switching during close animation
