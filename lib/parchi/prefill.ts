@@ -1,12 +1,16 @@
 /**
  * The Parchi app's "Get tickets" link lands on the event page with
- * `?parchiId=XXX`. We remember it for this tab so checkout can pre-fill the
- * Parchi ID box. Only a convenience: the student still approves in the
- * Parchi app. Client-only; storage can be unavailable, so never throws.
+ * `?parchiId=XXX`. We remember it so checkout can pre-fill the Parchi ID box.
+ * Only a convenience: the student still approves in the Parchi app.
+ *
+ * Kept in sessionStorage (this tab) and, for a day, in localStorage: some
+ * in-app browsers drop the tab's sessionStorage between the event page and
+ * checkout. Client-only; storage can be unavailable, so never throws.
  */
 import { useEffect, useState } from "react";
 
 const KEY = "ik:parchi-id";
+const LOCAL_TTL_MS = 24 * 60 * 60 * 1000;
 
 export function rememberParchiId(raw: string | null): void {
   const id = raw?.trim() ?? "";
@@ -14,16 +18,34 @@ export function rememberParchiId(raw: string | null): void {
   try {
     sessionStorage.setItem(KEY, id);
   } catch {
-    // Private mode / blocked storage - the student just types it.
+    // Private mode / blocked storage - fall through to localStorage.
+  }
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ id, at: Date.now() }));
+  } catch {
+    // Blocked storage - the student just types it.
   }
 }
 
 export function recallParchiId(): string {
   try {
-    return sessionStorage.getItem(KEY) ?? "";
+    const id = sessionStorage.getItem(KEY);
+    if (id) return id;
   } catch {
-    return "";
+    // Fall through to localStorage.
   }
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY) ?? "null") as {
+      id?: string;
+      at?: number;
+    } | null;
+    if (saved?.id && saved.at && Date.now() - saved.at < LOCAL_TTL_MS) {
+      return saved.id;
+    }
+  } catch {
+    // Unreadable - treat as not remembered.
+  }
+  return "";
 }
 
 /**
