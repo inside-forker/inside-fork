@@ -17,6 +17,7 @@ import { ok } from "@/lib/mobile/response";
 import { enforceMobileRateLimit } from "@/lib/mobile/rate-limit";
 import { getOptionalMobileUser } from "@/lib/mobile/auth";
 import { getUserCategoryAffinity } from "@/lib/recommendations/affinity";
+import { DETOUR_CATEGORY_EXCLUSION_SQL } from "@/lib/mobile/detour-exclusions";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,7 @@ const ORGANIC_ELIGIBILITY_SQL = `
   AND ld.avg_rating >= $1
   AND ld.review_count BETWEEN $2 AND $3
   AND COALESCE(ls.favorite_count, 0) <= $4
+  AND ${DETOUR_CATEGORY_EXCLUSION_SQL}
 `;
 
 function buildHiddenGemCard(
@@ -122,6 +124,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
          WHERE ld.status = 'published'
            AND l.hidden_gem_pinned = true
            AND l.hidden_gem_hidden = false
+           AND ${DETOUR_CATEGORY_EXCLUSION_SQL}
          ORDER BY l.hidden_gem_pinned_at DESC NULLS LAST, ld.id ASC`,
       ),
       query(
@@ -160,6 +163,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
            AND ld.avg_rating >= $4
            AND ld.review_count BETWEEN $5 AND $6
            AND COALESCE(ls.favorite_count, 0) <= $7
+           AND ${DETOUR_CATEGORY_EXCLUSION_SQL}
          ORDER BY discovery_score DESC, ld.review_count DESC, ld.id ASC
          LIMIT $8 OFFSET $9`,
         [
@@ -211,6 +215,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
              AND NULLIF(BTRIM(ld.address), '') IS NOT NULL
              AND EXISTS (SELECT 1 FROM listing_images li WHERE li.listing_id = ld.id)
              AND ld.id != ALL($1::int[])
+             AND ${DETOUR_CATEGORY_EXCLUSION_SQL}
            ORDER BY
              (COALESCE(ld.avg_rating, 0) > 0) DESC,
              COALESCE(ld.avg_rating, 0) DESC,
