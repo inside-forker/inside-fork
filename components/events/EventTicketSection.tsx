@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -276,20 +276,20 @@ export function EventTicketSection({
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="sticky bottom-4 z-10"
+          className="sticky bottom-24 md:bottom-6 z-40"
         >
-          <Card className="p-6 bg-card border rounded-2xl hover:border-primary/40 transition-all duration-300">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <Card className="p-4 sm:p-6 bg-card/95 backdrop-blur-md border border-border shadow-2xl hover:border-primary/40 transition-all duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
               <div>
-                <h4 className="text-base sm:text-lg font-semibold mb-1">
+                <h4 className="text-sm sm:text-base md:text-lg font-semibold mb-0.5">
                   {getTotalTickets()} ticket{getTotalTickets() !== 1 ? "s" : ""}{" "}
                   selected
                 </h4>
-                <p className="text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Total:{" "}
                   {showParchiPrice && getTotalPrice() > 0 ? (
                     <>
-                      <span className="line-through mr-2">
+                      <span className="line-through mr-1.5 sm:mr-2">
                         {formatPrice(getTotalPrice())}
                       </span>
                       <span
@@ -310,10 +310,10 @@ export function EventTicketSection({
 
               <Button
                 size="lg"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 py-3 rounded-xl transition-all duration-300"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl transition-all duration-300 w-full sm:w-auto shadow-lg shadow-primary/25 text-sm sm:text-base"
                 onClick={handleProceedToCheckout}
               >
-                <CreditCard className="w-5 h-5 mr-2" />
+                <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                 Proceed to Checkout
               </Button>
             </div>
