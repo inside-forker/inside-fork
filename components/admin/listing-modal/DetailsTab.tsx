@@ -725,9 +725,9 @@ export function DetailsTab({
             <Clock className="h-4 w-4 text-primary" />
             <h3 className="text-lg font-medium">Location</h3>
             {hasPrimaryBranch && (
-              <div className="ml-auto flex items-center gap-2 bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground">
+              <div className="ml-auto flex items-center gap-2 bg-primary/10 px-3 py-1 rounded-full text-xs text-primary font-medium">
                 <MapPin className="h-3 w-3" />
-                <span>Managed by Primary Branch</span>
+                <span>Primary Location</span>
               </div>
             )}
           </div>
@@ -741,14 +741,10 @@ export function DetailsTab({
                 value={formData.address}
                 onChange={(e) => onInputChange("address", e.target.value)}
                 placeholder="Enter full address"
-                disabled={!!hasPrimaryBranch}
-                className={
-                  hasPrimaryBranch ? "bg-muted text-muted-foreground" : ""
-                }
               />
               {hasPrimaryBranch && primaryBranch && (
                 <p className="text-xs text-muted-foreground">
-                  Synced with: {primaryBranch.name}
+                  Primary branch: {primaryBranch.name}
                 </p>
               )}
             </div>
@@ -761,10 +757,6 @@ export function DetailsTab({
                 value={formData.latitude}
                 onChange={(e) => onInputChange("latitude", e.target.value)}
                 placeholder="24.8607"
-                disabled={!!hasPrimaryBranch}
-                className={
-                  hasPrimaryBranch ? "bg-muted text-muted-foreground" : ""
-                }
               />
             </div>
             <div className="space-y-2">
@@ -776,10 +768,6 @@ export function DetailsTab({
                 value={formData.longitude}
                 onChange={(e) => onInputChange("longitude", e.target.value)}
                 placeholder="67.0011"
-                disabled={!!hasPrimaryBranch}
-                className={
-                  hasPrimaryBranch ? "bg-muted text-muted-foreground" : ""
-                }
               />
             </div>
           </div>
