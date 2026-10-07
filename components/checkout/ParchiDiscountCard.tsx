@@ -128,13 +128,13 @@ export function ParchiDiscountCard({
   const status = verification?.status;
 
   return (
-    <Card className="border-2 border-primary/10 shadow-sm">
-      <CardContent className="pt-6 space-y-4">
-        <div className="flex items-start gap-3">
-          <GraduationCap className="h-6 w-6 text-primary shrink-0 mt-0.5" />
+    <Card className="rounded-2xl border bg-card shadow-none">
+      <CardContent className="space-y-3.5 p-4">
+        <div className="flex items-center gap-3">
+          <GraduationCap className="h-[22px] w-[22px] shrink-0 text-foreground" />
           <div>
-            <h3 className="text-lg font-bold">Student? Verify with Parchi</h3>
-            <p className="text-sm text-muted-foreground">
+            <h3 className="text-sm font-semibold">Student? Verify with Parchi</h3>
+            <p className="text-xs text-muted-foreground">
               {describeParchiOffer(offer)} for verified Parchi students.
             </p>
           </div>
@@ -196,7 +196,12 @@ export function ParchiDiscountCard({
                 autoComplete="off"
                 disabled={isStarting}
               />
-              <Button onClick={start} disabled={isStarting || !parchiId.trim()}>
+              {/* Dark, like the app: pink is kept for the pay button. */}
+              <Button
+                onClick={start}
+                disabled={isStarting || !parchiId.trim()}
+                className="min-w-[84px] bg-[#111827] text-white hover:bg-[#111827]/90"
+              >
                 {isStarting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : status ? (
