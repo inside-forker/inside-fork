@@ -20,6 +20,7 @@ import {
   LogOut,
   LogIn,
   ChevronRight,
+  X,
 } from "lucide-react";
 import {
   publicUserNavigation as navigation,
@@ -300,8 +301,23 @@ export function PremiumSidebar({
           data-user-id={_userId}
         >
           <div className="h-full bg-background/95 backdrop-blur-xl border-l border-border/50 shadow-premium-lg flex flex-col">
+            {/* Top Close Header */}
+            <div className="flex-shrink-0 px-6 pt-4 pb-1 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Account & Menu
+              </span>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close menu"
+                className="p-1.5 -mr-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-all duration-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
             {/* User Profile Section - Fixed */}
-            <div className="flex-shrink-0 p-6 border-b border-border/50">
+            <div className="flex-shrink-0 p-6 pt-2 border-b border-border/50">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}

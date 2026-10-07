@@ -121,6 +121,8 @@ export function PremiumDashboardLayout({
       {/* Mobile Bottom Navigation */}
       <BottomNav
         onMenuOpen={() => setSidebarOpen(true)}
+        onMenuToggle={() => setSidebarOpen((v) => !v)}
+        isMenuOpen={sidebarOpen}
         user={user}
         profile={profile}
       />

@@ -100,7 +100,13 @@ export function MobileNav({
       <AnimatePresence mode="wait">
         {showFullNav ? (
           // Render the full BottomNav if the condition is met
-          <BottomNav onMenuOpen={openMenu} user={user} profile={profile} />
+          <BottomNav
+            onMenuOpen={openMenu}
+            onMenuToggle={() => setMenuOpen((v) => !v)}
+            isMenuOpen={isMenuOpen}
+            user={user}
+            profile={profile}
+          />
         ) : (
           // Otherwise, render the FloatingActionButton
           <FloatingActionButton onClick={() => setNavForcedOpen(true)} />

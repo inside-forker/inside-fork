@@ -25,12 +25,20 @@ interface ProfileShape {
 }
 
 interface BottomNavProps {
-  onMenuOpen: () => void;
+  onMenuOpen?: () => void;
+  onMenuToggle?: () => void;
+  isMenuOpen?: boolean;
   user?: SupabaseUser | { id: string; email?: string } | null;
   profile?: ProfileShape | null;
 }
 
-export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
+export function BottomNav({
+  onMenuOpen,
+  onMenuToggle,
+  isMenuOpen,
+  user,
+  profile,
+}: BottomNavProps) {
   const pathname = usePathname();
   const { loginHref } = useAuthLinks();
 
@@ -246,10 +254,26 @@ export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.4 }}
-                onClick={onMenuOpen}
-                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200 group-hover:bg-primary/10"
+                onClick={() => {
+                  if (onMenuToggle) {
+                    onMenuToggle();
+                  } else if (onMenuOpen) {
+                    onMenuOpen();
+                  }
+                }}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-200 group-hover:bg-primary/10",
+                  isMenuOpen && "bg-primary/20 shadow-lg shadow-primary/25",
+                )}
               >
-                <div className="p-0.5 rounded-full ring-2 ring-primary/30 group-hover:ring-primary transition-all duration-200 shadow-sm">
+                <div
+                  className={cn(
+                    "p-0.5 rounded-full ring-2 transition-all duration-200 shadow-sm",
+                    isMenuOpen
+                      ? "ring-primary"
+                      : "ring-primary/30 group-hover:ring-primary",
+                  )}
+                >
                   <Avatar className="h-5 w-5">
                     <AvatarImage src={profile?.avatar_url || undefined} />
                     <AvatarFallback className="bg-primary/20 text-primary font-semibold text-[10px]">
@@ -260,10 +284,28 @@ export function BottomNav({ onMenuOpen, user, profile }: BottomNavProps) {
                     </AvatarFallback>
                   </Avatar>
                 </div>
-                <span className="font-medium text-primary group-hover:text-primary/80 transition-colors duration-200 text-xs">
+                <span
+                  className={cn(
+                    "font-medium transition-colors duration-200 text-xs",
+                    isMenuOpen
+                      ? "text-primary font-semibold"
+                      : "text-primary group-hover:text-primary/80",
+                  )}
+                >
                   Profile
                 </span>
               </motion.button>
+              {isMenuOpen && (
+                <motion.div
+                  layoutId="bottom-nav-active-pill"
+                  className="absolute inset-0 rounded-xl bg-gradient-to-t from-primary/10 via-primary/5 to-transparent border border-primary/20 pointer-events-none"
+                  transition={{
+                    type: "spring",
+                    stiffness: 400,
+                    damping: 25,
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>
