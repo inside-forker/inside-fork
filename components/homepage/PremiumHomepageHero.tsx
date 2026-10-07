@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import ReactDOM from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -55,11 +54,6 @@ export function PremiumHomepageHero() {
   const router = useRouter();
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({
-    top: 0,
-    left: 0,
-    width: 0,
-  });
 
   const {
     searchQuery,
@@ -113,25 +107,26 @@ export function PremiumHomepageHero() {
     setLocationPin(null);
   }, []);
 
+  // Close dropdown on click/touch outside
   useEffect(() => {
     if (!showResults) return;
 
-    const originalStyle = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    if (searchContainerRef.current) {
-      const rect = searchContainerRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 8,
-        left: rect.left,
-        width: rect.width,
-      });
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowResults(false);
+      }
     }
 
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
     return () => {
-      document.body.style.overflow = originalStyle;
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
     };
-  }, [showResults]);
+  }, [showResults, setShowResults]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -193,7 +188,7 @@ export function PremiumHomepageHero() {
         </div>
 
         <div className="max-w-2xl mx-auto animate-hero-fade-in-delay-2">
-          <div className="relative group" ref={searchContainerRef}>
+          <div className="relative z-30 group" ref={searchContainerRef}>
             <div className="relative flex flex-col sm:flex-row bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
               <div className="relative flex-1">
                 <Search className="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -202,10 +197,11 @@ export function PremiumHomepageHero() {
                   placeholder="Try a café, salon or restaurant"
                   value={searchQuery}
                   onChange={handleSearchChange}
-                  onFocus={() =>
-                    searchQuery.length >= 2 && setShowResults(true)
-                  }
-                  onBlur={() => setTimeout(() => setShowResults(false), 200)}
+                  onFocus={() => {
+                    if (searchQuery.trim().length >= 2) {
+                      setShowResults(true);
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -294,43 +290,16 @@ export function PremiumHomepageHero() {
                 </Button>
               </div>
             </div>
-          </div>
 
-          <nav
-            aria-label="Start browsing"
-            className="-mx-6 mt-5 flex flex-wrap items-center justify-center gap-1.5 sm:mx-0 sm:gap-2"
-          >
-            {quickLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium sm:gap-1.5 sm:px-4 sm:text-sm text-foreground transition-colors hover:border-primary hover:text-primary active:opacity-80"
-              >
-                <link.icon
-                  className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4"
-                  aria-hidden
-                />
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-
-        {typeof document !== "undefined" &&
-          ReactDOM.createPortal(
+            {/* Results Dropdown anchored directly below the search bar */}
             <AnimatePresence>
               {showResults && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
+                  exit={{ opacity: 0, y: 6 }}
                   transition={{ duration: 0.15 }}
-                  className="fixed z-[9999] bg-card border border-border rounded-2xl shadow-lg overflow-hidden"
-                  style={{
-                    top: dropdownPosition.top,
-                    left: dropdownPosition.left,
-                    width: dropdownPosition.width,
-                  }}
+                  className="absolute left-0 right-0 top-full mt-2 z-50 bg-card border border-border rounded-2xl shadow-xl overflow-hidden text-left"
                 >
                   {isSearching ? (
                     <div className="p-4 text-center text-muted-foreground">
@@ -348,6 +317,8 @@ export function PremiumHomepageHero() {
                         return (
                           <button
                             key={`${result.type}-${result.id}`}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
                               setSearchQuery(result.name);
                               setShowResults(false);
@@ -364,7 +335,7 @@ export function PremiumHomepageHero() {
                                 window.location.href = getResultUrl(result);
                               }
                             }}
-                            className="w-full px-4 py-3 text-left hover:bg-primary/5 dark:hover:bg-primary/10 transition-colors duration-200 border-b border-border/20 last:border-b-0"
+                            className="w-full px-4 py-3 text-left hover:bg-primary/5 dark:hover:bg-primary/10 transition-colors duration-200 border-b border-border/20 last:border-b-0 cursor-pointer"
                           >
                             <div className="flex items-center space-x-3">
                               <div className="flex-shrink-0">
@@ -415,7 +386,7 @@ export function PremiumHomepageHero() {
                                   </div>
                                 )}
                               </div>
-                              <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                              <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                             </div>
                           </button>
                         );
@@ -430,9 +401,28 @@ export function PremiumHomepageHero() {
                   )}
                 </motion.div>
               )}
-            </AnimatePresence>,
-            document.body,
-          )}
+            </AnimatePresence>
+          </div>
+
+          <nav
+            aria-label="Start browsing"
+            className="-mx-6 mt-5 flex flex-wrap items-center justify-center gap-1.5 sm:mx-0 sm:gap-2"
+          >
+            {quickLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium sm:gap-1.5 sm:px-4 sm:text-sm text-foreground transition-colors hover:border-primary hover:text-primary active:opacity-80"
+              >
+                <link.icon
+                  className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4"
+                  aria-hidden
+                />
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
       </div>
     </HeroSectionStatic>
   );
