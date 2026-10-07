@@ -3,6 +3,7 @@ import { exchangeGoogleCode } from "@/lib/auth/google";
 import { getGoogleCallbackUrl, getRequestOrigin } from "@/lib/auth/url";
 import { setSession } from "@/lib/auth/session";
 import { findOrCreateOAuthUser } from "@/lib/auth/oauth-account";
+import { recordParchiAuth } from "@/lib/parchi/attribution";
 
 const STATE_COOKIE_NAME = "g_oauth_state";
 
@@ -75,6 +76,13 @@ export async function GET(request: NextRequest) {
       email: user.email,
       role: user.role,
     });
+    await recordParchiAuth(
+      request,
+      response,
+      user.id,
+      user.isNew ? "signup" : "signin",
+      "google",
+    );
 
     try {
       const { logUserLogin } = await import("@/lib/audit");

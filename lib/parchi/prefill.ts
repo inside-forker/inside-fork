@@ -11,6 +11,9 @@ import { useEffect, useState } from "react";
 
 const KEY = "ik:parchi-id";
 const LOCAL_TTL_MS = 24 * 60 * 60 * 1000;
+// Read server-side on the next sign-up / sign-in (lib/parchi/attribution.ts).
+const ARRIVAL_COOKIE = "ik_from_parchi";
+const ARRIVAL_MAX_AGE_S = 30 * 24 * 60 * 60;
 
 export function rememberParchiId(raw: string | null): void {
   const id = raw?.trim() ?? "";
@@ -25,6 +28,9 @@ export function rememberParchiId(raw: string | null): void {
   } catch {
     // Blocked storage - the student just types it.
   }
+  // "Came from Parchi" marker for the next sign-up / sign-in. SameSite=None
+  // so Apple's cross-site form_post callback still carries it.
+  document.cookie = `${ARRIVAL_COOKIE}=${encodeURIComponent(id)}; Max-Age=${ARRIVAL_MAX_AGE_S}; Path=/; SameSite=None; Secure`;
 }
 
 export function recallParchiId(): string {
