@@ -107,11 +107,11 @@ export function PremiumHomepageHero() {
     setLocationPin(null);
   }, []);
 
-  // Close dropdown on click/touch outside
+  // Close dropdown on click outside
   useEffect(() => {
     if (!showResults) return;
 
-    function handleClickOutside(e: MouseEvent | TouchEvent) {
+    function handleClickOutside(e: MouseEvent) {
       if (
         searchContainerRef.current &&
         !searchContainerRef.current.contains(e.target as Node)
@@ -120,11 +120,9 @@ export function PremiumHomepageHero() {
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
+    document.addEventListener("click", handleClickOutside);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("click", handleClickOutside);
     };
   }, [showResults, setShowResults]);
 
@@ -198,6 +196,11 @@ export function PremiumHomepageHero() {
                   value={searchQuery}
                   onChange={handleSearchChange}
                   onFocus={() => {
+                    if (searchQuery.trim().length >= 2) {
+                      setShowResults(true);
+                    }
+                  }}
+                  onClick={() => {
                     if (searchQuery.trim().length >= 2) {
                       setShowResults(true);
                     }
