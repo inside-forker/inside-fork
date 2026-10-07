@@ -22,12 +22,16 @@ export function HeroSectionStatic({
     return (
         <section
             className={cn(
-                "relative flex items-center justify-center overflow-hidden bg-background py-10 sm:py-14 lg:py-20",
+                "relative z-20 flex items-center justify-center bg-background py-10 sm:py-14 lg:py-20",
                 className,
             )}
         >
             {/* Floating slot (panels/icons) */}
-            {floating}
+            {floating && (
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    {floating}
+                </div>
+            )}
 
             {/* Content slot */}
             <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center">
