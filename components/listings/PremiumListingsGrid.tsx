@@ -245,6 +245,23 @@ export function PremiumListingsGrid({
     };
   }, []);
 
+  // Scroll helper to smoothly navigate to the top of the grid section
+  const scrollToGridTop = useCallback(() => {
+    const gridElement = document.getElementById("listings-grid");
+    if (gridElement) {
+      const headerOffset = 90; // account for sticky header height
+      const elementPosition = gridElement.getBoundingClientRect().top;
+      const offsetPosition =
+        elementPosition + window.pageYOffset - headerOffset;
+      window.scrollTo({
+        top: Math.max(0, offsetPosition),
+        behavior: "smooth",
+      });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, []);
+
   // Sync with URL changes - handles browser back/forward navigation.
   // We use pushState for pagination, so this reacts to real history navigation.
   useEffect(() => {
@@ -260,6 +277,7 @@ export function PremiumListingsGrid({
     // This handles browser back/forward navigation
     if (!isNaN(urlPage) && urlPage > 0 && urlPage !== currentPage) {
       setCurrentPage(urlPage);
+      scrollToGridTop();
       fetchListings(urlPage, itemsPerPage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -291,16 +309,13 @@ export function PremiumListingsGrid({
         newUrl
       );
 
-      // Scroll to top of grid
-      const gridElement = document.getElementById("listings-grid");
-      if (gridElement) {
-        gridElement.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+      // Smooth scroll to top of grid
+      scrollToGridTop();
 
       // Fetch new data via API
       fetchListings(newPage, itemsPerPage);
     },
-    [pathname, fetchListings, itemsPerPage, currentPage]
+    [pathname, fetchListings, itemsPerPage, currentPage, scrollToGridTop]
   );
 
   // Handle items per page change - fetch with new limit
@@ -324,10 +339,13 @@ export function PremiumListingsGrid({
         newUrl
       );
 
+      // Smooth scroll to top of grid
+      scrollToGridTop();
+
       // Fetch with new limit immediately (don't rely on state update)
       fetchListings(1, newLimit);
     },
-    [itemsPerPage, pathname, fetchListings]
+    [itemsPerPage, pathname, fetchListings, scrollToGridTop]
   );
 
   // Track previous serverListings to detect actual data changes
@@ -552,22 +570,25 @@ export function PremiumListingsGrid({
         </div>
       )}
 
-      {/* Loading overlay */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2 text-muted-foreground">
-            Loading listings...
-          </span>
-        </div>
-      )}
+      {/* Listings Grid with in-place Loading State */}
+      <div className="relative min-h-[300px]">
+        {isLoading && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/50 backdrop-blur-[2px] rounded-2xl transition-all duration-300">
+            <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-card/90 border border-border shadow-xl">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <span className="text-sm font-medium text-foreground">
+                Loading listings...
+              </span>
+            </div>
+          </div>
+        )}
 
-      {/* Listings Grid */}
-      {!isLoading && (
+        {/* Listings Grid */}
         <div
           key={`${currentPage}-${itemsPerPage}-${cardsPerRow}`}
           className={cn(
-            "grid gap-3 sm:gap-6",
+            "grid gap-3 sm:gap-6 transition-opacity duration-200",
+            isLoading && "opacity-30 pointer-events-none",
             CARDS_PER_ROW_OPTIONS.find((option) => option.value === cardsPerRow)
               ?.grid ||
               "grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
@@ -577,7 +598,7 @@ export function PremiumListingsGrid({
             <div
               key={listing.id}
               className="animate-fade-in"
-              style={{ animationDelay: `${index * 0.06}s` }}
+              style={{ animationDelay: `${index * 0.04}s` }}
             >
               <PremiumListingCard
                 listing={
@@ -590,7 +611,7 @@ export function PremiumListingsGrid({
             </div>
           ))}
         </div>
-      )}
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
