@@ -387,7 +387,11 @@ function LoginForm() {
               <p className="mt-5 text-center text-sm text-white/70">
                 Don&apos;t have an account?{" "}
                 <Link
-                  href="/signup"
+                  href={
+                    nextParam
+                      ? `/signup?next=${encodeURIComponent(nextParam)}`
+                      : "/signup"
+                  }
                   className="font-semibold text-white underline transition-colors hover:text-white/80"
                 >
                   Sign up

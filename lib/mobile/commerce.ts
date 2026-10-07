@@ -115,12 +115,17 @@ export type CheckoutItem = { ticket_type_id: number; quantity: number };
  * value is globally unique per user - two users at the same event with the same
  * tickets + last-4 CNIC can't collide in the shared `basket_id` namespace the
  * callback's `.single()` lookup depends on.
+ *
+ * `parchiVerificationId` is folded in only when present (existing hashes are
+ * unchanged), so a Parchi checkout never reuses an earlier undiscounted
+ * booking for the same cart.
  */
 export function computeBasketHash(
   userId: string,
   eventId: number,
   items: CheckoutItem[],
   cnic: string,
+  parchiVerificationId?: string,
 ): string {
   const payload = {
     user_id: userId,
@@ -130,6 +135,7 @@ export function computeBasketHash(
       .sort((a, b) => a.ticket_type_id - b.ticket_type_id)
       .map((i) => `${i.ticket_type_id}x${i.quantity}`),
     cnic_hash_preview: cnic.slice(-4),
+    ...(parchiVerificationId ? { parchi: parchiVerificationId } : {}),
   };
   return crypto
     .createHash("sha256")

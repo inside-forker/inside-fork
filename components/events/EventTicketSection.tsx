@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -10,6 +10,8 @@ import { EventTicketSectionProps, TicketType } from "@/types/events.types";
 import { PremiumHeading } from "@/components/brand/Typography";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/context/cartStore";
+import { computeParchiDiscount, PARCHI_BLUE } from "@/lib/parchi/discount";
+import { useArrivedFromParchi } from "@/lib/parchi/prefill";
 import {
   sectionVariants,
   cardGridVariants,
@@ -20,8 +22,19 @@ import {
 export function EventTicketSection({
   event,
   ticketTypes,
+  parchiOffer,
 }: EventTicketSectionProps) {
   const router = useRouter();
+  // Visitors from the Parchi app see the student price up front. It's a
+  // preview: the discount is applied at checkout once they approve in Parchi.
+  const arrivedFromParchi = useArrivedFromParchi();
+  const showParchiPrice = !!parchiOffer && arrivedFromParchi;
+  // Rounded for display, like the rest of the site's prices; the exact
+  // amount is charged at checkout.
+  const parchiPrice = (amount: number) =>
+    parchiOffer
+      ? Math.round(amount - computeParchiDiscount(parchiOffer, amount))
+      : amount;
   const { addItem, clearCart } = useCartStore();
   const [selectedTickets, setSelectedTickets] = useState<
     Record<number, number>
@@ -160,13 +173,32 @@ export function EventTicketSection({
                         <Badge variant={status.variant} className="mb-1">
                           {status.text}
                         </Badge>
-                        <div className="text-xl sm:text-2xl md:text-3xl font-bold whitespace-nowrap">
-                          {formatPrice(ticket.price)}
-                        </div>
-                        {ticket.price > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            per ticket
-                          </div>
+                        {showParchiPrice && ticket.price > 0 ? (
+                          <>
+                            <div className="text-sm text-muted-foreground line-through whitespace-nowrap">
+                              {formatPrice(ticket.price)}
+                            </div>
+                            <div
+                              className="text-xl sm:text-2xl md:text-3xl font-bold whitespace-nowrap"
+                              style={{ color: PARCHI_BLUE }}
+                            >
+                              {formatPrice(parchiPrice(ticket.price))}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Parchi student price
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-xl sm:text-2xl md:text-3xl font-bold whitespace-nowrap">
+                              {formatPrice(ticket.price)}
+                            </div>
+                            {ticket.price > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                per ticket
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -244,29 +276,44 @@ export function EventTicketSection({
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="sticky bottom-4 z-10"
+          className="sticky bottom-24 md:bottom-6 z-40"
         >
-          <Card className="p-6 bg-card border rounded-2xl hover:border-primary/40 transition-all duration-300">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <Card className="p-4 sm:p-6 bg-card/95 backdrop-blur-md border border-border shadow-2xl hover:border-primary/40 transition-all duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
               <div>
-                <h4 className="text-base sm:text-lg font-semibold mb-1">
+                <h4 className="text-sm sm:text-base md:text-lg font-semibold mb-0.5">
                   {getTotalTickets()} ticket{getTotalTickets() !== 1 ? "s" : ""}{" "}
                   selected
                 </h4>
-                <p className="text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Total:{" "}
-                  <span className="font-semibold text-foreground">
-                    {formatPrice(getTotalPrice())}
-                  </span>
+                  {showParchiPrice && getTotalPrice() > 0 ? (
+                    <>
+                      <span className="line-through mr-1.5 sm:mr-2">
+                        {formatPrice(getTotalPrice())}
+                      </span>
+                      <span
+                        className="font-semibold"
+                        style={{ color: PARCHI_BLUE }}
+                      >
+                        {formatPrice(parchiPrice(getTotalPrice()))}
+                      </span>{" "}
+                      <span className="text-xs">with Parchi</span>
+                    </>
+                  ) : (
+                    <span className="font-semibold text-foreground">
+                      {formatPrice(getTotalPrice())}
+                    </span>
+                  )}
                 </p>
               </div>
 
               <Button
                 size="lg"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 py-3 rounded-xl transition-all duration-300"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl transition-all duration-300 w-full sm:w-auto shadow-lg shadow-primary/25 text-sm sm:text-base"
                 onClick={handleProceedToCheckout}
               >
-                <CreditCard className="w-5 h-5 mr-2" />
+                <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                 Proceed to Checkout
               </Button>
             </div>

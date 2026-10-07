@@ -12,6 +12,8 @@ import { getEventGalleryImages } from "@/lib/utils/listing-images";
 import { EventSidebarButton } from "@/components/events/EventSidebarButton";
 import { ReportIssueButton } from "@/components/shared/ReportIssueButton";
 import { Suspense } from "react";
+import { ParchiEventBanner } from "@/components/events/ParchiEventBanner";
+import { getParchiOffer, type ParchiOffer } from "@/lib/parchi/service";
 
 // Containers
 import { EventTicketsContainer } from "@/components/events/containers/EventTicketsContainer";
@@ -67,6 +69,15 @@ export default async function EventPage({
   );
 
   const eventImages = (eventImagesData || []) as EventImage[];
+
+  // Parchi student discount for this event, if one is switched on. Never let
+  // it break the page.
+  let parchiOffer: ParchiOffer | null = null;
+  try {
+    parchiOffer = await getParchiOffer(event.id);
+  } catch (err) {
+    console.error("[event page] Parchi offer lookup failed:", err);
+  }
   // TEMP PREVIEW ONLY - revert before commit
   if (eventImages.length === 0 && event.id === 85) {
     eventImages.push({
@@ -93,10 +104,12 @@ export default async function EventPage({
       <EventHero event={event} images={heroImages} withTopMargin={false} />
 
       {/* MainContent */}
-      <div className="container mx-auto px-4 md:px-6 lg:px-8 py-12 md:py-16 lg:py-20">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 pt-12 pb-28 md:py-16 lg:py-20">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 md:gap-16 lg:gap-20">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-12 md:space-y-16 lg:space-y-20">
+            {parchiOffer && <ParchiEventBanner offer={parchiOffer} />}
+
             {/* Event Description */}
             {event.description && (
               <AnimatedSection className="space-y-6">
@@ -129,7 +142,7 @@ export default async function EventPage({
 
             {/* Ticket Section */}
             <Suspense fallback={<TicketSkeleton />}>
-              <EventTicketsContainer event={event} />
+              <EventTicketsContainer event={event} parchiOffer={parchiOffer} />
             </Suspense>
 
             {/* Event Location */}

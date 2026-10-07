@@ -1,5 +1,4 @@
 import { CheckoutClient } from "@/components/checkout/CheckoutClient";
-import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -18,11 +17,8 @@ export default function CheckoutPage() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
       </div>
 
-      <div className="container max-w-7xl pt-12 pb-20 relative z-10">
-        {/* Header Section */}
-        <CheckoutHeader />
-
-        {/* Main Content */}
+      {/* One column, like the app's checkout. */}
+      <div className="relative z-10 mx-auto w-full max-w-xl px-4 pb-32 pt-6 sm:px-6 md:pb-16">
         <CheckoutClient />
       </div>
     </div>

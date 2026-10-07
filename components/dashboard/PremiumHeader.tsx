@@ -13,6 +13,7 @@ import { ThemeAwareLogo } from "@/components/layout/ThemeAwareLogo";
 import { NotificationBell } from "@/components/layout/notifications/NotificationBell";
 import { SecurityAlertsBadge } from "@/components/admin/SecurityAlertsBadge";
 import { useRouter } from "next/navigation";
+import { useAuthLinks } from "@/lib/auth/return-to";
 import { PremiumDiscoveryPanel } from "@/components/layout/PremiumDiscoveryPanel";
 
 interface Profile {
@@ -48,6 +49,8 @@ export function PremiumHeader({
   onMenuClick,
   sidebarOpen = false,
 }: PremiumHeaderProps) {
+  // Sign in / Join bring the visitor back to this page afterwards.
+  const { loginHref, signupHref } = useAuthLinks();
   const [isDiscoveryOpen, setIsDiscoveryOpen] = React.useState(false);
   const router = useRouter();
 
@@ -141,7 +144,7 @@ export function PremiumHeader({
                   size="sm"
                   className="text-sm font-medium hover:bg-accent/50 transition-all duration-200 hover:scale-105 active:scale-95"
                 >
-                  <a href="/login">
+                  <a href={loginHref}>
                     <span className="sm:hidden">Login</span>
                     <span className="hidden sm:inline">Sign In</span>
                   </a>
@@ -151,7 +154,7 @@ export function PremiumHeader({
                   size="sm"
                   className="text-sm font-medium bg-primary hover:bg-primary/90 transition-all duration-200 px-3 sm:px-4 hover:scale-105 active:scale-95"
                 >
-                  <a href="/signup">
+                  <a href={signupHref}>
                     <span className="sm:hidden">Join</span>
                     <span className="hidden sm:inline">Get Started</span>
                   </a>
@@ -354,14 +357,14 @@ export function PremiumHeader({
                     size="sm"
                     className="text-sm font-medium hover:bg-accent/50 transition-all duration-200 hover:scale-105 active:scale-95"
                   >
-                    <a href="/login">Sign In</a>
+                    <a href={loginHref}>Sign In</a>
                   </Button>
                   <Button
                     asChild
                     size="sm"
                     className="text-sm font-medium bg-primary hover:bg-primary/90 transition-all duration-200 hover:scale-105 active:scale-95"
                   >
-                    <a href="/signup">Get Started</a>
+                    <a href={signupHref}>Get Started</a>
                   </Button>
                 </div>
               )}
