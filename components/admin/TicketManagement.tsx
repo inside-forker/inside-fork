@@ -923,7 +923,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
         onClose={() => setDeletingTicket(null)}
         onConfirm={handleDelete}
         title="Delete Ticket Type"
-        description={`Are you sure you want to delete "${deletingTicket?.name}"? This action cannot be undone. If there are existing bookings for this ticket type, the deletion will be prevented.`}
+        description={`Are you sure you want to delete "${deletingTicket?.name}"? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="destructive"

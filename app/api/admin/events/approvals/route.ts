@@ -540,21 +540,10 @@ export async function POST(request: NextRequest) {
           );
 
           for (const id of idsToDelete) {
-            // Check for bookings first
-            const { rows: bookingCountRows } = await query(
-              `SELECT COUNT(*) FROM booking_items WHERE ticket_type_id = $1`,
-              [id]
-            );
-            const bookingCount = parseInt(bookingCountRows[0].count, 10);
-
-            if (!bookingCount || bookingCount === 0) {
-              await query(`DELETE FROM ticket_types WHERE id = $1`, [id]);
-              console.log(`Deleted ticket ${id}`);
-            } else {
-              console.warn(
-                `Skipping deletion of ticket ${id} due to existing bookings`
-              );
-            }
+            await query(`DELETE FROM ticket_passes WHERE ticket_type_id = $1`, [id]);
+            await query(`DELETE FROM booking_items WHERE ticket_type_id = $1`, [id]);
+            await query(`DELETE FROM ticket_types WHERE id = $1`, [id]);
+            console.log(`Deleted ticket ${id}`);
           }
 
           // 3. Upsert (Update existing or Insert new)

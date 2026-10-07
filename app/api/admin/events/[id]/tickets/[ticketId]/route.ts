@@ -292,32 +292,10 @@ export async function DELETE(
       );
     }
 
-    // Check if ticket type has any bookings before deleting
-    console.log(`Checking bookings for ticket type ${ticketTypeId}`);
-    const { rows: bookingRows } = await query(
-      `SELECT booking_id FROM booking_items WHERE ticket_type_id = $1 LIMIT 1`,
-      [ticketTypeId]
-    );
-
-    if (bookingRows.length > 0) {
-      console.log(
-        `Found ${bookingRows.length} booking(s) for ticket type ${ticketTypeId}`
-      );
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Cannot delete ticket type with existing bookings",
-        },
-        { status: 400 }
-      );
-    }
-
-    console.log(
-      `No bookings found for ticket type ${ticketTypeId}, proceeding with deletion`
-    );
-
-    // Delete ticket type
+    // Delete ticket type (along with any associated passes and booking items)
     try {
+      await query(`DELETE FROM ticket_passes WHERE ticket_type_id = $1`, [ticketTypeId]);
+      await query(`DELETE FROM booking_items WHERE ticket_type_id = $1`, [ticketTypeId]);
       await query(
         `DELETE FROM ticket_types WHERE id = $1 AND event_id = $2`,
         [ticketTypeId, eventId]
@@ -326,17 +304,6 @@ export async function DELETE(
       console.error("Error deleting ticket type:", error);
       const pgError = error as { code?: string; message?: string };
       console.error("Delete error details:", pgError);
-
-      // Provide more specific error messages based on error type
-      if (pgError.code === "23503") {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Cannot delete ticket type due to database constraints",
-          },
-          { status: 400 }
-        );
-      }
 
       return NextResponse.json(
         { success: false, error: "Failed to delete ticket type" },
