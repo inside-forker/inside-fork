@@ -32,6 +32,12 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const { rows } = await query(
     `SELECT ${BOOKING_SELECT}, e.name AS event_name, e.start_time AS event_start_time,
             e.location_name AS event_location_name,
+            e.address AS event_address,
+            COALESCE(
+              (SELECT url FROM event_images ei WHERE ei.event_id = e.id AND ei.is_primary = true LIMIT 1),
+              (SELECT url FROM event_images ei WHERE ei.event_id = e.id ORDER BY ei.display_order ASC, ei.id ASC LIMIT 1),
+              e.image_url
+            ) AS event_image_url,
             (
               SELECT COUNT(*)::int
               FROM ticket_passes tp
@@ -48,12 +54,16 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     event_name: string | null;
     event_start_time: string | null;
     event_location_name: string | null;
+    event_address: string | null;
+    event_image_url: string | null;
     ticket_count: string;
   })[]).map((row) => ({
     ...toBooking(row),
     event_name: row.event_name,
     event_start_time: row.event_start_time,
     event_location_name: row.event_location_name,
+    event_address: row.event_address,
+    event_image_url: row.event_image_url,
     ticket_count: parseInt(row.ticket_count, 10) || 0,
   }));
 
