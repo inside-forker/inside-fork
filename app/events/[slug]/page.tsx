@@ -104,18 +104,18 @@ export default async function EventPage({
       <EventHero event={event} images={heroImages} withTopMargin={false} />
 
       {/* MainContent */}
-      <div className="container mx-auto px-4 md:px-6 lg:px-8 pt-12 pb-28 md:py-16 lg:py-20">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 md:gap-16 lg:gap-20">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 pt-6 sm:pt-8 md:pt-10 pb-28 md:pb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-10 lg:gap-12">
           {/* Left Column - Main Content */}
-          <div className="lg:col-span-2 space-y-12 md:space-y-16 lg:space-y-20">
+          <div className="lg:col-span-2 space-y-8 md:space-y-10">
             {parchiOffer && <ParchiEventBanner offer={parchiOffer} />}
 
             {/* Event Description */}
             {event.description && (
-              <AnimatedSection className="space-y-6">
+              <AnimatedSection className="space-y-4">
                 <div className="flex items-center space-x-3">
-                  <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
-                    <ExternalLink className="w-5 h-5 text-primary" />
+                  <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
+                    <ExternalLink className="w-4 h-4 text-primary" />
                   </div>
                   <PremiumHeading level={2} dense className="text-foreground">
                     About This{" "}
