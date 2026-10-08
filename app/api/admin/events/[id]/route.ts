@@ -40,7 +40,8 @@ const EVENTS_ROW_COLUMNS =
   "is_commission_based, commission_rate, status, " +
   "to_json(created_at) #>> '{}' AS created_at, to_json(updated_at) #>> '{}' AS updated_at, " +
   "category_id, max_capacity, is_featured, featured_rank, require_guest_details, " +
-  "location_name, address, latitude, longitude, scanning_mode, total_gates";
+  "location_name, address, latitude, longitude, scanning_mode, total_gates, " +
+  "layout_image_url";
 
 function toNumericEventsRow(row: Record<string, unknown>) {
   return {
@@ -132,10 +133,17 @@ export async function GET(
       images = [];
     }
 
+    // Not on the (untracked) events_with_details view, so read it directly.
+    const { rows: layoutRows } = await query(
+      `SELECT layout_image_url FROM events WHERE id = $1`,
+      [eventId]
+    );
+
     return NextResponse.json({
       success: true,
       data: {
         ...toNumericEvent(event),
+        layout_image_url: layoutRows[0]?.layout_image_url ?? null,
         images,
       },
     });
@@ -214,6 +222,7 @@ export async function PATCH(
       require_guest_details,
       scanning_mode,
       total_gates,
+      layout_image_url,
     } = body;
 
     // Build update
@@ -271,6 +280,8 @@ export async function PATCH(
       pushField("scanning_mode", scanning_mode);
     if (total_gates !== undefined)
       pushField("total_gates", Math.max(1, parseInt(total_gates, 10) || 1));
+    if (layout_image_url !== undefined)
+      pushField("layout_image_url", layout_image_url || null);
 
     updateParams.push(eventId);
     const idIdx = updateParams.length;

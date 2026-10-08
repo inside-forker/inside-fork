@@ -170,11 +170,14 @@ interface PremiumGalleryProps {
       }>
     | string[];
   title?: string;
+  /** Camera icon next to the heading (off on the event page). */
+  showIcon?: boolean;
 }
 
 export function PremiumGallery({
   images = [],
   title: _title = "Gallery",
+  showIcon = true,
 }: PremiumGalleryProps) {
   const [selectedImage, setSelectedImage] = useState<number | null>(null);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -323,9 +326,11 @@ export function PremiumGallery({
           {/* Mobile Header */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                <Camera className="h-4 w-4 text-primary" />
-              </div>
+              {showIcon && (
+                <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Camera className="h-4 w-4 text-primary" />
+                </div>
+              )}
               <div className="flex flex-col justify-center min-w-0">
                 <h3 className="font-bold text-base text-foreground leading-tight">
                   Photos
@@ -374,9 +379,11 @@ export function PremiumGallery({
         <div className="hidden md:block">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0 shadow-sm">
-                <Camera className="h-6 w-6 text-primary" />
-              </div>
+              {showIcon && (
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Camera className="h-6 w-6 text-primary" />
+                </div>
+              )}
               <div>
                 <PremiumHeading level={2} dense className="text-foreground">
                   {_title} <span className="text-primary"></span>

@@ -210,6 +210,7 @@ export async function POST(request: NextRequest) {
       require_guest_details,
       scanning_mode,
       total_gates,
+      layout_image_url,
     } = body;
 
     if (!name || !name.trim()) {
@@ -253,8 +254,8 @@ export async function POST(request: NextRequest) {
            name, slug, description, start_time, end_time,
            location_name, address, latitude, longitude, category_id, organizer_id, max_capacity,
            is_featured, featured_rank, commission_rate, is_commission_based, status, require_guest_details,
-           scanning_mode, total_gates
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+           scanning_mode, total_gates, layout_image_url
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
          RETURNING id, organizer_id, name, slug, description,
            to_json(start_time) #>> '{}' AS start_time,
            to_json(end_time) #>> '{}' AS end_time,
@@ -262,7 +263,8 @@ export async function POST(request: NextRequest) {
            to_json(created_at) #>> '{}' AS created_at,
            to_json(updated_at) #>> '{}' AS updated_at,
            category_id, max_capacity, is_featured, featured_rank, require_guest_details,
-           location_name, address, latitude, longitude, scanning_mode, total_gates`,
+           location_name, address, latitude, longitude, scanning_mode, total_gates,
+           layout_image_url`,
         [
           name.trim(),
           slug,
@@ -292,6 +294,7 @@ export async function POST(request: NextRequest) {
           require_guest_details === true || require_guest_details === "true",
           scanning_mode || "single",
           total_gates ? Math.max(1, parseInt(String(total_gates), 10) || 1) : 1,
+          layout_image_url || null,
         ]
       );
       const row = rows[0];

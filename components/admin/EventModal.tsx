@@ -39,6 +39,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OrganizerSelect } from "./OrganizerSelect";
 import { EventGalleryUpload } from "./EventGalleryUpload";
+import { EventVenueMapUpload } from "./EventVenueMapUpload";
 import { TicketManagement } from "./TicketManagement";
 import { v4 as uuidv4 } from "uuid";
 
@@ -83,6 +84,7 @@ export function EventModal({
     require_guest_details: false,
     scanning_mode: "single",
     total_gates: "1",
+    layout_image_url: "",
   });
 
   const [categories, setCategories] = React.useState<Category[]>([]);
@@ -197,6 +199,7 @@ export function EventModal({
         require_guest_details: false,
         scanning_mode: "single",
         total_gates: "1",
+        layout_image_url: "",
       });
       setImages([]);
       setPendingImageDeletions(new Set());
@@ -227,6 +230,7 @@ export function EventModal({
         require_guest_details: false,
         scanning_mode: "single",
         total_gates: "1",
+        layout_image_url: "",
       });
       setImages([]);
       setPendingImageDeletions(new Set());
@@ -264,6 +268,7 @@ export function EventModal({
               require_guest_details: eventData.require_guest_details || false,
               scanning_mode: eventData.scanning_mode || "single",
               total_gates: (eventData.total_gates || 1).toString(),
+              layout_image_url: eventData.layout_image_url || "",
             });
             setImages(eventData.images || []);
           }
@@ -693,6 +698,7 @@ export function EventModal({
         require_guest_details: formData.require_guest_details,
         scanning_mode: formData.scanning_mode as "single" | "multi_gate",
         total_gates: Math.max(1, parseInt(formData.total_gates || "1", 10) || 1),
+        layout_image_url: formData.layout_image_url || null,
       };
 
       const result = await onSave(eventData);
@@ -1425,6 +1431,14 @@ export function EventModal({
                   isLoading={isLoadingData}
                   pendingDeletions={pendingImageDeletions}
                   onPendingDeletionsChange={setPendingImageDeletions}
+                />
+                <Separator />
+                <EventVenueMapUpload
+                  value={formData.layout_image_url}
+                  onChange={(url) =>
+                    setFormData((prev) => ({ ...prev, layout_image_url: url }))
+                  }
+                  disabled={isLoadingData}
                 />
               </TabsContent>
 
