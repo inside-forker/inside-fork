@@ -10,6 +10,8 @@ import {
   type BookingRow,
 } from "@/lib/mobile/commerce";
 
+import { fetchPrimaryImagesByEventId } from "@/lib/mobile/event-images";
+
 export const dynamic = "force-dynamic";
 
 const BOOKING_SELECT = BOOKING_COLUMN_KEYS.map((c) => `b.${c}`).join(", ");
@@ -32,6 +34,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const { rows } = await query(
     `SELECT ${BOOKING_SELECT}, e.name AS event_name, e.start_time AS event_start_time,
             e.location_name AS event_location_name,
+            e.address AS event_address,
             (
               SELECT COUNT(*)::int
               FROM ticket_passes tp
@@ -44,16 +47,24 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     [user.id],
   );
 
+  const eventIds = rows
+    .map((r) => Number((r as { event_id?: unknown }).event_id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+  const imagesByEventId = await fetchPrimaryImagesByEventId(eventIds);
+
   const bookings = (rows as unknown as (BookingRow & {
     event_name: string | null;
     event_start_time: string | null;
     event_location_name: string | null;
+    event_address: string | null;
     ticket_count: string;
   })[]).map((row) => ({
     ...toBooking(row),
     event_name: row.event_name,
     event_start_time: row.event_start_time,
     event_location_name: row.event_location_name,
+    event_address: row.event_address,
+    event_image_url: imagesByEventId.get(Number(row.event_id)) || null,
     ticket_count: parseInt(row.ticket_count, 10) || 0,
   }));
 

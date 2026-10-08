@@ -29,10 +29,12 @@ export function GoogleSignInButton({
   next,
   invite,
   label = "Continue with Google",
+  className,
 }: {
   next?: string;
   invite?: string;
   label?: string;
+  className?: string;
 }) {
   const params = new URLSearchParams();
   if (next) params.set("next", next);
@@ -45,7 +47,10 @@ export function GoogleSignInButton({
       type="button"
       variant="outline"
       asChild
-      className="w-full bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white font-medium py-3 rounded-lg transition-all duration-200"
+      className={
+        className ??
+        "w-full bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white font-medium py-3 rounded-lg transition-all duration-200"
+      }
     >
       <a href={href} className="flex items-center justify-center gap-2">
         <GoogleLogo />

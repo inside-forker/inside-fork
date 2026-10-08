@@ -17,6 +17,7 @@ import { query } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { createAndSendSignupOtp } from "@/lib/auth/otp";
 import { v4 as uuidv4 } from "uuid";
+import { recordParchiAuth } from "@/lib/parchi/attribution";
 
 // Username validation function
 function validateUsername(username: string): boolean {
@@ -333,7 +334,7 @@ export async function POST(request: Request) {
       },
     };
 
-    return NextResponse.json(responseBody, {
+    const signupResponse = NextResponse.json(responseBody, {
       headers: {
         "X-Content-Type-Options": "nosniff",
         "X-Frame-Options": "DENY",
@@ -341,6 +342,8 @@ export async function POST(request: Request) {
         "Referrer-Policy": "strict-origin-when-cross-origin",
       },
     });
+    await recordParchiAuth(request, signupResponse, newUserId, "signup", "email");
+    return signupResponse;
   } catch (error) {
     console.error("Signup error:", error);
     captureRouteError(error, { route: "/api/auth/signup", method: "POST" });

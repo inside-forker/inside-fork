@@ -6,6 +6,7 @@ import {
   checkAuthRateLimit,
   createRateLimitResponse,
 } from "@/lib/rate-limiter-distributed";
+import { recordParchiAuth } from "@/lib/parchi/attribution";
 
 export async function POST(request: NextRequest) {
   const { email, password } = await request.json();
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
       email,
       role: dbUser.role,
     });
+    await recordParchiAuth(request, response, dbUser.id, "signin", "email");
 
     // Log successful login
     try {

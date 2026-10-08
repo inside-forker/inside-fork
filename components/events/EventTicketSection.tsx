@@ -5,13 +5,16 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Ticket, Plus, Minus, Clock, Users, CreditCard } from "lucide-react";
+import { Ticket, Plus, Minus, Clock, Users, CreditCard, LogIn } from "lucide-react";
 import { EventTicketSectionProps, TicketType } from "@/types/events.types";
 import { PremiumHeading } from "@/components/brand/Typography";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/context/cartStore";
 import { computeParchiDiscount, PARCHI_BLUE } from "@/lib/parchi/discount";
 import { useArrivedFromParchi } from "@/lib/parchi/prefill";
+import { isPrismfestSlug } from "@/lib/events/prismfest";
+import { useSupabaseUser } from "@/hooks/useSupabaseUser";
+import { AuthModal } from "@/components/auth/AuthModal";
 import {
   sectionVariants,
   cardGridVariants,
@@ -25,13 +28,16 @@ export function EventTicketSection({
   parchiOffer,
 }: EventTicketSectionProps) {
   const router = useRouter();
-  // Visitors from the Parchi app see the student price up front. It's a
-  // preview: the discount is applied at checkout once they approve in Parchi.
+  const { user, isLoading: isUserLoading } = useSupabaseUser();
+  // Parchi-app visitors: full prices + Parchi 2FA later. Logged-in IK on
+  // Prismfest (not from Parchi): preview the student slash automatically.
   const arrivedFromParchi = useArrivedFromParchi();
-  const showParchiPrice = !!parchiOffer && arrivedFromParchi;
-  // Rounded for display, like the rest of the site's prices; the exact
-  // amount is charged at checkout.
-  const parchiPrice = (amount: number) =>
+  const showIkStudentPrice =
+    !!parchiOffer &&
+    !arrivedFromParchi &&
+    !!user &&
+    isPrismfestSlug(event.slug);
+  const studentPrice = (amount: number) =>
     parchiOffer
       ? Math.round(amount - computeParchiDiscount(parchiOffer, amount))
       : amount;
@@ -39,6 +45,7 @@ export function EventTicketSection({
   const [selectedTickets, setSelectedTickets] = useState<
     Record<number, number>
   >({});
+  const [authOpen, setAuthOpen] = useState(false);
 
   const updateTicketQuantity = (ticketId: number, quantity: number) => {
     setSelectedTickets((prev) => ({
@@ -60,7 +67,7 @@ export function EventTicketSection({
   const getTotalTickets = () => {
     return Object.values(selectedTickets).reduce(
       (total, quantity) => total + quantity,
-      0
+      0,
     );
   };
 
@@ -99,7 +106,7 @@ export function EventTicketSection({
     return { text: "Available", variant: "default" as const };
   };
 
-  const handleProceedToCheckout = () => {
+  const goToCheckout = () => {
     clearCart();
     Object.entries(selectedTickets).forEach(([id, quantity]) => {
       if (quantity > 0) {
@@ -119,6 +126,16 @@ export function EventTicketSection({
     });
     router.push("/checkout");
   };
+
+  const handleProceedToCheckout = () => {
+    if (arrivedFromParchi && !user && !isUserLoading) {
+      setAuthOpen(true);
+      return;
+    }
+    goToCheckout();
+  };
+
+  const needsLoginCta = arrivedFromParchi && !user && !isUserLoading;
 
   return (
     <motion.div
@@ -153,9 +170,7 @@ export function EventTicketSection({
           return (
             <motion.div key={ticket.id} variants={cardVariants}>
               <Card className="group relative overflow-hidden bg-card border rounded-2xl p-4 md:p-6 lg:p-8 hover:border-primary/40 transition-all duration-300">
-                {/* Mobile: Stack vertically, Desktop: Side by side */}
                 <div className="flex flex-col gap-4 lg:gap-6">
-                  {/* Top row: Ticket info */}
                   <div className="flex-1 space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
@@ -168,24 +183,20 @@ export function EventTicketSection({
                             : FALLBACK_TICKET_DESCRIPTION}
                         </p>
                       </div>
-                      {/* Price - Always visible on the right */}
                       <div className="text-right flex-shrink-0">
                         <Badge variant={status.variant} className="mb-1">
                           {status.text}
                         </Badge>
-                        {showParchiPrice && ticket.price > 0 ? (
+                        {showIkStudentPrice && ticket.price > 0 ? (
                           <>
                             <div className="text-sm text-muted-foreground line-through whitespace-nowrap">
                               {formatPrice(ticket.price)}
                             </div>
-                            <div
-                              className="text-xl sm:text-2xl md:text-3xl font-bold whitespace-nowrap"
-                              style={{ color: PARCHI_BLUE }}
-                            >
-                              {formatPrice(parchiPrice(ticket.price))}
+                            <div className="text-xl sm:text-2xl md:text-3xl font-bold whitespace-nowrap text-primary">
+                              {formatPrice(studentPrice(ticket.price))}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Parchi student price
+                              Student price
                             </div>
                           </>
                         ) : (
@@ -232,7 +243,7 @@ export function EventTicketSection({
                             onClick={() =>
                               updateTicketQuantity(
                                 ticket.id,
-                                selectedQuantity - 1
+                                selectedQuantity - 1,
                               )
                             }
                             disabled={selectedQuantity === 0}
@@ -252,7 +263,7 @@ export function EventTicketSection({
                             onClick={() =>
                               updateTicketQuantity(
                                 ticket.id,
-                                selectedQuantity + 1
+                                selectedQuantity + 1,
                               )
                             }
                             disabled={selectedQuantity >= maxQuantity}
@@ -263,8 +274,6 @@ export function EventTicketSection({
                       )}
                     </div>
                   </div>
-
-                  {/* Removed duplicate bottom-row selector - moved inline in the info row */}
                 </div>
               </Card>
             </motion.div>
@@ -287,22 +296,24 @@ export function EventTicketSection({
                 </h4>
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   Total:{" "}
-                  {showParchiPrice && getTotalPrice() > 0 ? (
+                  {showIkStudentPrice && getTotalPrice() > 0 ? (
                     <>
                       <span className="line-through mr-1.5 sm:mr-2">
                         {formatPrice(getTotalPrice())}
                       </span>
-                      <span
-                        className="font-semibold"
-                        style={{ color: PARCHI_BLUE }}
-                      >
-                        {formatPrice(parchiPrice(getTotalPrice()))}
+                      <span className="font-semibold text-primary">
+                        {formatPrice(studentPrice(getTotalPrice()))}
                       </span>{" "}
-                      <span className="text-xs">with Parchi</span>
+                      <span className="text-xs">student</span>
                     </>
                   ) : (
                     <span className="font-semibold text-foreground">
                       {formatPrice(getTotalPrice())}
+                    </span>
+                  )}
+                  {arrivedFromParchi && (
+                    <span className="block text-xs mt-0.5" style={{ color: PARCHI_BLUE }}>
+                      Parchi discount applies after you verify at checkout
                     </span>
                   )}
                 </p>
@@ -313,13 +324,29 @@ export function EventTicketSection({
                 className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl transition-all duration-300 w-full sm:w-auto shadow-lg shadow-primary/25 text-sm sm:text-base"
                 onClick={handleProceedToCheckout}
               >
-                <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                Proceed to Checkout
+                {needsLoginCta ? (
+                  <>
+                    <LogIn className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                    Log in
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                    Proceed to Checkout
+                  </>
+                )}
               </Button>
             </div>
           </Card>
         </motion.div>
       )}
+
+      <AuthModal
+        open={authOpen}
+        onOpenChange={setAuthOpen}
+        nextPath={`/events/${event.slug}`}
+        onSuccess={goToCheckout}
+      />
     </motion.div>
   );
 }

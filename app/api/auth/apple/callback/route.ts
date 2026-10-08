@@ -3,6 +3,7 @@ import { exchangeAppleCode } from "@/lib/auth/apple";
 import { getAppleCallbackUrl, getRequestOrigin } from "@/lib/auth/url";
 import { setSession } from "@/lib/auth/session";
 import { findOrCreateOAuthUser } from "@/lib/auth/oauth-account";
+import { recordParchiAuth } from "@/lib/parchi/attribution";
 
 const STATE_COOKIE_NAME = "a_oauth_state";
 
@@ -106,6 +107,13 @@ export async function POST(request: NextRequest) {
       email: user.email,
       role: user.role,
     });
+    await recordParchiAuth(
+      request,
+      response,
+      user.id,
+      user.isNew ? "signup" : "signin",
+      "apple",
+    );
 
     try {
       const { logUserLogin } = await import("@/lib/audit");

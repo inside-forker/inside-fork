@@ -15,6 +15,7 @@ import {
 } from "@/lib/mobile/pagination";
 import { ok } from "@/lib/mobile/response";
 import { enforceMobileRateLimit } from "@/lib/mobile/rate-limit";
+import { DETOUR_CATEGORY_EXCLUSION_SQL } from "@/lib/mobile/detour-exclusions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,11 +27,12 @@ type RecentlyAddedRow = Record<string, unknown> & {
 /**
  * GET /api/mobile/v1/listings/recently-added
  *
- * Public, paginated feed for the home screen's "Recently added" section.
- * Only published listings are eligible. "Added" is the immutable
- * `listings.created_at` timestamp (rather than `updated_at`), so routine edits
- * do not make an older listing appear new. Results are newest first, with the
- * listing id as a deterministic tie-breaker.
+ * Public, paginated feed for the home screen's "Recently added" section (used
+ * to top up "Worth the detour").
+ * Only published listings are eligible, excluding education and hospital/medical
+ * listings. "Added" is the immutable `listings.created_at` timestamp (rather
+ * than `updated_at`), so routine edits do not make an older listing appear new.
+ * Results are newest first, with the listing id as a deterministic tie-breaker.
  */
 export const GET = mobileRoute(async (request: NextRequest) => {
   await enforceMobileRateLimit(request);
@@ -45,14 +47,16 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     const [{ rows: countRows }, { rows }] = await Promise.all([
       query(
         `SELECT COUNT(*)::integer AS total
-         FROM listings
-         WHERE status = 'published'`,
+         FROM listings_with_details ld
+         WHERE ld.status = 'published'
+           AND ${DETOUR_CATEGORY_EXCLUSION_SQL}`,
       ),
       query(
-        `SELECT ${LISTING_CARD_COLUMNS}, created_at AS added_at
-         FROM listings_with_details
-         WHERE status = 'published'
-         ORDER BY created_at DESC NULLS LAST, id DESC
+        `SELECT ${LISTING_CARD_COLUMNS}, ld.created_at AS added_at
+         FROM listings_with_details ld
+         WHERE ld.status = 'published'
+           AND ${DETOUR_CATEGORY_EXCLUSION_SQL}
+         ORDER BY ld.created_at DESC NULLS LAST, ld.id DESC
          LIMIT $1 OFFSET $2`,
         [limit, offset],
       ),

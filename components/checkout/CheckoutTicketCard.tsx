@@ -6,6 +6,7 @@ import { formatEventWhen, formatPkr } from "./checkoutFormat";
 
 export interface CheckoutEventInfo {
   name: string;
+  slug?: string | null;
   start_time: string | null;
   location_name: string | null;
   image_url: string | null;

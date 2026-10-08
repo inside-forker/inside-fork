@@ -12,7 +12,7 @@ import { getEventGalleryImages } from "@/lib/utils/listing-images";
 import { EventSidebarButton } from "@/components/events/EventSidebarButton";
 import { ReportIssueButton } from "@/components/shared/ReportIssueButton";
 import { Suspense } from "react";
-import { ParchiEventBanner } from "@/components/events/ParchiEventBanner";
+import { EventStudentBanners } from "@/components/events/EventStudentBanners";
 import { getParchiOffer, type ParchiOffer } from "@/lib/parchi/service";
 
 // Containers
@@ -108,7 +108,7 @@ export default async function EventPage({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-10 lg:gap-12">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-8 md:space-y-10">
-            {parchiOffer && <ParchiEventBanner offer={parchiOffer} />}
+            <EventStudentBanners offer={parchiOffer} eventSlug={event.slug} />
 
             {/* Event Description */}
             {event.description && (

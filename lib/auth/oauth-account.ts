@@ -64,7 +64,7 @@ export async function findOrCreateOAuthUser(
   provider: "google" | "apple",
   profile: OAuthProfile,
   inviteCode?: string
-): Promise<{ id: string; email: string; role: string }> {
+): Promise<{ id: string; email: string; role: string; isNew: boolean }> {
   const { rows } = await query(
     `SELECT u.id, COALESCE(p.role, 'public_user') as role, u.email, u.raw_app_meta_data, p.id as profile_id
      FROM auth.users u
@@ -128,7 +128,7 @@ export async function findOrCreateOAuthUser(
       );
     }
 
-    return { id: existing.id, email: existing.email, role: existing.role };
+    return { id: existing.id, email: existing.email, role: existing.role, isNew: false };
   }
 
   const newUserId = uuidv4();
@@ -190,5 +190,5 @@ export async function findOrCreateOAuthUser(
     console.error("Failed to log OAuth signup:", logError);
   }
 
-  return { id: newUserId, email: profile.email, role: "public_user" };
+  return { id: newUserId, email: profile.email, role: "public_user", isNew: true };
 }
