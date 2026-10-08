@@ -27,7 +27,7 @@ export function EventDescription({ text }: { text: string }) {
       <p
         ref={ref}
         className={cn(
-          "my-0 text-sm sm:text-base md:text-lg leading-relaxed text-muted-foreground",
+          "my-0 whitespace-pre-line text-sm sm:text-base md:text-lg leading-relaxed text-muted-foreground",
           !expanded && "line-clamp-3 md:line-clamp-4",
         )}
       >

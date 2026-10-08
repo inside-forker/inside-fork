@@ -186,11 +186,6 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
           <PremiumHeading level={2} dense className="text-foreground">
             Event <span className="text-primary">{isMultiOrganizer ? "Organizers" : "Organizer"}</span>
           </PremiumHeading>
-          <p className="text-sm sm:text-base md:text-lg text-muted-foreground md:mt-1">
-            {isMultiOrganizer
-              ? "Meet the team and co-hosts behind this amazing event experience."
-              : "Meet the team behind this amazing event experience."}
-          </p>
         </div>
       </div>
 
