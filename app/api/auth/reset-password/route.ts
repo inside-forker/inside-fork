@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 import { sendPasswordResetEmail } from "@/lib/emails/send-password-reset";
+import { getPublicSiteOrigin } from "@/lib/auth/url";
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,8 +53,8 @@ export async function POST(request: NextRequest) {
         [recoveryToken, tokenSentAt, user.id]
       );
 
-      // Build reset link
-      const resetLink = `${process.env.NEXT_PUBLIC_SITE_URL}/reset-password?code=${recoveryToken}`;
+      // Always the public site (never localhost), even when testing from local.
+      const resetLink = `${getPublicSiteOrigin()}/reset-password?code=${recoveryToken}`;
 
       // Get user profile for full name
       const { rows: profiles } = await query(

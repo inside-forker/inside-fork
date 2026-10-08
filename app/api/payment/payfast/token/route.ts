@@ -20,6 +20,10 @@ import {
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { RESUME_WINDOW_MINUTES } from "@/lib/checkout/resume";
+import {
+  confirmBookingWithoutPayment,
+  isPaymentSkipEnabled,
+} from "@/lib/mobile/skip-payment";
 import { z } from "zod";
 
 // Input validation schema
@@ -91,8 +95,7 @@ export async function POST(request: NextRequest) {
     // a fresh PayFast token for an already-paid booking.
     if (booking.payment_status === "paid") {
       return NextResponse.json(
-        { success: false, error: "This booking has already been paid" },
-        { status: 400 },
+        { success: true, skipped: true, bookingId: booking.id },
       );
     }
     if (booking.payment_status === "refunded") {
@@ -107,6 +110,30 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    // Local/review: confirm without PayFast (also covers resumed unpaid bookings).
+    const isFreeOrder = Number(booking.total_amount) === 0;
+    if (isFreeOrder || isPaymentSkipEnabled()) {
+      const { rows: payRows } = await query(
+        `SELECT id FROM payments WHERE booking_id = $1 AND gateway_code = 'payfast'`,
+        [booking.id],
+      );
+      if (payRows.length === 0) {
+        await query(
+          `INSERT INTO payments (booking_id, gateway_code, amount, currency, status, normalized_status)
+           VALUES ($1, 'payfast', $2, 'PKR', 'AWAITING_DETAILS', 'awaiting_payment')`,
+          [booking.id, booking.total_amount],
+        );
+      }
+      await confirmBookingWithoutPayment(
+        Number(booking.id),
+        isFreeOrder ? "free_order" : "payment_skipped",
+      );
+      return NextResponse.json(
+        { success: true, skipped: true, bookingId: booking.id },
+      );
+    }
+
     // Keyed on `created_at`, matching the resume window - see lib/checkout/resume.
     const createdAtMs = Date.parse(booking.created_at);
     if (

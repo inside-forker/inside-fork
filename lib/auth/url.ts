@@ -1,6 +1,7 @@
 const TRUSTED_SITE_URL_ENV_KEYS = [
   "SITE_URL",
   "NEXT_PUBLIC_SITE_URL",
+  "NEXT_PUBLIC_APP_URL",
   "VERCEL_URL",
 ] as const;
 
@@ -69,7 +70,7 @@ function resolveSiteOrigin(request?: RequestLike): string {
   }
 
   throw new Error(
-    "SITE_URL, NEXT_PUBLIC_SITE_URL, or VERCEL_URL must be configured for auth redirects"
+    "SITE_URL, NEXT_PUBLIC_SITE_URL, NEXT_PUBLIC_APP_URL, or VERCEL_URL must be configured for auth redirects"
   );
 }
 
@@ -101,6 +102,41 @@ export function getStateCookieDomain(): string | undefined {
  */
 export function getRequestOrigin(request?: RequestLike): string {
   return resolveSiteOrigin(request);
+}
+
+function isLocalHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "0.0.0.0" ||
+    host.endsWith(".local")
+  );
+}
+
+/**
+ * Public website origin for links inside outbound emails (password reset, etc.).
+ * Never uses localhost — even when local `.env` points NEXT_PUBLIC_APP_URL at
+ * the dev server — so recipients always land on insidekarachi.com.
+ */
+export function getPublicSiteOrigin(): string {
+  for (const key of [
+    "NEXT_PUBLIC_SITE_URL",
+    "SITE_URL",
+    "NEXT_PUBLIC_APP_URL",
+  ] as const) {
+    const raw = process.env[key]?.trim();
+    if (!raw) continue;
+    try {
+      const origin = normalizeSiteOrigin(raw);
+      if (!isLocalHostname(new URL(origin).hostname)) {
+        return origin;
+      }
+    } catch {
+      /* try next key */
+    }
+  }
+  return "https://www.insidekarachi.com";
 }
 
 export function getAuthCallbackUrl(request?: RequestLike): string {

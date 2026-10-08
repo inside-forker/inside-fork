@@ -13,6 +13,11 @@ import {
   createRateLimitResponse,
 } from "@/lib/rate-limiter-distributed";
 import { captureRouteError } from "@/lib/sentry/captureRouteError";
+import {
+  confirmBookingWithoutPayment,
+  isPaymentSkipEnabled,
+} from "@/lib/mobile/skip-payment";
+import { MobileApiError } from "@/lib/mobile/errors";
 
 // Payment gateway code constant
 const PAYMENT_GATEWAY_CODE = "payfast";
@@ -430,9 +435,33 @@ export async function POST(req: NextRequest) {
     const bookingReference = bookingRow.booking_reference || `${bookingId}`;
     const mockMode = false; // Not using test mode for PayFast
 
-    const normalizedStatus =
+    let normalizedStatus =
       (bookingRow.payment_status as BookingPaymentStatus | null) ??
       "awaiting_payment";
+
+    // Free orders and MOBILE_CHECKOUT_SKIP_PAYMENT skip PayFast entirely.
+    const isFreeOrder = Number(amount) === 0;
+    if (
+      normalizedStatus !== "paid" &&
+      (isFreeOrder || isPaymentSkipEnabled())
+    ) {
+      try {
+        await confirmBookingWithoutPayment(
+          bookingId,
+          isFreeOrder ? "free_order" : "payment_skipped",
+        );
+        normalizedStatus = "paid";
+      } catch (skipErr) {
+        if (skipErr instanceof MobileApiError) {
+          return bad(
+            skipErr.message,
+            skipErr.status,
+            skipErr.code.toUpperCase(),
+          );
+        }
+        throw skipErr;
+      }
+    }
 
     let paymentStage: PaymentStage = "awaiting_payment_details";
     if (normalizedStatus === "paid") {
@@ -441,12 +470,18 @@ export async function POST(req: NextRequest) {
       paymentStage = "awaiting_otp";
     }
 
-    if (normalizedStatus !== "awaiting_payment") {
+    // Normalize non-awaiting statuses to awaiting_payment before PayFast —
+    // never clobber a booking we just confirmed via skip/free.
+    if (
+      normalizedStatus !== "awaiting_payment" &&
+      normalizedStatus !== "paid"
+    ) {
       try {
         await query(
           `UPDATE bookings SET payment_status = 'awaiting_payment' WHERE id = $1`,
           [bookingId],
         );
+        normalizedStatus = "awaiting_payment";
       } catch (updateErr) {
         if (DEBUG_MODE) {
           console.warn(
