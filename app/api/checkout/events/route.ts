@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { rows } = await query(
-      `SELECT e.id, e.require_guest_details, e.name, e.start_time, e.location_name,
+      `SELECT e.id, e.require_guest_details, e.name, e.slug, e.start_time, e.location_name,
               (SELECT i.url FROM event_images i
                WHERE i.event_id = e.id
                ORDER BY i.is_primary DESC NULLS LAST, i.display_order ASC NULLS LAST
@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
       id: Number(row.id),
       require_guest_details: row.require_guest_details,
       name: row.name as string,
+      slug: (row.slug as string | null) ?? null,
       start_time: row.start_time ? new Date(row.start_time).toISOString() : null,
       location_name: (row.location_name as string | null) ?? null,
       image_url: (row.image_url as string | null) ?? null,

@@ -14,6 +14,7 @@ import { NotificationBell } from "@/components/layout/notifications/Notification
 import { SecurityAlertsBadge } from "@/components/admin/SecurityAlertsBadge";
 import { useRouter } from "next/navigation";
 import { useAuthLinks } from "@/lib/auth/return-to";
+import { useSupabaseUser } from "@/hooks/useSupabaseUser";
 import { PremiumDiscoveryPanel } from "@/components/layout/PremiumDiscoveryPanel";
 
 interface Profile {
@@ -42,8 +43,8 @@ interface PremiumHeaderProps {
 }
 
 export function PremiumHeader({
-  user,
-  profile,
+  user: userProp,
+  profile: profileProp,
   context = "dashboard",
   showDiscoveryPanel = false,
   onMenuClick,
@@ -51,6 +52,24 @@ export function PremiumHeader({
 }: PremiumHeaderProps) {
   // Sign in / Join bring the visitor back to this page afterwards.
   const { loginHref, signupHref } = useAuthLinks();
+  const { user: liveUser, isLoading: authLoading } = useSupabaseUser();
+  // Modal login leaves SSR props stale — prefer the live session once resolved.
+  const user = authLoading
+    ? userProp
+    : liveUser
+      ? { id: liveUser.id, email: liveUser.email }
+      : null;
+  const profile = authLoading
+    ? profileProp
+    : liveUser
+      ? {
+          id: liveUser.id,
+          full_name: liveUser.full_name,
+          avatar_url: liveUser.avatar_url,
+          role: liveUser.role,
+          active_role: liveUser.active_role,
+        }
+      : null;
   const [isDiscoveryOpen, setIsDiscoveryOpen] = React.useState(false);
   const router = useRouter();
 

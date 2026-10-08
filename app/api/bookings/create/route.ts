@@ -8,8 +8,12 @@ import { resolveAssignedGateIndex } from "@/lib/ticketing/resolve-gate-assignmen
 import crypto from "crypto";
 import {
   ParchiServiceError,
+  getParchiOffer,
   previewParchiDiscount,
 } from "@/lib/parchi/service";
+import { computeParchiDiscount } from "@/lib/parchi/discount";
+import { readParchiChannelCookie } from "@/lib/parchi/channel";
+import { PRISMFEST_SLUG } from "@/lib/events/prismfest";
 
 export async function POST(request: NextRequest) {
   try {
@@ -132,15 +136,22 @@ export async function POST(request: NextRequest) {
     const paymentFeePercentage =
       feeMap["fees.payment_processing_fee_percentage"] ?? 0;
 
-    // Parchi discount comes off the ticket subtotal before fees (same order
-    // as the mobile route). Non-authoritative: create_booking_atomic
-    // re-derives it under row locks and rejects a mismatch.
+    // Student discount comes off the ticket subtotal before fees.
+    // - Parchi channel / verification: claim via approved request id.
+    // - Logged-in IK on Prismfest, NOT from Parchi: open student discount.
+    // Non-authoritative preview: create_booking_atomic re-derives under locks.
     let discountAmount = 0;
+    let allowOpenStudentDiscount = false;
+    const eventId = verifiedItems[0].eventId as number;
+    const fromParchiChannel = readParchiChannelCookie(
+      request.headers.get("cookie"),
+    );
+
     if (parchiVerificationId) {
       try {
         discountAmount = await previewParchiDiscount({
           userId: user.id,
-          eventId: verifiedItems[0].eventId,
+          eventId,
           requestId: parchiVerificationId,
           subtotal,
         });
@@ -152,6 +163,19 @@ export async function POST(request: NextRequest) {
           );
         }
         throw err;
+      }
+    } else if (!fromParchiChannel) {
+      const { rows: eventRows } = await query(
+        `SELECT slug FROM events WHERE id = $1 LIMIT 1`,
+        [eventId],
+      );
+      const slug = (eventRows[0]?.slug as string | undefined) ?? "";
+      if (slug === PRISMFEST_SLUG) {
+        const offer = await getParchiOffer(eventId);
+        if (offer) {
+          discountAmount = computeParchiDiscount(offer, subtotal);
+          allowOpenStudentDiscount = discountAmount > 0;
+        }
       }
     }
     const discountedSubtotal = subtotal - discountAmount;
@@ -202,7 +226,8 @@ export async function POST(request: NextRequest) {
            p_customer_phone => $12,
            p_items => $13::jsonb,
            p_parchi_request_id => $14::uuid,
-           p_discount_amount => $15
+           p_discount_amount => $15,
+           p_allow_open_student_discount => $16
          ) AS result`,
         [
           user.id,
@@ -220,6 +245,7 @@ export async function POST(request: NextRequest) {
           JSON.stringify(rpcItems),
           parchiVerificationId,
           discountAmount,
+          allowOpenStudentDiscount,
         ],
       );
       const rpcResult = rpcRows[0]?.result as BookingAtomicResult | null;

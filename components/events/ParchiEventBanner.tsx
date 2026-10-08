@@ -9,17 +9,16 @@ import {
   PARCHI_YELLOW,
   type ParchiOffer,
 } from "@/lib/parchi/discount";
-import { rememberParchiId } from "@/lib/parchi/prefill";
+import { captureParchiArrivalFromUrl } from "@/lib/parchi/prefill";
 
 /**
- * "Students: 20% off with Parchi" on an event that has a Parchi discount.
+ * "Students: 20% off with Parchi" — only shown for Parchi-app arrivals.
  * Tapping it scrolls to the tickets; the Parchi ID + approval step happens at
- * checkout. Also remembers `?parchiId=` from the Parchi app's link so checkout
- * can pre-fill it.
+ * checkout. Also captures `?ref=parchi_app` / `?parchiId=` for channel + prefill.
  */
 export function ParchiEventBanner({ offer }: { offer: ParchiOffer }) {
   useEffect(() => {
-    rememberParchiId(new URLSearchParams(window.location.search).get("parchiId"));
+    captureParchiArrivalFromUrl();
   }, []);
 
   return (

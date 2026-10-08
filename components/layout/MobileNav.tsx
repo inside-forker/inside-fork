@@ -6,6 +6,7 @@ import { useScroll } from "@/lib/context/scroll-context";
 import { BottomNav } from "./BottomNav";
 import { PremiumSidebar } from "@/components/dashboard/PremiumSidebar";
 import { FloatingActionButton } from "./FloatingActionButton";
+import { useSupabaseUser } from "@/hooks/useSupabaseUser";
 import { User } from "@supabase/supabase-js";
 
 type NavItem = {
@@ -34,9 +35,28 @@ interface MobileNavProps {
 export function MobileNav({
   categoryNavItems: _categoryNavItems,
   simpleNavLinks: _simpleNavLinks,
-  user,
-  profile,
+  user: userProp,
+  profile: profileProp,
 }: MobileNavProps) {
+  const { user: liveUser, isLoading: authLoading } = useSupabaseUser();
+  // After modal login the server props stay stale until refresh — prefer live session.
+  const user = authLoading
+    ? userProp
+    : liveUser
+      ? ({ id: liveUser.id, email: liveUser.email } as User)
+      : null;
+  const profile = authLoading
+    ? profileProp
+    : liveUser
+      ? {
+          id: liveUser.id,
+          full_name: liveUser.full_name,
+          avatar_url: liveUser.avatar_url,
+          role: liveUser.role,
+          active_role: liveUser.active_role,
+        }
+      : null;
+
   const [isMenuOpen, setMenuOpen] = React.useState(false);
   const { isFooterInView } = useScroll();
 

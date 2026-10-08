@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { AUTH_CHANGED_EVENT } from "@/lib/auth/client-events";
 
 interface User {
   id: string;
@@ -44,54 +45,54 @@ export function useSupabaseUser(): SupabaseAuthState {
     error: null,
   });
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const resolveSession = async () => {
-      try {
-        const response = await fetch("/api/user/me", { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error("Failed to fetch user session");
-        }
-        const data = await response.json();
-        if (!isMounted) return;
-
-        if (data.user) {
-          setAuthState({
-            user: data.user,
-            session: { access_token: "dummy" },
-            userId: data.user.id,
-            isLoading: false,
-            error: null,
-          });
-        } else {
-          setAuthState({
-            user: null,
-            session: null,
-            userId: null,
-            isLoading: false,
-            error: null,
-          });
-        }
-      } catch (error) {
-        if (!isMounted) return;
-        // A network or profile-service failure is not proof that the JWT
-        // session disappeared. Preserve a previously verified user instead of
-        // converting a transient 5xx into a client-side logout/redirect.
-        setAuthState((current) => ({
-          ...current,
-          isLoading: false,
-          error: buildError(error),
-        }));
+  const resolveSession = useCallback(async () => {
+    try {
+      const response = await fetch("/api/user/me", { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("Failed to fetch user session");
       }
-    };
+      const data = await response.json();
 
+      if (data.user) {
+        setAuthState({
+          user: data.user,
+          session: { access_token: "dummy" },
+          userId: data.user.id,
+          isLoading: false,
+          error: null,
+        });
+      } else {
+        setAuthState({
+          user: null,
+          session: null,
+          userId: null,
+          isLoading: false,
+          error: null,
+        });
+      }
+    } catch (error) {
+      // A network or profile-service failure is not proof that the JWT
+      // session disappeared. Preserve a previously verified user instead of
+      // converting a transient 5xx into a client-side logout/redirect.
+      setAuthState((current) => ({
+        ...current,
+        isLoading: false,
+        error: buildError(error),
+      }));
+    }
+  }, []);
+
+  useEffect(() => {
     void resolveSession();
 
-    return () => {
-      isMounted = false;
+    const onAuthChanged = () => {
+      void resolveSession();
     };
-  }, []);
+    window.addEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
+    return () => {
+      window.removeEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
+    };
+  }, [resolveSession]);
 
   return authState;
 }

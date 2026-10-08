@@ -25,6 +25,8 @@ import {
   computeParchiDiscount,
   type ParchiOffer,
 } from "@/lib/parchi/discount";
+import { useArrivedFromParchi } from "@/lib/parchi/prefill";
+import { isPrismfestSlug } from "@/lib/events/prismfest";
 import type {
   ResumableBookingDTO,
   ResumableResponse,
@@ -70,6 +72,7 @@ export function CheckoutClient() {
   const { user, isLoading: isUserLoading } = useSupabaseUser();
   const { toast } = useToast();
   const userId = user?.id;
+  const arrivedFromParchi = useArrivedFromParchi();
 
   const [config, setConfig] = useState<Record<string, unknown> | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
@@ -151,14 +154,23 @@ export function CheckoutClient() {
     };
   }, [userId, parchiEventId]);
 
-  // Same arithmetic as app/api/bookings/create/route.ts: the Parchi discount
+  const ikOpenStudentDiscount =
+    !!user &&
+    !!parchiOffer &&
+    !arrivedFromParchi &&
+    !parchiVerificationId &&
+    isPrismfestSlug(eventInfo?.slug);
+
+  // Same arithmetic as app/api/bookings/create/route.ts: student discount
   // comes off the subtotal, then fees on what's left.
   const totals: CheckoutTotals = useMemo(() => {
     const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    const discount =
-      parchiOffer && parchiVerificationId
-        ? computeParchiDiscount(parchiOffer, subtotal)
-        : 0;
+    let discount = 0;
+    if (parchiOffer && parchiVerificationId) {
+      discount = computeParchiDiscount(parchiOffer, subtotal);
+    } else if (parchiOffer && ikOpenStudentDiscount) {
+      discount = computeParchiDiscount(parchiOffer, subtotal);
+    }
     const discounted = subtotal - discount;
     const platformFee =
       Number(config?.["fees.platform_fee_fixed"] || 0) +
@@ -174,7 +186,13 @@ export function CheckoutClient() {
       paymentFee,
       total: discounted + platformFee + paymentFee,
     };
-  }, [items, config, parchiOffer, parchiVerificationId]);
+  }, [
+    items,
+    config,
+    parchiOffer,
+    parchiVerificationId,
+    ikOpenStudentDiscount,
+  ]);
 
   // Fetch Config
   useEffect(() => {
@@ -499,7 +517,7 @@ export function CheckoutClient() {
         onChangeQuantity={updateQuantity}
       />
 
-      {parchiOffer && parchiEventId ? (
+      {parchiOffer && parchiEventId && arrivedFromParchi ? (
         <ParchiDiscountCard
           eventId={parchiEventId}
           offer={parchiOffer}
@@ -507,6 +525,15 @@ export function CheckoutClient() {
           onLogin={() => router.push(`/login?next=${encodeURIComponent("/checkout")}`)}
           onApprovedChange={setParchiVerificationId}
         />
+      ) : null}
+
+      {ikOpenStudentDiscount ? (
+        <div className="rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm">
+          <p className="font-semibold text-foreground">Student discount applied</p>
+          <p className="text-muted-foreground">
+            Your Inside Karachi student price is already included in the total.
+          </p>
+        </div>
       ) : null}
 
       <section className="space-y-3">

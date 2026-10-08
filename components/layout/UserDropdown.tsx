@@ -78,6 +78,10 @@ export function UserDropdown({ user, profile }: UserDropdownProps) {
   const handleLogout = async () => {
     setIsLoading(true);
     try {
+      // Leaving the account also leaves the Parchi-app channel — anonymous
+      // browsing on Inside should not keep Parchi branding/pricing.
+      const { clearParchiChannel } = await import("@/lib/parchi/prefill");
+      clearParchiChannel();
       // Race a short timeout so a slow/stuck request can never strand the user.
       await Promise.race([
         fetch("/api/auth/logout", { method: "POST" }),
