@@ -26,12 +26,15 @@ export function AuthModal({
   onOpenChange,
   onSuccess,
   nextPath,
+  description,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   /** Where Google/Apple should return after OAuth. */
   nextPath: string;
+  /** Replaces the default (Parchi) subtitle on both tabs. */
+  description?: string;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -140,9 +143,10 @@ export function AuthModal({
             {tab === "login" ? "Log in to continue" : "Create an account"}
           </DialogTitle>
           <DialogDescription>
-            {tab === "login"
-              ? "Sign in to Inside Karachi, then verify your Parchi ID at checkout for the student discount."
-              : "Create an Inside Karachi account to continue to checkout."}
+            {description ??
+              (tab === "login"
+                ? "Sign in to Inside Karachi, then verify your Parchi ID at checkout for the student discount."
+                : "Create an Inside Karachi account to continue to checkout.")}
           </DialogDescription>
         </DialogHeader>
 
