@@ -27,8 +27,8 @@ function headlineAmount(offer: ParchiOffer): string {
  * instead and never get this auto slash. Logged-out visitors see the offer too;
  * tapping asks them to sign in / sign up, which unlocks the price.
  *
- * Drawn as a ticket: the amount on the stub, a perforation with
- * notches cut in the page background, then the Inside Karachi side.
+ * Drawn as a ticket: the amount on the stub, a dashed perforation, then the
+ * Inside Karachi side.
  */
 export function InsideStudentBanner({
   offer,
@@ -57,13 +57,11 @@ export function InsideStudentBanner({
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.99 }}
         aria-label={`${describeParchiOffer(offer)} on Inside Karachi`}
-        className="group relative flex w-full items-stretch overflow-hidden rounded-2xl bg-zinc-950 text-left shadow-xl shadow-primary/20 ring-1 ring-white/10"
+        className="group relative flex w-full items-stretch overflow-hidden rounded-2xl bg-cream text-left shadow-lg shadow-ink/10 ring-1 ring-ink/10"
       >
-        <div className="pointer-events-none absolute -bottom-20 right-10 h-40 w-40 rounded-full bg-primary/15 blur-3xl" />
-
         {/* Shine sweep */}
         <motion.div
-          className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/15 to-transparent"
+          className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/60 to-transparent"
           initial={{ x: "0%" }}
           animate={{ x: "450%" }}
           transition={{
@@ -77,46 +75,44 @@ export function InsideStudentBanner({
 
         {/* Stub: the amount */}
         <div className="relative flex shrink-0 flex-col items-center justify-center px-5 py-5 sm:px-7">
-          <span className="text-4xl font-black leading-none tracking-tight text-primary drop-shadow-[0_0_18px_rgba(255,24,78,0.55)] sm:text-5xl">
+          <span className="text-4xl font-black leading-none tracking-tight text-primary sm:text-5xl">
             {amount}
           </span>
-          <span className="mt-1 text-xs font-black uppercase tracking-[0.35em] text-white sm:text-sm">
+          <span className="mt-1 text-xs font-black uppercase tracking-[0.35em] text-ink sm:text-sm">
             Off
           </span>
         </div>
 
-        {/* Perforation with notches cut in the page background */}
+        {/* Perforation */}
         <div className="relative w-px shrink-0">
-          <div className="absolute inset-y-3 left-0 border-l-2 border-dashed border-white/20" />
-          <div className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-background" />
-          <div className="absolute -bottom-3 -left-3 h-6 w-6 rounded-full bg-background" />
+          <div className="absolute inset-y-3 left-0 border-l-2 border-dashed border-ink/20" />
         </div>
 
         {/* Inside Karachi side */}
         <div className="relative flex min-w-0 flex-1 flex-col justify-center gap-2 py-4 pl-5 pr-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:pl-6 sm:pr-5">
           <div className="min-w-0 space-y-1.5">
             <Image
-              src="/assets/logo-white.png"
+              src="/assets/logo-black.png"
               alt="Inside Karachi"
               width={104}
               height={28}
               className="h-auto w-[88px] sm:w-[104px]"
             />
-            <p className="text-sm font-semibold leading-snug text-white sm:text-base">
+            <p className="text-sm font-semibold leading-snug text-ink sm:text-base">
               {signedIn
                 ? `Inside Karachi got you ${amount} off`
                 : "Free with an Inside Karachi account"}
             </p>
-            {cap ? <p className="text-xs text-white/60">{cap}</p> : null}
+            {cap ? <p className="text-xs text-ink/60">{cap}</p> : null}
           </div>
 
           {signedIn ? (
-            <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-white ring-1 ring-white/15 sm:text-sm">
+            <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-xs font-bold text-white sm:text-sm">
               <Check className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4" />
               Applied
             </span>
           ) : (
-            <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/40 transition-transform group-hover:translate-x-0.5 sm:text-sm">
+            <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-md shadow-primary/30 transition-transform group-hover:translate-x-0.5 sm:text-sm">
               Sign in to unlock
               <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </span>

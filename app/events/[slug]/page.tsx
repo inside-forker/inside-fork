@@ -2,10 +2,8 @@ import { query } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { EventHero } from "@/components/events/EventHero";
 import { EventOrganizer } from "@/components/events/EventOrganizer";
-import { EventLocation } from "@/components/events/EventLocation";
 import { AnimatedSection } from "@/components/events/AnimatedSection";
 import { PremiumGallery } from "@/components/listing/PremiumGallery";
-import { ExternalLink } from "lucide-react";
 import { Event, EventImage } from "@/types/events.types";
 import { PremiumHeading } from "@/components/brand/Typography";
 import { getEventGalleryImages } from "@/lib/utils/listing-images";
@@ -13,6 +11,9 @@ import { EventSidebarButton } from "@/components/events/EventSidebarButton";
 import { ReportIssueButton } from "@/components/shared/ReportIssueButton";
 import { Suspense } from "react";
 import { EventStudentBanners } from "@/components/events/EventStudentBanners";
+import { EventVenueMap } from "@/components/events/EventVenueMap";
+import { EventDescription } from "@/components/events/EventDescription";
+import { isPrismfestSlug, PRISMFEST_VENUE_MAP } from "@/lib/events/prismfest";
 import { getParchiOffer, type ParchiOffer } from "@/lib/parchi/service";
 
 // Containers
@@ -104,38 +105,45 @@ export default async function EventPage({
       <EventHero event={event} images={heroImages} withTopMargin={false} />
 
       {/* MainContent */}
-      <div className="container mx-auto px-4 md:px-6 lg:px-8 pt-6 sm:pt-8 md:pt-10 pb-28 md:pb-16">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-10 lg:gap-12">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 py-12 md:py-16 lg:py-20">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 md:gap-16 lg:gap-20">
           {/* Left Column - Main Content */}
-          <div className="lg:col-span-2 space-y-8 md:space-y-10">
+          <div className="lg:col-span-2 space-y-12 md:space-y-16 lg:space-y-20">
             <EventStudentBanners offer={parchiOffer} eventSlug={event.slug} />
 
             {/* Event Description */}
             {event.description && (
               <AnimatedSection className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
-                    <ExternalLink className="w-4 h-4 text-primary" />
-                  </div>
-                  <PremiumHeading level={2} dense className="text-foreground">
-                    About This{" "}
-                    <span className="text-primary">Event</span>
-                  </PremiumHeading>
-                </div>
+                <PremiumHeading level={2} dense className="text-foreground">
+                  About This{" "}
+                  <span className="text-primary">Event</span>
+                </PremiumHeading>
                 <div className="prose prose-gray dark:prose-invert max-w-none">
-                  <p className="text-sm sm:text-base md:text-lg leading-relaxed text-muted-foreground">
-                    {event.description}
-                  </p>
+                  <EventDescription text={event.description} />
                 </div>
               </AnimatedSection>
             )}
 
-            {/* Event Gallery - Show all uploaded images */}
+            {/* Event Gallery - Show all uploaded images. On phones a lone
+                image is just the poster already shown in full up top. */}
             {eventImages && eventImages.length > 0 && (
-              <AnimatedSection>
+              <AnimatedSection
+                className={eventImages.length === 1 ? "hidden md:block" : undefined}
+              >
                 <PremiumGallery
                   images={getEventGalleryImages(eventImages)}
                   title="Event Photos"
+                  showIcon={false}
+                />
+              </AnimatedSection>
+            )}
+
+            {/* Venue map (only Prismfest has one for now) */}
+            {isPrismfestSlug(event.slug) && (
+              <AnimatedSection>
+                <EventVenueMap
+                  src={PRISMFEST_VENUE_MAP}
+                  alt={`${event.name} venue map: Prism Core, Prism Front, Prism Exclusive, Prism Her and Prism Fam zones`}
                 />
               </AnimatedSection>
             )}
@@ -144,9 +152,6 @@ export default async function EventPage({
             <Suspense fallback={<TicketSkeleton />}>
               <EventTicketsContainer event={event} parchiOffer={parchiOffer} />
             </Suspense>
-
-            {/* Event Location */}
-            <EventLocation event={event} />
 
             {/* Event Organizer */}
             <AnimatedSection>
@@ -160,12 +165,13 @@ export default async function EventPage({
           </div>
 
           {/* Right Column - Sidebar */}
-          <AnimatedSection className="space-y-8 md:space-y-12">
+          <AnimatedSection className="space-y-8 md:space-y-10 lg:space-y-12">
             <div className="sticky lg:top-20 lg:self-start space-y-8 md:space-y-10 lg:space-y-12">
-              <div className="group relative overflow-hidden bg-card border rounded-2xl p-6 md:p-8 hover:border-primary/40 transition-all duration-300 space-y-6">
-                <h3 className="text-xl font-semibold">Event Information</h3>
+              {/* Desktop sidebar only - on smaller screens it repeats the header */}
+              <div className="group relative overflow-hidden bg-card border rounded-2xl p-5 md:p-8 hover:border-primary/40 transition-all duration-300 space-y-4 md:space-y-6 hidden lg:block">
+                <h3 className="text-lg md:text-xl font-semibold">Event Information</h3>
 
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                   <div>
                     <h4 className="font-medium mb-2">Date & Time</h4>
                     <p className="text-muted-foreground">

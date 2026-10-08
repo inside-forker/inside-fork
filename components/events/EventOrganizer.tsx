@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { User, Calendar, Verified, Phone, Globe } from "lucide-react";
+import { Calendar, Verified, Phone, Globe } from "lucide-react";
 import { PremiumHeading } from "@/components/brand/Typography";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EventOrganizerProps } from "@/types/events.types";
@@ -97,10 +97,7 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
   if (hasError && !isLoading && organizers.length === 0) {
     return (
       <div className="space-y-6 md:space-y-8">
-        <div className="flex items-center space-x-4">
-          <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
-            <User className="w-6 h-6 text-primary" />
-          </div>
+        <div className="flex items-center">
           <div>
             <PremiumHeading level={2} dense className="text-foreground">
               Event <span className="text-primary">Organizer</span>
@@ -130,10 +127,7 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
   if (isLoading) {
     return (
       <div className="space-y-6 md:space-y-8">
-        <div className="flex items-center space-x-4">
-          <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
-            <User className="w-6 h-6 text-primary" />
-          </div>
+        <div className="flex items-center">
           <div>
             <PremiumHeading level={2} dense className="text-foreground">
               Event <span className="text-primary">Organizer</span>
@@ -180,17 +174,14 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
 
   return (
     <motion.div
-      className="space-y-6 md:space-y-8"
+      className="space-y-4 md:space-y-8"
       initial="hidden"
       whileInView="visible"
       viewport={viewportSettings}
       variants={sectionVariants}
     >
       {/* Section Header */}
-      <div className="flex items-center space-x-4">
-        <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
-          <User className="w-6 h-6 text-primary" />
-        </div>
+      <div className="flex items-center">
         <div>
           <PremiumHeading level={2} dense className="text-foreground">
             Event <span className="text-primary">{isMultiOrganizer ? "Organizers" : "Organizer"}</span>
@@ -204,33 +195,33 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
       </div>
 
       {/* Organizer Cards List */}
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         {organizers.map((organizer) => {
           const orgName = organizer.full_name || organizer.username || "Organizer";
           return (
             <Card
               key={organizer.id}
-              className="group relative overflow-hidden bg-card border rounded-2xl p-6 md:p-8 hover:border-primary/40 transition-all duration-300"
+              className="group relative overflow-hidden bg-card border rounded-2xl p-4 md:p-8 hover:border-primary/40 transition-all duration-300"
             >
-              <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+              <div className="flex flex-col lg:flex-row gap-4 md:gap-6 lg:gap-8">
                 {/* Organizer Avatar & Basic Info */}
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 lg:flex-col lg:items-center lg:min-w-[200px]">
-                  <div className="relative">
-                    <Avatar className="h-24 w-24 md:h-32 md:w-32 border-4 border-primary/20">
+                <div className="flex flex-row items-center sm:items-start gap-4 lg:flex-col lg:items-center lg:min-w-[200px]">
+                  <div className="relative shrink-0">
+                    <Avatar className="h-16 w-16 sm:h-24 sm:w-24 md:h-32 md:w-32 border-4 border-primary/20">
                       <AvatarImage src={organizer.avatar_url || undefined} />
                       <AvatarFallback className="bg-primary text-primary-foreground text-2xl md:text-3xl font-bold">
                         {orgName.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     {organizer.isVerified && (
-                      <div className="absolute -bottom-2 -right-2 bg-primary text-primary-foreground rounded-full p-2">
-                        <Verified className="w-4 h-4" />
+                      <div className="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 bg-primary text-primary-foreground rounded-full p-1.5 sm:p-2">
+                        <Verified className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </div>
                     )}
                   </div>
 
-                  <div className="text-center sm:text-left lg:text-center">
-                    <div className="flex items-center justify-center sm:justify-start lg:justify-center gap-2 mb-2">
+                  <div className="min-w-0 text-left lg:text-center">
+                    <div className="flex flex-wrap items-center justify-start lg:justify-center gap-x-2 gap-y-1 mb-1 md:mb-2">
                       <h3 className="text-lg sm:text-xl md:text-2xl font-bold">
                         {orgName}
                       </h3>
@@ -243,39 +234,39 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-muted-foreground mb-3">
+                    <p className="text-sm md:text-base text-muted-foreground md:mb-3">
                       {organizer.company || "Event Organizer"}
                     </p>
                   </div>
                 </div>
 
                 {/* Organizer Stats & Details */}
-                <div className="flex-1 space-y-6">
+                <div className="flex-1 space-y-4 md:space-y-6">
                   {/* Stats Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div className="text-center p-4 bg-muted/30 rounded-xl">
-                      <div className="text-2xl md:text-3xl font-bold text-primary mb-1">
+                  <div className="grid grid-cols-3 gap-2 md:gap-4">
+                    <div className="text-center p-2.5 md:p-4 bg-muted/30 rounded-xl">
+                      <div className="text-xl md:text-3xl font-bold text-primary mb-0.5 md:mb-1">
                         {organizer.stats?.eventsOrganized ?? 0}
                       </div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-xs md:text-sm text-muted-foreground">
                         Events Organized
                       </div>
                     </div>
 
-                    <div className="text-center p-4 bg-muted/30 rounded-xl">
-                      <div className="text-2xl md:text-3xl font-bold text-primary mb-1">
+                    <div className="text-center p-2.5 md:p-4 bg-muted/30 rounded-xl">
+                      <div className="text-xl md:text-3xl font-bold text-primary mb-0.5 md:mb-1">
                         {(organizer.stats?.totalAttendees ?? 0).toLocaleString()}
                       </div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-xs md:text-sm text-muted-foreground">
                         Total Attendees
                       </div>
                     </div>
 
-                    <div className="text-center p-4 bg-muted/30 rounded-xl col-span-2 md:col-span-1">
-                      <div className="text-2xl md:text-3xl font-bold text-primary mb-1">
+                    <div className="text-center p-2.5 md:p-4 bg-muted/30 rounded-xl">
+                      <div className="text-xl md:text-3xl font-bold text-primary mb-0.5 md:mb-1">
                         {organizer.stats?.upcomingEvents ?? 0}
                       </div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-xs md:text-sm text-muted-foreground">
                         Upcoming Events
                       </div>
                     </div>
@@ -283,9 +274,9 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
 
                   {/* About Organizer */}
                   {organizer.bio && (
-                    <div className="space-y-4">
-                      <h4 className="text-lg font-semibold">About the Organizer</h4>
-                      <p className="text-muted-foreground leading-relaxed">
+                    <div className="space-y-1.5 md:space-y-4">
+                      <h4 className="text-base md:text-lg font-semibold">About the Organizer</h4>
+                      <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
                         {organizer.bio}
                       </p>
                     </div>
@@ -293,9 +284,9 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
 
                   {/* Previous Events Preview */}
                   {organizer.recentEvents && organizer.recentEvents.length > 0 && (
-                    <div className="space-y-4">
-                      <h4 className="text-lg font-semibold">Recent Events</h4>
-                      <div className="space-y-3">
+                    <div className="space-y-2 md:space-y-4">
+                      <h4 className="text-base md:text-lg font-semibold">Recent Events</h4>
+                      <div className="space-y-2 md:space-y-3">
                         {organizer.recentEvents.map((pastEvent) => (
                           <Link
                             key={pastEvent.id}
@@ -319,7 +310,7 @@ export function EventOrganizer({ event }: EventOrganizerProps) {
                   )}
 
                   {/* Action Buttons */}
-                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                  <div className="flex flex-col sm:flex-row gap-3 md:pt-4">
                     {organizer.phone && organizer.role === "organizer" && (
                       <Button
                         variant="outline"

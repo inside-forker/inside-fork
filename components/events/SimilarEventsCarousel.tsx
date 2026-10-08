@@ -57,10 +57,7 @@ export function SimilarEventsCarousel({
       variants={sectionVariants}
     >
       <div className="space-y-4">
-        <div className="flex items-center space-x-3">
-          <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
-            <ArrowRight className="w-5 h-5 text-primary" />
-          </div>
+        <div className="flex items-center">
           <div>
             <PremiumHeading level={2} dense className="text-foreground">
               More <span className="text-primary">Events</span>

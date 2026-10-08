@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Ticket, Plus, Minus, Clock, Users, CreditCard, LogIn } from "lucide-react";
+import { Plus, Minus, CreditCard, LogIn } from "lucide-react";
 import { EventTicketSectionProps, TicketType } from "@/types/events.types";
 import { PremiumHeading } from "@/components/brand/Typography";
 import { useRouter } from "next/navigation";
@@ -100,14 +100,43 @@ export function EventTicketSection({
     if (ticket.quantity_available === 0) {
       return { text: "Sold Out", variant: "destructive" as const };
     }
-    if (ticket.quantity_available !== null && ticket.quantity_available <= 10) {
-      return {
-        text: `${ticket.quantity_available} left`,
-        variant: "destructive" as const,
-      };
-    }
-    return { text: "Available", variant: "default" as const };
+    // On sale: no badge (stock counts aren't shown)
+    return null;
   };
+
+  const renderStepper = (
+    ticket: TicketType,
+    selectedQuantity: number,
+    maxQuantity: number,
+  ) => (
+    <div className="flex items-center space-x-2 sm:space-x-3 bg-background rounded-full p-0.5 sm:p-1 shrink-0">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 rounded-full"
+        aria-label={`Decrease quantity for ${ticket.name}`}
+        onClick={() => updateTicketQuantity(ticket.id, selectedQuantity - 1)}
+        disabled={selectedQuantity === 0}
+      >
+        <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+      </Button>
+
+      <div className="w-6 sm:w-10 md:w-12 text-center font-semibold text-sm sm:text-base">
+        {selectedQuantity}
+      </div>
+
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 rounded-full"
+        aria-label={`Increase quantity for ${ticket.name}`}
+        onClick={() => updateTicketQuantity(ticket.id, selectedQuantity + 1)}
+        disabled={selectedQuantity >= maxQuantity}
+      >
+        <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+      </Button>
+    </div>
+  );
 
   const goToCheckout = () => {
     clearCart();
@@ -144,22 +173,17 @@ export function EventTicketSection({
   return (
     <motion.div
       id="tickets"
-      className="space-y-8 scroll-mt-24"
+      className="space-y-4 md:space-y-8 scroll-mt-24"
       initial="hidden"
       whileInView="visible"
       viewport={viewportSettings}
       variants={sectionVariants}
     >
-      <div className="flex items-center space-x-3">
-        <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
-          <Ticket className="w-5 h-5 text-primary" />
-        </div>
-        <PremiumHeading level={2} dense className="text-foreground">
-          Select <span className="text-primary">Tickets</span>
-        </PremiumHeading>
-      </div>
+      <PremiumHeading level={2} dense className="text-foreground">
+        Select <span className="text-primary">Tickets</span>
+      </PremiumHeading>
 
-      <motion.div className="grid gap-6" variants={cardGridVariants}>
+      <motion.div className="grid gap-3 md:gap-6" variants={cardGridVariants}>
         {ticketTypes.map((ticket) => {
           const status = getTicketStatus(ticket);
           const isAvailable = isTicketAvailable(ticket);
@@ -170,114 +194,98 @@ export function EventTicketSection({
               ? Number.MAX_SAFE_INTEGER
               : ticket.quantity_available;
           const maxQuantity = Math.min(perPersonLimit, stockLimit);
+          const description = ticket.description?.trim()
+            ? ticket.description
+            : FALLBACK_TICKET_DESCRIPTION;
 
           return (
             <motion.div key={ticket.id} variants={cardVariants}>
               <Card className="group relative overflow-hidden bg-card border rounded-2xl p-4 md:p-6 lg:p-8 hover:border-primary/40 transition-all duration-300">
-                <div className="flex flex-col gap-4 lg:gap-6">
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold mb-1">
-                          {ticket.name}
-                        </h3>
-                        <p className="text-muted-foreground text-xs sm:text-sm line-clamp-2">
-                          {ticket.description?.trim()
-                            ? ticket.description
-                            : FALLBACK_TICKET_DESCRIPTION}
-                        </p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <Badge variant={status.variant} className="mb-1">
-                          {status.text}
-                        </Badge>
-                        {showIkStudentPrice && ticket.price > 0 ? (
-                          <>
-                            <div className="text-sm text-muted-foreground line-through whitespace-nowrap">
-                              {formatPrice(ticket.price)}
-                            </div>
-                            <div className="text-xl sm:text-2xl md:text-3xl font-bold whitespace-nowrap text-primary">
-                              {formatPrice(studentPrice(ticket.price))}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              Inside Karachi price
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="text-xl sm:text-2xl md:text-3xl font-bold whitespace-nowrap">
-                              {formatPrice(ticket.price)}
-                            </div>
-                            {ticket.price > 0 && (
-                              <div className="text-xs text-muted-foreground">
-                                per ticket
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0 flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                        <div className="flex items-center space-x-1.5 sm:space-x-2">
-                          <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          <span>
-                            {ticket.quantity_available === null
-                              ? "Unlimited"
-                              : `${ticket.quantity_available} left`}
+                {/* Phones: one compact row - name, line and price left; stepper right */}
+                <div className="flex items-center gap-3 md:hidden">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base font-semibold leading-snug">
+                      {ticket.name}
+                    </h3>
+                    <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
+                      {description}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2">
+                      {showIkStudentPrice && ticket.price > 0 ? (
+                        <>
+                          <span className="text-lg font-bold whitespace-nowrap text-primary">
+                            {formatPrice(studentPrice(ticket.price))}
                           </span>
-                        </div>
-                        <div className="flex items-center space-x-1.5 sm:space-x-2">
-                          <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          <span>
-                            Ends{" "}
-                            {new Date(ticket.sale_ends_at).toLocaleDateString()}
+                          <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
+                            {formatPrice(ticket.price)}
                           </span>
-                        </div>
-                      </div>
-
-                      {isAvailable && (
-                        <div className="flex items-center space-x-2 sm:space-x-3 bg-background rounded-full p-0.5 sm:p-1 shrink-0">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 rounded-full"
-                            aria-label={`Decrease quantity for ${ticket.name}`}
-                            onClick={() =>
-                              updateTicketQuantity(
-                                ticket.id,
-                                selectedQuantity - 1,
-                              )
-                            }
-                            disabled={selectedQuantity === 0}
-                          >
-                            <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </Button>
-
-                          <div className="w-8 sm:w-10 md:w-12 text-center font-semibold text-sm sm:text-base">
-                            {selectedQuantity}
-                          </div>
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 rounded-full"
-                            aria-label={`Increase quantity for ${ticket.name}`}
-                            onClick={() =>
-                              updateTicketQuantity(
-                                ticket.id,
-                                selectedQuantity + 1,
-                              )
-                            }
-                            disabled={selectedQuantity >= maxQuantity}
-                          >
-                            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </Button>
-                        </div>
+                        </>
+                      ) : (
+                        <span className="text-lg font-bold whitespace-nowrap">
+                          {formatPrice(ticket.price)}
+                        </span>
                       )}
                     </div>
                   </div>
+
+                  {isAvailable
+                    ? renderStepper(ticket, selectedQuantity, maxQuantity)
+                    : status && (
+                        <Badge variant={status.variant} className="shrink-0">
+                          {status.text}
+                        </Badge>
+                      )}
+                </div>
+
+                {/* Tablet & desktop */}
+                <div className="hidden md:flex flex-col gap-3 lg:gap-6">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <h3 className="text-xl lg:text-2xl font-semibold mb-1">
+                        {ticket.name}
+                      </h3>
+                      <p className="text-muted-foreground text-sm line-clamp-2">
+                        {description}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      {status && (
+                        <Badge variant={status.variant} className="mb-1">
+                          {status.text}
+                        </Badge>
+                      )}
+                      {showIkStudentPrice && ticket.price > 0 ? (
+                        <>
+                          <div className="text-sm text-muted-foreground line-through whitespace-nowrap">
+                            {formatPrice(ticket.price)}
+                          </div>
+                          <div className="text-3xl font-bold whitespace-nowrap text-primary">
+                            {formatPrice(studentPrice(ticket.price))}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Inside Karachi price
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-3xl font-bold whitespace-nowrap">
+                            {formatPrice(ticket.price)}
+                          </div>
+                          {ticket.price > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              per ticket
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {isAvailable && (
+                    <div className="flex justify-end">
+                      {renderStepper(ticket, selectedQuantity, maxQuantity)}
+                    </div>
+                  )}
                 </div>
               </Card>
             </motion.div>
