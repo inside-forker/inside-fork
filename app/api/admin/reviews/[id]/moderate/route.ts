@@ -7,7 +7,12 @@ import { notifyReviewStatus } from "@/lib/reviews/notifications";
 
 const ROUTE = "/api/admin/reviews/[id]/moderate";
 
-const MODERATION_STATUSES = new Set(["approved", "rejected", "pending"]);
+const MODERATION_STATUSES = new Set([
+  "approved",
+  "rejected",
+  "pending",
+  "flagged",
+]);
 
 export async function POST(
   request: NextRequest,

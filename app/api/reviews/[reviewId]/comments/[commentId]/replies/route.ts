@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
+import { validateReviewContent } from "@/lib/reviews/profanity-filter";
+import { notifyReviewReply } from "@/lib/reviews/notifications";
 import { CommentWithAuthor, CommentListResponse } from "@/types/comment.types";
 
 function commentColumns(alias: string): string {
@@ -165,13 +167,25 @@ export async function POST(
       );
     }
 
-    // Create the reply
+    // Check for prohibited/explicit language
+    const contentValidation = validateReviewContent(content);
+    if (!contentValidation.isValid) {
+      return NextResponse.json(
+        {
+          error: contentValidation.error,
+          code: contentValidation.code,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Create the reply (auto-approved)
     let newReply;
     try {
       const { rows: insertedRows } = await query(
         `WITH inserted AS (
-           INSERT INTO review_comments (review_id, user_id, parent_id, content, status)
-           VALUES ($1, $2, $3, $4, 'pending')
+           INSERT INTO review_comments (review_id, user_id, parent_id, content, status, moderated_at)
+           VALUES ($1, $2, $3, $4, 'approved', NOW())
            RETURNING *
          )
          SELECT ${commentColumns("inserted")},
@@ -199,9 +213,30 @@ export async function POST(
       author_avatar: newReply.profiles?.avatar_url || null,
     };
 
+    // Notify reviewer of the reply
+    try {
+      const { rows: reviewRows } = await query(
+        `SELECT id, user_id, listing_id FROM reviews WHERE id = $1 LIMIT 1`,
+        [reviewId]
+      );
+      if (reviewRows[0] && reviewRows[0].user_id !== session.userId) {
+        await notifyReviewReply({
+          review: {
+            reviewId: Number(reviewRows[0].id),
+            userId: reviewRows[0].user_id,
+            listingId: Number(reviewRows[0].listing_id),
+          },
+          commentId: newReply.id,
+          replySnippet: content.slice(0, 200),
+        });
+      }
+    } catch (notifError) {
+      console.error("Failed to notify reviewer of reply:", notifError);
+    }
+
     return NextResponse.json({
       reply: transformedReply as CommentWithAuthor,
-      message: "Reply submitted for review",
+      message: "Reply published successfully",
     });
   } catch (error) {
     console.error(

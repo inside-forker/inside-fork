@@ -8,6 +8,7 @@ import { parsePathId } from "@/lib/mobile/params";
 import { MobileApiError } from "@/lib/mobile/errors";
 import { query } from "@/lib/db";
 import { toComment, type CommentRowLike } from "@/lib/mobile/mappers";
+import { validateReviewContent } from "@/lib/reviews/profanity-filter";
 
 export const dynamic = "force-dynamic";
 
@@ -123,6 +124,16 @@ export const PATCH = mobileRoute(async (request: NextRequest, { params }) => {
     throw new MobileApiError(
       "validation_error",
       "Invalid content.",
+      400,
+      "content",
+    );
+  }
+
+  const contentValidation = validateReviewContent(parsed.data.content);
+  if (!contentValidation.isValid) {
+    throw new MobileApiError(
+      "validation_error",
+      contentValidation.error ?? "Invalid content.",
       400,
       "content",
     );

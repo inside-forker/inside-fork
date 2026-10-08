@@ -9,6 +9,7 @@ import { parsePathId } from "@/lib/mobile/params";
 import { MobileApiError } from "@/lib/mobile/errors";
 import { query } from "@/lib/db";
 import { toComment, type CommentRowLike } from "@/lib/mobile/mappers";
+import { validateReviewContent } from "@/lib/reviews/profanity-filter";
 
 export const dynamic = "force-dynamic";
 
@@ -167,6 +168,17 @@ export const POST = mobileRoute(async (request: NextRequest, { params }) => {
   }
   const { content, parent_id } = parsed.data;
 
+  // Prohibit explicit content
+  const contentValidation = validateReviewContent(content);
+  if (!contentValidation.isValid) {
+    throw new MobileApiError(
+      "validation_error",
+      contentValidation.error ?? "Invalid comment.",
+      400,
+      "content",
+    );
+  }
+
   await assertApprovedReview(reviewId);
 
   if (parent_id != null) {
@@ -189,8 +201,8 @@ export const POST = mobileRoute(async (request: NextRequest, { params }) => {
   try {
     const { rows } = await query(
       `WITH inserted AS (
-         INSERT INTO review_comments (review_id, user_id, content, parent_id, status)
-         VALUES ($1, $2, $3, $4, 'pending')
+         INSERT INTO review_comments (review_id, user_id, content, parent_id, status, moderated_at)
+         VALUES ($1, $2, $3, $4, 'approved', NOW())
          RETURNING *
        )
        SELECT ${COMMENT_SQL_COLUMNS}
@@ -206,6 +218,16 @@ export const POST = mobileRoute(async (request: NextRequest, { params }) => {
       "Failed to create comment.",
       500,
     );
+  }
+
+  // Award comment_review XP for top-level comments (matches web)
+  if (parent_id == null) {
+    try {
+      const { awardXP } = await import("@/lib/gamification");
+      await awardXP(user.id, "comment_review", created.id);
+    } catch (xpErr) {
+      console.error("[mobile-api] comment XP award failed:", xpErr);
+    }
   }
 
   return ok(toComment(created, user.id, 0), undefined, { status: 201 });

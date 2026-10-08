@@ -202,9 +202,8 @@ export function ReviewCreationModal({
       tempImagesRef.current = [];
 
       toast({
-        title: "Review Submitted!",
-        description:
-          "Thank you for your review. It will be published after moderation.",
+        title: "Review Published!",
+        description: "Thank you! Your review has been published.",
       });
 
       // Reset form state
@@ -398,7 +397,7 @@ export function ReviewCreationModal({
                   {user.full_name || user.email}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Your review will be published after moderation
+                  Posting as verified user
                 </p>
               </div>
             </div>

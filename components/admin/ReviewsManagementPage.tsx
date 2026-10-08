@@ -38,15 +38,13 @@ import type {
 
 export function ReviewsManagementPage() {
   const [reviews, setReviews] = React.useState<ReviewWithModeration[]>([]);
-  const [filteredReviews, setFilteredReviews] = React.useState<
-    ReviewWithModeration[]
-  >([]);
+  const [totalReviews, setTotalReviews] = React.useState(0);
   const [selectedReview, setSelectedReview] =
     React.useState<ReviewWithModeration | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState<string>("all");
+  const [statusFilter, setStatusFilter] = React.useState<string>("flagged");
   const [ratingFilter, setRatingFilter] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
@@ -69,24 +67,34 @@ export function ReviewsManagementPage() {
   } = useReviewManagement();
   const { toast } = useToast();
 
-  // Pagination
+  // Server-driven pagination
   const itemsPerPage = 12;
-  const totalPages = Math.ceil(filteredReviews.length / itemsPerPage);
-  const paginatedReviews = React.useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredReviews.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredReviews, currentPage]);
+  const totalPages = Math.max(1, Math.ceil(totalReviews / itemsPerPage));
 
-  // Fetch reviews
+  // Fetch reviews with server query parameters
   const fetchReviews = React.useCallback(
     async (showLoading = true) => {
       try {
         if (showLoading) setIsLoading(true);
-        const response = await fetch("/api/admin/reviews");
+        const params = new URLSearchParams();
+        params.set("page", currentPage.toString());
+        params.set("limit", itemsPerPage.toString());
+        if (statusFilter && statusFilter !== "all") {
+          params.set("status", statusFilter);
+        }
+        if (searchQuery.trim()) {
+          params.set("search", searchQuery.trim());
+        }
+        if (ratingFilter && ratingFilter !== "all") {
+          params.set("rating", ratingFilter);
+        }
+
+        const response = await fetch(`/api/admin/reviews?${params.toString()}`);
         const result = await response.json();
 
         if (result.success) {
-          setReviews(result.data.reviews);
+          setReviews(result.data.reviews || []);
+          setTotalReviews(result.data.total ?? 0);
           setStatistics(result.data.statistics);
         } else {
           throw new Error(result.error);
@@ -102,43 +110,26 @@ export function ReviewsManagementPage() {
         if (showLoading) setIsLoading(false);
       }
     },
-    [toast],
+    [currentPage, itemsPerPage, statusFilter, searchQuery, ratingFilter, toast],
   );
 
-  // Filter reviews (re-derive whenever reviews or filters change)
-  React.useEffect(() => {
-    let filtered = reviews;
-
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (review) =>
-          review.user_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          review.listing_name
-            ?.toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          review.comment?.toLowerCase().includes(searchQuery.toLowerCase()),
-      );
-    }
-
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((review) => review.status === statusFilter);
-    }
-
-    if (ratingFilter !== "all") {
-      filtered = filtered.filter(
-        (review) => review.rating === parseInt(ratingFilter),
-      );
-    }
-
-    setFilteredReviews(filtered);
-  }, [reviews, searchQuery, statusFilter, ratingFilter]);
-
-  // Reset page only when user changes filter criteria (not on data refreshes)
-  React.useEffect(() => {
+  // Reset page to 1 when filters change
+  const handleStatusFilterChange = (val: string) => {
+    setStatusFilter(val);
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, ratingFilter]);
+  };
 
-  // Load reviews on mount
+  const handleRatingFilterChange = (val: string) => {
+    setRatingFilter(val);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    setCurrentPage(1);
+  };
+
+  // Load reviews on mount and when filter/page dependencies change
   React.useEffect(() => {
     fetchReviews();
   }, [fetchReviews]);
@@ -186,9 +177,6 @@ export function ReviewsManagementPage() {
     // Optimistic Update: Remove immediately from UI
     const previousReviews = [...reviews];
     setReviews((prev) => prev.filter((r) => r.id !== reviewToDelete.id));
-    setFilteredReviews((prev) =>
-      prev.filter((r) => r.id !== reviewToDelete.id),
-    );
     setIsDeleteDialogOpen(false);
 
     const success = await deleteReview(reviewToDelete.id);
@@ -272,7 +260,7 @@ export function ReviewsManagementPage() {
 
   const handleSelectAll = (selected: boolean) => {
     if (selected) {
-      setSelectedReviews(new Set(paginatedReviews.map((r) => r.id)));
+      setSelectedReviews(new Set(reviews.map((r) => r.id)));
     } else {
       setSelectedReviews(new Set());
     }
@@ -558,13 +546,13 @@ export function ReviewsManagementPage() {
                   <Input
                     placeholder="Search reviews by user, listing, or content..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => handleSearchChange(e.target.value)}
                     className="pl-12 h-11 bg-background/50 border-border/50 focus:border-primary/50 focus:ring-primary/20"
                   />
                 </div>
 
                 {/* Status Filter */}
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
                   <SelectTrigger className="w-44 h-11 bg-background/50 border-border/50">
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
@@ -578,7 +566,7 @@ export function ReviewsManagementPage() {
                 </Select>
 
                 {/* Rating Filter */}
-                <Select value={ratingFilter} onValueChange={setRatingFilter}>
+                <Select value={ratingFilter} onValueChange={handleRatingFilterChange}>
                   <SelectTrigger className="w-44 h-11 bg-background/50 border-border/50">
                     <SelectValue placeholder="Filter by rating" />
                   </SelectTrigger>
@@ -667,7 +655,7 @@ export function ReviewsManagementPage() {
           {/* Reviews Table */}
           <motion.div variants={itemVariants}>
             <ReviewsTable
-              reviews={paginatedReviews}
+              reviews={reviews}
               isLoading={isLoading}
               onEditReview={handleEditReview}
               onDeleteReview={handleDeleteReview}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
+import { validateReviewContent } from "@/lib/reviews/profanity-filter";
 import { CommentWithAuthor, CommentStatus } from "@/types/comment.types";
 
 function commentColumns(alias: string): string {
@@ -162,6 +163,17 @@ export async function PUT(
       if (content.length > 2000) {
         return NextResponse.json(
           { error: "Comment content must be less than 2000 characters" },
+          { status: 400 }
+        );
+      }
+
+      const contentValidation = validateReviewContent(content);
+      if (!contentValidation.isValid) {
+        return NextResponse.json(
+          {
+            error: contentValidation.error,
+            code: contentValidation.code,
+          },
           { status: 400 }
         );
       }

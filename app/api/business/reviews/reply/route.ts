@@ -7,12 +7,8 @@ import {
   handleApiError,
 } from "@/lib/business-owner/api-utils";
 import { z } from "zod";
-import {
-  createNotification,
-  resolveCategorySlugForRole,
-  dispatchEmailOutboxBatch,
-} from "@/lib/notifications";
-import type { NotificationUserRole } from "@/types/notifications.types";
+import { validateReviewContent } from "@/lib/reviews/profanity-filter";
+import { notifyReviewReply } from "@/lib/reviews/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +33,15 @@ export async function POST(request: NextRequest) {
 
     const { reviewId, content } = validation.data;
 
+    // Check for prohibited/explicit language
+    const contentValidation = validateReviewContent(content);
+    if (!contentValidation.isValid) {
+      return apiError(contentValidation.error ?? "Invalid content", 400);
+    }
+
     // Get the review and verify ownership
     const { rows: reviewRows } = await query(
-      `SELECT r.id, r.listing_id, l.owner_id, l.name AS listing_name
+      `SELECT r.id, r.user_id AS reviewer_id, r.listing_id, l.owner_id, l.name AS listing_name
        FROM reviews r
        JOIN listings l ON l.id = r.listing_id
        WHERE r.id = $1`,
@@ -65,12 +67,12 @@ export async function POST(request: NextRequest) {
       return apiError("You have already replied to this review", 400);
     }
 
-    // Create the reply with pending status for admin moderation
+    // Create the reply (auto-approved)
     let comment;
     try {
       const { rows: insertedRows } = await query(
-        `INSERT INTO review_comments (review_id, user_id, content, status, edit_count)
-         VALUES ($1, $2, $3, 'pending', 0)
+        `INSERT INTO review_comments (review_id, user_id, content, status, edit_count, moderated_at)
+         VALUES ($1, $2, $3, 'approved', 0, NOW())
          RETURNING *`,
         [reviewId, userId, content],
       );
@@ -81,64 +83,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Notify listers/admins that a reply needs moderation.
+    // Notify the reviewer of the business owner's reply
     try {
-      const { rows: recipients } = await query(
-        `SELECT id, role FROM profiles WHERE role::text = ANY($1::text[])`,
-        [["lister", "admin", "super_admin"]],
-      );
-
-      if (recipients.length) {
-        const categoryCache = new Map<NotificationUserRole, string>();
-        await Promise.allSettled(
-          recipients.map(async (recipient) => {
-            try {
-              const role = recipient.role as NotificationUserRole;
-              if (!categoryCache.has(role)) {
-                categoryCache.set(role, await resolveCategorySlugForRole(role));
-              }
-              await createNotification({
-                recipientId: recipient.id,
-                roleScope: role,
-                categorySlug: categoryCache.get(role)!,
-                title: "New review reply pending moderation",
-                body: `A business owner replied to a review on "${review.listing_name}".`,
-                priority: "normal",
-                ctaLabel: "Review Reply",
-                ctaUrl: "/admin/reviews",
-                metadata: {
-                  comment_id: comment.id,
-                  review_id: reviewId,
-                  listing_id: review.listing_id,
-                  listing_name: review.listing_name,
-                },
-              });
-            } catch (notificationError) {
-              console.error(
-                "Failed to queue review reply notification:",
-                notificationError,
-              );
-            }
-          }),
-        );
-
-        try {
-          await dispatchEmailOutboxBatch({});
-        } catch (dispatchError) {
-          console.error(
-            "Failed to dispatch review reply notifications:",
-            dispatchError,
-          );
-        }
+      if (review.reviewer_id && review.reviewer_id !== userId) {
+        await notifyReviewReply({
+          review: {
+            reviewId,
+            userId: review.reviewer_id,
+            listingId: Number(review.listing_id),
+          },
+          commentId: Number(comment.id),
+          replySnippet: content.slice(0, 200),
+        });
       }
     } catch (notifyError) {
-      console.error("Failed to notify staff of review reply:", notifyError);
+      console.error("Failed to notify reviewer of reply:", notifyError);
     }
 
     return apiSuccess({
       commentId: comment.id,
-      status: "pending",
-      message: "Reply submitted for moderation",
+      status: "approved",
+      message: "Reply published successfully",
     });
   } catch (error) {
     return handleApiError(error);

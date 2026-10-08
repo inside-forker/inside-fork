@@ -10,7 +10,12 @@ import { notifyReviewStatus } from "@/lib/reviews/notifications";
 
 const ROUTE = "/api/admin/reviews/bulk-moderate";
 const MAX_BULK_REVIEWS = 100;
-const MODERATION_STATUSES = new Set(["approved", "rejected", "pending"]);
+const MODERATION_STATUSES = new Set([
+  "approved",
+  "rejected",
+  "pending",
+  "flagged",
+]);
 
 function parseReviewIds(raw: unknown): number[] {
   if (!Array.isArray(raw)) {

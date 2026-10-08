@@ -36,14 +36,21 @@ export async function GET(request: NextRequest) {
       Math.max(1, parseInt(searchParams.get("limit") || "20"))
     );
     const offset = (page - 1) * limit;
+    const search = searchParams.get("search") || "";
     const status = searchParams.get("status"); // pending, approved, rejected, flagged
     const sort_by = searchParams.get("sort_by") || "created_at";
     const sort_order = searchParams.get("sort_order") || "desc";
 
-    // Apply status filter if provided
+    // Apply filters if provided
     const conditions: string[] = [];
     const params: unknown[] = [];
     let paramIdx = 1;
+
+    if (search) {
+      conditions.push(`(rc.content ILIKE $${paramIdx} OR p.full_name ILIKE $${paramIdx})`);
+      params.push(`%${search}%`);
+      paramIdx++;
+    }
 
     if (
       status &&
