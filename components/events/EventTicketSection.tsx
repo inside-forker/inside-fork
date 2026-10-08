@@ -207,9 +207,12 @@ export function EventTicketSection({
                     <h3 className="text-base font-semibold leading-snug">
                       {ticket.name}
                     </h3>
-                    <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
-                      {description}
-                    </p>
+                    {/* Only the organiser's own short line - not the generic fallback */}
+                    {ticket.description?.trim() && (
+                      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
+                        {ticket.description}
+                      </p>
+                    )}
                     <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2">
                       {showIkStudentPrice && ticket.price > 0 ? (
                         <>

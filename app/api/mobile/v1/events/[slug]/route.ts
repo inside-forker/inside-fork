@@ -32,7 +32,7 @@ const EVENT_CARD_SQL_COLUMNS =
   "events_with_details.location_name, events_with_details.address, " +
   "events_with_details.latitude, events_with_details.longitude, " +
   "events_with_details.category_id, c.name AS category_name, c.slug AS category_slug, c.icon_name AS category_icon_name, " +
-  "e.venue_id, v.name AS venue_name, v.rating AS venue_rating";
+  "e.venue_id, v.name AS venue_name, v.rating AS venue_rating, e.layout_image_url";
 
 /** `venue_id` isn't on the (untracked) view, so it's reached by joining back
  * to `events` by id rather than editing the view - same approach as the
@@ -222,5 +222,15 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
     images: images.map(toEventImage),
     ticket_types: tickets.map(toTicketType),
     parchi_offer: parchiOffer,
+    // The detail tabs' extras. Only the venue map is stored so far; the rest
+    // stay empty and the app hides their sections.
+    event_info: {
+      doors_open_at: null,
+      layout_image_url: eventRow.layout_image_url ?? null,
+      is_refundable: null,
+      setting_tags: [],
+      amenities: [],
+      restrictions: [],
+    },
   });
 });

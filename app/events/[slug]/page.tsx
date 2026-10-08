@@ -71,6 +71,20 @@ export default async function EventPage({
 
   const eventImages = (eventImagesData || []) as EventImage[];
 
+  // Venue map isn't on the (untracked) events_with_details view. Prismfest's
+  // bundled image covers it until the layout_image_url migration has run.
+  let venueMapUrl: string | null = null;
+  try {
+    const { rows } = await query(
+      `SELECT layout_image_url FROM events WHERE id = $1`,
+      [event.id],
+    );
+    venueMapUrl = rows[0]?.layout_image_url ?? null;
+  } catch (error) {
+    console.error("Event venue map lookup failed:", error);
+  }
+  if (!venueMapUrl && isPrismfestSlug(event.slug)) venueMapUrl = PRISMFEST_VENUE_MAP;
+
   // Parchi student discount for this event, if one is switched on. Never let
   // it break the page.
   let parchiOffer: ParchiOffer | null = null;
@@ -138,12 +152,12 @@ export default async function EventPage({
               </AnimatedSection>
             )}
 
-            {/* Venue map (only Prismfest has one for now) */}
-            {isPrismfestSlug(event.slug) && (
+            {/* Venue map, when the event has one */}
+            {venueMapUrl && (
               <AnimatedSection>
                 <EventVenueMap
-                  src={PRISMFEST_VENUE_MAP}
-                  alt={`${event.name} venue map: Prism Core, Prism Front, Prism Exclusive, Prism Her and Prism Fam zones`}
+                  src={venueMapUrl}
+                  alt={`${event.name} venue map`}
                 />
               </AnimatedSection>
             )}

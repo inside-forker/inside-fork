@@ -22,6 +22,8 @@ export type AdminEvent = {
   scanning_mode?: "single" | "multi_gate";
   total_gates?: number;
   gate_assignment_mode?: "manual" | "auto";
+  /** Venue / zone map image (events.layout_image_url). */
+  layout_image_url?: string | null;
   created_at: string;
   updated_at: string;
   images?: EventImage[];
