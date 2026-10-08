@@ -8,6 +8,7 @@ import { parsePagination, buildPaginationMeta } from "@/lib/mobile/pagination";
 import { MobileApiError } from "@/lib/mobile/errors";
 import { sanitizeSearchTerm } from "@/lib/utils/search-sanitization";
 import {
+  collapseDealsByListing,
   normalizeCardName,
   toMobileDealPreview,
   type CardVariantLookup,
@@ -365,6 +366,9 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     endingSoonRaw && /^\d+$/.test(endingSoonRaw)
       ? Math.min(parseInt(endingSoonRaw, 10), 90)
       : null;
+  // Listing-centric lists (All Deals): collapse after filters. Catalog stream
+  // omits this so card-matching still sees every deal row.
+  const groupByListing = searchParams.get("groupBy") === "listing";
 
   // Pure ending-soon (Home rail): skip LIMIT 3000 catalog compile.
   const endingSoonOnly =
@@ -378,7 +382,9 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     ? await getEndingSoonCatalog(endingSoonDays)
     : await getCompiledCatalog();
 
-  // Fast-path: Unfiltered request with matching ETag -> 304 Not Modified
+  // Fast-path: Unfiltered request with matching ETag -> 304 Not Modified.
+  // Skip when groupBy=listing — same ETag as the deal-first catalog would
+  // incorrectly 304 a client holding an ungrouped body.
   const ifNoneMatch = request.headers.get("if-none-match");
   const isUnfiltered =
     !sanitizedSearch &&
@@ -386,6 +392,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     cardVariantId === null &&
     categoryFilter === null &&
     endingSoonDays === null &&
+    !groupByListing &&
     page === 1;
 
   if (isUnfiltered && ifNoneMatch && ifNoneMatch === catalog.etag) {
@@ -442,6 +449,10 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       .sort(
         (a, b) => (a.expiryDaysLeft ?? 0) - (b.expiryDaysLeft ?? 0),
       );
+  }
+
+  if (groupByListing) {
+    deals = collapseDealsByListing(deals);
   }
 
   const totalItems = deals.length;

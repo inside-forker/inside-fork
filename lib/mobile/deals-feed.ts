@@ -325,3 +325,55 @@ export function toMobileDealPreview(
   if (Number.isFinite(listingIdNum)) dto.listingId = listingIdNum;
   return dto;
 }
+
+/**
+ * Collapse deal-first rows to one primary per listing (best discountWeight).
+ * Single O(n) pass — no SQL, stubs only for siblings.
+ */
+export function collapseDealsByListing(
+  deals: MobileDealPreviewDTO[],
+): MobileDealPreviewDTO[] {
+  type Bucket = {
+    primary: MobileDealPreviewDTO;
+    stubs: MobileDealStubDTO[];
+  };
+  const buckets = new Map<string, Bucket>();
+  const order: string[] = [];
+
+  for (const deal of deals) {
+    const key =
+      deal.listingId != null
+        ? `listing:${deal.listingId}`
+        : `merchant:${deal.merchant}`;
+    const bucket = buckets.get(key);
+    if (!bucket) {
+      buckets.set(key, { primary: deal, stubs: [] });
+      order.push(key);
+      continue;
+    }
+    if (deal.discountWeight > bucket.primary.discountWeight) {
+      bucket.stubs.push({
+        id: bucket.primary.id,
+        merchant: bucket.primary.merchant,
+      });
+      bucket.primary = deal;
+    } else {
+      bucket.stubs.push({ id: deal.id, merchant: deal.merchant });
+    }
+  }
+
+  const out: MobileDealPreviewDTO[] = [];
+  for (const key of order) {
+    const bucket = buckets.get(key)!;
+    if (bucket.stubs.length === 0) {
+      out.push(bucket.primary);
+      continue;
+    }
+    out.push({
+      ...bucket.primary,
+      otherDealsCount: bucket.stubs.length,
+      otherDeals: bucket.stubs,
+    });
+  }
+  return out;
+}

@@ -231,6 +231,19 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     );
   }
 
+  // User cannot create multiple reviews for the same listing
+  const { rows: existingReviewRows } = await query(
+    `SELECT id FROM reviews WHERE listing_id = $1 AND user_id = $2 AND status != 'rejected' LIMIT 1`,
+    [listing_id, user.id],
+  );
+  if (existingReviewRows[0]) {
+    throw new MobileApiError(
+      "already_reviewed",
+      "You have already reviewed this place. You can edit your existing review instead.",
+      400,
+    );
+  }
+
   // Prohibit explicit content
   const contentValidation = validateReviewContent(comment);
   if (!contentValidation.isValid) {

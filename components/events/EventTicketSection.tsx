@@ -10,7 +10,11 @@ import { EventTicketSectionProps, TicketType } from "@/types/events.types";
 import { PremiumHeading } from "@/components/brand/Typography";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/context/cartStore";
-import { computeParchiDiscount, PARCHI_BLUE } from "@/lib/parchi/discount";
+import {
+  computeParchiDiscount,
+  describeParchiOffer,
+  PARCHI_BLUE,
+} from "@/lib/parchi/discount";
 import { useArrivedFromParchi } from "@/lib/parchi/prefill";
 import { isPrismfestSlug } from "@/lib/events/prismfest";
 import { useSupabaseUser } from "@/hooks/useSupabaseUser";
@@ -29,13 +33,12 @@ export function EventTicketSection({
 }: EventTicketSectionProps) {
   const router = useRouter();
   const { user, isLoading: isUserLoading } = useSupabaseUser();
-  // Parchi-app visitors: full prices + Parchi 2FA later. Logged-in IK on
-  // Prismfest (not from Parchi): preview the student slash automatically.
+  // Parchi-app visitors: full prices + Parchi 2FA later. IK on Prismfest
+  // (not from Parchi): show IK's own slash; logged-out must sign in to get it.
   const arrivedFromParchi = useArrivedFromParchi();
   const showIkStudentPrice =
     !!parchiOffer &&
     !arrivedFromParchi &&
-    !!user &&
     isPrismfestSlug(event.slug);
   const studentPrice = (amount: number) =>
     parchiOffer
@@ -127,15 +130,16 @@ export function EventTicketSection({
     router.push("/checkout");
   };
 
+  const needsLoginCta =
+    (arrivedFromParchi || showIkStudentPrice) && !user && !isUserLoading;
+
   const handleProceedToCheckout = () => {
-    if (arrivedFromParchi && !user && !isUserLoading) {
+    if (needsLoginCta) {
       setAuthOpen(true);
       return;
     }
     goToCheckout();
   };
-
-  const needsLoginCta = arrivedFromParchi && !user && !isUserLoading;
 
   return (
     <motion.div
@@ -196,7 +200,7 @@ export function EventTicketSection({
                               {formatPrice(studentPrice(ticket.price))}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Student price
+                              Inside Karachi price
                             </div>
                           </>
                         ) : (
@@ -304,7 +308,7 @@ export function EventTicketSection({
                       <span className="font-semibold text-primary">
                         {formatPrice(studentPrice(getTotalPrice()))}
                       </span>{" "}
-                      <span className="text-xs">student</span>
+                      <span className="text-xs">with Inside Karachi</span>
                     </>
                   ) : (
                     <span className="font-semibold text-foreground">
@@ -314,6 +318,11 @@ export function EventTicketSection({
                   {arrivedFromParchi && (
                     <span className="block text-xs mt-0.5" style={{ color: PARCHI_BLUE }}>
                       Parchi discount applies after you verify at checkout
+                    </span>
+                  )}
+                  {showIkStudentPrice && needsLoginCta && (
+                    <span className="block text-xs mt-0.5 text-primary">
+                      Sign in or sign up to get this price
                     </span>
                   )}
                 </p>
@@ -327,7 +336,9 @@ export function EventTicketSection({
                 {needsLoginCta ? (
                   <>
                     <LogIn className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    Log in
+                    {showIkStudentPrice && parchiOffer
+                      ? `Sign in for ${describeParchiOffer(parchiOffer)}`
+                      : "Log in"}
                   </>
                 ) : (
                   <>
@@ -346,6 +357,11 @@ export function EventTicketSection({
         onOpenChange={setAuthOpen}
         nextPath={`/events/${event.slug}`}
         onSuccess={goToCheckout}
+        description={
+          showIkStudentPrice && parchiOffer
+            ? `Sign in or create an Inside Karachi account to get ${describeParchiOffer(parchiOffer)}.`
+            : undefined
+        }
       />
     </motion.div>
   );

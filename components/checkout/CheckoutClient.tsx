@@ -514,6 +514,9 @@ export function CheckoutClient() {
         items={items}
         event={eventInfo}
         totals={totals}
+        discountLabel={
+          ikOpenStudentDiscount ? "Inside Karachi discount" : undefined
+        }
         onChangeQuantity={updateQuantity}
       />
 
@@ -529,9 +532,9 @@ export function CheckoutClient() {
 
       {ikOpenStudentDiscount ? (
         <div className="rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm">
-          <p className="font-semibold text-foreground">Student discount applied</p>
+          <p className="font-semibold text-foreground">Inside Karachi discount applied</p>
           <p className="text-muted-foreground">
-            Your Inside Karachi student price is already included in the total.
+            Your discount is already included in the total.
           </p>
         </div>
       ) : null}

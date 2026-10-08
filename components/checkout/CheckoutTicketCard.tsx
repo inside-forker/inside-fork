@@ -14,7 +14,7 @@ export interface CheckoutEventInfo {
 
 export interface CheckoutTotals {
   subtotal: number;
-  /** Parchi student discount, off the subtotal before fees. */
+  /** Parchi student or Inside Karachi discount, off the subtotal before fees. */
   discount: number;
   platformFee: number;
   paymentFee: number;
@@ -32,11 +32,13 @@ export function CheckoutTicketCard({
   items,
   event,
   totals,
+  discountLabel = "Parchi student discount",
   onChangeQuantity,
 }: {
   items: CartItem[];
   event: CheckoutEventInfo | null;
   totals: CheckoutTotals;
+  discountLabel?: string;
   onChangeQuantity: (ticketTypeId: number, quantity: number) => void;
 }) {
   const ticketCount = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -89,7 +91,7 @@ export function CheckoutTicketCard({
         <div className="space-y-1">
           <FeeRow label="Subtotal" amount={totals.subtotal} />
           {totals.discount > 0 ? (
-            <FeeRow label="Parchi student discount" amount={totals.discount} minus />
+            <FeeRow label={discountLabel} amount={totals.discount} minus />
           ) : null}
           {totals.platformFee > 0 ? (
             <FeeRow label="Platform fee" amount={totals.platformFee} />

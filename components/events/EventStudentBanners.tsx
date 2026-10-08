@@ -14,7 +14,7 @@ import { useSupabaseUser } from "@/hooks/useSupabaseUser";
 /**
  * Chooses Parchi vs Inside student branding on the event page.
  * - Parchi channel → Parchi banner only
- * - Logged-in non-Parchi on Prismfest → Inside banner
+ * - Non-Parchi on Prismfest → Inside banner (logged-out: sign in to unlock)
  * - Otherwise → nothing
  */
 export function EventStudentBanners({
@@ -40,8 +40,14 @@ export function EventStudentBanners({
     return <ParchiEventBanner offer={offer} />;
   }
 
-  if (!isLoading && user && isPrismfestSlug(eventSlug)) {
-    return <InsideStudentBanner offer={offer} />;
+  if (!isLoading && isPrismfestSlug(eventSlug)) {
+    return (
+      <InsideStudentBanner
+        offer={offer}
+        signedIn={!!user}
+        eventSlug={eventSlug}
+      />
+    );
   }
 
   return null;
