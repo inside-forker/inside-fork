@@ -2,6 +2,10 @@ import crypto from "crypto";
 import { query } from "@/lib/db";
 import { MobileApiError } from "@/lib/mobile/errors";
 import { resolveAssignedGateIndex } from "@/lib/ticketing/resolve-gate-assignment";
+import {
+  assignPdfInventoryForBooking,
+  getPdfInventoryTicketTypeIds,
+} from "@/lib/ticketing/pdf-inventory";
 import { scheduleParchiRedemptionReport } from "@/lib/parchi/service";
 
 /**
@@ -59,18 +63,26 @@ export async function confirmBookingWithoutPayment(
     }
   }
 
-  // Passes first: if this fails the booking stays awaiting_payment rather than
-  // ending up "paid" with no tickets.
+  // PDF inventory first (Prism Fam etc.), then IK passes for other tiers.
+  // If fulfillment fails the booking stays awaiting_payment.
+  const pdfAssigned = await assignPdfInventoryForBooking(
+    bookingId,
+    "/api/mobile/v1/checkout",
+  );
+
+  const { rows: items } = await query(
+    `SELECT ticket_type_id, quantity FROM booking_items WHERE booking_id = $1`,
+    [bookingId],
+  );
+  const pdfTypeIds = await getPdfInventoryTicketTypeIds(
+    items.map((item) => Number(item.ticket_type_id)),
+  );
+
   const { rows: existingPasses } = await query(
     `SELECT id FROM ticket_passes WHERE booking_id = $1 LIMIT 1`,
     [bookingId],
   );
   if (existingPasses.length === 0) {
-    const { rows: items } = await query(
-      `SELECT ticket_type_id, quantity FROM booking_items WHERE booking_id = $1`,
-      [bookingId],
-    );
-
     const passes: Array<{
       ticketTypeId: number;
       code: string;
@@ -79,6 +91,7 @@ export async function confirmBookingWithoutPayment(
       guestName: string;
     }> = [];
     for (const item of items) {
+      if (pdfTypeIds.has(Number(item.ticket_type_id))) continue;
       for (let i = 0; i < Number(item.quantity); i++) {
         const code = `IK-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
         const signature = crypto
@@ -120,6 +133,12 @@ export async function confirmBookingWithoutPayment(
            (booking_id, event_id, ticket_type_id, code, signature, status, quantity_index, guest_name, assigned_gate_index)
          VALUES ${placeholders}`,
         values,
+      );
+    } else if (pdfAssigned === 0 && items.length > 0) {
+      throw new MobileApiError(
+        "server_error",
+        "Could not issue tickets for this booking.",
+        500,
       );
     }
   } else if (assignedGateIndex !== null) {

@@ -439,13 +439,23 @@ async function buildCustomEmailHtml(
         return null;
       }
 
-      // Fetch ticket passes with guest details including CNIC
+      // Fetch IK ticket passes with guest details including CNIC
       const { rows: passes } = await query(
         `SELECT tp.code, tp.guest_name, tp.cnic_last4, tt.name AS ticket_type_name
          FROM public.ticket_passes tp
          LEFT JOIN public.ticket_types tt ON tt.id = tp.ticket_type_id
          WHERE tp.booking_id = $1
          ORDER BY tp.issued_at ASC`,
+        [bookingId],
+      );
+
+      // Organizer PDF inventory tickets (e.g. Ticketwala Prism Fam)
+      const { rows: pdfTickets } = await query(
+        `SELECT i.external_ticket_id, tt.name AS ticket_type_name
+         FROM public.ticket_pdf_inventory i
+         LEFT JOIN public.ticket_types tt ON tt.id = i.ticket_type_id
+         WHERE i.booking_id = $1
+         ORDER BY i.assigned_at ASC, i.id ASC`,
         [bookingId],
       );
 
@@ -466,6 +476,22 @@ async function buildCustomEmailHtml(
       const venueName = booking.event_location_name || "To be announced";
       const venueAddress = booking.event_address || "Check your tickets";
 
+      const emailPasses = [
+        ...passes.map((pass) => ({
+          code: pass.code as string,
+          guestName: pass.guest_name as string | null,
+          cnicLast4: pass.cnic_last4 as string | null,
+          ticketTypeName: (pass.ticket_type_name as string) || "General Admission",
+        })),
+        ...pdfTickets.map((pdf) => ({
+          code: `TW-${pdf.external_ticket_id}`,
+          guestName: booking.customer_name as string | null,
+          cnicLast4: null as string | null,
+          ticketTypeName:
+            (pdf.ticket_type_name as string) || "Event Ticket",
+        })),
+      ];
+
       // Generate HTML
       const premiumHtml = generateBookingConfirmationEmail({
         customerName: booking.customer_name || "Valued Customer",
@@ -474,14 +500,9 @@ async function buildCustomEmailHtml(
         eventDate: formattedDate,
         eventTime: formattedTime,
         eventVenue: `${venueName}, ${venueAddress}`,
-        ticketCount: passes.length,
+        ticketCount: emailPasses.length,
         totalAmount: booking.total_amount || 0,
-        passes: passes.map((pass) => ({
-          code: pass.code,
-          guestName: pass.guest_name,
-          cnicLast4: pass.cnic_last4,
-          ticketTypeName: pass.ticket_type_name || "General Admission",
-        })),
+        passes: emailPasses,
         viewTicketsUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/bookings`,
       });
 

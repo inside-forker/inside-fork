@@ -125,12 +125,18 @@ export default async function RootLayout({
             <ScrollProvider>
               <ConditionalLayout
                 header={
-                  <UnifiedPremiumHeader
-                    context="public"
-                    showDiscoveryPanel={true}
-                  />
+                  <div data-chrome="header">
+                    <UnifiedPremiumHeader
+                      context="public"
+                      showDiscoveryPanel={true}
+                    />
+                  </div>
                 }
-                footer={<Footer serverCategories={serverCategories} />}
+                footer={
+                  <div data-chrome="footer">
+                    <Footer serverCategories={serverCategories} />
+                  </div>
+                }
               >
                 {/* Route change loader bar - wrapped in Suspense for useSearchParams */}
                 <Suspense fallback={null}>

@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { PremiumHeading, PremiumText } from "@/components/brand/Typography";
 import { BookingPassList } from "@/components/events/BookingPassList";
-import { PublicPass } from "@/types/ticketing.types";
+import { BookingPdfTicketList } from "@/components/events/BookingPdfTicketList";
+import { PublicPass, PublicPdfTicket } from "@/types/ticketing.types";
 
 interface BookingEventSummary {
   id: number;
@@ -39,6 +40,7 @@ export interface DashboardBooking {
   total_amount: number;
   created_at: string;
   passes: PublicPass[];
+  pdfTickets: PublicPdfTicket[];
   event: BookingEventSummary | null;
 }
 
@@ -148,7 +150,7 @@ export function BookingsDashboard({ bookings }: Props) {
         paymentStatus === "awaiting_payment" || paymentStatus === "pending";
       if (isAwaiting) awaiting += 1;
       if (paymentStatus === "paid") totalPaid += booking.total_amount;
-      passes += booking.passes.length;
+      passes += booking.passes.length + (booking.pdfTickets?.length ?? 0);
 
       let eventStart: Date | null = null;
       if (booking.event?.start_time) {
@@ -454,7 +456,9 @@ export function BookingsDashboard({ bookings }: Props) {
                           </Link>
                         </Button>
                       )}
-                      {booking.payment_status === "paid" && (
+                      {booking.payment_status === "paid" &&
+                        (booking.passes.length > 0 ||
+                          (booking.pdfTickets?.length ?? 0) > 0) && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -462,20 +466,26 @@ export function BookingsDashboard({ bookings }: Props) {
                           onClick={() => setSelected(booking)}
                         >
                           <Ticket className="mr-2 h-3.5 w-3.5" />
-                          View passes
+                          View tickets
                         </Button>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {booking.passes.length > 0 && (
+                {(booking.passes.length > 0 ||
+                  (booking.pdfTickets?.length ?? 0) > 0) && (
                   <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary-100">
                     <Ticket className="h-4 w-4 flex-shrink-0" />
                     <span className="text-foreground/80 font-medium">
-                      {booking.passes.length} digital pass
-                      {booking.passes.length === 1 ? "" : "es"} secured for this
-                      booking.
+                      {booking.passes.length + (booking.pdfTickets?.length ?? 0)}{" "}
+                      ticket
+                      {booking.passes.length +
+                        (booking.pdfTickets?.length ?? 0) ===
+                      1
+                        ? ""
+                        : "s"}{" "}
+                      secured for this booking.
                     </span>
                   </div>
                 )}
@@ -527,7 +537,7 @@ export function BookingsDashboard({ bookings }: Props) {
                   Booking {selected.booking_reference ?? selected.id}
                 </DialogTitle>
                 <DialogDescription className="text-xs uppercase tracking-[0.35em] text-muted-foreground">
-                  Digital access passes
+                  Your tickets
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6">
@@ -549,17 +559,25 @@ export function BookingsDashboard({ bookings }: Props) {
                     )}
                   </span>
                 </div>
-                <BookingPassList
-                  passes={selected.passes}
-                  variant="dashboard"
-                  eventName={selected.event?.name}
-                  eventDate={selected.event?.start_time}
-                  venueName={selected.event?.venue_name ?? undefined}
-                  eventEndTime={selected.event?.end_time ?? undefined}
-                  address={selected.event?.address ?? undefined}
-                  organizer={selected.event?.organizer_name ?? undefined}
-                  bookingReference={selected.booking_reference ?? undefined}
-                />
+                {(selected.pdfTickets?.length ?? 0) > 0 && (
+                  <BookingPdfTicketList
+                    tickets={selected.pdfTickets}
+                    variant="dashboard"
+                  />
+                )}
+                {selected.passes.length > 0 && (
+                  <BookingPassList
+                    passes={selected.passes}
+                    variant="dashboard"
+                    eventName={selected.event?.name}
+                    eventDate={selected.event?.start_time}
+                    venueName={selected.event?.venue_name ?? undefined}
+                    eventEndTime={selected.event?.end_time ?? undefined}
+                    address={selected.event?.address ?? undefined}
+                    organizer={selected.event?.organizer_name ?? undefined}
+                    bookingReference={selected.booking_reference ?? undefined}
+                  />
+                )}
               </div>
             </DialogContent>
           </Dialog>

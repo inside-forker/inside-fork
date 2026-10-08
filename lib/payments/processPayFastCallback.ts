@@ -7,6 +7,10 @@ import {
 import { createNotification } from "@/lib/notifications/service";
 import { captureRouteError } from "@/lib/sentry/captureRouteError";
 import { resolveAssignedGateIndex } from "@/lib/ticketing/resolve-gate-assignment";
+import {
+  assignPdfInventoryForBooking,
+  getPdfInventoryTicketTypeIds,
+} from "@/lib/ticketing/pdf-inventory";
 import crypto from "crypto";
 import { scheduleParchiRedemptionReport } from "@/lib/parchi/service";
 
@@ -256,10 +260,28 @@ export async function processPayFastCallbackParams(
       );
     }
 
-    // If payment successful, create ticket passes
+    // If payment successful, create ticket passes (IK) and/or assign PDF inventory
     let passesCreated = 0;
+    let pdfTicketsAssigned = 0;
     if (bookingPaymentStatus === "paid" && booking.event_id) {
       try {
+        try {
+          pdfTicketsAssigned = await assignPdfInventoryForBooking(
+            Number(booking.id),
+            "/api/payments/payfast/callback",
+          );
+          if (pdfTicketsAssigned > 0) {
+            console.log(
+              `[PayFast Webhook] Assigned ${pdfTicketsAssigned} PDF ticket(s)`,
+            );
+          }
+        } catch (pdfError) {
+          console.error(
+            "[PayFast Webhook] PDF inventory assignment failed:",
+            pdfError,
+          );
+        }
+
         // Get booking items
         const { rows: bookingItems } = await query(
           `SELECT ticket_type_id, quantity FROM booking_items WHERE booking_id = $1`,
@@ -267,6 +289,9 @@ export async function processPayFastCallbackParams(
         );
 
         if (bookingItems && bookingItems.length > 0) {
+          const pdfTypeIds = await getPdfInventoryTicketTypeIds(
+            bookingItems.map((item) => Number(item.ticket_type_id)),
+          );
           const passesToCreate = [];
           const SIGNING_SECRET = process.env.TICKET_SIGNING_SECRET;
           if (!SIGNING_SECRET) {
@@ -276,6 +301,9 @@ export async function processPayFastCallbackParams(
           }
 
           for (const item of bookingItems) {
+            if (pdfTypeIds.has(Number(item.ticket_type_id))) {
+              continue;
+            }
             for (let i = 0; i < item.quantity; i++) {
               const code = `IK-${crypto
                 .randomBytes(3)
@@ -414,9 +442,12 @@ export async function processPayFastCallbackParams(
           roleScope: "public_user",
           categorySlug: "public_booking_confirmation",
           title: "🎉 Payment Confirmed!",
-          body: `Your tickets for ${eventName} are ready. ${passesCreated} pass${
-            passesCreated !== 1 ? "es" : ""
-          } issued.`,
+          body: (() => {
+            const issued = passesCreated + pdfTicketsAssigned;
+            return `Your tickets for ${eventName} are ready. ${issued} ticket${
+              issued !== 1 ? "s" : ""
+            } issued.`;
+          })(),
           priority: "high",
           ctaLabel: "View My Tickets",
           ctaUrl: `/dashboard/bookings`,
@@ -425,6 +456,7 @@ export async function processPayFastCallbackParams(
             booking_reference: booking.booking_reference,
             event_name: eventName,
             passes_count: passesCreated,
+            pdf_tickets_count: pdfTicketsAssigned,
             transaction_id: validation.transactionId,
           },
           channelOverrides: {
@@ -469,7 +501,7 @@ export async function processPayFastCallbackParams(
           type: "ticket_sale",
           eventId: Number(booking.event_id),
           data: {
-            ticketCount: passesCreated,
+            ticketCount: passesCreated + pdfTicketsAssigned,
             totalAmount: Number(booking.total_amount ?? 0),
             buyerName: booking.customer_name || undefined,
           },
