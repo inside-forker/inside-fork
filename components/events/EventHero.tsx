@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { OptimizedImage } from "@/components/ui/optimized-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Ticket, Sparkles } from "lucide-react";
+import { Calendar, MapPin, Navigation, Ticket, Sparkles } from "lucide-react";
 import { EventHeroProps } from "@/types/events.types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ShareButton } from "@/components/shared/ShareButton";
@@ -64,6 +64,14 @@ export function EventHero({
   };
 
   const eventDateTime = formatEventDate(event.start_time, event.end_time);
+
+  // Google Maps: exact pin when we have coordinates, else search the address
+  const directionsUrl =
+    event.latitude && event.longitude
+      ? `https://www.google.com/maps/dir/?api=1&destination=${event.latitude},${event.longitude}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+          event.address || event.location_name || "",
+        )}`;
   const heroImage =
     images && images.length > 0
       ? images[currentImageIndex]
@@ -71,14 +79,35 @@ export function EventHero({
 
   return (
     <div
-      className={`relative min-h-[580px] sm:min-h-[620px] md:h-[75vh] lg:h-[80vh] overflow-hidden flex flex-col justify-between ${
+      className={`relative overflow-hidden md:flex md:flex-col md:justify-between md:min-h-[620px] md:h-[75vh] lg:h-[80vh] ${
         withTopMargin ? "mt-16 md:mt-20" : ""
       }`}
     >
-      {/* Background Image with Smooth Fade */}
+      {/* Phones: the whole poster on its own (no crop), details below it */}
+      <motion.div
+        key={`poster-${currentImageIndex}`}
+        className="bg-black md:hidden"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      >
+        <OptimizedImage
+          src={heroImage}
+          alt={event.name}
+          width={1200}
+          height={675}
+          className="h-auto w-full"
+          priority
+          sizes="100vw"
+          loading="eager"
+          fetchPriority="high"
+        />
+      </motion.div>
+
+      {/* Tablet & desktop: Background Image with Smooth Fade */}
       <motion.div
         key={currentImageIndex}
-        className="absolute inset-0"
+        className="absolute inset-0 hidden md:block"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
@@ -100,8 +129,8 @@ export function EventHero({
         <div className="absolute inset-x-0 top-0 h-44 bg-gradient-to-b from-black/90 via-black/60 to-transparent pointer-events-none" />
       </motion.div>
 
-      {/* Floating Top Bar (Status & Featured Badges) */}
-      <div className="relative z-20 w-full container mx-auto px-4 md:px-6 lg:px-8 pt-3 sm:pt-4 md:pt-5 flex items-center justify-between pointer-events-none">
+      {/* Floating Top Bar (Status & Featured Badges) - tablet & desktop */}
+      <div className="relative z-20 w-full container mx-auto px-4 md:px-6 lg:px-8 pt-3 sm:pt-4 md:pt-5 hidden md:flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2 pointer-events-auto flex-wrap">
           <Badge
             variant="secondary"
@@ -127,32 +156,46 @@ export function EventHero({
         </div>
       </div>
 
-      {/* Main Content - Anchored at Bottom with Generous Spacing */}
-      <div className="relative z-10 w-full pt-8 pb-6 sm:pb-10">
+      {/* Main Content - below the poster on phones, over it from tablet up */}
+      <div className="relative z-10 w-full pt-4 pb-1 md:pt-8 md:pb-10">
         <div className="container mx-auto px-4 md:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
-            className="max-w-4xl text-left space-y-4 sm:space-y-5"
+            className="max-w-4xl text-left space-y-3 md:space-y-5"
           >
+            {/* Status (phones) */}
+            <div className="flex items-center gap-3 text-xs font-semibold md:hidden">
+              <span className="flex items-center gap-1.5 text-primary">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                {event.status === "published" ? "Upcoming Event" : event.status}
+              </span>
+              {event.is_featured && (
+                <span className="flex items-center gap-1 text-amber-600">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Featured
+                </span>
+              )}
+            </div>
+
             {/* Title */}
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+            <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-extrabold text-foreground md:text-white tracking-tight leading-tight md:drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
               {event.name}
             </h1>
 
-            {/* Event Details Chips Row */}
-            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-white">
+            {/* Event Details - plain rows on phones, glass chips from tablet up */}
+            <div className="flex flex-col items-start gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3 text-foreground md:text-white">
               {/* Date & Time Chip */}
-              <div className="backdrop-blur-md bg-black/40 border border-white/15 px-3.5 py-2 rounded-xl flex items-center gap-2.5 text-xs sm:text-sm shadow-md">
-                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/20 text-primary flex-shrink-0">
+              <div className="flex items-center gap-2.5 text-sm md:backdrop-blur-md md:bg-black/40 md:border md:border-white/15 md:px-3.5 md:py-2 md:rounded-xl md:shadow-md">
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 md:bg-primary/20 text-primary flex-shrink-0">
                   <Calendar className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-semibold text-white block leading-snug">
+                  <span className="font-semibold text-foreground md:text-white block leading-snug">
                     {eventDateTime.date}
                   </span>
-                  <span className="text-white/70 text-[11px] sm:text-xs block leading-tight">
+                  <span className="text-muted-foreground md:text-white/70 text-xs block leading-tight">
                     {eventDateTime.time}
                   </span>
                 </div>
@@ -160,44 +203,53 @@ export function EventHero({
 
               {/* Location Chip */}
               {event.location_name && (
-                <div className="backdrop-blur-md bg-black/40 border border-white/15 px-3.5 py-2 rounded-xl flex items-center gap-2.5 text-xs sm:text-sm shadow-md max-w-full sm:max-w-md">
-                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/20 text-primary flex-shrink-0">
+                <div className="flex items-center gap-2.5 text-sm max-w-full md:max-w-md md:backdrop-blur-md md:bg-black/40 md:border md:border-white/15 md:px-3.5 md:py-2 md:rounded-xl md:shadow-md">
+                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 md:bg-primary/20 text-primary flex-shrink-0">
                     <MapPin className="w-4 h-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <span className="font-semibold text-white block leading-snug truncate">
+                    <span className="font-semibold text-foreground md:text-white block leading-snug md:truncate">
                       {event.location_name}
                     </span>
                     {event.address && (
-                      <span className="text-white/70 text-[11px] sm:text-xs block leading-tight truncate">
+                      <span className="text-muted-foreground md:text-white/70 text-xs block leading-tight md:truncate">
                         {event.address}
                       </span>
                     )}
                   </div>
+                  <a
+                    href={directionsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 md:bg-primary md:text-primary-foreground md:hover:bg-primary/90"
+                  >
+                    <Navigation className="h-3 w-3" />
+                    Directions
+                  </a>
                 </div>
               )}
 
               {/* Organizer Capsule */}
               {event.organizer_name && (
-                <div className="backdrop-blur-md bg-black/40 border border-white/15 px-3 py-1.5 rounded-full flex items-center gap-2 text-xs shadow-md">
-                  <Avatar className="h-6 w-6 border border-white/20">
+                <div className="flex items-center gap-2.5 md:gap-2 text-sm md:text-xs md:backdrop-blur-md md:bg-black/40 md:border md:border-white/15 md:px-3 md:py-1.5 md:rounded-full md:shadow-md">
+                  <Avatar className="h-7 w-7 md:h-6 md:w-6 border border-border md:border-white/20">
                     <AvatarImage src={event.organizer_avatar || undefined} />
                     <AvatarFallback className="bg-primary text-primary-foreground text-[10px]">
                       {event.organizer_name.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-white/80">
-                    By <span className="font-medium text-white">{event.organizer_name}</span>
+                  <span className="text-muted-foreground md:text-white/80">
+                    By <span className="font-medium text-foreground md:text-white">{event.organizer_name}</span>
                   </span>
                 </div>
               )}
             </div>
 
             {/* Action Bar */}
-            <div className="pt-2 flex items-center gap-3 flex-wrap">
+            <div className="pt-1 md:pt-2 flex items-center gap-3">
               <Button
                 size="lg"
-                className="bg-primary text-primary-foreground font-bold px-7 sm:px-9 py-3.5 rounded-xl shadow-lg transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(255,24,77,0.5)] focus-visible:ring-2 focus-visible:ring-primary/40 focus:outline-none text-sm sm:text-base gap-2"
+                className="flex-1 md:flex-none bg-primary text-primary-foreground font-bold px-7 sm:px-9 py-3.5 rounded-xl shadow-lg transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(255,24,77,0.5)] focus-visible:ring-2 focus-visible:ring-primary/40 focus:outline-none text-sm sm:text-base gap-2"
                 onClick={() => {
                   const ticketsSection = document.getElementById("tickets");
                   if (ticketsSection) {
