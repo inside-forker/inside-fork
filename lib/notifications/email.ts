@@ -1,4 +1,5 @@
 import type { NotificationRecord } from "@/types/notifications.types";
+import { getPublicSiteOrigin } from "@/lib/auth/url";
 
 interface NotificationEmailRecipient {
   email: string;
@@ -28,13 +29,10 @@ const BREVO_SENDER_EMAIL =
 const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME ?? "Inside Karachi";
 const BREVO_BASE_URL = "https://api.brevo.com/v3/smtp/email";
 
-const SITE_URL = (
-  process.env.NEXT_PUBLIC_APP_URL ||
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  process.env.SITE_URL ||
-  "https://www.insidekarachi.com"
-).replace(/\/+$/, "");
-const LOGO_URL = `${SITE_URL}/logo-white.png`;
+/** Public site for email assets/CTAs — never localhost from a local .env. */
+function emailSiteUrl(): string {
+  return getPublicSiteOrigin();
+}
 
 /** Email clients cannot resolve relative paths — always emit an absolute href. */
 function resolveEmailCtaUrl(ctaUrl: string | null | undefined): string | null {
@@ -42,10 +40,11 @@ function resolveEmailCtaUrl(ctaUrl: string | null | undefined): string | null {
   const trimmed = ctaUrl.trim();
   if (!trimmed) return null;
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const site = emailSiteUrl();
   try {
-    return new URL(trimmed, `${SITE_URL}/`).toString();
+    return new URL(trimmed, `${site}/`).toString();
   } catch {
-    return `${SITE_URL}${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
+    return `${site}${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
   }
 }
 
@@ -145,7 +144,7 @@ function buildEmailHtml(
           <div style="${INLINE_STYLES.container}">
             <div style="${INLINE_STYLES.card}">
               <div style="${INLINE_STYLES.logoContainer}">
-                <img src="${LOGO_URL}" alt="Inside Karachi" style="${
+                <img src="${emailSiteUrl()}/logo-white.png" alt="Inside Karachi" style="${
     INLINE_STYLES.logo
   }" />
               </div>

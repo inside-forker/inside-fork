@@ -60,6 +60,13 @@ export function GoPayFastForm({
         throw new Error(result.error || "Failed to generate payment form");
       }
 
+      // Local/review skip: booking was confirmed without PayFast — reload so
+      // the payment page shows the paid success state.
+      if (result.skipped) {
+        window.location.reload();
+        return;
+      }
+
       setFormData(result.data);
     } catch (err) {
       hasFetchedRef.current = false;

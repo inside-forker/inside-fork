@@ -7,6 +7,7 @@ import { enforceMobileRateLimit } from "@/lib/mobile/rate-limit";
 import { MobileApiError } from "@/lib/mobile/errors";
 import { query } from "@/lib/db";
 import { sendPasswordResetEmail } from "@/lib/emails/send-password-reset";
+import { getPublicSiteOrigin } from "@/lib/auth/url";
 
 export const dynamic = "force-dynamic";
 
@@ -53,11 +54,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
         [recoveryToken, now, user.id],
       );
 
-      const baseUrl = (
-        process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-      ).replace(/\/+$/, "");
-      const resetLink = `${baseUrl}/reset-password?code=${recoveryToken}`;
-
+      const resetLink = `${getPublicSiteOrigin()}/reset-password?code=${recoveryToken}`;
       const { rows: profiles } = await query(
         "SELECT full_name FROM public.profiles WHERE id = $1 LIMIT 1",
         [user.id],

@@ -12,6 +12,7 @@ import type {
 import { NotificationEmailError, sendNotificationEmail } from "./email";
 import { NotificationPushError, sendNotificationPush } from "./push";
 import { generateBookingConfirmationEmail } from "@/lib/emails/booking-confirmation-template";
+import { getPublicSiteOrigin } from "@/lib/auth/url";
 
 const MAX_BATCH_SIZE = 25;
 const LOCK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -503,7 +504,7 @@ async function buildCustomEmailHtml(
         ticketCount: emailPasses.length,
         totalAmount: booking.total_amount || 0,
         passes: emailPasses,
-        viewTicketsUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/bookings`,
+        viewTicketsUrl: `${getPublicSiteOrigin()}/dashboard/bookings`,
       });
 
       return premiumHtml;

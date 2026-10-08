@@ -7,9 +7,10 @@ import {
   getPdfInventoryTicketTypeIds,
 } from "@/lib/ticketing/pdf-inventory";
 import { scheduleParchiRedemptionReport } from "@/lib/parchi/service";
+import { createNotification } from "@/lib/notifications/service";
 
 /**
- * Confirming a booking without a PayFast round trip.
+ * Confirm a booking without a PayFast round trip.
  *
  * Two cases skip the gateway:
  *  - `free_order`: the booking total is Rs 0, so there is nothing to charge.
@@ -39,7 +40,7 @@ export async function confirmBookingWithoutPayment(
   reason: SkipPaymentReason,
 ): Promise<void> {
   const { rows: bookingRows } = await query(
-    `SELECT id, event_id, customer_name, payment_status
+    `SELECT id, event_id, customer_name, payment_status, user_id, booking_reference
      FROM bookings WHERE id = $1`,
     [bookingId],
   );
@@ -78,6 +79,7 @@ export async function confirmBookingWithoutPayment(
     items.map((item) => Number(item.ticket_type_id)),
   );
 
+  let passesCreated = 0;
   const { rows: existingPasses } = await query(
     `SELECT id FROM ticket_passes WHERE booking_id = $1 LIMIT 1`,
     [bookingId],
@@ -134,6 +136,7 @@ export async function confirmBookingWithoutPayment(
          VALUES ${placeholders}`,
         values,
       );
+      passesCreated = passes.length;
     } else if (pdfAssigned === 0 && items.length > 0) {
       throw new MobileApiError(
         "server_error",
@@ -148,6 +151,11 @@ export async function confirmBookingWithoutPayment(
        WHERE booking_id = $2 AND assigned_gate_index IS NULL`,
       [assignedGateIndex, bookingId],
     );
+    const { rows: passCountRows } = await query(
+      `SELECT COUNT(*)::int AS count FROM ticket_passes WHERE booking_id = $1`,
+      [bookingId],
+    );
+    passesCreated = Number(passCountRows[0]?.count ?? 0);
   }
 
   await query(
@@ -186,4 +194,66 @@ export async function confirmBookingWithoutPayment(
   console.warn(
     `[skip-payment] Booking ${bookingId} confirmed without payment (${reason}).`,
   );
+
+  // Same confirmation email path as PayFast / admin mark-paid.
+  if (booking.user_id && booking.event_id) {
+    try {
+      const { rows: eventRows } = await query(
+        `SELECT name FROM events WHERE id = $1`,
+        [booking.event_id],
+      );
+      const eventName = (eventRows[0]?.name as string | undefined) || "your event";
+      const issuedCount = passesCreated + pdfAssigned;
+
+      const notificationResult = await createNotification({
+        recipientId: String(booking.user_id),
+        roleScope: "public_user",
+        categorySlug: "public_booking_confirmation",
+        title: "🎉 Payment Confirmed!",
+        body: `Your tickets for ${eventName} are ready. ${issuedCount} ticket${
+          issuedCount !== 1 ? "s" : ""
+        } issued.`,
+        priority: "high",
+        ctaLabel: "View My Tickets",
+        ctaUrl: `/dashboard/bookings`,
+        metadata: {
+          booking_id: bookingId,
+          booking_reference: booking.booking_reference,
+          event_name: eventName,
+          passes_count: passesCreated,
+          pdf_tickets_count: pdfAssigned,
+          skipped_payment: reason,
+        },
+        channelOverrides: {
+          bell: true,
+          email: true,
+          push: false,
+        },
+      });
+
+      if (notificationResult.outbox.length > 0) {
+        try {
+          const dispatchModule = await import("@/lib/notifications/dispatcher");
+          const dispatchResult = await dispatchModule.dispatchEmailOutboxBatch({
+            limit: 10,
+          });
+          console.log("[skip-payment] Email dispatch result:", {
+            bookingId,
+            sent: dispatchResult.sent,
+            failed: dispatchResult.failed,
+          });
+        } catch (dispatchError) {
+          console.error(
+            "[skip-payment] Email dispatch failed:",
+            dispatchError,
+          );
+        }
+      }
+    } catch (notifError) {
+      console.error(
+        "[skip-payment] Failed to send booking confirmation:",
+        notifError,
+      );
+    }
+  }
 }
