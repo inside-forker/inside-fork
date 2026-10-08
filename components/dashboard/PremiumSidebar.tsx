@@ -247,6 +247,8 @@ export function PremiumSidebar({
     // Filter navigation items based on ACTIVE role
     const isSuperAdmin = activeRole === "super_admin";
 
+    const emailNorm = (user?.email ?? "").trim().toLowerCase();
+
     return adminNavigation.filter((item: SidebarNavItem) => {
       // If the nav item requires a specific role, filter accordingly
       if (item.requiredRole === "super_admin" && !isSuperAdmin) {
@@ -256,9 +258,15 @@ export function PremiumSidebar({
       if (item.requiredRole === "admin" && !isAdmin) {
         return false;
       }
+      if (
+        item.requiredEmail &&
+        item.requiredEmail.trim().toLowerCase() !== emailNorm
+      ) {
+        return false;
+      }
       return true;
     });
-  }, [isAdmin, activeRole]);
+  }, [isAdmin, activeRole, user?.email]);
 
   // Create dynamic secondary navigation based on user role
   const dynamicSecondaryNavigation = React.useMemo(() => {

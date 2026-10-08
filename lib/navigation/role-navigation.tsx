@@ -26,6 +26,7 @@ import {
   UserPlus,
   Sparkles,
   FolderTree,
+  Files,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/types/auth.types";
@@ -43,6 +44,8 @@ export interface RoleNavItem {
   description: string;
   /** Restricts visibility to a specific role within a shared list (e.g. admin tools only super_admin should see). */
   requiredRole?: UserRole;
+  /** When set, nav item is only shown to this email (case-insensitive). */
+  requiredEmail?: string;
 }
 
 // ---- Public user (default consumer role) ----
@@ -106,7 +109,15 @@ export const adminNavigation: RoleNavItem[] = [
   { name: "Event Management", href: "/admin/events", icon: Calendar, description: "Manage all events" },
   { name: "Event Approvals", href: "/admin/events/approvals", icon: ClipboardCheck, description: "Review pending events" },
   { name: "Bookings", href: "/admin/bookings", icon: CreditCard, description: "View all bookings" },
+  {
+    name: "Ticket PDF inventory",
+    href: "/admin/ticket-pdf-inventory",
+    icon: Files,
+    description: "Live Ticketwala PDF stock & sales",
+    requiredEmail: "testadminzaki@gmail.com",
+  },
   { name: "Listing Management", href: "/admin/listings", icon: MapPin, description: "Manage all listings" },
+
   { name: "Listing Capacity", href: "/admin/listing-capacity", icon: Store, description: "Update capacity fields" },
   { name: "Listing Approvals", href: "/admin/listings/approvals", icon: ClipboardCheck, description: "Review pending listings" },
   { name: "Review Moderation", href: "/admin/reviews", icon: Star, description: "Moderate user reviews" },
@@ -212,13 +223,22 @@ const NOT_A_SHORTCUT = new Set(["Home", "Dashboard"]);
 export function getQuickAccessItems(
   activeRole: string | null | undefined,
   max = 6,
+  email?: string | null,
 ): QuickAccessItem[] {
+  const emailNorm = email?.trim().toLowerCase() ?? "";
   switch (activeRole) {
     case "super_admin":
     case "admin": {
-      const items = adminNavigation.filter(
-        (item) => !item.requiredRole || item.requiredRole === activeRole,
-      );
+      const items = adminNavigation.filter((item) => {
+        if (item.requiredRole && item.requiredRole !== activeRole) return false;
+        if (
+          item.requiredEmail &&
+          item.requiredEmail.trim().toLowerCase() !== emailNorm
+        ) {
+          return false;
+        }
+        return true;
+      });
       return withColors(items, max);
     }
     case "lister": {

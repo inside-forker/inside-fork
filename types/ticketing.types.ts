@@ -19,6 +19,18 @@ export interface PublicPass {
   gate_label?: string | null;
 }
 
+/** Organizer PDF handed out from ticket_pdf_inventory (e.g. Ticketwala). */
+export interface PublicPdfTicket {
+  id: number;
+  booking_id: number;
+  ticket_type_id: number;
+  ticket_type_name?: string | null;
+  external_ticket_id: string;
+  original_filename?: string | null;
+  assigned_at: string;
+  download_path: string;
+}
+
 export interface BookingStatusPayload {
   booking_id: number;
   booking_reference: string | null;

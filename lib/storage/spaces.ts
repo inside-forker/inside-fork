@@ -1,4 +1,11 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command, CopyObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+  CopyObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
 
 const region = process.env.DO_SPACES_REGION || "sgp1";
 const endpoint = process.env.DO_SPACES_ENDPOINT || `https://${region}.digitaloceanspaces.com`;
@@ -13,6 +20,7 @@ export const GET_LISTED_IMAGES_PREFIX = "get-listed-images";
 export const PROFILES_AVATAR_PREFIX = "profiles_avatar";
 export const MENU_ITEM_IMAGES_PREFIX = "menu-item-images";
 export const LISTING_PDFS_PREFIX = "listing-pdfs";
+export const TICKET_PDF_INVENTORY_PREFIX = "ticket-pdf-inventory";
 export const SHARE_SCREENSHOTS_PREFIX = "share-screenshots";
 export const BANKS_PREFIX = "banks";
 export const BLOG_IMAGES_PREFIX = "blog-images";
@@ -24,6 +32,7 @@ export const SPACES_ASSET_PREFIXES = [
   PROFILES_AVATAR_PREFIX,
   MENU_ITEM_IMAGES_PREFIX,
   LISTING_PDFS_PREFIX,
+  TICKET_PDF_INVENTORY_PREFIX,
   SHARE_SCREENSHOTS_PREFIX,
   BANKS_PREFIX,
   BLOG_IMAGES_PREFIX,
@@ -322,6 +331,34 @@ export async function deleteFile(path: string, bucket?: string): Promise<void> {
       Key: cleanPath,
     })
   );
+}
+
+/**
+ * Download an object body as a Buffer (for private ticket PDFs, etc.).
+ */
+export async function getObjectBuffer(
+  path: string,
+  bucket?: string,
+): Promise<{ body: Buffer; contentType: string | undefined }> {
+  const targetBucket = bucket || defaultBucket;
+  const cleanPath = path.startsWith("/") ? path.substring(1) : path;
+
+  const result = await s3Client.send(
+    new GetObjectCommand({
+      Bucket: targetBucket,
+      Key: cleanPath,
+    }),
+  );
+
+  if (!result.Body) {
+    throw new Error(`Empty object body for key: ${cleanPath}`);
+  }
+
+  const bytes = await result.Body.transformToByteArray();
+  return {
+    body: Buffer.from(bytes),
+    contentType: result.ContentType,
+  };
 }
 
 /**

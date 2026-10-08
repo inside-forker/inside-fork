@@ -3,6 +3,10 @@ import { query } from "@/lib/db";
 import { requireSuperAdmin, getAdminAuthErrorStatus } from "@/lib/auth/admin";
 import { createNotification } from "@/lib/notifications/service";
 import { resolveAssignedGateIndex } from "@/lib/ticketing/resolve-gate-assignment";
+import {
+  assignPdfInventoryForBooking,
+  getPdfInventoryTicketTypeIds,
+} from "@/lib/ticketing/pdf-inventory";
 import crypto from "crypto";
 import { scheduleParchiRedemptionReport } from "@/lib/parchi/service";
 
@@ -136,6 +140,16 @@ export async function POST(
           console.error("[RPC PATH] Failed to auto-allocate gate index:", gateErr);
         }
 
+        let pdfTicketsAssigned = 0;
+        try {
+          pdfTicketsAssigned = await assignPdfInventoryForBooking(
+            bookingId,
+            "/api/admin/bookings/[id]/mark-paid",
+          );
+        } catch (pdfErr) {
+          console.error("[RPC PATH] PDF inventory assignment failed:", pdfErr);
+        }
+
         // === SEND NOTIFICATION: Payment Success (RPC Path) ===
         try {
           // Fetch booking details for notification
@@ -173,12 +187,14 @@ export async function POST(
           }
 
           const passesCreated = rpcResult.passes_created || 0;
+          const issuedCount = passesCreated + pdfTicketsAssigned;
           const eventName = (bookingData.event as { name: string }).name;
 
           console.log("[RPC PATH] Creating notification:", {
             recipientId: bookingData.user_id,
             eventName,
             passesCreated,
+            pdfTicketsAssigned,
           });
 
           const notificationResult = await createNotification({
@@ -186,8 +202,8 @@ export async function POST(
             roleScope: "public_user",
             categorySlug: "public_booking_confirmation",
             title: "🎉 Payment Confirmed!",
-            body: `Your tickets for ${eventName} are ready. ${passesCreated} pass${
-              passesCreated !== 1 ? "es" : ""
+            body: `Your tickets for ${eventName} are ready. ${issuedCount} ticket${
+              issuedCount !== 1 ? "s" : ""
             } issued.`,
             priority: "high",
             ctaLabel: "View My Tickets",
@@ -197,6 +213,7 @@ export async function POST(
               booking_reference: bookingData.booking_reference,
               event_name: eventName,
               passes_count: passesCreated,
+              pdf_tickets_count: pdfTicketsAssigned,
             },
             channelOverrides: {
               bell: true,
@@ -324,8 +341,15 @@ export async function POST(
       quantity_index: number;
     }> = [];
 
+    const pdfTypeIds = needsTickets
+      ? await getPdfInventoryTicketTypeIds(
+          bookingItems.map((item) => Number(item.ticket_type_id)),
+        )
+      : new Set<number>();
+
     if (needsTickets) {
       for (const item of bookingItems) {
+        if (pdfTypeIds.has(Number(item.ticket_type_id))) continue;
         for (let i = 0; i < item.quantity; i++) {
           const code = generateTicketCode();
           const signature = generateSignature(code, eventId, bookingId);
@@ -375,6 +399,28 @@ export async function POST(
       }
     }
 
+    // Assign organizer PDF inventory (if any), then create IK passes for other tiers.
+    let pdfTicketsAssigned = 0;
+    try {
+      pdfTicketsAssigned = await assignPdfInventoryForBooking(
+        bookingId,
+        "/api/admin/bookings/[id]/mark-paid",
+      );
+    } catch (pdfError) {
+      console.error("Failed to assign PDF inventory:", pdfError);
+      await query(
+        `UPDATE bookings SET payment_status = 'awaiting_payment', status = 'pending' WHERE id = $1`,
+        [bookingId],
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to assign ticket PDFs. Booking status reverted.",
+        },
+        { status: 500 },
+      );
+    }
+
     // Create ticket passes if needed
     let passesCreated = 0;
     if (passesToCreate.length > 0) {
@@ -421,6 +467,24 @@ export async function POST(
           { status: 500 },
         );
       }
+    }
+
+    if (
+      needsTickets &&
+      passesCreated === 0 &&
+      pdfTicketsAssigned === 0
+    ) {
+      await query(
+        `UPDATE bookings SET payment_status = 'awaiting_payment', status = 'pending' WHERE id = $1`,
+        [bookingId],
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to issue tickets. Booking status reverted.",
+        },
+        { status: 500 },
+      );
     }
 
     // Record in booking status history if table exists

@@ -11,6 +11,10 @@ import {
   isBookingPaid,
   type PassRow,
 } from "@/lib/mobile/commerce";
+import {
+  listAssignedPdfTickets,
+  toPublicPdfTicket,
+} from "@/lib/ticketing/pdf-inventory";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +80,13 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       ).rows
     : [];
 
+  const pdfTickets = paid
+    ? (await listAssignedPdfTickets(bookingId)).map((row) => ({
+        ...toPublicPdfTicket(row),
+        download_path: `/api/mobile/v1/tickets/pdfs/${row.id}`,
+      }))
+    : [];
+
   return ok({
     booking_id: booking.id,
     booking_reference: booking.booking_reference,
@@ -95,5 +106,6 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       ...toPass(p, paid),
       ticket_type_name: p.ticket_type_name ?? null,
     })),
+    pdf_tickets: pdfTickets,
   });
 });

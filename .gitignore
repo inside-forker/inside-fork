@@ -35,6 +35,9 @@ yarn-error.log*
 # local audit/probe artifacts (logs, CSVs)
 /tmp/
 
+# Organizer ticket PDF pools (seed locally; do not commit Ticketwala files)
+/scripts/data/ticket-pdfs/
+
 # vercel
 .vercel
 

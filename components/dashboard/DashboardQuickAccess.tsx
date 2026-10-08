@@ -10,6 +10,7 @@ import {
   getQuickAccessItems,
   type QuickAccessColor,
 } from "@/lib/navigation/role-navigation";
+import { useSupabaseUser } from "@/hooks/useSupabaseUser";
 
 const INITIAL_VISIBLE = 6;
 
@@ -80,7 +81,8 @@ export function DashboardQuickAccess({
   className,
   max = 6,
 }: DashboardQuickAccessProps) {
-  const items = getQuickAccessItems(role, max);
+  const { user: liveUser } = useSupabaseUser();
+  const items = getQuickAccessItems(role, max, liveUser?.email ?? null);
   const [expanded, setExpanded] = React.useState(false);
 
   if (items.length === 0) {

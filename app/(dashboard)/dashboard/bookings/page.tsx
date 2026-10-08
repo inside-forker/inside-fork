@@ -5,6 +5,10 @@ import {
 } from "@/components/dashboard/BookingsDashboard";
 import { Database } from "@/types/database";
 import { requireSessionUser } from "@/lib/auth/require-session";
+import {
+  listAssignedPdfTicketsForBookings,
+  toPublicPdfTicket,
+} from "@/lib/ticketing/pdf-inventory";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +31,7 @@ type BookingRow = Database["public"]["Tables"]["bookings"]["Row"] & {
       ticket_type_name: string | null;
     }
   >;
+  pdfTickets?: DashboardBooking["pdfTickets"];
 };
 
 type EventDetails = {
@@ -92,12 +97,22 @@ export default async function DashboardBookingsPage() {
       }
     }
 
+    let pdfByBooking: Awaited<
+      ReturnType<typeof listAssignedPdfTicketsForBookings>
+    > = new Map();
+    try {
+      pdfByBooking = await listAssignedPdfTicketsForBookings(bookingIds);
+    } catch (pdfErr) {
+      console.error("Failed to load PDF tickets for dashboard", pdfErr);
+    }
+
     bookings = bookingRows.map((b) => ({
       ...b,
       id: Number(b.id),
       event_id: b.event_id !== null ? Number(b.event_id) : null,
       total_amount: Number(b.total_amount),
       ticket_passes: passesByBooking.get(Number(b.id)) ?? [],
+      pdfTickets: (pdfByBooking.get(Number(b.id)) ?? []).map(toPublicPdfTicket),
     })) as BookingRow[];
   } catch (bookingsError) {
     console.error("Failed to load bookings for dashboard", bookingsError);
@@ -188,6 +203,7 @@ export default async function DashboardBookingsPage() {
         assigned_gate_index: pass.assigned_gate_index,
         gate_label: pass.gate_label,
       })),
+      pdfTickets: booking.pdfTickets ?? [],
       event: event
         ? {
             id: event.event_id,
