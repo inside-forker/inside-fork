@@ -10,11 +10,13 @@ import { AreasSection } from "@/components/homepage/AreasSection";
 // Containers
 import { CategoriesContainer } from "@/components/homepage/containers/CategoriesContainer";
 import { FeaturedListingsContainer } from "@/components/homepage/containers/FeaturedListingsContainer";
+import { TrendingEventsContainer } from "@/components/homepage/containers/TrendingEventsContainer";
 
 // Skeletons
 import {
   CategoriesSkeleton,
   FeaturedListingsSkeleton,
+  EventsSkeleton,
 } from "@/components/listing/skeletons";
 
 export const metadata: Metadata = {
@@ -28,6 +30,11 @@ export default function Home() {
     <main className="min-h-screen bg-background">
       {/* Hero, search and browsing shortcuts - renders immediately */}
       <PremiumHomepageHero />
+
+      {/* Upcoming events (a single event gets the featured layout) */}
+      <Suspense fallback={<EventsSkeleton />}>
+        <TrendingEventsContainer />
+      </Suspense>
 
       {/* 1. Explore categories */}
       <Suspense fallback={<CategoriesSkeleton />}>

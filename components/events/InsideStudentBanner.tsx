@@ -104,7 +104,7 @@ export function InsideStudentBanner({
             />
             <p className="text-sm font-semibold leading-snug text-white sm:text-base">
               {signedIn
-                ? "Already taken off your ticket prices"
+                ? `Inside Karachi got you ${amount} off`
                 : "Free with an Inside Karachi account"}
             </p>
             {cap ? <p className="text-xs text-white/60">{cap}</p> : null}
