@@ -8,6 +8,8 @@ import { parsePagination, buildPaginationMeta } from "@/lib/mobile/pagination";
 import { MobileApiError } from "@/lib/mobile/errors";
 import { query } from "@/lib/db";
 import { toReview, type ReviewRowLike } from "@/lib/mobile/mappers";
+import { validateReviewContent } from "@/lib/reviews/profanity-filter";
+import { awardLeaveReviewXpOnApprove } from "@/lib/reviews/moderation-xp";
 
 export const dynamic = "force-dynamic";
 
@@ -229,6 +231,17 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     );
   }
 
+  // Prohibit explicit content
+  const contentValidation = validateReviewContent(comment);
+  if (!contentValidation.isValid) {
+    throw new MobileApiError(
+      "validation_error",
+      contentValidation.error ?? "Invalid content.",
+      400,
+      "comment",
+    );
+  }
+
   // Auto-flag suspicious patterns (does not block submission). Replicated
   // directly from check_suspicious_review_pattern() (same reason above).
   let isFlagged = false;
@@ -251,8 +264,8 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   try {
     const { rows } = await query(
       `WITH inserted AS (
-         INSERT INTO reviews (listing_id, branch_id, user_id, rating, comment, status, is_flagged_suspicious, created_at)
-         VALUES ($1, $2, $3, $4, $5, 'pending', $6, NOW())
+         INSERT INTO reviews (listing_id, branch_id, user_id, rating, comment, status, is_flagged_suspicious, moderated_at, created_at)
+         VALUES ($1, $2, $3, $4, $5, 'approved', $6, NOW(), NOW())
          RETURNING *
        )
        SELECT ${REVIEW_SQL_COLUMNS}
@@ -264,6 +277,48 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   } catch (error) {
     console.error("[mobile-api] review insert failed:", error);
     throw new MobileApiError("internal_error", "Failed to create review.", 500);
+  }
+
+  // Award XP immediately on auto-approved review creation (idempotent per user+listing)
+  try {
+    await awardLeaveReviewXpOnApprove({
+      reviewId: created.id,
+      userId: user.id,
+      listingId: listing_id,
+    });
+  } catch (xpErr) {
+    console.error("[mobile-api] review XP award failed:", xpErr);
+  }
+
+  // Notify listing owner
+  try {
+    const { createNotification } = await import("@/lib/notifications");
+    const { rows: ownerRows } = await query(
+      `SELECT created_by, name FROM listings WHERE id = $1`,
+      [listing_id],
+    );
+    const listingOwnerId = ownerRows[0]?.created_by;
+    const listingName = ownerRows[0]?.name || "Your listing";
+    if (listingOwnerId && listingOwnerId !== user.id) {
+      await createNotification({
+        recipientId: listingOwnerId,
+        roleScope: "lister",
+        categorySlug: "general",
+        title: "New Review on Your Listing",
+        body: `${listingName} received a ${rating}-star review from a customer.`,
+        priority: "normal",
+        ctaLabel: "View Review",
+        ctaUrl: `/admin/reviews`,
+        metadata: {
+          review_id: created.id,
+          listing_id,
+          listing_name: listingName,
+          rating,
+        },
+      });
+    }
+  } catch (notifErr) {
+    console.error("[mobile-api] review owner notification failed:", notifErr);
   }
 
   return ok(

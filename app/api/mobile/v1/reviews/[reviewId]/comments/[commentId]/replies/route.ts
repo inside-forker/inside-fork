@@ -9,6 +9,7 @@ import { parsePathId } from "@/lib/mobile/params";
 import { MobileApiError } from "@/lib/mobile/errors";
 import { query } from "@/lib/db";
 import { toComment, type CommentRowLike } from "@/lib/mobile/mappers";
+import { validateReviewContent } from "@/lib/reviews/profanity-filter";
 
 export const dynamic = "force-dynamic";
 
@@ -151,14 +152,25 @@ export const POST = mobileRoute(async (request: NextRequest, { params }) => {
     );
   }
 
+  // Prohibit explicit content
+  const contentValidation = validateReviewContent(parsed.data.content);
+  if (!contentValidation.isValid) {
+    throw new MobileApiError(
+      "validation_error",
+      contentValidation.error ?? "Invalid reply.",
+      400,
+      "content",
+    );
+  }
+
   await assertApprovedParent(reviewId, commentId);
 
   let created: CommentRowLike;
   try {
     const { rows } = await query(
       `WITH inserted AS (
-         INSERT INTO review_comments (review_id, user_id, parent_id, content, status)
-         VALUES ($1, $2, $3, $4, 'pending')
+         INSERT INTO review_comments (review_id, user_id, parent_id, content, status, moderated_at)
+         VALUES ($1, $2, $3, $4, 'approved', NOW())
          RETURNING *
        )
        SELECT ${COMMENT_SQL_COLUMNS}

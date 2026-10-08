@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
+import { validateReviewContent } from "@/lib/reviews/profanity-filter";
 import {
   CreateCommentPayload,
   CommentWithAuthor,
@@ -185,6 +186,18 @@ export async function POST(
       );
     }
 
+    // Check for prohibited/explicit language
+    const contentValidation = validateReviewContent(content);
+    if (!contentValidation.isValid) {
+      return NextResponse.json(
+        {
+          error: contentValidation.error,
+          code: contentValidation.code,
+        },
+        { status: 400 }
+      );
+    }
+
     // If this is a reply, validate parent comment exists
     if (parent_id) {
       const { rows: parentRows } = await query(
@@ -200,13 +213,13 @@ export async function POST(
       }
     }
 
-    // Create the comment
+    // Create the comment (auto-approved)
     let newComment;
     try {
       const { rows: insertedRows } = await query(
         `WITH inserted AS (
-           INSERT INTO review_comments (review_id, user_id, content, parent_id, status)
-           VALUES ($1, $2, $3, $4, 'pending')
+           INSERT INTO review_comments (review_id, user_id, content, parent_id, status, moderated_at)
+           VALUES ($1, $2, $3, $4, 'approved', NOW())
            RETURNING *
          )
          SELECT ${commentColumns("inserted")},
@@ -270,7 +283,7 @@ export async function POST(
 
     return NextResponse.json({
       comment: transformedComment as CommentWithAuthor,
-      message: "Comment submitted for review",
+      message: "Comment published successfully",
     });
   } catch (error) {
     console.error(

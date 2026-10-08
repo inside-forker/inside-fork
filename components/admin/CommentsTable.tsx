@@ -38,6 +38,9 @@ interface CommentsTableProps {
   isBulkMode: boolean;
   onBulkModeChange: (enabled: boolean) => void;
   onBulkModerate: (status: CommentStatus) => void;
+  currentPage?: number;
+  totalPages?: number;
+  onPageChange?: (page: number) => void;
 }
 
 export function CommentsTable({
@@ -51,6 +54,9 @@ export function CommentsTable({
   isBulkMode,
   onBulkModeChange,
   onBulkModerate,
+  currentPage,
+  totalPages,
+  onPageChange,
 }: CommentsTableProps) {
   const [dropdownOpen, setDropdownOpen] = React.useState<
     Record<number, boolean>
@@ -480,6 +486,31 @@ export function CommentsTable({
           {comments.length} comment{comments.length === 1 ? "" : "s"}
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages !== undefined && totalPages > 1 && onPageChange && (
+        <div className="flex justify-center items-center space-x-2 mt-6">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange((currentPage ?? 1) - 1)}
+            disabled={(currentPage ?? 1) <= 1}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage ?? 1} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange((currentPage ?? 1) + 1)}
+            disabled={(currentPage ?? 1) >= totalPages}
+          >
+            Next
+          </Button>
+        </div>
+      )}
 
       {selectedComment && (
         <CommentModal

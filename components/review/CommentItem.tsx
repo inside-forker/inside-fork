@@ -173,12 +173,12 @@ export function CommentItem({
       .slice(0, 2);
   };
 
-  // Check if comment can be edited/deleted (pending comments by author, or any comment by admin)
-  const canModify = comment.status === "pending" || isAdmin;
+  // Check if comment can be edited/deleted (author's own comment, or any comment by admin)
+  const isOwnComment = !!userId && comment.user_id === userId;
+  const canModify = isOwnComment || isAdmin;
   // Anyone (including signed-out visitors, who get prompted to sign in on
   // click) viewing someone else's comment can report it - admins already
   // have Flag for this, and you can't report your own comment.
-  const isOwnComment = !!userId && comment.user_id === userId;
   const canReport = !isAdmin && !isOwnComment;
 
   return (

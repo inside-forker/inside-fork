@@ -3,6 +3,8 @@ import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { captureRouteError } from "@/lib/sentry/captureRouteError";
 import { z } from "zod";
+import { validateReviewContent } from "@/lib/reviews/profanity-filter";
+import { awardLeaveReviewXpOnApprove } from "@/lib/reviews/moderation-xp";
 
 // Validation schema for review creation (with branch_id)
 const createReviewSchema = z.object({
@@ -148,13 +150,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the review
+    // Check for prohibited/explicit language
+    const contentValidation = validateReviewContent(comment);
+    if (!contentValidation.isValid) {
+      return NextResponse.json(
+        {
+          error: contentValidation.error,
+          code: contentValidation.code,
+        },
+        { status: 400 },
+      );
+    }
+
+    // Create the review (auto-approved)
     let review;
     try {
       const { rows: insertedRows } = await query(
         `WITH inserted AS (
-           INSERT INTO reviews (listing_id, branch_id, user_id, rating, comment, status, is_flagged_suspicious, created_at)
-           VALUES ($1, $2, $3, $4, $5, 'pending', $6, NOW())
+           INSERT INTO reviews (listing_id, branch_id, user_id, rating, comment, status, is_flagged_suspicious, moderated_at, created_at)
+           VALUES ($1, $2, $3, $4, $5, 'approved', $6, NOW(), NOW())
            RETURNING *
          )
          SELECT inserted.id, inserted.listing_id, inserted.branch_id, inserted.user_id,
@@ -208,7 +222,7 @@ export async function POST(request: NextRequest) {
             listing_id,
             listing_name: listing.name,
             rating,
-            status: "pending",
+            status: "approved",
           }),
         ]
       );
@@ -217,9 +231,16 @@ export async function POST(request: NextRequest) {
       console.error("Audit logging failed:", auditError);
     }
 
-    // NOTE: Do NOT award XP here - reviews are pending moderation
-    // XP will be awarded when admin approves the review via /api/admin/reviews/[id]/moderate
-    // This prevents XP farming via spam reviews that get rejected
+    // Award XP immediately on auto-approved review creation (idempotent per user+listing)
+    try {
+      await awardLeaveReviewXpOnApprove({
+        reviewId: review.id,
+        userId: session.userId,
+        listingId: listing_id,
+      });
+    } catch (xpError) {
+      console.error("[POST /api/reviews] Failed to award review XP:", xpError);
+    }
 
     // === SMART NOTIFICATIONS (Prevent Admin Spam) ===
     try {

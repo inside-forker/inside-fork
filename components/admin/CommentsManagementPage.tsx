@@ -29,16 +29,14 @@ import type { CommentWithAuthor, CommentStatus } from "@/types/comment.types";
 
 export function CommentsManagementPage() {
   const [comments, setComments] = React.useState<CommentWithAuthor[]>([]);
-  const [filteredComments, setFilteredComments] = React.useState<
-    CommentWithAuthor[]
-  >([]);
+  const [totalComments, setTotalComments] = React.useState(0);
   const [selectedComment, setSelectedComment] =
     React.useState<CommentWithAuthor | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState<string>("all");
-  const [_currentPage, setCurrentPage] = React.useState(1);
+  const [statusFilter, setStatusFilter] = React.useState<string>("flagged");
+  const [currentPage, setCurrentPage] = React.useState(1);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [commentToDelete, setCommentToDelete] =
     React.useState<CommentWithAuthor | null>(null);
@@ -46,28 +44,49 @@ export function CommentsManagementPage() {
     new Set(),
   );
   const [isBulkMode, setIsBulkMode] = React.useState(false);
+  const [statistics, setStatistics] = React.useState<{
+    totalComments: number;
+    pendingComments: number;
+    approvedComments: number;
+    rejectedComments: number;
+    flaggedComments: number;
+  }>({
+    totalComments: 0,
+    pendingComments: 0,
+    approvedComments: 0,
+    rejectedComments: 0,
+    flaggedComments: 0,
+  });
   const { toast } = useToast();
 
-  // Live counts derived from the loaded comments
-  const statistics = {
-    totalComments: comments.length,
-    pendingComments: comments.filter((c) => c.status === "pending").length,
-    approvedComments: comments.filter((c) => c.status === "approved").length,
-    rejectedComments: comments.filter((c) => c.status === "rejected").length,
-    flaggedComments: comments.filter((c) => c.status === "flagged").length,
-  };
+  const itemsPerPage = 12;
+  const totalPages = Math.max(1, Math.ceil(totalComments / itemsPerPage));
 
   // Fetch comments
   const fetchComments = React.useCallback(
     async (showLoading = true) => {
       try {
         if (showLoading) setIsLoading(true);
-        const response = await fetch("/api/admin/comments");
+        const params = new URLSearchParams();
+        params.set("page", currentPage.toString());
+        params.set("limit", itemsPerPage.toString());
+        if (statusFilter && statusFilter !== "all") {
+          params.set("status", statusFilter);
+        }
+        if (searchQuery.trim()) {
+          params.set("search", searchQuery.trim());
+        }
+
+        const response = await fetch(`/api/admin/comments?${params.toString()}`);
         if (!response.ok) {
           throw new Error("Failed to fetch comments");
         }
         const data = await response.json();
         setComments(data.comments || []);
+        setTotalComments(data.total || data.count || (data.comments || []).length);
+        if (data.statistics) {
+          setStatistics(data.statistics);
+        }
       } catch (error) {
         console.error("Error fetching comments:", error);
         toast({
@@ -79,50 +98,22 @@ export function CommentsManagementPage() {
         if (showLoading) setIsLoading(false);
       }
     },
-    [toast],
+    [currentPage, itemsPerPage, statusFilter, searchQuery, toast],
   );
 
-  // Filter comments
+  const handleStatusFilterChange = (val: string) => {
+    setStatusFilter(val);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    setCurrentPage(1);
+  };
+
+  // Load comments on mount and filter/page changes
   React.useEffect(() => {
-    let filtered = comments;
-
-    // Search filter
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (comment) =>
-          comment.author_name
-            ?.toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          comment.content?.toLowerCase().includes(searchQuery.toLowerCase()),
-      );
-    }
-
-    // Status filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((comment) => comment.status === statusFilter);
-    }
-
-    setFilteredComments(filtered);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [comments, searchQuery, statusFilter]);
-
-  // Load comments on mount
-  React.useEffect(() => {
-    // Initial load
     fetchComments();
-
-    // Refresh when tab becomes visible (background refresh)
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        void fetchComments(false);
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
   }, [fetchComments]);
 
   const handleEditComment = (comment: CommentWithAuthor) => {
@@ -141,9 +132,6 @@ export function CommentsManagementPage() {
     // Optimistic Update: Remove from UI immediately
     const previousComments = [...comments];
     setComments((prev) => prev.filter((c) => c.id !== commentToDelete.id));
-    setFilteredComments((prev) =>
-      prev.filter((c) => c.id !== commentToDelete.id),
-    );
     setIsDeleteDialogOpen(false);
 
     try {
@@ -169,7 +157,6 @@ export function CommentsManagementPage() {
       console.error("Error deleting comment:", error);
       // Revert on failure
       setComments(previousComments);
-      setFilteredComments(previousComments);
       toast({
         title: "Error",
         description: "Failed to delete comment",
@@ -459,13 +446,13 @@ export function CommentsManagementPage() {
               <Input
                 placeholder="Search comments by user, listing, or content..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-12 h-11 bg-background/50 border-border/50 focus:border-primary/50 focus:ring-primary/20"
               />
             </div>
 
             {/* Status Filter */}
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
               <SelectTrigger className="w-44 h-11 bg-background/50 border-border/50">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
@@ -548,7 +535,7 @@ export function CommentsManagementPage() {
       {/* Comments Table */}
       <motion.div variants={itemVariants}>
         <CommentsTable
-          comments={filteredComments}
+          comments={comments}
           isLoading={isLoading}
           onEdit={handleEditComment}
           onDelete={handleDeleteComment}
@@ -558,6 +545,9 @@ export function CommentsManagementPage() {
           isBulkMode={isBulkMode}
           onBulkModeChange={setIsBulkMode}
           onBulkModerate={handleBulkModerate}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
         />
       </motion.div>
 

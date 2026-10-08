@@ -221,9 +221,9 @@ export async function POST(request: NextRequest) {
 
     // Create the review
     const { rows: reviewRows } = await query(
-      `INSERT INTO public.reviews (listing_id, branch_id, user_id, rating, comment)
-       VALUES ($1, 1, $2, $3, $4) RETURNING *`,
-      [listing_id, user_id, rating, comment]
+      `INSERT INTO public.reviews (listing_id, branch_id, user_id, rating, comment, status, moderated_by, moderated_at)
+       VALUES ($1, 1, $2, $3, $4, 'approved', $5, NOW()) RETURNING *`,
+      [listing_id, user_id, rating, comment, session.userId]
     );
 
     return NextResponse.json({
