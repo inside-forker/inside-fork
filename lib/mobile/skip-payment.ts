@@ -31,7 +31,23 @@ import { createNotification } from "@/lib/notifications/service";
 
 export type SkipPaymentReason = "free_order" | "payment_skipped";
 
+/**
+ * Review/local only. Never allow PayFast skip on production — even if
+ * MOBILE_CHECKOUT_SKIP_PAYMENT is mistakenly set on Vercel.
+ */
 export function isPaymentSkipEnabled(): boolean {
+  const isProdRuntime =
+    process.env.VERCEL_ENV === "production" ||
+    process.env.NODE_ENV === "production";
+
+  if (isProdRuntime) {
+    if (process.env.MOBILE_CHECKOUT_SKIP_PAYMENT === "true") {
+      console.error(
+        "[skip-payment] MOBILE_CHECKOUT_SKIP_PAYMENT is set but ignored in production.",
+      );
+    }
+    return false;
+  }
   return process.env.MOBILE_CHECKOUT_SKIP_PAYMENT === "true";
 }
 
