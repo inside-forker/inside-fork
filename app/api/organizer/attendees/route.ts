@@ -121,6 +121,59 @@ export async function GET(request: NextRequest) {
       pending: attendees.filter((a) => a.status === "issued" || a.status === "active").length,
     };
 
+    // Per-tier stock for the vendor (sold / remaining / capacity).
+    // Prefer ticket_pdf_inventory counts when a tier has a PDF pool.
+    const eventIdNum = parseInt(eventId, 10);
+    const { rows: tierRows } = await query(
+      `SELECT
+         tt.id,
+         tt.name,
+         tt.price,
+         tt.quantity_available,
+         COALESCE((
+           SELECT SUM(bi.quantity)::int
+           FROM booking_items bi
+           JOIN bookings b ON b.id = bi.booking_id
+           WHERE bi.ticket_type_id = tt.id
+             AND b.event_id = tt.event_id
+             AND b.payment_status = 'paid'
+             AND b.status != 'cancelled'
+         ), 0) AS sold_booked,
+         (SELECT COUNT(*)::int FROM ticket_pdf_inventory i WHERE i.ticket_type_id = tt.id) AS pdf_total,
+         (SELECT COUNT(*)::int FROM ticket_pdf_inventory i
+           WHERE i.ticket_type_id = tt.id AND i.booking_id IS NULL) AS pdf_available,
+         (SELECT COUNT(*)::int FROM ticket_pdf_inventory i
+           WHERE i.ticket_type_id = tt.id AND i.booking_id IS NOT NULL) AS pdf_sold
+       FROM ticket_types tt
+       WHERE tt.event_id = $1
+       ORDER BY tt.id ASC`,
+      [eventIdNum],
+    );
+
+    const ticketTypes = tierRows.map((t) => {
+      const hasPdfPool = Number(t.pdf_total) > 0;
+      const sold = hasPdfPool ? Number(t.pdf_sold) : Number(t.sold_booked);
+      const available = hasPdfPool
+        ? Number(t.pdf_available)
+        : t.quantity_available != null
+          ? Number(t.quantity_available)
+          : null;
+      const capacity = hasPdfPool
+        ? Number(t.pdf_total)
+        : available != null
+          ? sold + available
+          : null;
+      return {
+        id: Number(t.id),
+        name: String(t.name),
+        price: Number(t.price || 0),
+        sold,
+        available,
+        capacity,
+        hasPdfPool,
+      };
+    });
+
     return NextResponse.json({
       success: true,
       event: {
@@ -135,6 +188,7 @@ export async function GET(request: NextRequest) {
       },
       attendees,
       stats,
+      ticketTypes,
     });
   } catch (error) {
     console.error("Attendees fetch error:", error);

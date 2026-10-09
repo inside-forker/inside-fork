@@ -205,10 +205,13 @@ export async function GET(request: NextRequest) {
         (sum, t) => sum + (ticketsSoldByType[t.id] || 0),
         0,
       );
-      const totalCapacity = eventTicketTypes.reduce(
-        (sum, t) => sum + (t.quantity_available || 0),
-        0,
-      );
+      // Capacity = sold + remaining (quantity_available is remaining stock).
+      const totalCapacity = eventTicketTypes.reduce((sum, t) => {
+        const sold = ticketsSoldByType[t.id] || 0;
+        const available =
+          t.quantity_available != null ? Number(t.quantity_available) : 0;
+        return sum + sold + available;
+      }, 0);
       const grossRevenue = eventTicketTypes.reduce(
         (sum, t) => sum + (ticketsSoldByType[t.id] || 0) * Number(t.price || 0),
         0,
@@ -222,18 +225,19 @@ export async function GET(request: NextRequest) {
       const endTime = new Date(event.end_time);
       const isUpcoming = startTime > now;
       const isLive = startTime <= now && endTime >= now;
+      const capacityForRate = totalCapacity || event.max_capacity || 0;
 
       return {
         ...event,
         stats: {
           ticketsSold,
-          totalCapacity: totalCapacity || event.max_capacity || 0,
+          totalCapacity: capacityForRate,
           revenue: grossRevenue,
           checkIns,
           totalPasses: eventPasses.length,
           occupancyRate:
-            totalCapacity > 0
-              ? Math.round((ticketsSold / totalCapacity) * 100)
+            capacityForRate > 0
+              ? Math.round((ticketsSold / capacityForRate) * 100)
               : 0,
         },
         ticketTypes: eventTicketTypes.map((t) => ({
@@ -241,7 +245,8 @@ export async function GET(request: NextRequest) {
           name: t.name,
           price: Number(t.price),
           sold: ticketsSoldByType[t.id] || 0,
-          available: t.quantity_available || 0,
+          available:
+            t.quantity_available != null ? Number(t.quantity_available) : 0,
         })),
         eventStatus: isLive ? "live" : isUpcoming ? "upcoming" : "past",
       };
