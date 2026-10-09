@@ -317,7 +317,7 @@ function EventCard({
                 Tier Allocation
               </p>
               <div className="space-y-1">
-                {event.ticketTypes.slice(0, 3).map((tier) => {
+                {event.ticketTypes.map((tier) => {
                   const capacity =
                     tier.available != null ? tier.sold + tier.available : null;
                   const pct = capacity
