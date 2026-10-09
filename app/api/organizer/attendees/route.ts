@@ -57,8 +57,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    // Get all ticket passes for this event
-    let passes;
+    const eventIdNum = parseInt(eventId, 10);
+
+    // Get all ticket passes for this event with Parchi verification flag
+    let passes: any[] = [];
     try {
       const { rows } = await query(
         `SELECT
@@ -70,16 +72,20 @@ export async function GET(request: NextRequest) {
            COALESCE(b.booking_reference, b.id::text) AS booking_code,
            b.customer_name, b.customer_email, b.customer_phone,
            p.full_name AS buyer_full_name, p.phone AS buyer_phone,
-           tt.name AS ticket_type_name, tt.price AS ticket_type_price
+           tt.name AS ticket_type_name, tt.price AS ticket_type_price,
+           CASE WHEN v.request_id IS NULL THEN false ELSE true END AS is_parchi,
+           v.parchi_id
          FROM ticket_passes tp
          INNER JOIN bookings b ON b.id = tp.booking_id
          LEFT JOIN profiles p ON p.id = b.user_id
          LEFT JOIN ticket_types tt ON tt.id = tp.ticket_type_id
+         LEFT JOIN parchi_verifications v
+           ON v.booking_id = b.id AND v.status = 'approved'
          WHERE tp.event_id = $1
            AND b.payment_status = 'paid'
            AND tp.status != 'revoked'
          ORDER BY tp.issued_at DESC`,
-        [parseInt(eventId, 10)]
+        [eventIdNum]
       );
       passes = rows;
     } catch (error) {
@@ -90,7 +96,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Format attendees - use customer_email from booking, fallback to profile data
+    // Format attendees
     const attendees = passes.map((pass) => ({
       id: Number(pass.id),
       code: pass.code,
@@ -112,6 +118,8 @@ export async function GET(request: NextRequest) {
       quantityIndex: pass.quantity_index !== null ? Number(pass.quantity_index) : 0,
       buyerEmail: pass.customer_email,
       buyerPhone: pass.customer_phone || pass.buyer_phone,
+      isParchi: Boolean(pass.is_parchi),
+      parchiId: pass.parchi_id || null,
     }));
 
     // Calculate stats
@@ -119,11 +127,10 @@ export async function GET(request: NextRequest) {
       total: attendees.length,
       checkedIn: attendees.filter((a) => a.status === "checked_in").length,
       pending: attendees.filter((a) => a.status === "issued" || a.status === "active").length,
+      parchiCount: attendees.filter((a) => a.isParchi).length,
     };
 
     // Per-tier stock for the vendor (sold / remaining / capacity).
-    // Prefer ticket_pdf_inventory counts when a tier has a PDF pool.
-    const eventIdNum = parseInt(eventId, 10);
     const { rows: tierRows } = await query(
       `SELECT
          tt.id,
@@ -147,7 +154,7 @@ export async function GET(request: NextRequest) {
        FROM ticket_types tt
        WHERE tt.event_id = $1
        ORDER BY tt.id ASC`,
-      [eventIdNum],
+      [eventIdNum]
     );
 
     const ticketTypes = tierRows.map((t) => {
@@ -174,6 +181,58 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    // Detailed Stock Inventory units (every single ticket slot: sold and available)
+    let inventoryItems: any[] = [];
+    try {
+      const { rows: invRows } = await query(
+        `SELECT
+           i.id,
+           i.external_ticket_id,
+           i.original_filename,
+           i.ticket_type_id,
+           i.booking_id,
+           to_json(i.assigned_at) #>> '{}' AS assigned_at,
+           to_json(i.created_at) #>> '{}' AS created_at,
+           tt.name AS ticket_type_name,
+           tt.price AS ticket_type_price,
+           (i.booking_id IS NOT NULL) AS is_bought,
+           b.booking_reference,
+           b.customer_name,
+           b.customer_email,
+           b.customer_phone,
+           CASE WHEN v.request_id IS NULL THEN false ELSE true END AS is_parchi,
+           v.parchi_id
+         FROM ticket_pdf_inventory i
+         INNER JOIN ticket_types tt ON tt.id = i.ticket_type_id
+         LEFT JOIN bookings b ON b.id = i.booking_id
+         LEFT JOIN parchi_verifications v
+           ON v.booking_id = i.booking_id AND v.status = 'approved'
+         WHERE tt.event_id = $1
+         ORDER BY (i.booking_id IS NOT NULL) DESC, i.assigned_at DESC NULLS LAST, i.id ASC`,
+        [eventIdNum]
+      );
+
+      inventoryItems = invRows.map((row) => ({
+        id: Number(row.id),
+        ticketTypeId: Number(row.ticket_type_id),
+        ticketTypeName: String(row.ticket_type_name),
+        price: Number(row.ticket_type_price || 0),
+        externalTicketId: row.external_ticket_id,
+        filename: row.original_filename,
+        isBought: Boolean(row.is_bought),
+        bookingId: row.booking_id ? Number(row.booking_id) : null,
+        bookingReference: row.booking_reference || null,
+        assignedAt: row.assigned_at,
+        customerName: row.customer_name || null,
+        customerEmail: row.customer_email || null,
+        customerPhone: row.customer_phone || null,
+        isParchi: Boolean(row.is_parchi),
+        parchiId: row.parchi_id || null,
+      }));
+    } catch (err) {
+      console.warn("Could not fetch pdf inventory table:", err);
+    }
+
     return NextResponse.json({
       success: true,
       event: {
@@ -189,6 +248,7 @@ export async function GET(request: NextRequest) {
       attendees,
       stats,
       ticketTypes,
+      inventoryItems,
     });
   } catch (error) {
     console.error("Attendees fetch error:", error);

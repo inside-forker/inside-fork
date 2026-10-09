@@ -4,6 +4,7 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +27,12 @@ import {
   Activity,
   Plus,
   SlidersHorizontal,
+  ArrowRight,
+  ShieldCheck,
+  ChevronRight,
+  Layers,
+  Sparkles,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { SoldTicketsModal } from "./SoldTicketsModal";
@@ -83,13 +90,13 @@ interface OrganizerDashboardProps {
   } | null;
 }
 
-// Stat card
-function PremiumStatCard({
+// Executive Metric Card
+function ExecutiveInsightCard({
   title,
   value,
   subtitle,
   icon,
-  trend,
+  badgeText,
   color,
   prefix = "",
   delay = 0,
@@ -98,7 +105,7 @@ function PremiumStatCard({
   value: number;
   subtitle: string;
   icon: React.ReactNode;
-  trend?: { value: number; isPositive: boolean };
+  badgeText?: string;
   color: "primary" | "blue" | "green" | "amber" | "purple";
   prefix?: string;
   delay?: number;
@@ -107,27 +114,32 @@ function PremiumStatCard({
     primary: {
       border: "hover:border-primary/50",
       iconBg: "bg-primary/10 text-primary",
-      gradient: "from-primary/5 via-transparent to-transparent",
+      gradient: "from-primary/10 via-background to-background",
+      badge: "bg-primary/10 text-primary border-primary/20",
     },
     blue: {
       border: "hover:border-blue-500/50",
       iconBg: "bg-blue-500/10 text-blue-500",
-      gradient: "from-blue-500/5 via-transparent to-transparent",
+      gradient: "from-blue-500/10 via-background to-background",
+      badge: "bg-blue-500/10 text-blue-500 border-blue-500/20",
     },
     green: {
       border: "hover:border-emerald-500/50",
       iconBg: "bg-emerald-500/10 text-emerald-500",
-      gradient: "from-emerald-500/5 via-transparent to-transparent",
+      gradient: "from-emerald-500/10 via-background to-background",
+      badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
     },
     amber: {
       border: "hover:border-amber-500/50",
       iconBg: "bg-amber-500/10 text-amber-500",
-      gradient: "from-amber-500/5 via-transparent to-transparent",
+      gradient: "from-amber-500/10 via-background to-background",
+      badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
     },
     purple: {
       border: "hover:border-purple-500/50",
       iconBg: "bg-purple-500/10 text-purple-500",
-      gradient: "from-purple-500/5 via-transparent to-transparent",
+      gradient: "from-purple-500/10 via-background to-background",
+      badge: "bg-purple-500/10 text-purple-500 border-purple-500/20",
     },
   };
 
@@ -135,68 +147,57 @@ function PremiumStatCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: delay * 0.1 }}
+      transition={{ delay: delay * 0.08, duration: 0.3 }}
       className={cn(
-        "relative rounded-2xl border bg-card p-6 shadow-sm transition-all duration-300",
+        "relative rounded-2xl border bg-card/70 backdrop-blur-md p-5 sm:p-6 shadow-sm transition-all duration-300",
         "bg-gradient-to-br",
         style.gradient,
-        style.border,
+        style.border
       )}
     >
-      <div className="relative">
-        <div className="flex items-center justify-between">
-          <div className={cn("rounded-xl p-3", style.iconBg)}>{icon}</div>
-          {trend && (
-            <div
-              className={cn(
-                "flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full",
-                trend.isPositive
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400",
-              )}
-            >
-              {trend.isPositive ? (
-                <TrendingUp className="h-3 w-3" />
-              ) : (
-                <TrendingDown className="h-3 w-3" />
-              )}
-              {Math.abs(trend.value)}%
-            </div>
-          )}
+      <div className="flex items-center justify-between">
+        <div className={cn("rounded-xl p-2.5 sm:p-3", style.iconBg)}>
+          {icon}
         </div>
-        <div className="mt-4">
-          <div className="text-2xl font-bold">
-            {prefix}
-            <AnimatedCounter value={value} />
-          </div>
-          <p className="text-sm font-medium text-muted-foreground mt-1">
-            {title}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+        {badgeText && (
+          <Badge
+            variant="outline"
+            className={cn("text-[11px] font-semibold px-2 py-0.5", style.badge)}
+          >
+            {badgeText}
+          </Badge>
+        )}
+      </div>
+      <div className="mt-4">
+        <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+          {prefix}
+          <AnimatedCounter value={value} />
         </div>
+        <p className="text-sm font-semibold text-foreground/90 mt-1">{title}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
       </div>
     </motion.div>
   );
 }
 
-// Event Card Component
+// Upgraded Event Card Component with Direct Passes Action
 function EventCard({
   event,
   index,
   onExport,
-  onViewTickets,
+  onViewQuickModal,
 }: {
   event: Event;
   index: number;
   onExport: () => void;
-  onViewTickets: () => void;
+  onViewQuickModal: () => void;
 }) {
   const statusColors = {
-    live: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+    live: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/40",
     upcoming:
-      "bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30",
+      "bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/40",
     past: "bg-muted text-muted-foreground border-border",
   };
 
@@ -206,153 +207,182 @@ function EventCard({
     past: "Completed",
   };
 
+  const checkInPct =
+    event.stats.ticketsSold > 0
+      ? Math.round((event.stats.checkIns / event.stats.ticketsSold) * 100)
+      : 0;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
-      className="rounded-xl border bg-card/50 backdrop-blur-sm overflow-hidden hover:border-primary/30 transition-colors flex flex-col justify-between"
+      className="rounded-2xl border bg-card/60 backdrop-blur-md overflow-hidden hover:border-primary/40 hover:shadow-lg transition-all duration-300 flex flex-col justify-between"
     >
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <span
-                className={cn(
-                  "text-xs font-medium px-2 py-0.5 rounded-full border",
-                  statusColors[event.eventStatus],
-                )}
-              >
-                {event.eventStatus === "live" && (
-                  <span className="inline-block w-1.5 h-1.5 bg-current rounded-full mr-1 animate-pulse" />
-                )}
-                {statusLabels[event.eventStatus]}
-              </span>
-            </div>
-            <h3 className="font-semibold text-lg truncate">{event.name}</h3>
-            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Clock className="w-4 h-4" />
-                {format(new Date(event.start_time), "MMM d, h:mm a")}
-              </span>
-              {event.venue && (
-                <span className="flex items-center gap-1 truncate">
-                  <MapPin className="w-4 h-4 shrink-0" />
-                  <span className="truncate">{event.venue.name}</span>
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-4 gap-3 mt-4 pt-4 border-t">
-          <div>
-            <p className="text-lg font-bold">{event.stats.ticketsSold}</p>
-            <p className="text-xs text-muted-foreground">Sold</p>
-          </div>
-          <div>
-            <p className="text-lg font-bold">{event.stats.checkIns}</p>
-            <p className="text-xs text-muted-foreground">Check-ins</p>
-          </div>
-          <div>
-            <p className="text-lg font-bold">{event.stats.occupancyRate}%</p>
-            <p className="text-xs text-muted-foreground">Capacity</p>
-          </div>
-          <div>
-            <p className="text-lg font-bold">
-              {event.stats.revenue > 0
-                ? `${(event.stats.revenue / 1000).toFixed(0)}k`
-                : "0"}
-            </p>
-            <p className="text-xs text-muted-foreground">Revenue</p>
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="mt-4">
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min(100, event.stats.occupancyRate)}%` }}
-              transition={{ delay: 0.3, duration: 0.5 }}
+      <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between">
+        <div>
+          {/* Status & Timing */}
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span
               className={cn(
-                "h-full rounded-full",
-                event.stats.occupancyRate >= 90
-                  ? "bg-emerald-500"
-                  : event.stats.occupancyRate >= 50
-                    ? "bg-primary"
-                    : "bg-amber-500",
+                "text-xs font-semibold px-2.5 py-1 rounded-full border flex items-center gap-1.5",
+                statusColors[event.eventStatus]
               )}
-            />
-          </div>
-        </div>
+            >
+              {event.eventStatus === "live" && (
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
+              )}
+              {statusLabels[event.eventStatus]}
+            </span>
 
-        {/* Per-tier stock */}
-        {event.ticketTypes?.length > 0 && (
-          <div className="mt-4 pt-3 border-t space-y-1.5">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Stock by tier
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Clock className="w-3.5 h-3.5 text-primary" />
+              {format(new Date(event.start_time), "MMM d, h:mm a")}
+            </div>
+          </div>
+
+          <h3 className="font-bold text-lg text-foreground line-clamp-1">
+            {event.name}
+          </h3>
+
+          {event.venue && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1 truncate">
+              <MapPin className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate">{event.venue.name}</span>
             </p>
-            {event.ticketTypes.map((tier) => {
-              const capacity =
-                tier.available != null ? tier.sold + tier.available : null;
-              return (
-                <div
-                  key={tier.id}
-                  className="flex items-center justify-between gap-2 text-xs"
-                >
-                  <span className="truncate text-foreground/90">{tier.name}</span>
-                  <span className="shrink-0 tabular-nums text-muted-foreground">
-                    {tier.sold} sold ·{" "}
-                    {tier.available == null
-                      ? "unlimited"
-                      : `${tier.available} left`}
-                    {capacity != null ? ` · ${capacity}` : ""}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+          )}
 
-      {/* Actions */}
-      <div className="p-5 pt-0 space-y-2">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="default"
-            size="sm"
-            onClick={onViewTickets}
-            className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Ticket className="w-4 h-4 mr-1.5" />
-            Sold Tickets & PDFs
-          </Button>
+          {/* Core Analytics Grid */}
+          <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-border/40 bg-muted/20 p-3 rounded-xl">
+            <div>
+              <p className="text-base font-extrabold text-foreground">
+                {event.stats.ticketsSold}
+              </p>
+              <p className="text-[11px] text-muted-foreground font-medium">
+                Tickets Sold
+              </p>
+            </div>
+            <div>
+              <p className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+                {event.stats.checkIns}{" "}
+                <span className="text-[10px] text-muted-foreground font-normal">
+                  ({checkInPct}%)
+                </span>
+              </p>
+              <p className="text-[11px] text-muted-foreground font-medium">
+                Admitted
+              </p>
+            </div>
+            <div>
+              <p className="text-base font-extrabold text-foreground">
+                {event.stats.revenue > 0
+                  ? `PKR ${(event.stats.revenue / 1000).toFixed(0)}k`
+                  : "PKR 0"}
+              </p>
+              <p className="text-[11px] text-muted-foreground font-medium">
+                Revenue
+              </p>
+            </div>
+          </div>
+
+          {/* Occupancy Progress */}
+          <div className="mt-4 space-y-1.5">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Capacity Occupancy</span>
+              <span className="font-semibold text-foreground">
+                {event.stats.occupancyRate}%
+              </span>
+            </div>
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-500",
+                  event.stats.occupancyRate >= 90
+                    ? "bg-emerald-500"
+                    : event.stats.occupancyRate >= 50
+                    ? "bg-primary"
+                    : "bg-blue-500"
+                )}
+                style={{
+                  width: `${Math.min(100, event.stats.occupancyRate)}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Tier breakdown preview */}
+          {event.ticketTypes?.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-border/30 space-y-1.5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Tier Allocation
+              </p>
+              <div className="space-y-1">
+                {event.ticketTypes.slice(0, 3).map((tier) => {
+                  const capacity =
+                    tier.available != null ? tier.sold + tier.available : null;
+                  const pct = capacity
+                    ? Math.round((tier.sold / capacity) * 100)
+                    : 0;
+                  return (
+                    <div
+                      key={tier.id}
+                      className="flex items-center justify-between text-xs py-0.5"
+                    >
+                      <span className="text-muted-foreground truncate max-w-[140px]">
+                        {tier.name}
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {tier.sold} / {capacity ?? "∞"}{" "}
+                        <span className="text-[10px] text-muted-foreground">
+                          ({pct}%)
+                        </span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onExport}
-            className="flex-1"
+        {/* Action Controls */}
+        <div className="mt-5 pt-4 border-t border-border/40 space-y-2">
+          {/* Primary Dedicated Full Page Button */}
+          <Link
+            href={`/dashboard/events/${event.id}/tickets`}
+            className="block w-full"
           >
-            <Download className="w-4 h-4 mr-1.5" />
-            Export CSV
-          </Button>
-          <Link href={`/dashboard/events`} className="flex-1">
-            <Button variant="outline" size="sm" className="w-full">
-              <Edit2 className="w-4 h-4 mr-1.5" />
-              Edit
+            <Button
+              size="sm"
+              className="w-full h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-sm"
+            >
+              <Ticket className="w-4 h-4 mr-2" />
+              Manage Passes & Manifest
             </Button>
           </Link>
-          <Link href={`/events/${event.slug}`} className="flex-1">
-            <Button variant="outline" size="sm" className="w-full">
-              <Eye className="w-4 h-4 mr-1.5" />
-              View Page
+
+          <div className="flex items-center gap-2">
+            <Link href={`/events/${event.slug}`} className="flex-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs h-8 bg-background/60"
+              >
+                <Eye className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+                Live Page
+              </Button>
+            </Link>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onExport}
+              className="text-xs h-8 px-3 bg-background/60"
+              title="Export CSV Manifest"
+            >
+              <Download className="w-3.5 h-3.5" />
             </Button>
-          </Link>
+          </div>
         </div>
       </div>
     </motion.div>
@@ -368,7 +398,8 @@ export function OrganizerDashboard({
   const [events, setEvents] = React.useState<Event[]>([]);
   const [summary, setSummary] = React.useState<Summary | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [selectedEventForTickets, setSelectedEventForTickets] = React.useState<Event | null>(null);
+  const [selectedEventForTickets, setSelectedEventForTickets] =
+    React.useState<Event | null>(null);
 
   const fetchData = React.useCallback(async () => {
     try {
@@ -412,14 +443,13 @@ export function OrganizerDashboard({
   const exportAttendees = async (eventId: number) => {
     try {
       const response = await fetch(
-        `/api/organizer/attendees?eventId=${eventId}`,
+        `/api/organizer/attendees?eventId=${eventId}`
       );
       const data = await response.json();
 
       if (!response.ok)
         throw new Error(data.error || "Failed to fetch attendees");
 
-      // Check if there are any attendees to export
       if (!data.attendees || data.attendees.length === 0) {
         toast({
           title: "No Attendees",
@@ -435,32 +465,36 @@ export function OrganizerDashboard({
         "Status",
         "Checked In At",
         "Email",
+        "Phone",
       ];
       const rows = data.attendees.map((a: Record<string, unknown>) => [
-        a.guestName || "",
-        a.ticketType || "",
-        a.code || "",
-        a.status || "",
-        a.checkedInAt ? format(new Date(a.checkedInAt as string), "PPpp") : "",
-        a.buyerEmail || "",
+        `"${a.guestName || ""}"`,
+        `"${a.ticketType || ""}"`,
+        `"${a.code || ""}"`,
+        `"${a.status || ""}"`,
+        `"${a.checkedInAt ? format(new Date(a.checkedInAt as string), "PPpp") : ""}"`,
+        `"${a.buyerEmail || ""}"`,
+        `"${a.buyerPhone || ""}"`,
       ]);
 
-      const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
-      const blob = new Blob([csv], { type: "text/csv" });
+      const csv = [headers.join(","), ...rows.map((r: string[]) => r.join(","))].join(
+        "\n"
+      );
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       const eventName = data.event?.name || `event-${eventId}`;
-      a.download = `attendees-${eventName.replace(/\s+/g, "-")}-${format(
+      a.download = `attendees-${eventName.replace(/[^a-zA-Z0-9]/g, "_")}-${format(
         new Date(),
-        "yyyy-MM-dd",
+        "yyyyMMdd_HHmm"
       )}.csv`;
       a.click();
       URL.revokeObjectURL(url);
 
       toast({
         title: "Exported",
-        description: `${data.attendees.length} attendees exported`,
+        description: `${data.attendees.length} attendees exported successfully`,
       });
     } catch (_error) {
       toast({
@@ -473,230 +507,257 @@ export function OrganizerDashboard({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading organizer dashboard...</p>
+      <div className="flex items-center justify-center py-24">
+        <div className="text-center space-y-3">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground font-medium">
+            Loading organizer command center...
+          </p>
         </div>
       </div>
     );
   }
 
+  const overallCheckInRate =
+    summary && summary.totalTicketsSold > 0
+      ? Math.round((summary.totalCheckIns / summary.totalTicketsSold) * 100)
+      : 0;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-8 pb-12">
+      {/* Executive Command Header */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-card to-background p-6 md:p-8"
+        className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card/80 to-background p-6 md:p-8 shadow-sm backdrop-blur-md"
       >
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="p-2 rounded-xl bg-primary/10 text-primary">
-                <Ticket className="w-5 h-5" />
-              </span>
-              <span className="text-sm font-medium text-muted-foreground">
-                Organizer Portal
+              <Badge
+                variant="outline"
+                className="bg-primary/10 text-primary border-primary/30 text-xs font-semibold px-2.5 py-0.5 rounded-full"
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-1" />
+                Organizer Command Hub
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {format(new Date(), "EEEE, MMMM d, yyyy")}
               </span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-bold">
+
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
               Welcome back,{" "}
-              <span className="gradient-text-primary">
-                {profile?.full_name?.split(" ")[0] || "Organizer"}
+              <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+                {profile?.full_name?.split(" ")[0] || "Partner"}
               </span>
             </h1>
-            <p className="text-muted-foreground mt-1">
-              Manage your events, sold ticket passes, gate allocations, and verify attendees
+
+            <p className="text-sm text-muted-foreground mt-1 max-w-xl leading-relaxed">
+              Track live ticket sales velocity, gate attendance radar, attendee
+              manifests, and settlement payouts in real time.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+
+          {/* Action Bar */}
+          <div className="flex flex-wrap items-center gap-3">
             <Button
               variant="outline"
               size="sm"
               onClick={fetchData}
-              className="gap-2"
+              className="h-10 px-4 gap-2 bg-background/60 hover:bg-background/90 border-border/70"
             >
               <RefreshCw className="w-4 h-4" />
               Refresh
             </Button>
-            <Link href="/dashboard/scan">
-              <Button size="sm" className="gap-2 shadow-premium">
-                <ScanLine className="w-4 h-4" />
-                Verify Tickets
+
+            <Link href="/dashboard/events">
+              <Button
+                size="sm"
+                className="h-10 px-5 gap-2 bg-primary hover:bg-primary/90 shadow-md font-semibold"
+              >
+                <Plus className="w-4 h-4" />
+                Create Event
               </Button>
             </Link>
           </div>
         </div>
       </motion.div>
 
-      {/* Live Events Banner */}
+      {/* Live Event In Progress Alert */}
       {events.some((e) => e.eventStatus === "live") && (
         <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-center gap-3"
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 flex items-center justify-between gap-4"
         >
-          <div className="relative">
-            <Radio className="w-5 h-5 text-emerald-500" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Radio className="w-5 h-5 text-emerald-500" />
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
+            </div>
+            <div>
+              <p className="font-bold text-emerald-700 dark:text-emerald-300 text-sm sm:text-base">
+                Live Event in Progress
+              </p>
+              <p className="text-xs text-emerald-600/90 dark:text-emerald-400/90">
+                Ticket sales and check-in metrics are refreshing automatically every 30 seconds.
+              </p>
+            </div>
           </div>
-          <div className="flex-1">
-            <p className="font-medium text-emerald-700 dark:text-emerald-300">
-              Live Event in Progress
-            </p>
-            <p className="text-sm text-emerald-600/80 dark:text-emerald-400/80">
-              Stats refresh automatically every 30 seconds
-            </p>
-          </div>
+          <Link href="/dashboard/events">
+            <Button
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shrink-0"
+            >
+              View Active Event
+            </Button>
+          </Link>
         </motion.div>
       )}
 
-      {/* Summary Stats */}
+      {/* High-Impact Executive Metric Cards */}
       {summary && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <PremiumStatCard
-            icon={<Calendar className="w-5 h-5" />}
-            title="Total Events"
-            value={summary.totalEvents}
-            subtitle={`${summary.upcomingEvents} upcoming, ${summary.pastEvents} completed`}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {/* Gross Revenue */}
+          <ExecutiveInsightCard
+            icon={<DollarSign className="w-5 h-5" />}
+            title="Gross Ticket Revenue"
+            value={summary.totalRevenue}
+            subtitle="Gross sales across all events"
+            prefix="PKR "
+            badgeText="Financial Volume"
             color="primary"
             delay={0}
           />
-          <PremiumStatCard
+
+          {/* Tickets Sold */}
+          <ExecutiveInsightCard
             icon={<Ticket className="w-5 h-5" />}
-            title="Tickets Sold"
+            title="Total Tickets Sold"
             value={summary.totalTicketsSold}
-            subtitle="Across all events"
+            subtitle={`${summary.upcomingEvents} upcoming event${summary.upcomingEvents === 1 ? "" : "s"}`}
+            badgeText="Sales Volume"
             color="blue"
             delay={1}
           />
-          <PremiumStatCard
+
+          {/* Gate Check-Ins */}
+          <ExecutiveInsightCard
             icon={<CheckCircle2 className="w-5 h-5" />}
-            title="Check-ins"
+            title="Verified Gate Check-Ins"
             value={summary.totalCheckIns}
-            subtitle="Verified attendees"
+            subtitle={`${overallCheckInRate}% total check-in rate`}
+            badgeText="Gate Operations"
             color="green"
             delay={2}
           />
-          <PremiumStatCard
-            icon={<DollarSign className="w-5 h-5" />}
-            title="Total Revenue"
-            value={summary.totalRevenue}
-            subtitle="PKR earned"
-            prefix="PKR "
-            color="amber"
+
+          {/* Total Managed Events */}
+          <ExecutiveInsightCard
+            icon={<Calendar className="w-5 h-5" />}
+            title="Active Events Portfolio"
+            value={summary.totalEvents}
+            subtitle={`${summary.pastEvents} past completed`}
+            badgeText="Portfolio"
+            color="purple"
             delay={3}
           />
         </div>
       )}
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-        >
-          <Link href="/dashboard/events">
-            <div className="rounded-xl border bg-card/50 p-4 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all cursor-pointer group">
-              <Plus className="w-8 h-8 text-emerald-500 mb-3 group-hover:scale-110 transition-transform" />
-              <h3 className="font-semibold">Manage Events</h3>
-              <p className="text-sm text-muted-foreground">Create & edit</p>
+      {/* Quick Action Navigation Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <Link href="/dashboard/events" className="group">
+          <div className="rounded-2xl border border-border/60 bg-card/60 p-4 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300">
+            <div className="flex items-center justify-between mb-2">
+              <Calendar className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
+              <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
             </div>
-          </Link>
-        </motion.div>
+            <h3 className="font-semibold text-sm text-foreground">
+              Event Management
+            </h3>
+            <p className="text-xs text-muted-foreground">Create & edit event listings</p>
+          </div>
+        </Link>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Link href="/admin/accounts">
-            <div className="rounded-xl border bg-card/50 p-4 hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer group">
-              <SlidersHorizontal className="w-8 h-8 text-primary mb-3 group-hover:scale-110 transition-transform" />
-              <h3 className="font-semibold">Gate & Device Hub</h3>
-              <p className="text-sm text-muted-foreground">Lanes & staff control</p>
+        <Link href="/dashboard/notifications" className="group">
+          <div className="rounded-2xl border border-border/60 bg-card/60 p-4 hover:border-purple-500/50 hover:bg-purple-500/5 transition-all duration-300">
+            <div className="flex items-center justify-between mb-2">
+              <Activity className="w-5 h-5 text-purple-500 group-hover:scale-110 transition-transform" />
+              <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
             </div>
-          </Link>
-        </motion.div>
+            <h3 className="font-semibold text-sm text-foreground">
+              Sales & Activity Feed
+            </h3>
+            <p className="text-xs text-muted-foreground">Real-time alerts & updates</p>
+          </div>
+        </Link>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
-        >
-          <Link href="/dashboard/scan">
-            <div className="rounded-xl border bg-card/50 p-4 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all cursor-pointer group">
-              <ScanLine className="w-8 h-8 text-blue-500 mb-3 group-hover:scale-110 transition-transform" />
-              <h3 className="font-semibold">Scan Tickets</h3>
-              <p className="text-sm text-muted-foreground">Verify & check-in</p>
+        <Link href="/dashboard/profile" className="group">
+          <div className="rounded-2xl border border-border/60 bg-card/60 p-4 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all duration-300">
+            <div className="flex items-center justify-between mb-2">
+              <Users className="w-5 h-5 text-amber-500 group-hover:scale-110 transition-transform" />
+              <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
             </div>
-          </Link>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Link href="/dashboard/notifications">
-            <div className="rounded-xl border bg-card/50 p-4 hover:border-purple-500/50 hover:bg-purple-500/5 transition-all cursor-pointer group">
-              <Activity className="w-8 h-8 text-purple-500 mb-3 group-hover:scale-110 transition-transform" />
-              <h3 className="font-semibold">Notifications</h3>
-              <p className="text-sm text-muted-foreground">Sales & updates</p>
-            </div>
-          </Link>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.55 }}
-        >
-          <Link href="/dashboard/profile">
-            <div className="rounded-xl border bg-card/50 p-4 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all cursor-pointer group">
-              <Users className="w-8 h-8 text-amber-500 mb-3 group-hover:scale-110 transition-transform" />
-              <h3 className="font-semibold">Profile</h3>
-              <p className="text-sm text-muted-foreground">Organizer profile</p>
-            </div>
-          </Link>
-        </motion.div>
+            <h3 className="font-semibold text-sm text-foreground">
+              Organizer Profile
+            </h3>
+            <p className="text-xs text-muted-foreground">Company details & settings</p>
+          </div>
+        </Link>
       </div>
 
-      {/* Events List */}
+      {/* Events Command Grid */}
       {events.length === 0 ? (
-        <div className="rounded-2xl border bg-card/50 p-12 text-center">
-          <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Events Yet</h3>
-          <p className="text-muted-foreground mb-4">
-            You haven&apos;t been assigned any events. Contact admin to get
-            started.
-          </p>
+        <div className="rounded-3xl border border-border/60 bg-card/40 backdrop-blur-sm p-12 text-center space-y-4">
+          <Calendar className="w-12 h-12 text-muted-foreground/60 mx-auto" />
+          <div>
+            <h3 className="text-lg font-bold text-foreground">No Events Created Yet</h3>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto mt-1">
+              Ready to launch your first event? Create your event listing to start selling tickets and admitting attendees.
+            </p>
+          </div>
+          <Link href="/dashboard/events">
+            <Button className="mt-2 bg-primary hover:bg-primary/90 font-semibold">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Your First Event
+            </Button>
+          </Link>
         </div>
       ) : (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Your Events</h2>
-            <p className="text-sm text-muted-foreground">
-              {events.length} total
-            </p>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight text-foreground">
+                Your Events & Ticket Operations
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Click &apos;Manage Passes &amp; Manifest&apos; for complete full-screen attendee analytics
+              </p>
+            </div>
+            <Link href="/dashboard/events">
+              <Button variant="ghost" size="sm" className="text-xs font-semibold text-primary">
+                View All in Table <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
+            </Link>
           </div>
-          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {events.map((event, index) => (
               <EventCard
                 key={event.id}
                 event={event}
                 index={index}
                 onExport={() => exportAttendees(event.id)}
-                onViewTickets={() => setSelectedEventForTickets(event)}
+                onViewQuickModal={() => setSelectedEventForTickets(event)}
               />
             ))}
           </div>
         </div>
       )}
 
-      {/* Sold Tickets & PDF Viewer Dialog */}
+      {/* Quick Modal Preview Fallback */}
       <SoldTicketsModal
         eventId={selectedEventForTickets?.id || null}
         eventName={selectedEventForTickets?.name}
