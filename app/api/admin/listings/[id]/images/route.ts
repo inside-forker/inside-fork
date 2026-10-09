@@ -42,6 +42,47 @@ export async function GET(
       );
     }
 
+    // Fallback: If no DB images exist, check if listing has peekaboo photos in storage
+    if (!images || images.length === 0) {
+      try {
+        const { rows: listingRows } = await query(
+          `SELECT peekaboo_id FROM listings WHERE id = $1`,
+          [listingId],
+        );
+        const listing = listingRows[0];
+        if (listing?.peekaboo_id) {
+          const { listListingImages, getListingImagePublicUrl } = await import(
+            "@/lib/storage/spaces"
+          );
+          const peekabooFiles = await listListingImages(
+            `peekaboo/${listing.peekaboo_id}`,
+          );
+          const galleryFiles = peekabooFiles
+            .filter((f) => !f.includes("/menu/") && !f.endsWith("/"))
+            .map((key, idx) => {
+              const name = key.split("/").pop() ?? "";
+              return {
+                id: -1 * (idx + 1),
+                listing_id: listingId,
+                url: getListingImagePublicUrl(
+                  `peekaboo/${listing.peekaboo_id}/${name}`,
+                ),
+                alt_text: "Gallery image",
+                display_order: idx,
+                is_primary: idx === 0,
+                availability: "available",
+                created_at: new Date().toISOString(),
+              };
+            });
+          if (galleryFiles.length > 0) {
+            return NextResponse.json({ success: true, data: galleryFiles });
+          }
+        }
+      } catch (fallbackErr) {
+        console.warn("[ADMIN IMAGES] Fallback lookup notice:", fallbackErr);
+      }
+    }
+
     return NextResponse.json({ success: true, data: images || [] });
   } catch (error) {
     if (error instanceof Error && error.name === "ListingRouteAccessError") {
