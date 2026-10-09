@@ -171,17 +171,16 @@ export async function PATCH(
         );
       }
 
-      // If the listing is published, we should require both open and close times
-      // only when at least one of them is provided, and the day is not marked closed.
-      if (listing?.status === "published" && row.isClosed !== true) {
-        const openEmpty = !row.openTime;
-        const closeEmpty = !row.closeTime;
+      // If the listing is published, validate times if provided
+      if (listing?.status === "published" && !row.isClosed) {
+        const openStr = typeof row.openTime === "string" ? row.openTime.trim() : "";
+        const closeStr = typeof row.closeTime === "string" ? row.closeTime.trim() : "";
 
-        // If both empty -> optional, allow
-        if (openEmpty && closeEmpty) continue;
+        // If both empty -> allowed
+        if (!openStr && !closeStr) continue;
 
-        // If one is missing -> invalid
-        if (openEmpty || closeEmpty) {
+        // If one is provided and one is missing -> invalid for published
+        if ((!openStr && closeStr) || (openStr && !closeStr)) {
           console.error(
             `PATCH /opening-hours: Incomplete times at index ${i}`,
             row,
@@ -211,26 +210,37 @@ export async function PATCH(
       await query(`DELETE FROM opening_hours WHERE ${deleteWhereSql}`, deleteParams);
     } catch (deleteError) {
       console.error("[OPENING HOURS API] Delete failed:", deleteError);
-      console.error(
-        "PATCH /opening-hours: Failed to delete existing rows",
-        deleteError,
-      );
       return NextResponse.json(
         { error: "Failed to delete existing opening hours" },
         { status: 500 },
       );
     }
 
+    // Helper to sanitize time input (convert empty strings/whitespace to null)
+    const sanitizeTime = (val: unknown): string | null => {
+      if (typeof val !== "string") return null;
+      const trimmed = val.trim();
+      if (!trimmed || trimmed === "null" || trimmed === "undefined") return null;
+      // Basic check for time format (e.g. HH:MM or HH:MM:SS)
+      return trimmed;
+    };
+
     // Insert new opening hours
     // Data is already in correct database format (0=Sunday) from frontend
-    const insertRows = body.opening_hours.map((row: OpeningHoursInput) => ({
-      listing_id: listingId,
-      day_of_week: row.dayOfWeek, // Database format: 0=Sunday, 1=Monday, etc.
-      open_time: row.isClosed ? null : row.openTime,
-      close_time: row.isClosed ? null : row.closeTime,
-      is_closed: !!row.isClosed,
-      branch_id: row.branch_id ?? null, // Preserve branch association (critical for multi-location)
-    }));
+    const insertRows = body.opening_hours.map((row: OpeningHoursInput) => {
+      const isClosed = Boolean(row.isClosed);
+      const openTime = isClosed ? null : sanitizeTime(row.openTime);
+      const closeTime = isClosed ? null : sanitizeTime(row.closeTime);
+
+      return {
+        listing_id: listingId,
+        day_of_week: row.dayOfWeek,
+        open_time: openTime,
+        close_time: closeTime,
+        is_closed: isClosed || (!openTime && !closeTime),
+        branch_id: row.branch_id ?? null,
+      };
+    });
 
     let insertedData;
     try {

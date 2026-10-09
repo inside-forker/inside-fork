@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -816,13 +817,19 @@ export function OrganizerEventsPage() {
                           sideOffset={4}
                         >
                           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/2 rounded-xl pointer-events-none" />
-                          <div className="relative z-10 p-2">
+                          <div className="relative z-10 p-2 space-y-1">
+                            <Link href={`/dashboard/events/${event.event_id}/tickets`}>
+                              <DropdownMenuItem className="cursor-pointer hover:bg-primary/10 text-primary font-medium">
+                                <Ticket className="h-4 w-4 mr-2" />
+                                Passes & Manifest (Full Page)
+                              </DropdownMenuItem>
+                            </Link>
                             <DropdownMenuItem
                               onClick={() => setSelectedEventForTickets(event)}
-                              className="cursor-pointer hover:bg-primary/10 text-primary font-medium"
+                              className="cursor-pointer hover:bg-muted text-xs text-muted-foreground"
                             >
-                              <Ticket className="h-4 w-4 mr-2" />
-                              Sold Tickets & PDFs
+                              <Eye className="h-3.5 w-3.5 mr-2" />
+                              Quick Preview Modal
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleEditEvent(event)}
@@ -906,6 +913,20 @@ export function OrganizerEventsPage() {
                           event.pending_action_type,
                         )}
                       </div>
+                    </div>
+
+                    {/* Direct Full-Page Passes Action Button */}
+                    <div className="pt-2 border-t border-border/40 mt-2">
+                      <Link href={`/dashboard/events/${event.event_id}/tickets`} className="block w-full">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-xs font-semibold h-9 bg-primary/5 hover:bg-primary hover:text-white border-primary/30 transition-all group/btn"
+                        >
+                          <Ticket className="h-3.5 w-3.5 mr-1.5 text-primary group-hover/btn:text-white transition-colors" />
+                          View Passes & Manifest
+                        </Button>
+                      </Link>
                     </div>
                   </CardContent>
                 </Card>

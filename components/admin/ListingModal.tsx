@@ -1238,12 +1238,25 @@ export function ListingModal({
           if (hasAnyBranch) {
             // No-op: listings with a branch manage hours per branch.
           } else {
+            const sanitizedHours = openingHours.map((h) => {
+              const isClosed = Boolean(h.isClosed);
+              const openTime = isClosed || !h.openTime || !h.openTime.trim() ? null : h.openTime.trim();
+              const closeTime = isClosed || !h.closeTime || !h.closeTime.trim() ? null : h.closeTime.trim();
+              return {
+                dayOfWeek: h.dayOfWeek,
+                openTime,
+                closeTime,
+                isClosed: isClosed || (!openTime && !closeTime),
+                branch_id: h.branch_id ?? null,
+              };
+            });
+
             const response = await fetch(
               `/api/admin/listings/${hoursListingId}/opening-hours`,
               {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ opening_hours: openingHours }),
+                body: JSON.stringify({ opening_hours: sanitizedHours }),
               },
             );
 
@@ -1253,7 +1266,7 @@ export function ListingModal({
               console.error("[OPENING HOURS SAVE] Save failed:", result);
               toast({
                 title: "Save Failed",
-                description: "Opening hours could not be saved",
+                description: result.error || "Opening hours could not be saved",
                 variant: "destructive",
               });
             }

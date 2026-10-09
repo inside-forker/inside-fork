@@ -36,8 +36,8 @@ export async function GET(
       const { rows: items } =
         sectionIds.length > 0
           ? await query(
-              `SELECT id, section_id, name, description, price, is_available, display_order
-               FROM menu_items WHERE section_id = ANY($1::int[])`,
+              `SELECT id, section_id, name, description, price, is_available, is_featured, display_order, image_url, image_alt
+               FROM menu_items WHERE section_id = ANY($1::int[]) ORDER BY display_order ASC`,
               [sectionIds],
             )
           : { rows: [] };
