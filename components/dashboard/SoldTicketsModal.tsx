@@ -32,10 +32,17 @@ import {
   Eye,
   Layers,
   FileText,
-  SlidersHorizontal,
-  ExternalLink,
 } from "lucide-react";
-import Link from "next/link";
+
+export interface TierStockItem {
+  id: number;
+  name: string;
+  price: number;
+  sold: number;
+  available: number | null;
+  capacity: number | null;
+  hasPdfPool?: boolean;
+}
 
 export interface AttendeeTicketItem {
   id: number;
@@ -84,6 +91,7 @@ export function SoldTicketsModal({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [attendees, setAttendees] = useState<AttendeeTicketItem[]>([]);
+  const [tierStock, setTierStock] = useState<TierStockItem[]>([]);
   const [eventDetails, setEventDetails] = useState<EventMetadata | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -99,6 +107,7 @@ export function SoldTicketsModal({
       const data = await res.json();
       if (res.ok) {
         setAttendees(data.attendees || []);
+        setTierStock(Array.isArray(data.ticketTypes) ? data.ticketTypes : []);
         if (data.event) {
           setEventDetails(data.event);
         }
@@ -125,6 +134,7 @@ export function SoldTicketsModal({
       fetchAttendees();
     } else {
       setAttendees([]);
+      setTierStock([]);
       setSearchQuery("");
       setStatusFilter("all");
       setTierFilter("all");
@@ -132,11 +142,25 @@ export function SoldTicketsModal({
     }
   }, [isOpen, eventId, fetchAttendees]);
 
-  // Unique ticket tiers
+  // Unique ticket tiers (prefer stock list so empty inventory still shows)
   const tiers = useMemo(() => {
-    const list = Array.from(new Set(attendees.map((a) => a.ticketType).filter(Boolean)));
-    return list;
-  }, [attendees]);
+    if (tierStock.length > 0) return tierStock.map((t) => t.name);
+    return Array.from(new Set(attendees.map((a) => a.ticketType).filter(Boolean)));
+  }, [attendees, tierStock]);
+
+  const stockTotals = useMemo(() => {
+    const sold = tierStock.reduce((sum, t) => sum + (t.sold || 0), 0);
+    const available = tierStock.reduce(
+      (sum, t) => sum + (t.available != null ? t.available : 0),
+      0,
+    );
+    const capacity = tierStock.reduce((sum, t) => {
+      if (t.capacity != null) return sum + t.capacity;
+      if (t.available != null) return sum + t.sold + t.available;
+      return sum + t.sold;
+    }, 0);
+    return { sold, available, capacity };
+  }, [tierStock]);
 
   // Filtered attendees
   const filteredAttendees = useMemo(() => {
@@ -302,19 +326,6 @@ export function SoldTicketsModal({
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
-                {eventId && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-primary/20 hover:bg-primary/5 text-xs"
-                    asChild
-                  >
-                    <Link href={`/admin/accounts?event_id=${eventId}`} target="_blank">
-                      <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5 text-primary" />
-                      Gate & Device Console
-                    </Link>
-                  </Button>
-                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -358,6 +369,65 @@ export function SoldTicketsModal({
                 <div className="text-xl font-bold text-foreground">PKR {totalRevenue.toLocaleString()}</div>
               </div>
             </div>
+
+            {/* Per-tier stock */}
+            {tierStock.length > 0 && (
+              <div className="mt-4 rounded-xl border border-border/50 bg-card/60 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Ticket stock by tier
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {stockTotals.sold} sold · {stockTotals.available} left
+                    {stockTotals.capacity > 0 ? ` · ${stockTotals.capacity} total` : ""}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {tierStock.map((tier) => {
+                    const capacity =
+                      tier.capacity ??
+                      (tier.available != null ? tier.sold + tier.available : null);
+                    const leftLabel =
+                      tier.available == null ? "Unlimited" : `${tier.available} left`;
+                    const fillPct =
+                      capacity && capacity > 0
+                        ? Math.min(100, Math.round((tier.sold / capacity) * 100))
+                        : 0;
+                    return (
+                      <div
+                        key={tier.id}
+                        className="rounded-lg border border-border/40 bg-background/70 px-3 py-2"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">{tier.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              PKR {Number(tier.price || 0).toLocaleString()}
+                              {tier.hasPdfPool ? " · PDF pool" : ""}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="text-sm font-semibold tabular-nums">
+                              {tier.sold}
+                              {capacity != null ? ` / ${capacity}` : ""}
+                            </div>
+                            <div className="text-xs text-muted-foreground">{leftLabel}</div>
+                          </div>
+                        </div>
+                        {capacity != null && capacity > 0 && (
+                          <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-primary"
+                              style={{ width: `${fillPct}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Filters & Search */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-4">

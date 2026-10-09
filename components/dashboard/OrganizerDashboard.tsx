@@ -274,7 +274,7 @@ function EventCard({
           <div className="h-2 bg-muted rounded-full overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${event.stats.occupancyRate}%` }}
+              animate={{ width: `${Math.min(100, event.stats.occupancyRate)}%` }}
               transition={{ delay: 0.3, duration: 0.5 }}
               className={cn(
                 "h-full rounded-full",
@@ -287,6 +287,34 @@ function EventCard({
             />
           </div>
         </div>
+
+        {/* Per-tier stock */}
+        {event.ticketTypes?.length > 0 && (
+          <div className="mt-4 pt-3 border-t space-y-1.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Stock by tier
+            </p>
+            {event.ticketTypes.map((tier) => {
+              const capacity =
+                tier.available != null ? tier.sold + tier.available : null;
+              return (
+                <div
+                  key={tier.id}
+                  className="flex items-center justify-between gap-2 text-xs"
+                >
+                  <span className="truncate text-foreground/90">{tier.name}</span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">
+                    {tier.sold} sold ·{" "}
+                    {tier.available == null
+                      ? "unlimited"
+                      : `${tier.available} left`}
+                    {capacity != null ? ` · ${capacity}` : ""}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Actions */}
@@ -300,17 +328,6 @@ function EventCard({
           >
             <Ticket className="w-4 h-4 mr-1.5" />
             Sold Tickets & PDFs
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            asChild
-            className="flex-1 border-primary/20 hover:bg-primary/5"
-          >
-            <Link href={`/admin/accounts?event_id=${event.id}`}>
-              <SlidersHorizontal className="w-4 h-4 mr-1.5 text-primary" />
-              Gate Console
-            </Link>
           </Button>
         </div>
 

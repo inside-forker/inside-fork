@@ -37,7 +37,6 @@ import {
   CheckCircle2,
   Users,
   Ticket,
-  SlidersHorizontal,
 } from "lucide-react";
 import type {
   OrganizerManagedEvent,
@@ -48,7 +47,6 @@ import type {
 import { OrganizerEventModal } from "./OrganizerEventModal";
 import { RejectedRequestModal } from "./RejectedRequestModal";
 import { SoldTicketsModal } from "./SoldTicketsModal";
-import Link from "next/link";
 
 export function OrganizerEventsPage() {
   const [events, setEvents] = React.useState<OrganizerManagedEvent[]>([]);
@@ -825,12 +823,6 @@ export function OrganizerEventsPage() {
                             >
                               <Ticket className="h-4 w-4 mr-2" />
                               Sold Tickets & PDFs
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild className="cursor-pointer hover:bg-primary/10">
-                              <Link href={`/admin/accounts?event_id=${event.event_id}`}>
-                                <SlidersHorizontal className="h-4 w-4 mr-2" />
-                                Gate & Device Console
-                              </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleEditEvent(event)}
