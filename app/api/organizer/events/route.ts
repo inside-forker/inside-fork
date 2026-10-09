@@ -193,6 +193,39 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // Uploaded ticket PDFs are the real stock when a tier has a pool:
+    // capacity = total uploaded, sold = assigned to a booking.
+    const pdfPool: Record<number, { total: number; sold: number }> = {};
+    if (ticketTypeIds.length > 0) {
+      try {
+        const { rows } = await query(
+          `SELECT ticket_type_id,
+             COUNT(*)::int AS total,
+             COUNT(*) FILTER (WHERE booking_id IS NOT NULL)::int AS sold
+           FROM ticket_pdf_inventory
+           WHERE ticket_type_id = ANY($1::bigint[])
+           GROUP BY ticket_type_id`,
+          [ticketTypeIds]
+        );
+        rows.forEach((row) => {
+          pdfPool[Number(row.ticket_type_id)] = {
+            total: row.total,
+            sold: row.sold,
+          };
+        });
+      } catch (error) {
+        console.error("Ticket PDF inventory fetch error:", error);
+      }
+    }
+    const soldFor = (t: TicketTypeRecord) =>
+      pdfPool[t.id] ? pdfPool[t.id].sold : ticketsSoldByType[t.id] || 0;
+    const availableFor = (t: TicketTypeRecord) =>
+      pdfPool[t.id]
+        ? pdfPool[t.id].total - pdfPool[t.id].sold
+        : t.quantity_available != null
+          ? Number(t.quantity_available)
+          : 0;
+
     // Calculate per-event stats
     const eventsWithStats = events.map((event) => {
       const eventBookings = bookings.filter((b) => b.event_id === event.id);
@@ -202,16 +235,14 @@ export async function GET(request: NextRequest) {
       const eventPasses = ticketPasses.filter((p) => p.event_id === event.id);
 
       const ticketsSold = eventTicketTypes.reduce(
-        (sum, t) => sum + (ticketsSoldByType[t.id] || 0),
+        (sum, t) => sum + soldFor(t),
         0,
       );
-      // Capacity = sold + remaining (quantity_available is remaining stock).
-      const totalCapacity = eventTicketTypes.reduce((sum, t) => {
-        const sold = ticketsSoldByType[t.id] || 0;
-        const available =
-          t.quantity_available != null ? Number(t.quantity_available) : 0;
-        return sum + sold + available;
-      }, 0);
+      // Capacity = sold + remaining.
+      const totalCapacity = eventTicketTypes.reduce(
+        (sum, t) => sum + soldFor(t) + availableFor(t),
+        0,
+      );
       const grossRevenue = eventTicketTypes.reduce(
         (sum, t) => sum + (ticketsSoldByType[t.id] || 0) * Number(t.price || 0),
         0,
@@ -244,9 +275,8 @@ export async function GET(request: NextRequest) {
           id: t.id,
           name: t.name,
           price: Number(t.price),
-          sold: ticketsSoldByType[t.id] || 0,
-          available:
-            t.quantity_available != null ? Number(t.quantity_available) : 0,
+          sold: soldFor(t),
+          available: availableFor(t),
         })),
         eventStatus: isLive ? "live" : isUpcoming ? "upcoming" : "past",
       };
