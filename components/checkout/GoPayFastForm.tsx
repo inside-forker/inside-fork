@@ -1,8 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Phone } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { formatPhone, digitsOnly } from "./checkoutFormat";
 
 interface GoPayFastFormProps {
   bookingReference: string;
@@ -28,14 +29,17 @@ export function GoPayFastForm({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormFieldsData | null>(null);
+  const [mobileInput, setMobileInput] = useState(customerMobile || "");
   const formRef = useRef<HTMLFormElement>(null);
   const hasFetchedRef = useRef(false);
   const hasSubmittedRef = useRef(false);
 
   // Fetch form fields from server
-  const fetchFormFields = useCallback(async () => {
+  const fetchFormFields = useCallback(async (overrideMobile?: string) => {
     if (hasFetchedRef.current) return;
     hasFetchedRef.current = true;
+
+    const phoneToUse = overrideMobile ?? mobileInput ?? customerMobile;
 
     try {
       setError(null);
@@ -48,7 +52,7 @@ export function GoPayFastForm({
         body: JSON.stringify({
           basketId: bookingReference,
           amount: amount.toFixed(2),
-          customerMobile,
+          customerMobile: phoneToUse,
           customerEmail,
           transactionDescription,
         }),
@@ -79,6 +83,7 @@ export function GoPayFastForm({
     bookingReference,
     amount,
     customerMobile,
+    mobileInput,
     customerEmail,
     transactionDescription,
   ]);
@@ -109,8 +114,45 @@ export function GoPayFastForm({
     fetchFormFields();
   };
 
-  // Show error state
+  // Show error state with inline phone prompt if contact details were missing
   if (error) {
+    if (error.toLowerCase().includes("contact details") || !customerMobile) {
+      return (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-primary" />
+              <h4 className="text-sm font-semibold text-foreground">
+                Mobile Number Required
+              </h4>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Please enter your mobile phone number to complete payment.
+            </p>
+            <input
+              type="tel"
+              value={mobileInput}
+              onChange={(e) => setMobileInput(formatPhone(e.target.value))}
+              placeholder="03XX-XXXXXXX"
+              maxLength={12}
+              className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground outline-none focus:border-primary"
+            />
+            <Button
+              onClick={() => {
+                hasFetchedRef.current = false;
+                fetchFormFields(mobileInput);
+              }}
+              disabled={digitsOnly(mobileInput).length < 11 || isLoading}
+              className="w-full py-5 text-sm font-semibold"
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Proceed to Payment
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4">
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">

@@ -78,7 +78,11 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
   }, [isInView, setIsFooterInView]);
 
   return (
-    <footer ref={footerRef} className="border-t border-border bg-cream">
+    <footer
+      data-chrome="footer"
+      ref={footerRef}
+      className="border-t border-border bg-cream"
+    >
       <div className="container mx-auto px-5 py-10 sm:px-6 lg:px-8">
         <div className="grid gap-8 md:grid-cols-12 md:gap-10">
           {/* Brand, newsletter and socials */}

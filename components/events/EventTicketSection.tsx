@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Minus, CreditCard, LogIn } from "lucide-react";
+import { Plus, Minus, CreditCard } from "lucide-react";
 import { EventTicketSectionProps, TicketType } from "@/types/events.types";
 import { PremiumHeading } from "@/components/brand/Typography";
 import { useRouter } from "next/navigation";
@@ -18,7 +18,6 @@ import {
 import { useArrivedFromParchi } from "@/lib/parchi/prefill";
 import { isPrismfestSlug } from "@/lib/events/prismfest";
 import { useSupabaseUser } from "@/hooks/useSupabaseUser";
-import { AuthModal } from "@/components/auth/AuthModal";
 import {
   sectionVariants,
   cardGridVariants,
@@ -48,7 +47,6 @@ export function EventTicketSection({
   const [selectedTickets, setSelectedTickets] = useState<
     Record<number, number>
   >({});
-  const [authOpen, setAuthOpen] = useState(false);
 
   const updateTicketQuantity = (ticketId: number, quantity: number) => {
     setSelectedTickets((prev) => ({
@@ -157,17 +155,6 @@ export function EventTicketSection({
       }
     });
     router.push("/checkout");
-  };
-
-  const needsLoginCta =
-    (arrivedFromParchi || showIkStudentPrice) && !user && !isUserLoading;
-
-  const handleProceedToCheckout = () => {
-    if (needsLoginCta) {
-      setAuthOpen(true);
-      return;
-    }
-    goToCheckout();
   };
 
   return (
@@ -331,9 +318,9 @@ export function EventTicketSection({
                       Parchi discount applies after you verify at checkout
                     </span>
                   )}
-                  {showIkStudentPrice && needsLoginCta && (
+                  {showIkStudentPrice && !user && !isUserLoading && (
                     <span className="block text-xs mt-0.5 text-primary">
-                      Sign in or sign up to get this price
+                      Sign in at checkout to get this price
                     </span>
                   )}
                 </p>
@@ -342,38 +329,15 @@ export function EventTicketSection({
               <Button
                 size="lg"
                 className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl transition-all duration-300 w-full sm:w-auto shadow-lg shadow-primary/25 text-sm sm:text-base"
-                onClick={handleProceedToCheckout}
+                onClick={goToCheckout}
               >
-                {needsLoginCta ? (
-                  <>
-                    <LogIn className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    {showIkStudentPrice && parchiOffer
-                      ? `Sign in for ${describeParchiOffer(parchiOffer)}`
-                      : "Log in"}
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    Proceed to Checkout
-                  </>
-                )}
+                <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                Proceed to Checkout
               </Button>
             </div>
           </Card>
         </motion.div>
       )}
-
-      <AuthModal
-        open={authOpen}
-        onOpenChange={setAuthOpen}
-        nextPath={`/events/${event.slug}`}
-        onSuccess={goToCheckout}
-        description={
-          showIkStudentPrice && parchiOffer
-            ? `Sign in or create an Inside Karachi account to get ${describeParchiOffer(parchiOffer)}.`
-            : undefined
-        }
-      />
     </motion.div>
   );
 }

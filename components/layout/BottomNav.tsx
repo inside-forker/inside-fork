@@ -55,6 +55,7 @@ export function BottomNav({
   return (
     <>
       <motion.nav
+        data-chrome="footer"
         initial={{ y: 120, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{

@@ -108,11 +108,10 @@ export function ConditionalLayout({
     // Regular pages: with header, footer, and favorites
     // Wrap with FavoritesProvider ONLY for user-facing pages
 
-    // Render {header}/{footer} slots directly — do NOT wrap them in extra
-    // client-owned DOM here. Wrappers around Server Component props can be
-    // omitted from SSR HTML while the client still expects them, which causes
-    // hydration mismatches (e.g. <header> vs <div data-chrome="header">).
-    // Chrome wrappers live on the server-composed slots in app/layout.tsx.
+    // Render {header}/{footer} slots directly without wrappers to prevent
+    // hydration mismatches between SSR and client VDOM.
+    // Chrome attributes data-chrome="header" and data-chrome="footer" live directly
+    // on the root <header> and <footer> elements.
     return (
       <FavoritesProvider>
         <div className="relative flex min-h-screen flex-col">
