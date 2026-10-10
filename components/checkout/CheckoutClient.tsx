@@ -576,53 +576,46 @@ export function CheckoutClient() {
         </div>
       ) : null}
 
-      {user ? (
-        <section className="space-y-3">
-          <div className="space-y-1">
-            <h2 className="text-xl font-bold">Who&apos;s going</h2>
-            <p className="text-xs text-muted-foreground">
-              Each ticket carries a name and CNIC.
-            </p>
-          </div>
-          {guests.map((guest, index) =>
-            isBuyerSlot(index) ? (
-              <BuyerHolderCard
-                key={`buyer-${index}`}
-                name={buyer.name}
-                avatarUrl={profile?.avatar_url ?? user?.avatar_url}
-                ticketName={slots[index]?.ticketName ?? ""}
-                cnic={buyer.cnic}
-                onChangeCnic={(value) => handleBuyerChange("cnic", value)}
-                error={buyerErrors.cnic}
-                onHandOff={() => setBuyerHoldsFirst(false)}
-              />
-            ) : (
-              <GuestHolderCard
-                key={`guest-${index}`}
-                index={index}
-                ticketName={slots[index]?.ticketName ?? ""}
-                value={guest}
-                onChange={(field, value) => handleGuestChange(index, field, value)}
-                errors={guestErrors[index]}
-                onClaim={index === 0 ? () => setBuyerHoldsFirst(true) : undefined}
-              />
-            ),
-          )}
-        </section>
-      ) : null}
-
       <section className="space-y-3">
-        <h2 className="text-base font-bold">Contact</h2>
+        <div className="space-y-1">
+          <h2 className="text-xl font-bold">Attendee & Contact Details</h2>
+          <p className="text-xs text-muted-foreground">
+            {user
+              ? "Each ticket requires a CNIC. Tickets and receipt will be sent to your contact info."
+              : "Tickets and receipt will be linked to your account."}
+          </p>
+        </div>
+
         <CheckoutContactCard
           values={buyer}
           onChange={handleBuyerChange}
           errors={buyerErrors}
-          editing={showContactFields}
-          onEdit={() => setEditingContact(true)}
-          buyerNotGoing={!buyerHoldsFirst}
+          ticketName={slots[0]?.ticketName ?? ""}
+          avatarUrl={profile?.avatar_url ?? user?.avatar_url}
+          buyerHoldsFirst={buyerHoldsFirst}
+          onToggleBuyerHoldsFirst={() => setBuyerHoldsFirst((prev) => !prev)}
           isLoggedIn={!!user}
           onAuthRequest={() => setAuthOpen(true)}
         />
+
+        {user && (!buyerHoldsFirst || slotCount > 1) ? (
+          <div className="space-y-3 pt-1">
+            {guests.map((guest, index) => {
+              if (index === 0 && buyerHoldsFirst) return null;
+              return (
+                <GuestHolderCard
+                  key={`guest-${index}`}
+                  index={index}
+                  ticketName={slots[index]?.ticketName ?? ""}
+                  value={guest}
+                  onChange={(field, value) => handleGuestChange(index, field, value)}
+                  errors={guestErrors[index]}
+                  onClaim={index === 0 ? () => setBuyerHoldsFirst(true) : undefined}
+                />
+              );
+            })}
+          </div>
+        ) : null}
       </section>
 
       <div className="space-y-1 text-center text-xs text-muted-foreground">
