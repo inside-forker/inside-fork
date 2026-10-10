@@ -41,6 +41,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
     }
 
+    // Validate Phone
+    const rawPhone = (buyerDetails?.phone || "").replace(/\D/g, "");
+    if (!rawPhone || rawPhone.length < 10) {
+      return NextResponse.json(
+        { error: "Valid mobile phone number is required" },
+        { status: 400 },
+      );
+    }
+    const customerPhone = (buyerDetails?.phone || "").trim();
+    const customerEmail = (session.email || buyerDetails?.email || "").trim();
+    const customerName = (buyerDetails?.name || "").trim() || "Guest";
+
     // Validate CNIC
     const rawCnic = buyerDetails?.cnic?.replace(/-/g, "") || "";
     if (!rawCnic || !/^\d{13}$/.test(rawCnic)) {
@@ -169,7 +181,7 @@ export async function POST(request: NextRequest) {
         }
         throw err;
       }
-    } else if (!fromParchiChannel) {
+    } else {
       const { rows: eventRows } = await query(
         `SELECT slug FROM events WHERE id = $1 LIMIT 1`,
         [eventId],
@@ -244,9 +256,9 @@ export async function POST(request: NextRequest) {
           expiresAt,
           cnicHash,
           cnicLast4Digits,
-          buyerDetails.name,
-          buyerDetails.email,
-          buyerDetails.phone,
+          customerName,
+          customerEmail,
+          customerPhone,
           JSON.stringify(rpcItems),
           parchiVerificationId,
           discountAmount,
@@ -255,6 +267,13 @@ export async function POST(request: NextRequest) {
       );
       const rpcResult = rpcRows[0]?.result as BookingAtomicResult | null;
       bookingId = rpcResult?.booking_id;
+
+      if (customerPhone && session.userId) {
+        query(
+          `UPDATE profiles SET phone = COALESCE(NULLIF(phone, ''), $1) WHERE id = $2`,
+          [customerPhone, session.userId],
+        ).catch(() => {});
+      }
     } catch (bookingError) {
       console.error("Booking creation failed:", bookingError);
       captureRouteError(

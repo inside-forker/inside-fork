@@ -21,35 +21,50 @@ export function CheckoutContactCard({
   values,
   onChange,
   errors,
-  editing,
-  onEdit,
   buyerNotGoing,
+  isLoggedIn = false,
+  onAuthRequest,
 }: {
   values: BuyerDetails;
   onChange: (field: keyof BuyerDetails, value: string) => void;
   errors?: Partial<Record<keyof BuyerDetails, string>>;
-  /** Show name, email and phone as fields rather than read-only rows. */
-  editing: boolean;
-  onEdit: () => void;
+  editing?: boolean;
+  onEdit?: () => void;
   /** The buyer isn't holding ticket 1, so their name and CNIC live here. */
   buyerNotGoing: boolean;
+  isLoggedIn?: boolean;
+  onAuthRequest?: () => void;
 }) {
   return (
-    <div className={`rounded-2xl bg-primary/5 p-3.5 ${editing ? "space-y-3.5" : "space-y-2.5"}`}>
+    <div className="rounded-2xl bg-primary/5 p-3.5 space-y-3.5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">Tickets and receipt go to</p>
-        {editing ? null : (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="text-xs font-semibold text-primary hover:opacity-80"
-          >
-            Edit
-          </button>
-        )}
       </div>
 
-      {editing ? (
+      {!isLoggedIn ? (
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <User className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Sign in or create account
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Tickets and receipt will be linked to your account
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onAuthRequest}
+            className="shrink-0 rounded-xl bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-200"
+          >
+            Sign in
+          </button>
+        </div>
+      ) : (
         <>
           <CheckoutField
             label="Full Name"
@@ -60,16 +75,24 @@ export function CheckoutContactCard({
             error={errors?.name}
             id="contact-name"
           />
-          <CheckoutField
-            label="Email Address"
-            value={values.email}
-            onChange={(e) => onChange("email", e.target.value)}
-            placeholder="you@example.com"
-            type="email"
-            autoComplete="email"
-            error={errors?.email}
-            id="contact-email"
-          />
+          <div className="space-y-1">
+            <CheckoutField
+              label="Email Address"
+              value={values.email}
+              readOnly
+              disabled
+              tabIndex={-1}
+              className="bg-muted/70 text-muted-foreground/80 cursor-not-allowed select-none border-border"
+              placeholder="you@example.com"
+              type="email"
+              autoComplete="email"
+              error={errors?.email}
+              id="contact-email"
+            />
+            <p className="text-[11px] text-muted-foreground/70">
+              Account email cannot be changed
+            </p>
+          </div>
           <CheckoutField
             label="Phone"
             value={values.phone}
@@ -81,18 +104,6 @@ export function CheckoutContactCard({
             error={errors?.phone}
             id="contact-phone"
           />
-        </>
-      ) : (
-        <>
-          {buyerNotGoing ? (
-            <ContactRow icon={<User className="h-[15px] w-[15px]" />}>{values.name}</ContactRow>
-          ) : null}
-          <ContactRow icon={<Mail className="h-[15px] w-[15px]" />} strong>
-            {values.email}
-          </ContactRow>
-          <ContactRow icon={<Smartphone className="h-[15px] w-[15px]" />}>
-            {values.phone}
-          </ContactRow>
         </>
       )}
 

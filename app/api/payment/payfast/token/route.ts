@@ -149,13 +149,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Contact details come from the booking the server already holds, so the
-    // browser never has to keep or resend buyer PII. Body values are a fallback
-    // for callers that still send them.
-    const customerEmail =
-      (booking.customer_email as string | null) ?? validation.data.customerEmail;
-    const customerMobile =
-      (booking.customer_phone as string | null) ?? validation.data.customerMobile;
+    let customerEmail =
+      (booking.customer_email as string | null) || validation.data.customerEmail || session.email;
+    let customerMobile =
+      (booking.customer_phone as string | null) || validation.data.customerMobile;
+
+    if (!customerMobile) {
+      const { rows: profileRows } = await query(
+        `SELECT phone FROM profiles WHERE id = $1`,
+        [session.userId],
+      );
+      if (profileRows[0]?.phone) {
+        customerMobile = profileRows[0].phone;
+      }
+    }
+
     if (!customerEmail || !customerMobile) {
       return NextResponse.json(
         {
@@ -164,6 +172,13 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 },
       );
+    }
+
+    if (customerMobile && (!booking.customer_phone || !booking.customer_email)) {
+      await query(
+        `UPDATE bookings SET customer_phone = COALESCE(NULLIF(customer_phone, ''), $1), customer_email = COALESCE(NULLIF(customer_email, ''), $2) WHERE id = $3`,
+        [customerMobile, customerEmail, booking.id],
+      ).catch(() => {});
     }
 
     const amount = Number(booking.total_amount).toFixed(2);

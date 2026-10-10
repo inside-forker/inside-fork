@@ -23,10 +23,12 @@ import { CheckoutContactCard, type BuyerDetails } from "./CheckoutContactCard";
 import { digitsOnly, formatPhone, formatPkr } from "./checkoutFormat";
 import {
   computeParchiDiscount,
+  describeParchiOffer,
   type ParchiOffer,
 } from "@/lib/parchi/discount";
 import { useArrivedFromParchi } from "@/lib/parchi/prefill";
 import { isPrismfestSlug } from "@/lib/events/prismfest";
+import { AuthModal } from "@/components/auth/AuthModal";
 import type {
   ResumableBookingDTO,
   ResumableResponse,
@@ -82,6 +84,7 @@ export function CheckoutClient() {
   const [resumable, setResumable] = useState<ResumableBookingDTO | null>(null);
   const [isResuming, setIsResuming] = useState(false);
   const [resumeError, setResumeError] = useState<string | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
 
   const [buyer, setBuyer] = useState<BuyerDetails>({
     name: "",
@@ -139,27 +142,31 @@ export function CheckoutClient() {
   >(null);
 
   useEffect(() => {
-    setParchiOffer(null);
-    setParchiVerificationId(null);
     if (!parchiEventId) return;
     let cancelled = false;
     fetch(`/api/parchi/offer?eventId=${parchiEventId}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!cancelled) setParchiOffer(data?.offer ?? null);
+        if (!cancelled && data?.offer) setParchiOffer(data.offer);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [userId, parchiEventId]);
+  }, [parchiEventId]);
+
+  // Synchronously detect Prismfest carts right from the cart items
+  const isPrismfestCart =
+    isPrismfestSlug(eventInfo?.slug) ||
+    items.some(
+      (i) =>
+        i.eventId === 101 ||
+        (i.eventName && i.eventName.toLowerCase().includes("prism")),
+    );
 
   const ikOpenStudentDiscount =
-    !!user &&
-    !!parchiOffer &&
-    !arrivedFromParchi &&
     !parchiVerificationId &&
-    isPrismfestSlug(eventInfo?.slug);
+    isPrismfestCart;
 
   // Same arithmetic as app/api/bookings/create/route.ts: student discount
   // comes off the subtotal, then fees on what's left.
@@ -168,8 +175,13 @@ export function CheckoutClient() {
     let discount = 0;
     if (parchiOffer && parchiVerificationId) {
       discount = computeParchiDiscount(parchiOffer, subtotal);
-    } else if (parchiOffer && ikOpenStudentDiscount) {
-      discount = computeParchiDiscount(parchiOffer, subtotal);
+    } else if (ikOpenStudentDiscount) {
+      const offerToUse: ParchiOffer = parchiOffer ?? {
+        discount_type: "percentage",
+        discount_value: 20,
+        max_discount_amount: null,
+      };
+      discount = computeParchiDiscount(offerToUse, subtotal);
     }
     const discounted = subtotal - discount;
     const platformFee =
@@ -229,16 +241,12 @@ export function CheckoutClient() {
     };
   }, [firstEventId]);
 
-  // Look for an unfinished booking to offer resuming (only once on mount).
-  //
-  // Deliberately NOT gated on `items.length`: after a failed payment the cart
-  // is empty, and resuming is exactly what the user needs then. When the cart
-  // does have items we still narrow by event, so a resumable booking for
-  // what you're currently buying takes priority.
+  // Look for an unfinished booking to offer resuming only when the cart is empty
+  // (e.g. user returns after an aborted or failed payment).
   const hasCheckedExistingBookings = useRef(false);
   useEffect(() => {
     const checkExistingBookings = async () => {
-      if (!user || hasCheckedExistingBookings.current) return;
+      if (!user || items.length > 0 || hasCheckedExistingBookings.current) return;
       hasCheckedExistingBookings.current = true;
 
       const eventIds = Array.from(new Set(items.map((i) => i.eventId)));
@@ -302,7 +310,7 @@ export function CheckoutClient() {
     setBuyer((prev) => ({
       ...prev,
       name: prev.name || (user.full_name ?? "").trim(),
-      email: prev.email || (user.email ?? "").trim(),
+      email: (user.email ?? "").trim(),
     }));
     let cancelled = false;
     fetch("/api/profile")
@@ -314,6 +322,7 @@ export function CheckoutClient() {
         setBuyer((prev) => ({
           ...prev,
           name: prev.name || (p.full_name ?? "").trim(),
+          email: (user.email ?? "").trim(),
           phone: prev.phone || phoneFromProfile(p.phone),
         }));
       })
@@ -322,7 +331,7 @@ export function CheckoutClient() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, user?.email]);
 
   // Judged on the account/profile rather than the live fields, so the card
   // doesn't fold back into read-only rows halfway through the buyer typing.
@@ -336,9 +345,10 @@ export function CheckoutClient() {
         cnic: "",
       }),
     ).length === 0;
-  const showContactFields = editingContact || !profileComplete;
+  const showContactFields = editingContact || (!!user && !profileComplete);
 
   const handleBuyerChange = (field: keyof BuyerDetails, value: string) => {
+    if (field === "email" && user) return;
     setBuyer((prev) => ({ ...prev, [field]: value }));
     if (field !== "cnic") setEditingContact(true);
     if (buyerErrors[field]) {
@@ -366,17 +376,26 @@ export function CheckoutClient() {
 
   const isBuyerSlot = (index: number) => index === 0 && buyerHoldsFirst;
 
-  const handleProceed = async () => {
-    if (!user) {
-      toast({
-        title: "Login Required",
-        description: "Please login to complete your purchase.",
-      });
-      router.push(`/login?next=${encodeURIComponent("/checkout")}`);
+  const handleProceed = async (overrideUserCheck = false) => {
+    if (!user && !overrideUserCheck) {
+      setAuthOpen(true);
       return;
     }
 
-    const nextBuyerErrors = contactErrors(buyer);
+    const effectiveName = (buyer.name.trim() || user?.full_name || user?.email?.split("@")[0] || "Guest").trim();
+    const effectiveEmail = (user?.email || buyer.email).trim();
+    const effectivePhone = (buyer.phone.trim() || profile?.phone || "").trim();
+
+    const nextBuyerErrors: BuyerErrors = {};
+    if (!effectiveName) {
+      nextBuyerErrors.name = "Name is required";
+    }
+
+    const phoneDigits = digitsOnly(effectivePhone);
+    if (!phoneDigits || phoneDigits.length < 11) {
+      nextBuyerErrors.phone = "Mobile number is required (03XX-XXXXXXX)";
+    }
+
     if (digitsOnly(buyer.cnic).length < 13) nextBuyerErrors.cnic = "Enter a valid CNIC";
 
     const nextGuestErrors: HolderErrors = {};
@@ -390,22 +409,36 @@ export function CheckoutClient() {
 
     setBuyerErrors(nextBuyerErrors);
     setGuestErrors(nextGuestErrors);
-    // A contact error has to be visible to be fixed.
-    if (nextBuyerErrors.name || nextBuyerErrors.email || nextBuyerErrors.phone) {
-      setEditingContact(true);
-    }
+
     if (Object.keys(nextBuyerErrors).length || Object.keys(nextGuestErrors).length) {
-      toast({
-        title: "Check your details",
-        description: "Each ticket needs a name and CNIC.",
-        variant: "destructive",
-      });
+      if (nextBuyerErrors.phone) {
+        toast({
+          title: "Mobile number required",
+          description: "Please enter your mobile number (03XX-XXXXXXX) to proceed.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Check your details",
+          description: "Each ticket needs a valid CNIC.",
+          variant: "destructive",
+        });
+      }
       return;
+    }
+
+    // Save phone to profile if it wasn't saved yet
+    if (phoneDigits.length >= 11 && (!profile?.phone || profile.phone !== effectivePhone)) {
+      fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: effectivePhone }),
+      }).catch(() => {});
     }
 
     // A ticket the buyer holds carries the buyer's own name and CNIC.
     const holders = guests.map((guest, index) =>
-      isBuyerSlot(index) ? { name: buyer.name.trim(), cnic: buyer.cnic } : guest,
+      isBuyerSlot(index) ? { name: effectiveName, cnic: buyer.cnic } : guest,
     );
     const bookingItems = items.map((item) => {
       const guestInfo: Record<number, HolderInfo> = {};
@@ -421,7 +454,12 @@ export function CheckoutClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          buyerDetails: { ...buyer, name: buyer.name.trim() },
+          buyerDetails: {
+            ...buyer,
+            name: effectiveName,
+            email: effectiveEmail,
+            phone: effectivePhone,
+          },
           items: bookingItems,
           parchiVerificationId,
         }),
@@ -456,9 +494,8 @@ export function CheckoutClient() {
     );
   }
 
-  // Offer to resume an unfinished booking before showing the cart. The user
-  // chooses - we never silently resume or silently discard.
-  if (resumable) {
+  // Offer to resume an unfinished booking if the cart is empty.
+  if (items.length === 0 && resumable) {
     return (
       <div className="flex min-h-[50vh] w-full flex-col items-center justify-center">
         <ResumeBookingCard
@@ -525,7 +562,7 @@ export function CheckoutClient() {
           eventId={parchiEventId}
           offer={parchiOffer}
           isLoggedIn={!!user}
-          onLogin={() => router.push(`/login?next=${encodeURIComponent("/checkout")}`)}
+          onLogin={() => setAuthOpen(true)}
           onApprovedChange={setParchiVerificationId}
         />
       ) : null}
@@ -534,7 +571,9 @@ export function CheckoutClient() {
         <div className="rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm">
           <p className="font-semibold text-foreground">Inside Karachi discount applied</p>
           <p className="text-muted-foreground">
-            Your discount is already included in the total.
+            {user
+              ? "Your 20% discount is included in the total."
+              : "20% discount is included in the total. Sign in or create an account before payment to finalize."}
           </p>
         </div>
       ) : null}
@@ -581,6 +620,8 @@ export function CheckoutClient() {
           editing={showContactFields}
           onEdit={() => setEditingContact(true)}
           buyerNotGoing={!buyerHoldsFirst}
+          isLoggedIn={!!user}
+          onAuthRequest={() => setAuthOpen(true)}
         />
       </section>
 
@@ -598,7 +639,7 @@ export function CheckoutClient() {
       <div className="sticky bottom-24 z-20 md:bottom-6">
         <button
           type="button"
-          onClick={handleProceed}
+          onClick={() => void handleProceed()}
           disabled={isSubmitting}
           aria-label={`Continue to payment, ${formatPkr(totals.total)}`}
           className="flex h-[54px] w-full items-center justify-between rounded-xl bg-primary px-[18px] text-primary-foreground shadow-lg shadow-primary/25 transition-opacity hover:opacity-95 active:opacity-90 disabled:opacity-70"
@@ -615,6 +656,20 @@ export function CheckoutClient() {
           )}
         </button>
       </div>
+
+      <AuthModal
+        open={authOpen}
+        onOpenChange={setAuthOpen}
+        nextPath="/checkout"
+        onSuccess={() => {
+          // Stay on the checkout page with account connected
+        }}
+        description={
+          parchiOffer && isPrismfestSlug(eventInfo?.slug)
+            ? `Sign in or create an Inside Karachi account to unlock your discount.`
+            : "Sign in or create an account to complete your booking."
+        }
+      />
     </div>
   );
 }

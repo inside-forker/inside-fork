@@ -20,6 +20,8 @@ const BOOKING_COLUMNS = [
   "status",
   "payment_status",
   "customer_name",
+  "customer_email",
+  "customer_phone",
   "cnic_last4",
   "created_at",
   "expires_at",

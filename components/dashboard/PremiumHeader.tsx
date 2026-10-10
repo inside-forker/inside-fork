@@ -134,7 +134,10 @@ export function PremiumHeader({
   }, [setShowResults]);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 h-20 animate-hero-fade-in">
+    <header
+      data-chrome="header"
+      className="fixed top-0 left-0 right-0 z-40 h-20 animate-hero-fade-in"
+    >
       <div className="absolute inset-0 bg-background/80 backdrop-blur-xl border-b border-border/50" />
 
       <div className="relative z-10 h-full max-w-7xl mx-auto px-6 lg:px-8">

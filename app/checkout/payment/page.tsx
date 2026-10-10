@@ -183,7 +183,7 @@ export default function PaymentPage() {
                           <div className="flex justify-between py-2">
                             <span className="text-muted-foreground">Email</span>
                             <span className="font-medium text-right text-xs sm:text-sm truncate max-w-[180px]">
-                              {booking.customer_email}
+                              {booking.customer_email || "Account email"}
                             </span>
                           </div>
                           <Separator />
@@ -192,7 +192,7 @@ export default function PaymentPage() {
                               Mobile
                             </span>
                             <span className="font-medium">
-                              {booking.customer_phone}
+                              {booking.customer_phone || "Required for payment"}
                             </span>
                           </div>
                         </div>
