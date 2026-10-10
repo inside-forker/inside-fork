@@ -1,17 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   Download,
   ExternalLink,
   Loader2,
   Lock,
+  Plus,
   RefreshCw,
   Ticket,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -19,6 +29,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -29,6 +46,8 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { PARCHI_BLUE, PARCHI_YELLOW } from "@/lib/parchi/discount";
+import { TicketPdfUploadDialog } from "@/components/ticketing/TicketPdfUploadDialog";
+import { useToast } from "@/hooks/use-toast";
 
 type InventoryTicket = {
   id: number;
@@ -112,8 +131,22 @@ function formatWhen(iso: string | null): string {
   return `${get("month")} ${get("day")}, ${get("hour")}:${get("minute")} ${get("dayPeriod")}`;
 }
 
+type EventOption = {
+  event_id: number;
+  event_name: string;
+  event_slug: string;
+};
+
+type TicketTypeOption = {
+  id: number;
+  name: string;
+  price: number | null;
+  quantity_available: number | null;
+};
+
 export function TicketPdfInventoryPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [data, setData] = useState<InventoryPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -122,6 +155,25 @@ export function TicketPdfInventoryPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [tierFilter, setTierFilter] = useState<number | "all">("all");
   const [autoRefresh, setAutoRefresh] = useState(true);
+
+  const [events, setEvents] = useState<EventOption[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<number | "">("");
+  const [ticketTypes, setTicketTypes] = useState<TicketTypeOption[]>([]);
+  const [selectedTicketTypeId, setSelectedTicketTypeId] = useState<
+    number | ""
+  >("");
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    quantity_available: "0",
+    max_per_person: "10",
+    sale_starts_at: "",
+    sale_ends_at: "",
+  });
 
   const load = useCallback(
     async (silent = false) => {
@@ -180,6 +232,141 @@ export function TicketPdfInventoryPage() {
     }, POLL_MS);
     return () => window.clearInterval(id);
   }, [autoRefresh, load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/events?limit=100&page=1", {
+          cache: "no-store",
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success || cancelled) return;
+        const list = (json.data?.events ?? []) as EventOption[];
+        setEvents(list);
+      } catch {
+        // non-blocking for inventory view
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const loadTicketTypes = useCallback(async (eventId: number) => {
+    setTicketTypes([]);
+    setSelectedTicketTypeId("");
+    try {
+      const res = await fetch(`/api/admin/events/${eventId}/tickets`, {
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to load ticket types");
+      }
+      const list = (json.data?.ticket_types ?? []) as TicketTypeOption[];
+      setTicketTypes(list);
+    } catch (err) {
+      toast({
+        title: "Error",
+        description:
+          err instanceof Error ? err.message : "Failed to load ticket types",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (selectedEventId === "") return;
+    void loadTicketTypes(selectedEventId);
+  }, [selectedEventId, loadTicketTypes]);
+
+  const selectedTicketType = useMemo(
+    () =>
+      ticketTypes.find((t) => t.id === selectedTicketTypeId) ?? null,
+    [ticketTypes, selectedTicketTypeId],
+  );
+
+  async function handleCreateCategory(e: FormEvent) {
+    e.preventDefault();
+    if (selectedEventId === "") {
+      toast({
+        title: "Select an event",
+        description: "Pick an event before creating a category.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (
+      !createForm.name.trim() ||
+      !createForm.price ||
+      !createForm.sale_starts_at ||
+      !createForm.sale_ends_at
+    ) {
+      toast({
+        title: "Validation Error",
+        description: "Name, price, and sale dates are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const res = await fetch(
+        `/api/admin/events/${selectedEventId}/tickets`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: createForm.name.trim(),
+            description: createForm.description.trim() || null,
+            price: parseFloat(createForm.price),
+            quantity_available: createForm.quantity_available
+              ? parseInt(createForm.quantity_available, 10)
+              : 0,
+            sale_starts_at: createForm.sale_starts_at,
+            sale_ends_at: createForm.sale_ends_at,
+            max_per_person: createForm.max_per_person
+              ? parseInt(createForm.max_per_person, 10)
+              : 10,
+          }),
+        },
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to create ticket type");
+      }
+      toast({
+        title: "Category created",
+        description: `"${createForm.name.trim()}" is ready for PDF uploads.`,
+      });
+      setCreateOpen(false);
+      setCreateForm({
+        name: "",
+        description: "",
+        price: "",
+        quantity_available: "0",
+        max_per_person: "10",
+        sale_starts_at: "",
+        sale_ends_at: "",
+      });
+      await loadTicketTypes(selectedEventId);
+      const createdId = Number(json.data?.id);
+      if (Number.isInteger(createdId) && createdId > 0) {
+        setSelectedTicketTypeId(createdId);
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description:
+          err instanceof Error ? err.message : "Failed to create category",
+        variant: "destructive",
+      });
+    } finally {
+      setCreating(false);
+    }
+  }
 
   const filteredTickets = useMemo(() => {
     if (!data) return [];
@@ -271,6 +458,89 @@ export function TicketPdfInventoryPage() {
           {error}
         </div>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Upload &amp; categories</CardTitle>
+          <CardDescription>
+            Create a ticket category, then upload Ticketwala PDFs one-by-one or
+            in bulk. Filename must end with the ticket number (e.g.{" "}
+            <code className="text-xs">002_Prism_Fam_2586389.pdf</code>).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="inv-event">Event</Label>
+              <select
+                id="inv-event"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={selectedEventId === "" ? "" : String(selectedEventId)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSelectedEventId(v ? Number(v) : "");
+                }}
+              >
+                <option value="">Select event…</option>
+                {events.map((ev) => (
+                  <option key={ev.event_id} value={ev.event_id}>
+                    {ev.event_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="inv-tier">Category (ticket type)</Label>
+              <select
+                id="inv-tier"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={
+                  selectedTicketTypeId === ""
+                    ? ""
+                    : String(selectedTicketTypeId)
+                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSelectedTicketTypeId(v ? Number(v) : "");
+                }}
+                disabled={selectedEventId === ""}
+              >
+                <option value="">
+                  {selectedEventId === ""
+                    ? "Select an event first"
+                    : "Select category…"}
+                </option>
+                {ticketTypes.map((tt) => (
+                  <option key={tt.id} value={tt.id}>
+                    {tt.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={selectedEventId === ""}
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="mr-2 h-3.5 w-3.5" />
+              New category
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!selectedTicketType}
+              onClick={() => setUploadOpen(true)}
+            >
+              <Upload className="mr-2 h-3.5 w-3.5" />
+              Upload PDFs
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
         <Card>
@@ -547,6 +817,167 @@ export function TicketPdfInventoryPage() {
           )}
         </CardContent>
       </Card>
+
+      {selectedTicketType && (
+        <TicketPdfUploadDialog
+          open={uploadOpen}
+          onOpenChange={setUploadOpen}
+          ticketTypeId={selectedTicketType.id}
+          ticketTypeName={selectedTicketType.name}
+          uploadUrl="/api/admin/ticket-pdf-inventory/upload"
+          onSuccess={() => {
+            void load();
+          }}
+        />
+      )}
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>New ticket category</DialogTitle>
+            <DialogDescription>
+              Creates a ticket type for the selected event. You can upload PDFs
+              into it afterward.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => void handleCreateCategory(e)} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cat-name">
+                Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="cat-name"
+                value={createForm.name}
+                onChange={(e) =>
+                  setCreateForm((prev) => ({ ...prev, name: e.target.value }))
+                }
+                placeholder="e.g. Prism Fam"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cat-desc">Description</Label>
+              <Input
+                id="cat-desc"
+                value={createForm.description}
+                onChange={(e) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                placeholder="Optional"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="cat-price">
+                  Price (PKR) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="cat-price"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={createForm.price}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      price: e.target.value,
+                    }))
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cat-qty">Initial quantity</Label>
+                <Input
+                  id="cat-qty"
+                  type="number"
+                  min="0"
+                  value={createForm.quantity_available}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      quantity_available: e.target.value,
+                    }))
+                  }
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Overwritten when you upload PDFs.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cat-max">Max per person</Label>
+              <Input
+                id="cat-max"
+                type="number"
+                min="1"
+                value={createForm.max_per_person}
+                onChange={(e) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    max_per_person: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cat-start">
+                Sale starts <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="cat-start"
+                type="datetime-local"
+                value={createForm.sale_starts_at}
+                onChange={(e) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    sale_starts_at: e.target.value,
+                  }))
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cat-end">
+                Sale ends <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="cat-end"
+                type="datetime-local"
+                value={createForm.sale_ends_at}
+                onChange={(e) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    sale_ends_at: e.target.value,
+                  }))
+                }
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCreateOpen(false)}
+                disabled={creating}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={creating}>
+                {creating ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="mr-2 h-4 w-4" />
+                )}
+                Create
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
