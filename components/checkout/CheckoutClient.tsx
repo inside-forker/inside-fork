@@ -571,45 +571,45 @@ export function CheckoutClient() {
         <div className="rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm">
           <p className="font-semibold text-foreground">Inside Karachi discount applied</p>
           <p className="text-muted-foreground">
-            {user
-              ? "Your 20% discount is included in the total."
-              : "20% discount is included in the total. Sign in or create an account before payment to finalize."}
+            Your 20% discount is included in the total.
           </p>
         </div>
       ) : null}
 
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-xl font-bold">Who&apos;s going</h2>
-          <p className="text-xs text-muted-foreground">
-            Each ticket carries a name and CNIC.
-          </p>
-        </div>
-        {guests.map((guest, index) =>
-          isBuyerSlot(index) ? (
-            <BuyerHolderCard
-              key={`buyer-${index}`}
-              name={buyer.name}
-              avatarUrl={profile?.avatar_url ?? user?.avatar_url}
-              ticketName={slots[index]?.ticketName ?? ""}
-              cnic={buyer.cnic}
-              onChangeCnic={(value) => handleBuyerChange("cnic", value)}
-              error={buyerErrors.cnic}
-              onHandOff={() => setBuyerHoldsFirst(false)}
-            />
-          ) : (
-            <GuestHolderCard
-              key={`guest-${index}`}
-              index={index}
-              ticketName={slots[index]?.ticketName ?? ""}
-              value={guest}
-              onChange={(field, value) => handleGuestChange(index, field, value)}
-              errors={guestErrors[index]}
-              onClaim={index === 0 ? () => setBuyerHoldsFirst(true) : undefined}
-            />
-          ),
-        )}
-      </section>
+      {user ? (
+        <section className="space-y-3">
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold">Who&apos;s going</h2>
+            <p className="text-xs text-muted-foreground">
+              Each ticket carries a name and CNIC.
+            </p>
+          </div>
+          {guests.map((guest, index) =>
+            isBuyerSlot(index) ? (
+              <BuyerHolderCard
+                key={`buyer-${index}`}
+                name={buyer.name}
+                avatarUrl={profile?.avatar_url ?? user?.avatar_url}
+                ticketName={slots[index]?.ticketName ?? ""}
+                cnic={buyer.cnic}
+                onChangeCnic={(value) => handleBuyerChange("cnic", value)}
+                error={buyerErrors.cnic}
+                onHandOff={() => setBuyerHoldsFirst(false)}
+              />
+            ) : (
+              <GuestHolderCard
+                key={`guest-${index}`}
+                index={index}
+                ticketName={slots[index]?.ticketName ?? ""}
+                value={guest}
+                onChange={(field, value) => handleGuestChange(index, field, value)}
+                errors={guestErrors[index]}
+                onClaim={index === 0 ? () => setBuyerHoldsFirst(true) : undefined}
+              />
+            ),
+          )}
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <h2 className="text-base font-bold">Contact</h2>

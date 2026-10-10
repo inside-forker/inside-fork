@@ -318,11 +318,6 @@ export function EventTicketSection({
                       Parchi discount applies after you verify at checkout
                     </span>
                   )}
-                  {showIkStudentPrice && !user && !isUserLoading && (
-                    <span className="block text-xs mt-0.5 text-primary">
-                      Sign in at checkout to get this price
-                    </span>
-                  )}
                 </p>
               </div>
 
