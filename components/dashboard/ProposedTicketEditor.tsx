@@ -23,12 +23,22 @@ import {
   Banknote,
   Clock,
   AlertCircle,
+  Upload,
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import type { ProposedTicketType } from "@/types/event-change-request.types";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { TicketPdfUploadDialog } from "@/components/ticketing/TicketPdfUploadDialog";
 
 const DESCRIPTION_MAX_LENGTH = 500;
+
+type PdfTierStock = {
+  ticket_type_id: number;
+  total: number;
+  sold: number;
+  available: number;
+};
 
 interface TicketFormData {
   name: string;
@@ -45,6 +55,8 @@ interface ProposedTicketEditorProps {
   onTicketsChange: (tickets: ProposedTicketType[]) => void;
   eventStartTime?: string;
   eventEndTime?: string;
+  /** When set (existing event), enable PDF inventory upload + stock for saved tiers. */
+  eventId?: number | null;
 }
 
 export function ProposedTicketEditor({
@@ -52,12 +64,18 @@ export function ProposedTicketEditor({
   onTicketsChange,
   eventStartTime,
   eventEndTime: _eventEndTime,
+  eventId = null,
 }: ProposedTicketEditorProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingTicket, setEditingTicket] =
     React.useState<ProposedTicketType | null>(null);
   const [deletingTicket, setDeletingTicket] =
     React.useState<ProposedTicketType | null>(null);
+  const [uploadTicket, setUploadTicket] =
+    React.useState<ProposedTicketType | null>(null);
+  const [pdfStockByType, setPdfStockByType] = React.useState<
+    Record<number, PdfTierStock>
+  >({});
   const [formData, setFormData] = React.useState<TicketFormData>({
     name: "",
     description: "",
@@ -70,6 +88,33 @@ export function ProposedTicketEditor({
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
   const modalRef = React.useRef<HTMLDivElement>(null);
+
+  const fetchPdfInventory = React.useCallback(async () => {
+    if (!eventId || !Number.isInteger(eventId) || eventId <= 0) {
+      setPdfStockByType({});
+      return;
+    }
+    try {
+      const response = await fetch(
+        `/api/organizer/events/${eventId}/ticket-pdf-inventory`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) return;
+      const data = await response.json();
+      const tiers = (data.data?.tiers ?? []) as PdfTierStock[];
+      const map: Record<number, PdfTierStock> = {};
+      for (const tier of tiers) {
+        map[tier.ticket_type_id] = tier;
+      }
+      setPdfStockByType(map);
+    } catch (error) {
+      console.error("Error fetching PDF inventory:", error);
+    }
+  }, [eventId]);
+
+  React.useEffect(() => {
+    void fetchPdfInventory();
+  }, [fetchPdfInventory]);
 
   // Prevent scroll lock layout shift
   React.useEffect(() => {
