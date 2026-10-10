@@ -1025,6 +1025,7 @@ export function RejectedRequestModal({
                   onTicketsChange={setProposedTickets}
                   eventStartTime={formData.start_time}
                   eventEndTime={formData.end_time}
+                  eventId={request.event_id ?? null}
                 />
               </TabsContent>
             </Tabs>

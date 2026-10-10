@@ -51,7 +51,9 @@ import {
   PackageX,
   Boxes,
   HelpCircle,
+  Upload,
 } from "lucide-react";
+import { TicketPdfUploadDialog } from "@/components/ticketing/TicketPdfUploadDialog";
 
 export interface TierStockItem {
   id: number;
@@ -157,6 +159,10 @@ export function EventPassesManagementView({
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<
     Record<string, boolean>
   >({});
+  const [uploadTier, setUploadTier] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
 
   const fetchAttendees = useCallback(async () => {
     if (!eventId) return;
@@ -730,6 +736,19 @@ export function EventPassesManagementView({
                         </span>
                       </div>
                     </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() =>
+                        setUploadTier({ id: tier.id, name: tier.name })
+                      }
+                    >
+                      <Upload className="h-3.5 w-3.5 mr-1.5" />
+                      Upload PDFs
+                    </Button>
                   </CardContent>
                 </Card>
               );
@@ -1142,6 +1161,21 @@ export function EventPassesManagementView({
           )}
         </DialogContent>
       </Dialog>
+
+      {uploadTier && (
+        <TicketPdfUploadDialog
+          open={!!uploadTier}
+          onOpenChange={(open) => {
+            if (!open) setUploadTier(null);
+          }}
+          ticketTypeId={uploadTier.id}
+          ticketTypeName={uploadTier.name}
+          uploadUrl={`/api/organizer/events/${eventId}/ticket-pdf-inventory/upload`}
+          onSuccess={() => {
+            void fetchAttendees();
+          }}
+        />
+      )}
     </div>
   );
 }
