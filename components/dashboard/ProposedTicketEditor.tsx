@@ -23,12 +23,22 @@ import {
   Banknote,
   Clock,
   AlertCircle,
+  Upload,
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import type { ProposedTicketType } from "@/types/event-change-request.types";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { TicketPdfUploadDialog } from "@/components/ticketing/TicketPdfUploadDialog";
 
 const DESCRIPTION_MAX_LENGTH = 500;
+
+type PdfTierStock = {
+  ticket_type_id: number;
+  total: number;
+  sold: number;
+  available: number;
+};
 
 interface TicketFormData {
   name: string;
@@ -45,6 +55,8 @@ interface ProposedTicketEditorProps {
   onTicketsChange: (tickets: ProposedTicketType[]) => void;
   eventStartTime?: string;
   eventEndTime?: string;
+  /** When set (existing event), enable PDF inventory upload + stock for saved tiers. */
+  eventId?: number | null;
 }
 
 export function ProposedTicketEditor({
@@ -52,12 +64,18 @@ export function ProposedTicketEditor({
   onTicketsChange,
   eventStartTime,
   eventEndTime: _eventEndTime,
+  eventId = null,
 }: ProposedTicketEditorProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingTicket, setEditingTicket] =
     React.useState<ProposedTicketType | null>(null);
   const [deletingTicket, setDeletingTicket] =
     React.useState<ProposedTicketType | null>(null);
+  const [uploadTicket, setUploadTicket] =
+    React.useState<ProposedTicketType | null>(null);
+  const [pdfStockByType, setPdfStockByType] = React.useState<
+    Record<number, PdfTierStock>
+  >({});
   const [formData, setFormData] = React.useState<TicketFormData>({
     name: "",
     description: "",
@@ -70,6 +88,33 @@ export function ProposedTicketEditor({
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
   const modalRef = React.useRef<HTMLDivElement>(null);
+
+  const fetchPdfInventory = React.useCallback(async () => {
+    if (!eventId || !Number.isInteger(eventId) || eventId <= 0) {
+      setPdfStockByType({});
+      return;
+    }
+    try {
+      const response = await fetch(
+        `/api/organizer/events/${eventId}/ticket-pdf-inventory`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) return;
+      const data = await response.json();
+      const tiers = (data.data?.tiers ?? []) as PdfTierStock[];
+      const map: Record<number, PdfTierStock> = {};
+      for (const tier of tiers) {
+        map[tier.ticket_type_id] = tier;
+      }
+      setPdfStockByType(map);
+    } catch (error) {
+      console.error("Error fetching PDF inventory:", error);
+    }
+  }, [eventId]);
+
+  React.useEffect(() => {
+    void fetchPdfInventory();
+  }, [fetchPdfInventory]);
 
   // Prevent scroll lock layout shift
   React.useEffect(() => {
@@ -286,8 +331,9 @@ export function ProposedTicketEditor({
         <div className="text-sm text-blue-700 dark:text-blue-400">
           <p className="font-medium">Define Your Tickets</p>
           <p className="mt-1">
-            Add ticket types here. They will be reviewed along with your event
-            and created after approval.
+            {eventId
+              ? "Edit ticket types here. For saved categories you can upload Ticketwala PDF inventory (stock counts only — no pool download)."
+              : "Add ticket types here. They will be reviewed along with your event and created after approval."}
           </p>
         </div>
       </div>
@@ -310,15 +356,36 @@ export function ProposedTicketEditor({
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {tickets.map((ticket) => (
+          {tickets.map((ticket) => {
+            const savedTypeId =
+              typeof ticket.id === "number" && ticket.id > 0
+                ? ticket.id
+                : null;
+            const canUploadPdfs = Boolean(eventId && savedTypeId);
+            const pdfStock = savedTypeId
+              ? pdfStockByType[savedTypeId]
+              : undefined;
+
+            return (
             <Card
-              key={ticket.temp_id}
+              key={ticket.temp_id || ticket.id || ticket.name}
               className="hover:shadow-md transition-shadow"
             >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">{ticket.name}</CardTitle>
                   <div className="flex items-center gap-1">
+                    {canUploadPdfs && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setUploadTicket(ticket)}
+                        className="h-8 w-8 p-0"
+                        title="Upload PDF tickets"
+                      >
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -354,12 +421,23 @@ export function ProposedTicketEditor({
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-blue-600" />
                     <span className="text-sm text-muted-foreground">
-                      {ticket.quantity_available === null
-                        ? "Unlimited"
-                        : `${ticket.quantity_available} available`}
+                      {pdfStock
+                        ? `${pdfStock.available} of ${pdfStock.total} left`
+                        : ticket.quantity_available === null
+                          ? "Unlimited"
+                          : `${ticket.quantity_available} available`}
                     </span>
                   </div>
                 </div>
+
+                {pdfStock && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">PDF pool</Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {pdfStock.sold} sold · {pdfStock.available} available
+                    </span>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -376,15 +454,29 @@ export function ProposedTicketEditor({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    Max {ticket.max_per_person || 10} per person
-                  </span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Max {ticket.max_per_person || 10} per person
+                    </span>
+                  </div>
+                  {canUploadPdfs && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUploadTicket(ticket)}
+                    >
+                      <Upload className="h-3.5 w-3.5 mr-1.5" />
+                      Upload PDFs
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -579,6 +671,24 @@ export function ProposedTicketEditor({
         cancelText="Cancel"
         variant="destructive"
       />
+
+      {eventId &&
+        uploadTicket &&
+        typeof uploadTicket.id === "number" &&
+        uploadTicket.id > 0 && (
+          <TicketPdfUploadDialog
+            open={!!uploadTicket}
+            onOpenChange={(open) => {
+              if (!open) setUploadTicket(null);
+            }}
+            ticketTypeId={uploadTicket.id}
+            ticketTypeName={uploadTicket.name}
+            uploadUrl={`/api/organizer/events/${eventId}/ticket-pdf-inventory/upload`}
+            onSuccess={() => {
+              void fetchPdfInventory();
+            }}
+          />
+        )}
     </div>
   );
 }

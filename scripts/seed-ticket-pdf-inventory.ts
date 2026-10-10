@@ -16,20 +16,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { Pool } from "pg";
 import {
-  TICKET_PDF_INVENTORY_PREFIX,
-  uploadPrefixedFile,
-} from "../lib/storage/spaces";
+  extractExternalId,
+  syncTicketTypeQuantityAvailable,
+  uploadPdfToInventory,
+} from "../lib/ticketing/pdf-inventory-upload";
 
 function argValue(flag: string): string | null {
   const idx = process.argv.indexOf(flag);
   if (idx === -1 || idx + 1 >= process.argv.length) return null;
   return process.argv[idx + 1];
-}
-
-function extractExternalId(filename: string): string | null {
-  const base = path.basename(filename, path.extname(filename));
-  const match = base.match(/(\d{6,})$/);
-  return match?.[1] ?? null;
 }
 
 async function main() {
@@ -101,56 +96,31 @@ async function main() {
     let skipped = 0;
 
     for (const filename of pdfFiles) {
-      const externalId = extractExternalId(filename);
-      if (!externalId) {
-        console.warn(`Skip (no ticket id in name): ${filename}`);
-        skipped += 1;
-        continue;
-      }
-
-      const { rows: existing } = await client.query(
-        `SELECT id FROM ticket_pdf_inventory WHERE external_ticket_id = $1`,
-        [externalId],
-      );
-      if (existing.length > 0) {
-        console.log(`Exists: ${externalId} -> inventory #${existing[0].id}`);
-        skipped += 1;
-        continue;
-      }
-
       const absolute = path.join(dir, filename);
       const body = fs.readFileSync(absolute);
-      const relativePath = `${ticketTypeId}/${externalId}.pdf`;
+      const result = await uploadPdfToInventory({
+        ticketTypeId,
+        buffer: body,
+        filename,
+        externalId: extractExternalId(filename),
+      });
 
-      const uploaded = await uploadPrefixedFile(
-        TICKET_PDF_INVENTORY_PREFIX,
-        relativePath,
-        body,
-        { contentType: "application/pdf", isPublic: false },
-      );
-
-      await client.query(
-        `INSERT INTO ticket_pdf_inventory
-           (ticket_type_id, external_ticket_id, storage_key, original_filename)
-         VALUES ($1, $2, $3, $4)`,
-        [ticketTypeId, externalId, uploaded.path, filename],
-      );
-      inserted += 1;
-      console.log(`Uploaded ${filename} -> ${uploaded.path}`);
+      if (result.status === "ok") {
+        inserted += 1;
+        console.log(
+          `Uploaded ${filename} -> inventory #${result.inventory_id}`,
+        );
+      } else {
+        skipped += 1;
+        console.log(
+          `${result.status}: ${filename}${result.message ? ` (${result.message})` : ""}`,
+        );
+      }
     }
 
-    const { rows: availRows } = await client.query(
-      `SELECT COUNT(*)::int AS available
-       FROM ticket_pdf_inventory
-       WHERE ticket_type_id = $1 AND booking_id IS NULL`,
-      [ticketTypeId],
-    );
-    const available = Number(availRows[0]?.available ?? 0);
-
-    await client.query(
-      `UPDATE ticket_types SET quantity_available = $1 WHERE id = $2`,
-      [available, ticketTypeId],
-    );
+    // syncTicketTypeQuantityAvailable uses the app pool; for the CLI we sync here too
+    // via the shared helper which also uses DATABASE_URL through @/lib/db.
+    const available = await syncTicketTypeQuantityAvailable(ticketTypeId);
 
     console.log(
       `\nDone. inserted=${inserted} skipped=${skipped} quantity_available=${available}`,
