@@ -170,6 +170,24 @@ export default async function DashboardBookingsPage() {
     }
   }
 
+  const coverByEvent = new Map<number, string>();
+  if (eventIds.length > 0) {
+    try {
+      const { rows: imageRows } = await query(
+        `SELECT event_id, url FROM event_images
+         WHERE event_id = ANY($1) AND (is_primary = true OR display_order = 1)
+         ORDER BY display_order ASC`,
+        [eventIds],
+      );
+      for (const img of imageRows) {
+        const id = Number(img.event_id);
+        if (!coverByEvent.has(id) && img.url) coverByEvent.set(id, img.url);
+      }
+    } catch (imageError) {
+      console.error("Failed to load event images for bookings", imageError);
+    }
+  }
+
   const normalizedBookings: DashboardBooking[] = bookings.map((booking) => {
     const event = booking.event_id
       ? (eventsMap.get(booking.event_id) ?? null)
@@ -218,6 +236,7 @@ export default async function DashboardBookingsPage() {
             venue_name: event.location_name,
             address: event.address,
             organizer_name: event.organizer_name,
+            cover_image: coverByEvent.get(event.event_id) ?? null,
           }
         : null,
     };
