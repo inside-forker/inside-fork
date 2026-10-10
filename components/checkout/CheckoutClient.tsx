@@ -552,7 +552,7 @@ export function CheckoutClient() {
         event={eventInfo}
         totals={totals}
         discountLabel={
-          ikOpenStudentDiscount ? "Inside Karachi discount" : undefined
+          ikOpenStudentDiscount ? "Inside Karachi Discount" : undefined
         }
         onChangeQuantity={updateQuantity}
       />
@@ -569,60 +569,53 @@ export function CheckoutClient() {
 
       {ikOpenStudentDiscount ? (
         <div className="rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm">
-          <p className="font-semibold text-foreground">Inside Karachi discount applied</p>
+          <p className="font-semibold text-foreground">Inside Karachi Discount Applied</p>
           <p className="text-muted-foreground">
-            {user
-              ? "Your 20% discount is included in the total."
-              : "20% discount is included in the total. Sign in or create an account before payment to finalize."}
+            Your 20% discount is included in the total.
           </p>
         </div>
       ) : null}
 
       <section className="space-y-3">
         <div className="space-y-1">
-          <h2 className="text-xl font-bold">Who&apos;s going</h2>
+          <h2 className="text-xl font-bold">Attendee & Contact Details</h2>
           <p className="text-xs text-muted-foreground">
-            Each ticket carries a name and CNIC.
+            {user
+              ? "Each ticket requires a CNIC. Tickets and receipt will be sent to your contact info."
+              : "Tickets and receipt will be linked to your account."}
           </p>
         </div>
-        {guests.map((guest, index) =>
-          isBuyerSlot(index) ? (
-            <BuyerHolderCard
-              key={`buyer-${index}`}
-              name={buyer.name}
-              avatarUrl={profile?.avatar_url ?? user?.avatar_url}
-              ticketName={slots[index]?.ticketName ?? ""}
-              cnic={buyer.cnic}
-              onChangeCnic={(value) => handleBuyerChange("cnic", value)}
-              error={buyerErrors.cnic}
-              onHandOff={() => setBuyerHoldsFirst(false)}
-            />
-          ) : (
-            <GuestHolderCard
-              key={`guest-${index}`}
-              index={index}
-              ticketName={slots[index]?.ticketName ?? ""}
-              value={guest}
-              onChange={(field, value) => handleGuestChange(index, field, value)}
-              errors={guestErrors[index]}
-              onClaim={index === 0 ? () => setBuyerHoldsFirst(true) : undefined}
-            />
-          ),
-        )}
-      </section>
 
-      <section className="space-y-3">
-        <h2 className="text-base font-bold">Contact</h2>
         <CheckoutContactCard
           values={buyer}
           onChange={handleBuyerChange}
           errors={buyerErrors}
-          editing={showContactFields}
-          onEdit={() => setEditingContact(true)}
-          buyerNotGoing={!buyerHoldsFirst}
+          ticketName={slots[0]?.ticketName ?? ""}
+          avatarUrl={profile?.avatar_url ?? user?.avatar_url}
+          buyerHoldsFirst={buyerHoldsFirst}
+          onToggleBuyerHoldsFirst={() => setBuyerHoldsFirst((prev) => !prev)}
           isLoggedIn={!!user}
           onAuthRequest={() => setAuthOpen(true)}
         />
+
+        {user && (!buyerHoldsFirst || slotCount > 1) ? (
+          <div className="space-y-3 pt-1">
+            {guests.map((guest, index) => {
+              if (index === 0 && buyerHoldsFirst) return null;
+              return (
+                <GuestHolderCard
+                  key={`guest-${index}`}
+                  index={index}
+                  ticketName={slots[index]?.ticketName ?? ""}
+                  value={guest}
+                  onChange={(field, value) => handleGuestChange(index, field, value)}
+                  errors={guestErrors[index]}
+                  onClaim={index === 0 ? () => setBuyerHoldsFirst(true) : undefined}
+                />
+              );
+            })}
+          </div>
+        ) : null}
       </section>
 
       <div className="space-y-1 text-center text-xs text-muted-foreground">

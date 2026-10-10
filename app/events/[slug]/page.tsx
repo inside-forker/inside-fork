@@ -138,8 +138,7 @@ export default async function EventPage({
               </AnimatedSection>
             )}
 
-            {/* Event Gallery - Show all uploaded images. On phones a lone
-                image is just the poster already shown in full up top. */}
+            {/* Event Photos section hidden for now.
             {eventImages && eventImages.length > 0 && (
               <AnimatedSection
                 className={eventImages.length === 1 ? "hidden md:block" : undefined}
@@ -151,6 +150,7 @@ export default async function EventPage({
                 />
               </AnimatedSection>
             )}
+            */}
 
             {/* Venue map, when the event has one */}
             {venueMapUrl && (

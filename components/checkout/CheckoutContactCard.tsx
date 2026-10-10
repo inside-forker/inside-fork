@@ -1,6 +1,7 @@
 "use client";
 
-import { Mail, Smartphone, User } from "lucide-react";
+import { User } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CheckoutField } from "./CheckoutField";
 import { formatCnic, formatPhone } from "./checkoutFormat";
 
@@ -11,38 +12,33 @@ export type BuyerDetails = {
   cnic: string;
 };
 
-/**
- * Where the tickets and receipt go (mirrors the app's CheckoutContactCard).
- * The profile's name, email and phone arrive filled in and read as a summary;
- * "Edit" opens them. The page opens them itself when one is missing or fails
- * validation.
- */
 export function CheckoutContactCard({
   values,
   onChange,
   errors,
-  buyerNotGoing,
+  ticketName,
+  avatarUrl,
+  buyerHoldsFirst = true,
+  onToggleBuyerHoldsFirst,
   isLoggedIn = false,
   onAuthRequest,
 }: {
   values: BuyerDetails;
   onChange: (field: keyof BuyerDetails, value: string) => void;
   errors?: Partial<Record<keyof BuyerDetails, string>>;
-  editing?: boolean;
-  onEdit?: () => void;
-  /** The buyer isn't holding ticket 1, so their name and CNIC live here. */
-  buyerNotGoing: boolean;
+  ticketName?: string;
+  avatarUrl?: string | null;
+  buyerHoldsFirst?: boolean;
+  onToggleBuyerHoldsFirst?: () => void;
   isLoggedIn?: boolean;
   onAuthRequest?: () => void;
 }) {
-  return (
-    <div className="rounded-2xl bg-primary/5 p-3.5 space-y-3.5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">Tickets and receipt go to</p>
-      </div>
+  const display = values.name.trim() || "You";
 
+  return (
+    <div className="rounded-2xl bg-primary/5 p-4 space-y-4">
       {!isLoggedIn ? (
-        <div className="flex items-center justify-between gap-3 pt-1">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
               <User className="h-4 w-4" />
@@ -66,6 +62,34 @@ export function CheckoutContactCard({
         </div>
       ) : (
         <>
+          <div className="flex items-center justify-between gap-3 pb-3 border-b border-primary/10">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-9 w-9">
+                {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
+                <AvatarFallback className="text-xs font-semibold">
+                  {display.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{display}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {buyerHoldsFirst
+                    ? `You · ${ticketName || "Ticket 1"}`
+                    : "Buyer (Not attending)"}
+                </p>
+              </div>
+            </div>
+            {onToggleBuyerHoldsFirst ? (
+              <button
+                type="button"
+                onClick={onToggleBuyerHoldsFirst}
+                className="text-xs font-semibold text-primary hover:opacity-80"
+              >
+                {buyerHoldsFirst ? "Not going?" : "It's me"}
+              </button>
+            ) : null}
+          </div>
+
           <CheckoutField
             label="Full Name"
             value={values.name}
@@ -75,6 +99,7 @@ export function CheckoutContactCard({
             error={errors?.name}
             id="contact-name"
           />
+
           <div className="space-y-1">
             <CheckoutField
               label="Email Address"
@@ -93,6 +118,7 @@ export function CheckoutContactCard({
               Account email cannot be changed
             </p>
           </div>
+
           <CheckoutField
             label="Phone"
             value={values.phone}
@@ -103,39 +129,22 @@ export function CheckoutContactCard({
             maxLength={12}
             error={errors?.phone}
             id="contact-phone"
+            required
+          />
+
+          <CheckoutField
+            label={buyerHoldsFirst ? "Your CNIC" : "Buyer's CNIC"}
+            value={values.cnic}
+            onChange={(e) => onChange("cnic", formatCnic(e.target.value))}
+            placeholder="42101-1234567-1"
+            inputMode="numeric"
+            maxLength={15}
+            error={errors?.cnic}
+            id="contact-cnic"
+            required
           />
         </>
       )}
-
-      {buyerNotGoing ? (
-        <CheckoutField
-          label="Your CNIC"
-          value={values.cnic}
-          onChange={(e) => onChange("cnic", formatCnic(e.target.value))}
-          placeholder="42101-1234567-1"
-          inputMode="numeric"
-          maxLength={15}
-          error={errors?.cnic}
-          id="contact-cnic"
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function ContactRow({
-  icon,
-  strong,
-  children,
-}: {
-  icon: React.ReactNode;
-  strong?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-2.5 text-sm">
-      <span className="text-muted-foreground">{icon}</span>
-      <span className={`flex-1 truncate ${strong ? "font-semibold" : ""}`}>{children}</span>
     </div>
   );
 }

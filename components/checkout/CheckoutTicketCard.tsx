@@ -32,7 +32,7 @@ export function CheckoutTicketCard({
   items,
   event,
   totals,
-  discountLabel = "Parchi student discount",
+  discountLabel = "Parchi Student Discount",
   onChangeQuantity,
 }: {
   items: CartItem[];
@@ -94,10 +94,10 @@ export function CheckoutTicketCard({
             <FeeRow label={discountLabel} amount={totals.discount} minus />
           ) : null}
           {totals.platformFee > 0 ? (
-            <FeeRow label="Platform fee" amount={totals.platformFee} />
+            <FeeRow label="Platform Fee" amount={totals.platformFee} />
           ) : null}
           {totals.paymentFee > 0 ? (
-            <FeeRow label="Processing fee" amount={totals.paymentFee} />
+            <FeeRow label="Processing Fee" amount={totals.paymentFee} />
           ) : null}
         </div>
         <div className="flex items-end justify-between gap-3">
