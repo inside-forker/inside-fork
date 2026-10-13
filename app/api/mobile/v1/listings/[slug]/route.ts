@@ -16,6 +16,7 @@ import {
 import { isRestaurantCategory } from "@/lib/utils/category-helpers";
 import { getListingCategoryIds } from "@/lib/listings/sync-listing-categories";
 import { resolveListingHeaderImage } from "@/lib/mobile/listing-covers";
+import { getSiblingLocations } from "@/lib/listings/brand-groups";
 import {
   normalizeCardName,
   resolveCardMatches,
@@ -102,6 +103,7 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
     reviewsRes,
     reviewsCountRes,
     favRes,
+    siblingLocations,
   ] = await Promise.all([
     query(
       `SELECT id, listing_id, url, alt_text, display_order, is_primary, availability
@@ -160,6 +162,13 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
           [currentUserId, listingId],
         )
       : Promise.resolve({ rows: [] as Array<Record<string, unknown>> }),
+    getSiblingLocations(listingId).catch((err) => {
+      console.error(
+        "[mobile-api] sibling_locations lookup failed:",
+        err instanceof Error ? err.message : err,
+      );
+      return [] as Awaited<ReturnType<typeof getSiblingLocations>>;
+    }),
   ]);
 
   let menuItemsBySection: Record<
@@ -454,6 +463,7 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
     deals,
     opening_hours: openingHours,
     branches,
+    sibling_locations: siblingLocations,
     reviews_preview: reviewsPreview,
     reviews_total: reviewsTotal,
     flags: {
