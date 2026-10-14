@@ -22,7 +22,7 @@ import {
   LISTING_COVER_CANDIDATE_CAP,
   resolveListingCovers,
 } from "@/lib/mobile/listing-covers";
-import { getOpenListingIds } from "@/lib/listings/open-status";
+import { getClosingTimes, getOpenListingIds } from "@/lib/listings/open-status";
 
 /** Explicit column list for `listings_with_details` - never use `*`. */
 const LISTING_CARD_SQL_COLUMNS =
@@ -317,18 +317,28 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     }
   }
 
+  // Open-now results also say when each place closes.
+  const closesAt = openNow
+    ? await getClosingTimes(
+        rows.map((r) => r.id).filter((id): id is number => typeof id === "number"),
+      )
+    : null;
+
   const listings = rows
     .filter((r) => typeof r.id === "number")
-    .map((r) =>
-      toListingCard(
+    .map((r) => {
+      const card = toListingCard(
         r,
         imagesByListing[r.id as number] ?? [],
         // `?? null` (not `undefined`) so a listing with no active deal still
         // reports `best_deal: null` — the client can tell "no offer" apart
         // from an endpoint that never loaded deals at all.
         dealsByListing[r.id as number] ?? null,
-      ),
-    );
+      );
+      return closesAt
+        ? { ...card, closes_at: closesAt.get(r.id as number) ?? null }
+        : card;
+    });
 
   return ok(
     listings,

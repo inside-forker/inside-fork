@@ -51,6 +51,11 @@ export type ListingCardDTO = {
   best_deal?: ListingDealSummaryDTO | null;
   /** Active deals on the listing, so a row can say "+2 more". */
   deal_count?: number;
+  /**
+   * Today's closing time ("HH:MM", Karachi) — only on open-now results.
+   * `null` = open but no closing time on record (or open round the clock).
+   */
+  closes_at?: string | null;
 };
 
 /**

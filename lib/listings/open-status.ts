@@ -120,3 +120,64 @@ export async function getOpenListingIds(mode: OpenMode): Promise<number[]> {
   inflight.set(key, work);
   return work;
 }
+
+/**
+ * Today's closing time ("HH:MM") for each listing that's open right now, from
+ * the same branch timings / opening hours as {@link getOpenListingIds}. With
+ * several spans covering now (branches), the one that runs latest wins; if any
+ * of them is round-the-clock there's no closing time and the listing is left
+ * out.
+ */
+export async function getClosingTimes(
+  listingIds: number[],
+): Promise<Map<number, string>> {
+  const closes = new Map<number, string>();
+  if (listingIds.length === 0) return closes;
+
+  const { rows } = await query(
+    `WITH now_local AS (
+       SELECT (now() AT TIME ZONE 'Asia/Karachi')::time AS t,
+              EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Karachi'))::int AS dow
+     ),
+     spans AS (
+       SELECT lb.listing_id,
+              split_part(lb.timings, '-', 1)::time AS open_time,
+              split_part(lb.timings, '-', 2)::time AS close_time
+       FROM listing_branches lb
+       WHERE lb.listing_id = ANY($1::bigint[])
+         AND lb.timings ~ '^[0-9]{2}:[0-9]{2}:[0-9]{2}-[0-9]{2}:[0-9]{2}:[0-9]{2}$'
+       UNION ALL
+       SELECT oh.listing_id, oh.open_time, oh.close_time
+       FROM opening_hours oh, now_local n
+       WHERE oh.listing_id = ANY($1::bigint[])
+         AND oh.day_of_week = n.dow
+         AND oh.is_closed = false
+         AND oh.open_time IS NOT NULL
+         AND oh.close_time IS NOT NULL
+     )
+     SELECT DISTINCT ON (s.listing_id)
+            s.listing_id,
+            to_char(s.close_time, 'HH24:MI') AS close_time,
+            -- Same open/close, or 00:00–23:59 (how all-day places are entered).
+            (s.open_time = s.close_time
+              OR (s.open_time = '00:00'::time AND s.close_time >= '23:59'::time)) AS all_day
+     FROM spans s, now_local n
+     WHERE CASE
+             WHEN s.open_time <= s.close_time THEN n.t BETWEEN s.open_time AND s.close_time
+             ELSE n.t >= s.open_time OR n.t <= s.close_time
+           END
+     ORDER BY s.listing_id,
+              all_day DESC,
+              -- Time left until close, wrapping past midnight.
+              (EXTRACT(EPOCH FROM (s.close_time - n.t)) + 86400)::bigint % 86400 DESC`,
+    [listingIds],
+  );
+
+  for (const row of rows) {
+    const id = Number(row.listing_id);
+    if (Number.isFinite(id) && !row.all_day && row.close_time) {
+      closes.set(id, String(row.close_time));
+    }
+  }
+  return closes;
+}
