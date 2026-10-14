@@ -3,6 +3,7 @@ import { query } from "@/lib/db";
 import { EventTicketSection } from "@/components/events/EventTicketSection";
 import { Event } from "@/types/events.types";
 import type { ParchiOffer } from "@/lib/parchi/discount";
+import { effectiveQuantitySql } from "@/lib/ticketing/sellable-quantity";
 
 interface EventTicketsContainerProps {
     event: Event;
@@ -13,20 +14,11 @@ export async function EventTicketsContainer({
     event,
     parchiOffer,
 }: EventTicketsContainerProps) {
-    // Prefer unassigned PDF inventory count when a tier has PDF rows, so the
-    // public page cannot show Sold Out while Ticketwala PDFs remain free.
+    // Same stock source as /admin/ticket-pdf-inventory: free PDF rows when
+    // the tier has PDF inventory; otherwise ticket_types.quantity_available.
     const { rows } = await query(
         `SELECT tt.*,
-            CASE
-              WHEN EXISTS (
-                SELECT 1 FROM ticket_pdf_inventory i
-                WHERE i.ticket_type_id = tt.id
-              ) THEN (
-                SELECT COUNT(*)::int FROM ticket_pdf_inventory i
-                WHERE i.ticket_type_id = tt.id AND i.booking_id IS NULL
-              )
-              ELSE tt.quantity_available
-            END AS effective_quantity_available
+            ${effectiveQuantitySql("tt")} AS effective_quantity_available
          FROM ticket_types tt
          WHERE tt.event_id = $1
          ORDER BY tt.price ASC`,

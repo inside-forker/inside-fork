@@ -913,7 +913,13 @@ export function TicketPdfInventoryPage() {
                 <span className="font-semibold text-foreground">
                   {selectedTicketType.name}
                 </span>{" "}
-                · Stock: {selectedTicketType.quantity_available ?? 0}
+                · Available:{" "}
+                {data?.tiers.find(
+                  (t) => t.ticket_type_id === selectedTicketType.id,
+                )?.available ??
+                  selectedTicketType.quantity_available ??
+                  0}{" "}
+                (PDF inventory)
               </span>
             )}
           </div>
