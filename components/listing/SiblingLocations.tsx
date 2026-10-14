@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { MapPin, Check } from "lucide-react";
 import { PremiumHeading } from "@/components/brand/Typography";
-import type { SiblingLocation } from "@/lib/listings/brand-groups";
+import type { SiblingLocation } from "@/lib/listings/brand-group-types";
 
 interface SiblingLocationsProps {
   siblings: SiblingLocation[];
