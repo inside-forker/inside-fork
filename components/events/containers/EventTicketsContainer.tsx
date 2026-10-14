@@ -13,8 +13,23 @@ export async function EventTicketsContainer({
     event,
     parchiOffer,
 }: EventTicketsContainerProps) {
+    // Prefer unassigned PDF inventory count when a tier has PDF rows, so the
+    // public page cannot show Sold Out while Ticketwala PDFs remain free.
     const { rows } = await query(
-        `SELECT * FROM ticket_types WHERE event_id = $1 ORDER BY price ASC`,
+        `SELECT tt.*,
+            CASE
+              WHEN EXISTS (
+                SELECT 1 FROM ticket_pdf_inventory i
+                WHERE i.ticket_type_id = tt.id
+              ) THEN (
+                SELECT COUNT(*)::int FROM ticket_pdf_inventory i
+                WHERE i.ticket_type_id = tt.id AND i.booking_id IS NULL
+              )
+              ELSE tt.quantity_available
+            END AS effective_quantity_available
+         FROM ticket_types tt
+         WHERE tt.event_id = $1
+         ORDER BY tt.price ASC`,
         [event.id],
     );
 
@@ -24,16 +39,24 @@ export async function EventTicketsContainer({
 
     // node-pg returns bigint/numeric columns as strings; the UI does strict
     // (===) comparisons against parsed numbers, so these must be normalized.
-    const ticketTypes = rows.map((row) => ({
-        ...row,
-        id: Number(row.id),
-        event_id: Number(row.event_id),
-        price: row.price !== null ? Number(row.price) : 0,
-        quantity_available:
-            row.quantity_available !== null ? Number(row.quantity_available) : null,
-        max_per_person:
-            row.max_per_person !== null ? Number(row.max_per_person) : null,
-    }));
+    const ticketTypes = rows.map((row) => {
+        const effective =
+            row.effective_quantity_available !== undefined
+                ? row.effective_quantity_available
+                : row.quantity_available;
+        return {
+            ...row,
+            id: Number(row.id),
+            event_id: Number(row.event_id),
+            price: row.price !== null ? Number(row.price) : 0,
+            quantity_available:
+                effective !== null && effective !== undefined
+                    ? Number(effective)
+                    : null,
+            max_per_person:
+                row.max_per_person !== null ? Number(row.max_per_person) : null,
+        };
+    });
 
     return (
         <EventTicketSection

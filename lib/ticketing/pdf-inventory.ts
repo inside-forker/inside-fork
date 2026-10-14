@@ -187,7 +187,6 @@ export async function assignPdfInventoryForBooking(
     );
 
     await client.query("COMMIT");
-    return assignedNow;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
     captureRouteError(error, {
@@ -199,6 +198,29 @@ export async function assignPdfInventoryForBooking(
   } finally {
     client.release();
   }
+
+  // Keep ticket_types.quantity_available in sync with free PDF rows so the
+  // public event page never shows Sold Out while PDFs remain unassigned.
+  if (assignedNow > 0) {
+    const { syncTicketTypeQuantityAvailable } = await import(
+      "@/lib/ticketing/pdf-inventory-upload"
+    );
+    const { rows: typeRows } = await query<{ ticket_type_id: number | string }>(
+      `SELECT DISTINCT ticket_type_id
+       FROM booking_items
+       WHERE booking_id = $1
+         AND EXISTS (
+           SELECT 1 FROM ticket_pdf_inventory i
+           WHERE i.ticket_type_id = booking_items.ticket_type_id
+         )`,
+      [bookingId],
+    );
+    for (const row of typeRows) {
+      await syncTicketTypeQuantityAvailable(Number(row.ticket_type_id));
+    }
+  }
+
+  return assignedNow;
 }
 
 /** Public DTO for APIs / dashboard (no storage_key). */

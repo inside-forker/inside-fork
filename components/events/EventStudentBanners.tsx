@@ -1,21 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { ParchiEventBanner } from "@/components/events/ParchiEventBanner";
 import { InsideStudentBanner } from "@/components/events/InsideStudentBanner";
-import type { ParchiOffer } from "@/lib/parchi/discount";
 import {
-  captureParchiArrivalFromUrl,
-  recallParchiChannel,
-} from "@/lib/parchi/prefill";
+  resolveStudentOffer,
+  type ParchiOffer,
+} from "@/lib/parchi/discount";
+import { useArrivedFromParchi } from "@/lib/parchi/prefill";
 import { isPrismfestSlug } from "@/lib/events/prismfest";
 import { useSupabaseUser } from "@/hooks/useSupabaseUser";
 
 /**
  * Chooses Parchi vs Inside student branding on the event page.
  * - Parchi channel → Parchi banner only
- * - Non-Parchi on Prismfest → Inside banner (logged-out: sign in to unlock)
+ * - Non-Parchi on Prismfest → Inside banner
  * - Otherwise → nothing
+ *
+ * Prismfest always has a resolvable offer (live coupon or 20% fallback) so the
+ * banner never disappears when the coupon row is briefly unreadable.
  */
 export function EventStudentBanners({
   offer,
@@ -25,25 +27,23 @@ export function EventStudentBanners({
   eventSlug: string;
 }) {
   const { user, isLoading } = useSupabaseUser();
-  const [fromParchi, setFromParchi] = useState(false);
-  const [ready, setReady] = useState(false);
+  const fromParchi = useArrivedFromParchi();
+  const isPrismfest = isPrismfestSlug(eventSlug);
+  // Non-Prismfest: only show when a real coupon exists. Prismfest: always
+  // resolve so IK/Parchi branding cannot vanish if getParchiOffer returned null.
+  const resolved =
+    offer ?? (isPrismfest ? resolveStudentOffer(null) : null);
 
-  useEffect(() => {
-    captureParchiArrivalFromUrl();
-    setFromParchi(recallParchiChannel());
-    setReady(true);
-  }, []);
-
-  if (!offer || !ready) return null;
+  if (!resolved) return null;
 
   if (fromParchi) {
-    return <ParchiEventBanner offer={offer} />;
+    return <ParchiEventBanner offer={resolved} />;
   }
 
-  if (!isLoading && isPrismfestSlug(eventSlug)) {
+  if (!isLoading && isPrismfest) {
     return (
       <InsideStudentBanner
-        offer={offer}
+        offer={resolved}
         signedIn={!!user}
         eventSlug={eventSlug}
       />

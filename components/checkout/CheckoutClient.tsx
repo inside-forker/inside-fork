@@ -23,7 +23,7 @@ import { CheckoutContactCard, type BuyerDetails } from "./CheckoutContactCard";
 import { digitsOnly, formatPhone, formatPkr } from "./checkoutFormat";
 import {
   computeParchiDiscount,
-  describeParchiOffer,
+  resolveStudentOffer,
   type ParchiOffer,
 } from "@/lib/parchi/discount";
 import { useArrivedFromParchi } from "@/lib/parchi/prefill";
@@ -164,24 +164,28 @@ export function CheckoutClient() {
         (i.eventName && i.eventName.toLowerCase().includes("prism")),
     );
 
+  // Open IK discount only when NOT on the Parchi channel. Parchi visitors
+  // must complete 2FA (parchiVerificationId) before any student discount.
   const ikOpenStudentDiscount =
-    !parchiVerificationId &&
-    isPrismfestCart;
+    isPrismfestCart &&
+    !arrivedFromParchi &&
+    !parchiVerificationId;
 
   // Same arithmetic as app/api/bookings/create/route.ts: student discount
   // comes off the subtotal, then fees on what's left.
   const totals: CheckoutTotals = useMemo(() => {
     const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     let discount = 0;
-    if (parchiOffer && parchiVerificationId) {
-      discount = computeParchiDiscount(parchiOffer, subtotal);
+    if (parchiVerificationId) {
+      discount = computeParchiDiscount(
+        resolveStudentOffer(parchiOffer),
+        subtotal,
+      );
     } else if (ikOpenStudentDiscount) {
-      const offerToUse: ParchiOffer = parchiOffer ?? {
-        discount_type: "percentage",
-        discount_value: 20,
-        max_discount_amount: null,
-      };
-      discount = computeParchiDiscount(offerToUse, subtotal);
+      discount = computeParchiDiscount(
+        resolveStudentOffer(parchiOffer),
+        subtotal,
+      );
     }
     const discounted = subtotal - discount;
     const platformFee =
@@ -557,10 +561,10 @@ export function CheckoutClient() {
         onChangeQuantity={updateQuantity}
       />
 
-      {parchiOffer && parchiEventId && arrivedFromParchi ? (
+      {parchiEventId && arrivedFromParchi && isPrismfestCart ? (
         <ParchiDiscountCard
           eventId={parchiEventId}
-          offer={parchiOffer}
+          offer={resolveStudentOffer(parchiOffer)}
           isLoggedIn={!!user}
           onLogin={() => setAuthOpen(true)}
           onApprovedChange={setParchiVerificationId}

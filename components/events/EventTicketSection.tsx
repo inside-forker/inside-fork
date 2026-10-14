@@ -12,12 +12,11 @@ import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/context/cartStore";
 import {
   computeParchiDiscount,
-  describeParchiOffer,
   PARCHI_BLUE,
+  resolveStudentOffer,
 } from "@/lib/parchi/discount";
 import { useArrivedFromParchi } from "@/lib/parchi/prefill";
 import { isPrismfestSlug } from "@/lib/events/prismfest";
-import { useSupabaseUser } from "@/hooks/useSupabaseUser";
 import {
   sectionVariants,
   cardGridVariants,
@@ -31,17 +30,16 @@ export function EventTicketSection({
   parchiOffer,
 }: EventTicketSectionProps) {
   const router = useRouter();
-  const { user, isLoading: isUserLoading } = useSupabaseUser();
-  // Parchi-app visitors: full prices + Parchi 2FA later. IK on Prismfest
-  // (not from Parchi): show IK's own slash; logged-out must sign in to get it.
+  // Parchi-app visitors: full prices + Parchi 2FA later. Anyone else on
+  // Prismfest: Inside Karachi slashed prices (coupon or 20% fallback).
   const arrivedFromParchi = useArrivedFromParchi();
-  const showIkStudentPrice =
-    !!parchiOffer &&
-    !arrivedFromParchi &&
-    isPrismfestSlug(event.slug);
+  const isPrismfest = isPrismfestSlug(event.slug);
+  const studentOffer =
+    isPrismfest && !arrivedFromParchi ? resolveStudentOffer(parchiOffer) : null;
+  const showIkStudentPrice = !!studentOffer;
   const studentPrice = (amount: number) =>
-    parchiOffer
-      ? Math.round(amount - computeParchiDiscount(parchiOffer, amount))
+    studentOffer
+      ? Math.round(amount - computeParchiDiscount(studentOffer, amount))
       : amount;
   const { addItem, clearCart } = useCartStore();
   const [selectedTickets, setSelectedTickets] = useState<
