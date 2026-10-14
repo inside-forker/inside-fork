@@ -15,6 +15,10 @@ import {
   confirmBookingWithoutPayment,
   isPaymentSkipEnabled,
 } from "@/lib/mobile/skip-payment";
+import {
+  effectiveQuantitySql,
+  syncPdfStockForTicketTypes,
+} from "@/lib/ticketing/sellable-quantity";
 
 export const dynamic = "force-dynamic";
 
@@ -137,9 +141,14 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   // Friendly pre-validation (the RPC re-checks authoritatively under a row lock).
   const ids = items.map((i) => i.ticket_type_id);
   let types;
+  // Same stock as /admin/ticket-pdf-inventory before insufficient checks / RPC.
+  await syncPdfStockForTicketTypes(ids);
+
   try {
     ({ rows: types } = await query(
-      `SELECT id, event_id, quantity_available, sale_starts_at, sale_ends_at
+      `SELECT id, event_id,
+              ${effectiveQuantitySql("ticket_types")} AS quantity_available,
+              sale_starts_at, sale_ends_at
        FROM ticket_types WHERE id = ANY($1::int[])`,
       [ids],
     ));

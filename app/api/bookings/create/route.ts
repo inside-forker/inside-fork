@@ -6,6 +6,7 @@ import { captureRouteError } from "@/lib/sentry/captureRouteError";
 import { hashCnic, cnicLast4 } from "@/lib/utils/cnic-server";
 import { resolveAssignedGateIndex } from "@/lib/ticketing/resolve-gate-assignment";
 import { getPdfInventoryTicketTypeIds } from "@/lib/ticketing/pdf-inventory";
+import { syncPdfStockForTicketTypes } from "@/lib/ticketing/sellable-quantity";
 import {
   confirmBookingWithoutPayment,
   isPaymentSkipEnabled,
@@ -123,6 +124,10 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    // Align quantity_available with admin PDF inventory (free PDF rows) before
+    // create_booking_atomic decrements it — same source as the event page.
+    await syncPdfStockForTicketTypes(ticketTypeIds);
 
     // Fetch platform and payment fees from server config (never trust client-supplied fees)
     const { rows: feeConfigs } = await query(
