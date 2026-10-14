@@ -597,6 +597,21 @@ export class DatabaseSync {
       };
     }
 
+    // Archived umbrella parents (post branch-split) must not be re-hydrated
+    // into nested listing_branches — outlets now live as sibling listings in
+    // brand_groups.
+    if (existing.status === "archived") {
+      console.log(
+        `[SYNC] Skipping archived listing id=${existing.id} peekaboo_id=${peekabooId} (likely split into brand-group outlets)`,
+      );
+      return {
+        action: "skip",
+        listingId: existing.id,
+        conflicts: [],
+        hasManualEdits: false,
+      };
+    }
+
     // Existing listing found - check for conflicts
     const conflicts: ConflictInfo[] = [];
     const customAttrs = existing.custom_attributes as Record<string, unknown>;

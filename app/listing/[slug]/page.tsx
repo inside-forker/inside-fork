@@ -7,7 +7,10 @@ import { ListingFeatures } from "@/components/listing/ListingFeatures";
 import { ListingContact } from "@/components/listing/ListingContact";
 import { ListingMap } from "@/components/listing/ListingMap";
 import { ListingBranches } from "@/components/listing/ListingBranches";
+import { SiblingLocations } from "@/components/listing/SiblingLocations";
 import { ListingPageWrapper } from "@/components/listing/ListingPageWrapper";
+import { getSiblingLocations } from "@/lib/listings/brand-groups";
+import { brandStemFromListingName } from "@/lib/listings/borrowed-header-image";
 import { MenuImagesViewer } from "@/components/listing/MenuImagesViewer";
 import { getListingHeroImages } from "@/lib/utils/listing-images";
 import { isRestaurantCategory } from "@/lib/utils/category-helpers";
@@ -92,6 +95,7 @@ export default async function ListingPage({ params }: ListingPageProps) {
     _openingHoursResult,
     featuresResult,
     listingCategoryIds,
+    siblingLocationsResult,
   ] = await Promise.all([
     query(
       `SELECT * FROM listing_images
@@ -158,6 +162,10 @@ export default async function ListingPage({ params }: ListingPageProps) {
       console.error("[listing-page] categoryIds query error:", err);
       return [];
     }),
+    getSiblingLocations(listingId).catch((err) => {
+      console.error("[listing-page] sibling_locations query error:", err);
+      return [];
+    }),
   ]);
 
   const images = imagesResult?.rows || [];
@@ -165,6 +173,7 @@ export default async function ListingPage({ params }: ListingPageProps) {
   const dealsCount = Number(dealsCountResult?.rows?.[0]?.count ?? 0);
   const hoursCount = Number(hoursCountResult?.rows?.[0]?.count ?? 0);
   const branches = branchesResult?.rows || [];
+  const siblingLocations = siblingLocationsResult || [];
   const _openingHours = _openingHoursResult?.rows || [];
   const dbFeatures = (featuresResult?.rows || []).map((f) => ({
     name: String(f.name || ""),
@@ -254,18 +263,31 @@ export default async function ListingPage({ params }: ListingPageProps) {
                 </Suspense>
               )}
 
-              {/* Branches/Locations Section - Only for MULTIPLE branches */}
-              {branches && branches.length > 1 && (
-                <ListingBranches
-                  branches={branches}
-                  listingName={listing.name || "This Listing"}
+              {/* Brand siblings (separate location listings) take precedence */}
+              {siblingLocations.length > 1 && (
+                <SiblingLocations
+                  siblings={siblingLocations}
+                  brandLabel={
+                    brandStemFromListingName(listing.name as string | null) ??
+                    undefined
+                  }
                 />
               )}
 
-              {/* Map & Location - Show when NO branches OR single branch */}
-              {(!branches || branches.length <= 1) && (
-                <ListingMap listing={listing} />
-              )}
+              {/* Nested branches — only when not already brand-grouped */}
+              {siblingLocations.length <= 1 &&
+                branches &&
+                branches.length > 1 && (
+                  <ListingBranches
+                    branches={branches}
+                    listingName={listing.name || "This Listing"}
+                  />
+                )}
+
+              {/* Map — single location / single nested branch / brand sibling */}
+              {(siblingLocations.length > 1 ||
+                !branches ||
+                branches.length <= 1) && <ListingMap listing={listing} />}
 
               {/* Opening Hours Section */}
               <Suspense fallback={<OpeningHoursSkeleton />}>

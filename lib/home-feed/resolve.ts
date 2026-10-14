@@ -12,7 +12,7 @@ import {
 } from "@/lib/events/upcoming-query";
 import { fetchPrimaryImagesByEventId } from "@/lib/mobile/event-images";
 import { fetchPriceRangeByEventId } from "@/lib/mobile/event-pricing";
-import { getOpenListingIds } from "@/lib/listings/open-status";
+import { getClosingTimes, getOpenListingIds } from "@/lib/listings/open-status";
 import {
   resolveCategoryBySlugWithScope,
   listingCategoriesExistsClause,
@@ -100,12 +100,14 @@ async function fetchOpenNowListings(): Promise<ListingCardDTO[]> {
 
   const listingIds = rows.map((r) => Number(r.id)).filter(Number.isFinite);
   const imagesByListing = await loadListingImages(listingIds);
-  return rows.map((row) =>
-    toListingCard(
+  const closesAt = await getClosingTimes(listingIds);
+  return rows.map((row) => ({
+    ...toListingCard(
       toNumericListingRow(row as Record<string, unknown>),
       imagesByListing[Number(row.id)] ?? [],
     ),
-  );
+    closes_at: closesAt.get(Number(row.id)) ?? null,
+  }));
 }
 
 async function fetchForYouListings(): Promise<ListingCardDTO[]> {
@@ -183,7 +185,7 @@ export type HomeFeedPayload = {
   spine: EventCardDTO[];
   openNow: ListingCardDTO[];
   forYou: ListingCardDTO[];
-  /** Soonest upcoming events (client filters free/cheap; [0] is this-week). */
+  /** Soonest upcoming events (client filters free/cheap and this-week). */
   upcomingEvents: EventCardDTO[];
 };
 
