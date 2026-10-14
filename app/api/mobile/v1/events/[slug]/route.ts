@@ -46,7 +46,11 @@ const EVENTS_FROM_SQL =
 const EVENT_IMAGE_SQL_COLUMNS = "id, url, alt_text, display_order";
 
 const TICKET_TYPE_SQL_COLUMNS =
-  "id, name, price, quantity_available, " +
+  "id, name, price, " +
+  // Prefer free PDF count when this tier uses Ticketwala PDF inventory.
+  "CASE WHEN EXISTS (SELECT 1 FROM ticket_pdf_inventory i WHERE i.ticket_type_id = ticket_types.id) " +
+  "THEN (SELECT COUNT(*)::int FROM ticket_pdf_inventory i WHERE i.ticket_type_id = ticket_types.id AND i.booking_id IS NULL) " +
+  "ELSE quantity_available END AS quantity_available, " +
   "to_json(sale_starts_at) #>> '{}' AS sale_starts_at, " +
   "to_json(sale_ends_at) #>> '{}' AS sale_ends_at";
 

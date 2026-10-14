@@ -8,7 +8,7 @@
  *
  * Client-only; storage can be unavailable, so never throws.
  */
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { PARCHI_CHANNEL_COOKIE } from "@/lib/parchi/channel";
 
 const KEY = "ik:parchi-id";
@@ -35,6 +35,38 @@ function readBrowserCookie(name: string): string | null {
   return null;
 }
 
+/** Cookie attrs that work on http localhost (Lax) and https prod (None+Secure). */
+function channelCookieAttrs(): string {
+  if (typeof window !== "undefined" && window.location.protocol === "https:") {
+    return `Max-Age=${ARRIVAL_MAX_AGE_S}; Path=/; SameSite=None; Secure`;
+  }
+  return `Max-Age=${ARRIVAL_MAX_AGE_S}; Path=/; SameSite=Lax`;
+}
+
+function arrivalCookieAttrs(): string {
+  if (typeof window !== "undefined" && window.location.protocol === "https:") {
+    return `Max-Age=${ARRIVAL_MAX_AGE_S}; Path=/; SameSite=None; Secure`;
+  }
+  return `Max-Age=${ARRIVAL_MAX_AGE_S}; Path=/; SameSite=Lax`;
+}
+
+/** True when the live URL itself says we came from Parchi (source of truth). */
+export function urlSaysParchiChannel(
+  search: string | URLSearchParams = typeof window !== "undefined"
+    ? window.location.search
+    : "",
+): boolean {
+  const params =
+    typeof search === "string"
+      ? new URLSearchParams(search.startsWith("?") ? search.slice(1) : search)
+      : search;
+  const ref = (params.get("ref") ?? "").trim().toLowerCase();
+  if (ref === "inside" || ref === "ik" || ref === "clear") return false;
+  if (ref === "parchi_app" || ref === "parchi") return true;
+  const parchiId = params.get("parchiId");
+  return !!(parchiId && /^[A-Za-z0-9]{1,10}$/.test(parchiId.trim()));
+}
+
 /** Mark this browser as a Parchi-app visitor for pricing/branding. */
 export function markParchiChannel(): void {
   try {
@@ -50,10 +82,14 @@ export function markParchiChannel(): void {
   } catch {
     // blocked storage
   }
-  document.cookie = `${PARCHI_CHANNEL_COOKIE}=1; Max-Age=${ARRIVAL_MAX_AGE_S}; Path=/; SameSite=None; Secure`;
+  if (typeof document !== "undefined") {
+    document.cookie = `${PARCHI_CHANNEL_COOKIE}=1; ${channelCookieAttrs()}`;
+  }
 }
 
 export function recallParchiChannel(): boolean {
+  // Live URL wins over sticky storage (first paint + deep links).
+  if (typeof window !== "undefined" && urlSaysParchiChannel()) return true;
   try {
     if (sessionStorage.getItem(CHANNEL_KEY) === "1") return true;
   } catch {
@@ -108,7 +144,11 @@ export function captureParchiArrivalFromUrl(
     return;
   }
   const parchiId = params.get("parchiId");
-  if (ref === "parchi_app" || ref === "parchi" || (parchiId && /^[A-Za-z0-9]{1,10}$/.test(parchiId.trim()))) {
+  if (
+    ref === "parchi_app" ||
+    ref === "parchi" ||
+    (parchiId && /^[A-Za-z0-9]{1,10}$/.test(parchiId.trim()))
+  ) {
     markParchiChannel();
   }
   if (parchiId) rememberParchiId(parchiId);
@@ -127,9 +167,10 @@ export function rememberParchiId(raw: string | null): void {
   } catch {
     // Blocked storage - the student just types it.
   }
-  // "Came from Parchi" marker for the next sign-up / sign-in. SameSite=None
-  // so Apple's cross-site form_post callback still carries it.
-  document.cookie = `${ARRIVAL_COOKIE}=${encodeURIComponent(id)}; Max-Age=${ARRIVAL_MAX_AGE_S}; Path=/; SameSite=None; Secure`;
+  // "Came from Parchi" marker for the next sign-up / sign-in.
+  if (typeof document !== "undefined") {
+    document.cookie = `${ARRIVAL_COOKIE}=${encodeURIComponent(id)}; ${arrivalCookieAttrs()}`;
+  }
   // Having a Parchi ID in the link also implies the Parchi channel.
   markParchiChannel();
 }
@@ -158,19 +199,21 @@ export function recallParchiId(): string {
 /**
  * True when this visitor came from the Parchi app (`ref=parchi_app` and/or
  * `parchiId`). Survives login so Parchi visitors never get Inside's auto slash.
+ *
+ * useSyncExternalStore: client first paint reads URL + sticky channel; SSR is
+ * false (no mismatch). Re-reads on window focus after ?ref=clear in another tab.
  */
 export function useArrivedFromParchi(): boolean {
-  const [arrived, setArrived] = useState(false);
-  useEffect(() => {
-    captureParchiArrivalFromUrl();
-    setArrived(recallParchiChannel());
-  }, []);
-  // Re-read when the tab becomes visible again (e.g. after clearing via
-  // another tab / ?ref=inside navigation in the same session).
-  useEffect(() => {
-    const sync = () => setArrived(recallParchiChannel());
-    window.addEventListener("focus", sync);
-    return () => window.removeEventListener("focus", sync);
-  }, []);
-  return arrived;
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      captureParchiArrivalFromUrl();
+      window.addEventListener("focus", onStoreChange);
+      return () => window.removeEventListener("focus", onStoreChange);
+    },
+    () => {
+      captureParchiArrivalFromUrl();
+      return recallParchiChannel();
+    },
+    () => false,
+  );
 }

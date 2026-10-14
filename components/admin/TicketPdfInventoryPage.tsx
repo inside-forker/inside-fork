@@ -197,7 +197,9 @@ export function TicketPdfInventoryPage() {
     name: "",
     description: "",
     price: "",
-    quantity_available: "0",
+    // Empty = null (not on sale until PDFs upload sync stock). Never default
+    // to "0" — that falsely marks the tier Sold Out before any uploads.
+    quantity_available: "",
     max_per_person: "10",
     sale_starts_at: "",
     sale_ends_at: "",
@@ -358,9 +360,9 @@ export function TicketPdfInventoryPage() {
             name: createForm.name.trim(),
             description: createForm.description.trim() || null,
             price: parseFloat(createForm.price),
-            quantity_available: createForm.quantity_available
+            quantity_available: createForm.quantity_available.trim()
               ? parseInt(createForm.quantity_available, 10)
-              : 0,
+              : null,
             sale_starts_at: createForm.sale_starts_at,
             sale_ends_at: createForm.sale_ends_at,
             max_per_person: createForm.max_per_person
@@ -382,7 +384,7 @@ export function TicketPdfInventoryPage() {
         name: "",
         description: "",
         price: "",
-        quantity_available: "0",
+        quantity_available: "",
         max_per_person: "10",
         sale_starts_at: "",
         sale_ends_at: "",
@@ -1626,7 +1628,8 @@ export function TicketPdfInventoryPage() {
                   }
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Overwritten when you upload PDFs.
+                  Leave blank until you upload PDFs (stock syncs from free PDFs).
+                  Do not set 0 — that marks the tier Sold Out.
                 </p>
               </div>
             </div>

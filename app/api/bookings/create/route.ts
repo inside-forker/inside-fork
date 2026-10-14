@@ -181,7 +181,9 @@ export async function POST(request: NextRequest) {
         }
         throw err;
       }
-    } else {
+    } else if (!fromParchiChannel) {
+      // Open IK student discount: Prismfest shoppers who did NOT arrive from
+      // the Parchi app. Parchi-channel bookings must verify via 2FA above.
       const { rows: eventRows } = await query(
         `SELECT slug FROM events WHERE id = $1 LIMIT 1`,
         [eventId],

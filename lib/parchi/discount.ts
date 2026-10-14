@@ -11,6 +11,20 @@ export interface ParchiOffer {
   max_discount_amount: number | null;
 }
 
+/** Prismfest open-discount fallback when the coupon row is missing/unreadable. */
+export const PRISMFEST_FALLBACK_OFFER: ParchiOffer = {
+  discount_type: "percentage",
+  discount_value: 20,
+  max_discount_amount: null,
+};
+
+/** Prefer the live coupon; otherwise the Prismfest 20% fallback. */
+export function resolveStudentOffer(
+  offer: ParchiOffer | null | undefined,
+): ParchiOffer {
+  return offer ?? PRISMFEST_FALLBACK_OFFER;
+}
+
 /** Same math as claim_parchi_discount (and the coupon RPC branch). */
 export function computeParchiDiscount(offer: ParchiOffer, subtotal: number): number {
   let discount =
