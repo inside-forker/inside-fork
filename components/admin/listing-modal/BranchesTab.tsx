@@ -276,9 +276,18 @@ export function BranchesTab({
       {/* Brand group — sibling location listings */}
       {listingId && (
         <div className="rounded-lg border p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Link2 className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold">Brand locations</h3>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold">Brand locations</h3>
+            </div>
+            <Link
+              href="/admin/brand-groups"
+              target="_blank"
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              Open Brand Groups Manager
+            </Link>
           </div>
           <p className="text-xs text-muted-foreground">
             Link this listing to other outlets of the same brand (e.g. KFC -

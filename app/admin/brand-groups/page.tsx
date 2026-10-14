@@ -1,0 +1,62 @@
+import { redirect } from "next/navigation";
+import { requireSessionUser } from "@/lib/auth/require-session";
+import { BrandGroupsManagementPage } from "@/components/admin/BrandGroupsManagementPage";
+import { Link2 } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+
+export const dynamic = "force-dynamic";
+
+export default async function AdminBrandGroupsPage() {
+  const { profile } = await requireSessionUser();
+
+  if (!profile) {
+    redirect("/login");
+  }
+
+  // Check admin / staff access (admin, super_admin, lister, data_entry)
+  if (
+    profile.role !== "admin" &&
+    profile.role !== "super_admin" &&
+    profile.role !== "lister" &&
+    profile.role !== "data_entry"
+  ) {
+    redirect("/dashboard");
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Header - consistent with other admin management pages */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-2xl" />
+        <div className="relative p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-primary/10 rounded-xl">
+                <Link2 className="h-6 w-6 text-primary" />
+              </div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                Brand Groups
+              </h1>
+            </div>
+            <p className="text-muted-foreground text-base max-w-2xl">
+              Manually link multiple listings into brand sibling groups (e.g. KFC, Xander&apos;s).
+              When a brand has 2+ published listings, customers can switch between outlets on detail pages.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Link href="/admin/listings">
+              <Button variant="outline" size="sm">
+                Go to Listings
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Brand Groups Management Front */}
+      <BrandGroupsManagementPage />
+    </div>
+  );
+}
