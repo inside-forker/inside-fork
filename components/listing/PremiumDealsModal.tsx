@@ -45,6 +45,14 @@ interface Deal {
   is_active: boolean;
   created_at: string;
   banks?: Bank | null;
+  metadata?: {
+    card_associations?: Array<{
+      name?: string;
+      image?: string;
+      typeId?: number;
+    }>;
+    [key: string]: unknown;
+  } | null;
 }
 
 interface PremiumDealsModalProps {
@@ -165,8 +173,7 @@ export function PremiumDealsModal({
       deals.filter(
         (deal) =>
           deal.is_active &&
-          deal.end_date &&
-          new Date(deal.end_date) > new Date(),
+          (!deal.end_date || new Date(deal.end_date) > new Date()),
       ),
     [deals],
   );
@@ -187,29 +194,77 @@ export function PremiumDealsModal({
     ];
   }, [activeDeals]);
 
-  // Memoize expensive filtering operation
+  // Memoize available card types for selected bank
+  const availableCardTypes = useMemo(() => {
+    const types = new Set<string>();
+    const bankDeals = selectedBank
+      ? deals.filter((d) => d.banks?.name === selectedBank)
+      : deals;
+
+    for (const deal of bankDeals) {
+      const assocs = deal.metadata?.card_associations;
+      if (Array.isArray(assocs)) {
+        for (const assoc of assocs) {
+          const name = assoc.name?.toLowerCase() || "";
+          if (name.includes("visa")) types.add("visa");
+          if (name.includes("mastercard")) types.add("mastercard");
+          if (name.includes("paypak")) types.add("paypak");
+          if (name.includes("unionpay")) types.add("unionpay");
+        }
+      }
+      const titleDesc = `${deal.title} ${deal.description || ""}`.toLowerCase();
+      if (titleDesc.includes("visa")) types.add("visa");
+      if (titleDesc.includes("mastercard")) types.add("mastercard");
+      if (titleDesc.includes("paypak")) types.add("paypak");
+      if (titleDesc.includes("unionpay")) types.add("unionpay");
+    }
+
+    if (types.size === 0) {
+      types.add("visa");
+      types.add("mastercard");
+    }
+
+    return Array.from(types).sort();
+  }, [deals, selectedBank]);
+
+  // Memoize filtering operation
   const filteredSections = useMemo(() => {
-    if (!debouncedSearchQuery.trim()) return dealSections;
+    const hasSearch = !!debouncedSearchQuery.trim();
+    const hasBank = !!selectedBank;
+    const hasCardType = !!selectedCardType;
+
+    if (!hasSearch && !hasBank && !hasCardType) return dealSections;
 
     const query = debouncedSearchQuery.toLowerCase().trim();
+    const targetCardType = selectedCardType.toLowerCase().trim();
 
     return dealSections.map((section) => ({
       ...section,
       deals: section.deals.filter((deal) => {
         // Search filter
         const matchesSearch =
+          !hasSearch ||
           deal.title.toLowerCase().includes(query) ||
           deal.description?.toLowerCase().includes(query) ||
-          deal.banks?.name.toLowerCase().includes(query);
+          deal.banks?.name?.toLowerCase().includes(query);
 
         // Bank filter
         const matchesBank =
-          selectedBank === "" || deal.banks?.name === selectedBank;
+          !hasBank || deal.banks?.name === selectedBank;
 
-        // Card type filter (for bank deals only)
-        const matchesCardType =
-          selectedCardType === "" ||
-          (deal.deal_type === "bank_discount" && deal.banks?.name);
+        // Card type filter (for bank deals)
+        let matchesCardType = !hasCardType;
+        if (hasCardType) {
+          const assocs = deal.metadata?.card_associations;
+          if (Array.isArray(assocs) && assocs.length > 0) {
+            matchesCardType = assocs.some((assoc) =>
+              assoc.name?.toLowerCase().includes(targetCardType),
+            );
+          } else {
+            const combinedText = `${deal.title} ${deal.description || ""}`.toLowerCase();
+            matchesCardType = combinedText.includes(targetCardType);
+          }
+        }
 
         return matchesSearch && matchesBank && matchesCardType;
       }),
@@ -308,7 +363,12 @@ export function PremiumDealsModal({
                 {dealSections.map((section, index) => {
                   const IconComponent = section.icon;
                   const isActive = activeTab === index;
-                  const sectionDeals = searchQuery
+                  const isFiltered = !!(
+                    debouncedSearchQuery.trim() ||
+                    selectedBank ||
+                    selectedCardType
+                  );
+                  const sectionDeals = isFiltered
                     ? filteredSections[index]?.deals
                     : section.deals;
 
@@ -370,15 +430,22 @@ export function PremiumDealsModal({
                       onChange={(e) => setActiveTab(Number(e.target.value))}
                       className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                     >
-                      {dealSections.map((section, index) => (
-                        <option key={index} value={index}>
-                          {section.name} (
-                          {searchQuery
-                            ? filteredSections[index]?.deals?.length
-                            : section.deals.length}
-                          )
-                        </option>
-                      ))}
+                      {dealSections.map((section, index) => {
+                        const isFiltered = !!(
+                          debouncedSearchQuery.trim() ||
+                          selectedBank ||
+                          selectedCardType
+                        );
+                        return (
+                          <option key={index} value={index}>
+                            {section.name} (
+                            {isFiltered
+                              ? (filteredSections[index]?.deals?.length ?? 0)
+                              : section.deals.length}
+                            )
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                   <div className="hidden lg:block">
@@ -456,8 +523,19 @@ export function PremiumDealsModal({
                           className="rounded-lg border border-border bg-background/80 px-3 py-1.5 text-sm font-medium focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
                         >
                           <option value="">All Cards</option>
-                          <option value="visa">Visa</option>
-                          <option value="mastercard">Mastercard</option>
+                          {availableCardTypes.map((card) => (
+                            <option key={card} value={card}>
+                              {card === "mastercard"
+                                ? "Mastercard"
+                                : card === "visa"
+                                  ? "Visa"
+                                  : card === "paypak"
+                                    ? "PayPak"
+                                    : card === "unionpay"
+                                      ? "UnionPay"
+                                      : card.charAt(0).toUpperCase() + card.slice(1)}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     )}
@@ -511,7 +589,17 @@ export function PremiumDealsModal({
                           variant="secondary"
                           className="text-xs px-2 py-1 bg-primary/10 text-primary border border-primary/20"
                         >
-                          Card: {selectedCardType}
+                          Card:{" "}
+                          {selectedCardType === "mastercard"
+                            ? "Mastercard"
+                            : selectedCardType === "visa"
+                              ? "Visa"
+                              : selectedCardType === "paypak"
+                                ? "PayPak"
+                                : selectedCardType === "unionpay"
+                                  ? "UnionPay"
+                                  : selectedCardType.charAt(0).toUpperCase() +
+                                    selectedCardType.slice(1)}
                           <button
                             onClick={() => setSelectedCardType("")}
                             className="ml-1 hover:text-primary/70"
@@ -534,6 +622,17 @@ export function PremiumDealsModal({
                           </button>
                         </Badge>
                       )}
+                      <button
+                        onClick={() => {
+                          setSelectedBank("");
+                          setSelectedCardType("");
+                          setSearchQuery("");
+                          setDebouncedSearchQuery("");
+                        }}
+                        className="text-xs text-muted-foreground hover:text-foreground underline ml-2 transition-colors"
+                      >
+                        Clear all
+                      </button>
                     </div>
                   )}
                 </div>
