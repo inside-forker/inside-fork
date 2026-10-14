@@ -5,6 +5,26 @@ import { syncListingCategories, syncListingCategoriesBulk, normalizeCategoryIds,
 import { deleteListingsBulk } from "@/lib/utils/listing-deletion";
 import { resolveCategoryIdScope } from "@/lib/listings/category-scope";
 
+async function generateUniqueListingSlug(name: string): Promise<string> {
+  const baseSlug =
+    name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "listing";
+
+  let candidate = baseSlug;
+  let counter = 2;
+  while (true) {
+    const { rows } = await query<{ exists: boolean }>(
+      `SELECT 1 FROM listings WHERE slug = $1 LIMIT 1`,
+      [candidate],
+    );
+    if (rows.length === 0) return candidate;
+    candidate = `${baseSlug}-${counter++}`.slice(0, 120);
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession(request);
@@ -276,12 +296,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate slug from name
-    const slug = name
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
+    // Generate unique slug from name
+    const slug = await generateUniqueListingSlug(name);
 
     // Insert new listing
     let listing;
@@ -323,10 +339,17 @@ export async function POST(request: NextRequest) {
         ],
       );
       listing = rows[0];
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error creating listing:", error);
+      const dbError = error as { code?: string; message?: string } | null;
+      if (dbError?.code === "23505") {
+        return NextResponse.json(
+          { error: "A listing with this name or slug already exists." },
+          { status: 409 },
+        );
+      }
       return NextResponse.json(
-        { error: "Failed to create listing" },
+        { error: dbError?.message || "Failed to create listing" },
         { status: 500 },
       );
     }
