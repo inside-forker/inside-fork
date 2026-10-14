@@ -31,6 +31,7 @@ export function PremiumDropdown({
   icon: Icon,
   searchable = false,
   variant = "default",
+  placement = "auto",
 }: PremiumDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -83,15 +84,22 @@ export function PremiumDropdown({
 
       const isCompact = variant === "compact";
       const estimatedHeight = isCompact ? (searchable ? 220 : 160) : (searchable ? 300 : 240);
-      setOpenUpward(
-        spaceBelow < Math.min(estimatedHeight, 180) && spaceAbove > spaceBelow
-      );
+
+      if (placement === "top") {
+        setOpenUpward(spaceAbove >= estimatedHeight || spaceAbove > spaceBelow);
+      } else if (placement === "bottom") {
+        setOpenUpward(false);
+      } else {
+        setOpenUpward(
+          spaceBelow < estimatedHeight + 30 && spaceAbove > spaceBelow
+        );
+      }
 
       if (searchable && searchInputRef.current) {
         setTimeout(() => searchInputRef.current?.focus(), 100);
       }
     }
-  }, [isOpen, searchable, variant]);
+  }, [isOpen, searchable, variant, placement]);
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (!isOpen) {
@@ -159,7 +167,7 @@ export function PremiumDropdown({
   };
 
   return (
-    <div className="relative z-10">
+    <div className="relative z-20">
       <button
         ref={triggerRef}
         type="button"

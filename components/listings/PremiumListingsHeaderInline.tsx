@@ -733,10 +733,10 @@ export function PremiumListingsHeaderInline({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="relative mb-8"
+            className="relative z-30 mb-8"
           >
             <div className="container mx-auto px-6 lg:px-8">
-              <div className="relative rounded-2xl bg-card/50 backdrop-blur-xl border border-border/50 shadow-xl">
+              <div className="relative z-30 rounded-2xl bg-card/50 backdrop-blur-xl border border-border/50 shadow-xl">
                 {/* Gradient accent */}
                 <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
 
@@ -948,7 +948,7 @@ export function PremiumListingsHeaderInline({
                         Bank & Card
                       </h3>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 relative z-30">
                       <PremiumDropdown
                         value={localFilters.bank}
                         onChange={(value) => {
@@ -959,6 +959,7 @@ export function PremiumListingsHeaderInline({
                         variant="compact"
                         searchable={bankOptions.length > 5}
                         icon={Building}
+                        placement="top"
                       />
 
                       <AnimatePresence mode="wait">
@@ -969,7 +970,7 @@ export function PremiumListingsHeaderInline({
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
                             transition={{ duration: 0.2 }}
-                            className="min-w-0 relative z-10"
+                            className="min-w-0 relative z-30"
                             style={{
                               minWidth: "140px", // Ensure minimum width
                             }}
@@ -990,6 +991,7 @@ export function PremiumListingsHeaderInline({
                               variant="compact"
                               searchable={cardOptions.length > 5}
                               icon={CreditCard}
+                              placement="top"
                             />
                           </motion.div>
                         )}

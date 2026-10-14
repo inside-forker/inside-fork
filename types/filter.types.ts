@@ -57,6 +57,7 @@ export interface PremiumDropdownProps {
   icon?: LucideIcon;
   searchable?: boolean;
   variant?: "default" | "compact";
+  placement?: "auto" | "top" | "bottom";
 }
 
 // Caching interfaces
