@@ -4,6 +4,7 @@ import {
   toListingAccessResponse,
 } from "@/lib/listings/route-access";
 import { query } from "@/lib/db";
+import { getBrandGroupForListing } from "@/lib/listings/brand-groups";
 
 /**
  * Opening Hours Input Type
@@ -194,15 +195,14 @@ export async function PATCH(
     }
 
     // Delete existing opening hours for this listing
-    // CRITICAL: Only delete hours for the branch being edited to avoid data loss!
+    // If a specific branch is specified, clear for that branch (and any legacy null branch_id)
     const deleteParams: unknown[] = [listingId];
     let deleteWhereSql = "listing_id = $1";
 
     if (isEditingSingleBranch && branchIdToUpdate !== null) {
       deleteParams.push(branchIdToUpdate);
-      deleteWhereSql += ` AND branch_id = $${deleteParams.length}`;
+      deleteWhereSql += ` AND (branch_id = $${deleteParams.length} OR branch_id IS NULL)`;
     } else if (allLegacy) {
-      // Legacy mode: Only delete hours with branch_id = null
       deleteWhereSql += " AND branch_id IS NULL";
     }
 
@@ -221,7 +221,6 @@ export async function PATCH(
       if (typeof val !== "string") return null;
       const trimmed = val.trim();
       if (!trimmed || trimmed === "null" || trimmed === "undefined") return null;
-      // Basic check for time format (e.g. HH:MM or HH:MM:SS)
       return trimmed;
     };
 
@@ -293,9 +292,110 @@ export async function PATCH(
       );
     }
 
+    // Optional: Sync opening hours to all sibling branches in the brand group
+    let syncedBrandCount = 0;
+    if (body.sync_to_brand_group) {
+      try {
+        const group = await getBrandGroupForListing(listingId);
+        if (group && group.members.length > 1) {
+          const siblingIds = group.members
+            .map((m) => m.listing_id)
+            .filter((sId) => sId !== listingId);
+
+          for (const sibId of siblingIds) {
+            // Find sibling's primary branch if any
+            const { rows: sibBranches } = await query<{ id: number | string }>(
+              `SELECT id FROM listing_branches WHERE listing_id = $1 ORDER BY is_primary DESC, id ASC LIMIT 1`,
+              [sibId],
+            );
+            const sibBranchId = sibBranches[0]?.id ? Number(sibBranches[0].id) : null;
+
+            // Delete existing hours for sibling
+            await query(`DELETE FROM opening_hours WHERE listing_id = $1`, [sibId]);
+
+            // Insert new opening hours for sibling
+            for (const row of insertRows) {
+              await query(
+                `INSERT INTO opening_hours (listing_id, day_of_week, open_time, close_time, is_closed, branch_id)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [
+                  sibId,
+                  row.day_of_week,
+                  row.open_time,
+                  row.close_time,
+                  row.is_closed,
+                  sibBranchId,
+                ],
+              );
+            }
+
+            // Also update timings string on sibling branch if present
+            if (sibBranchId) {
+              const activeRow = insertRows.find(
+                (r: { is_closed: boolean; open_time: string | null; close_time: string | null }) =>
+                  !r.is_closed && r.open_time && r.close_time,
+              );
+              if (activeRow) {
+                await query(
+                  `UPDATE listing_branches SET timings = $1 WHERE id = $2`,
+                  [`${activeRow.open_time}-${activeRow.close_time}`, sibBranchId],
+                );
+              }
+            }
+
+            syncedBrandCount++;
+          }
+        }
+      } catch (syncBrandErr) {
+        console.error("Failed to sync hours to brand group:", syncBrandErr);
+      }
+    }
+
+    // Optional: Sync opening hours to all internal branches of this listing
+    let syncedInternalCount = 0;
+    if (body.sync_to_branches) {
+      try {
+        const { rows: listingBranches } = await query<{ id: number | string }>(
+          `SELECT id FROM listing_branches WHERE listing_id = $1`,
+          [listingId],
+        );
+        if (listingBranches.length > 1) {
+          for (const b of listingBranches) {
+            const bId = Number(b.id);
+            if (bId !== branchIdToUpdate) {
+              await query(
+                `DELETE FROM opening_hours WHERE listing_id = $1 AND branch_id = $2`,
+                [listingId, bId],
+              );
+              for (const row of insertRows) {
+                await query(
+                  `INSERT INTO opening_hours (listing_id, day_of_week, open_time, close_time, is_closed, branch_id)
+                   VALUES ($1, $2, $3, $4, $5, $6)`,
+                  [
+                    listingId,
+                    row.day_of_week,
+                    row.open_time,
+                    row.close_time,
+                    row.is_closed,
+                    bId,
+                  ],
+                );
+              }
+              syncedInternalCount++;
+            }
+          }
+        }
+      } catch (syncInternalErr) {
+        console.error("Failed to sync hours to internal branches:", syncInternalErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       inserted: insertedData?.length || 0,
+      synced_brand_count: syncedBrandCount,
+      synced_internal_count: syncedInternalCount,
+      total_synced: syncedBrandCount + syncedInternalCount,
     });
   } catch (_error) {
     if (_error instanceof Error && _error.name === "ListingRouteAccessError") {
