@@ -222,8 +222,8 @@ function DealCard({ deal }: DealCardProps) {
 
           {/* Bank Card Showcase */}
           {deal.deal_type === "bank_discount" && deal.banks && (
-            <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3">
-              <span className="text-xs text-muted-foreground flex-shrink-0">
+            <div className="flex items-start gap-1.5 md:gap-2 mb-2 md:mb-3">
+              <span className="text-xs text-muted-foreground flex-shrink-0 pt-1">
                 Valid on:
               </span>
               <BankCardShowcase
@@ -231,6 +231,7 @@ function DealCard({ deal }: DealCardProps) {
                 bankId={deal.bank_id || undefined}
                 dealId={deal.id}
                 size="sm"
+                maxCards={24}
               />
             </div>
           )}

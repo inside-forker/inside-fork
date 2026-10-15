@@ -782,8 +782,8 @@ export function PremiumDealsModal({
                                 {/* Bank Card Showcase */}
                                 {deal.deal_type === "bank_discount" &&
                                   deal.banks && (
-                                    <div className="flex items-center gap-2 mb-3">
-                                      <span className="text-xs text-muted-foreground">
+                                    <div className="flex items-start gap-2 mb-3">
+                                      <span className="text-xs text-muted-foreground flex-shrink-0 pt-1">
                                         Valid on:
                                       </span>
                                       <BankCardShowcase
@@ -791,6 +791,7 @@ export function PremiumDealsModal({
                                         bankId={deal.bank_id || undefined}
                                         dealId={deal.id}
                                         size="sm"
+                                        maxCards={24}
                                       />
                                     </div>
                                   )}

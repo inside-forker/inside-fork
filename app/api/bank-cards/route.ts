@@ -3,7 +3,7 @@ import { query } from "@/lib/db";
 
 // Public, read-only lookup of active card variants for a bank, optionally
 // narrowed to a specific deal's associated cards. Backs the client-side
-// BankCardShowcase component (was previously a direct browser Supabase call).
+// BankCardShowcase component.
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -12,8 +12,8 @@ export async function GET(request: NextRequest) {
     const dealIdParam = searchParams.get("dealId");
     const maxCardsParam = searchParams.get("maxCards");
     const maxCards = Math.min(
-      50,
-      Math.max(1, parseInt(maxCardsParam || "4", 10) || 4),
+      100,
+      Math.max(1, parseInt(maxCardsParam || "50", 10) || 50),
     );
 
     let bankId: number | null = bankIdParam ? parseInt(bankIdParam, 10) : null;
@@ -25,11 +25,15 @@ export async function GET(request: NextRequest) {
     const dealId = dealIdParam ? parseInt(dealIdParam, 10) : null;
     if (dealId !== null && !Number.isNaN(dealId)) {
       const { rows: dealRows } = await query(
-        `SELECT valid_card_variants, metadata FROM deals WHERE id = $1 LIMIT 1`,
+        `SELECT valid_card_variants, metadata, bank_id FROM deals WHERE id = $1 LIMIT 1`,
         [dealId],
       );
       const deal = dealRows[0];
       if (deal) {
+        if (bankId === null && deal.bank_id) {
+          bankId = Number(deal.bank_id);
+        }
+
         if (
           Array.isArray(deal.valid_card_variants) &&
           deal.valid_card_variants.length > 0
@@ -47,7 +51,9 @@ export async function GET(request: NextRequest) {
         ) {
           targetCardNames = (
             metadata.card_associations as { name: string }[]
-          ).map((c) => c.name);
+          )
+            .map((c) => c.name)
+            .filter((name) => typeof name === "string" && name.trim().length > 0);
         }
       }
     }
@@ -63,31 +69,54 @@ export async function GET(request: NextRequest) {
 
     let finalRows: Array<Record<string, unknown>> = [];
 
-    // Attempt 1: Fetch by IDs (most precise)
-    if (targetCardIds.length > 0) {
-      const params: unknown[] = [targetCardIds];
-      let sql = `SELECT * FROM card_variants WHERE is_active = true AND id = ANY($1)`;
-      if (bankId !== null) {
-        params.push(bankId);
-        sql += ` AND bank_id = $${params.length}`;
-      }
-      params.push(maxCards);
-      sql += ` ORDER BY card_tier ASC, card_name ASC LIMIT $${params.length}`;
+    // Deal specific cards resolution:
+    // Match by ID (for local IDs) OR by card_name (for deals imported with Peekaboo metadata)
+    if (targetCardIds.length > 0 || targetCardNames.length > 0) {
+      const conditions: string[] = [];
+      const params: unknown[] = [];
 
-      const { rows } = await query(sql, params);
-      if (rows.length > 0) finalRows = rows;
+      if (targetCardIds.length > 0) {
+        params.push(targetCardIds);
+        let idCond = `id = ANY($${params.length})`;
+        if (bankId !== null) {
+          params.push(bankId);
+          idCond += ` AND bank_id = $${params.length}`;
+        }
+        conditions.push(`(${idCond})`);
+      }
+
+      if (targetCardNames.length > 0 && bankId !== null) {
+        params.push(bankId);
+        const bIdx = params.length;
+        params.push(targetCardNames);
+        const nIdx = params.length;
+        conditions.push(`(bank_id = $${bIdx} AND card_name = ANY($${nIdx}))`);
+      }
+
+      if (conditions.length > 0) {
+        params.push(maxCards);
+        const sql = `
+          SELECT *
+          FROM card_variants
+          WHERE is_active = true AND (${conditions.join(" OR ")})
+          ORDER BY card_tier ASC, card_name ASC
+          LIMIT $${params.length}
+        `;
+        const { rows } = await query(sql, params);
+        if (rows.length > 0) finalRows = rows;
+      }
     }
 
-    // Attempt 2: Fetch by names (if IDs failed or returned nothing)
-    if (finalRows.length === 0 && targetCardNames.length > 0 && bankId !== null) {
+    // Fallback: If no cards matched a specific deal, but bank is known, load bank's active cards
+    if (finalRows.length === 0 && bankId !== null && !dealId) {
       const { rows } = await query(
         `SELECT * FROM card_variants
-         WHERE is_active = true AND bank_id = $1 AND card_name = ANY($2)
+         WHERE is_active = true AND bank_id = $1
          ORDER BY card_tier ASC, card_name ASC
-         LIMIT $3`,
-        [bankId, targetCardNames, maxCards],
+         LIMIT $2`,
+        [bankId, maxCards],
       );
-      if (rows.length > 0) finalRows = rows;
+      finalRows = rows;
     }
 
     const cards = finalRows.map((row) => ({

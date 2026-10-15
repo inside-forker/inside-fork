@@ -22,7 +22,7 @@ export function BankCardShowcase({
   dealId,
   size = "sm",
   className = "",
-  maxCards = 4,
+  maxCards = 24,
 }: BankCardShowcaseProps) {
   const [cardVariants, setCardVariants] = useState<CardVariant[]>([]);
   const [loading, setLoading] = useState(true);
