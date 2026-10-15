@@ -47,6 +47,8 @@ export const GET = mobileRoute(async (request: NextRequest) => {
             r.discount_value, r.currency, r.void_reason, r.created_at,
             r.validated_at, r.voided_at, r.listing_id, r.deal_id,
             l.name AS listing_name, l.slug AS listing_slug,
+            (SELECT li.url FROM listing_images li WHERE li.listing_id = l.id
+             ORDER BY li.is_primary DESC NULLS LAST, li.display_order ASC LIMIT 1) AS listing_image_url,
             d.title AS deal_title, d.discount_value AS deal_discount,
             COUNT(*) OVER() AS total_count
      FROM public.redemptions r
@@ -67,6 +69,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     listingId: Number(row.listing_id),
     listingName: row.listing_name,
     listingSlug: row.listing_slug,
+    listingImageUrl: row.listing_image_url ?? null,
     dealId: row.deal_id != null ? Number(row.deal_id) : null,
     dealTitle: row.deal_title,
     discountLabel: row.deal_discount,

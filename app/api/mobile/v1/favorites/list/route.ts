@@ -12,6 +12,8 @@ import {
   type ListingImageDTO,
   type ListingRowLike,
 } from "@/lib/mobile/mappers";
+import { fetchBestDealsByListing } from "@/lib/mobile/listing-deals";
+import { getOpenListingIds } from "@/lib/listings/open-status";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +31,7 @@ function toNumericListingRow(row: Record<string, unknown>): ListingRowLike {
  * GET /api/mobile/v1/favorites/list?page=&limit=
  *
  * The caller's favorited listings as paginated ListingCards, most-recently
- * favorited first. Favorites whose listing is no longer published are omitted
+ * favorited first, each with its `best_deal` and an `is_open_now` flag. Favorites whose listing is no longer published are omitted
  * from the page (filtered by `status = 'published'`) though they still count
  * toward the total.
  */
@@ -106,6 +108,12 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     }
   }
 
+  // The Favorites screen badges each saved place with its best offer and
+  // splits them into Open now / Deals tabs, so both come with the page.
+  // Sequential on purpose - the pool is one connection (see above).
+  const dealsByListing = await fetchBestDealsByListing(listingIds);
+  const openIds = new Set(await getOpenListingIds("now"));
+
   // Preserve the favorite order (the ANY() query returns rows arbitrarily).
   const byId = new Map<number, ListingRowLike>();
   for (const r of rows) {
@@ -114,7 +122,14 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   const listings = orderedIds
     .map((id) => byId.get(id))
     .filter((r): r is ListingRowLike => r != null)
-    .map((r) => toListingCard(r, imagesByListing[r.id as number] ?? []));
+    .map((r) => ({
+      ...toListingCard(
+        r,
+        imagesByListing[r.id as number] ?? [],
+        dealsByListing[r.id as number] ?? null,
+      ),
+      is_open_now: openIds.has(r.id as number),
+    }));
 
   return ok(listings, {
     pagination: buildPaginationMeta(page, limit, total),
