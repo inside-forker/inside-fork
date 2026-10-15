@@ -50,6 +50,8 @@ const SUPPORTED_SORTS = new Set([
   "name",
   "nearest",
   "distance",
+  "best-nearby",
+  "best_nearby",
   "open-now",
   "open-tonight",
   "tonight",
@@ -207,6 +209,30 @@ export const GET = mobileRoute(async (request: NextRequest) => {
 
   let orderBySql: string;
   switch (sort) {
+    case "best-nearby":
+    case "best_nearby":
+    case "open-now":
+    case "open_now":
+    case "open-tonight":
+    case "tonight":
+      orderBySql = hasUserLocation
+        ? `CASE
+             WHEN latitude IS NOT NULL AND longitude IS NOT NULL AND ${haversineDistanceExpr} <= 25 AND avg_rating >= 4.0 THEN 1
+             WHEN latitude IS NOT NULL AND longitude IS NOT NULL AND ${haversineDistanceExpr} <= 25 THEN 2
+             WHEN latitude IS NOT NULL AND longitude IS NOT NULL THEN 3
+             ELSE 4
+           END ASC,
+           CASE
+             WHEN latitude IS NOT NULL AND longitude IS NOT NULL AND ${haversineDistanceExpr} <= 25 AND avg_rating >= 4.0 THEN avg_rating
+             ELSE NULL
+           END DESC NULLS LAST,
+           ${haversineDistanceExpr} ASC NULLS LAST,
+           (avg_rating IS NOT NULL AND avg_rating > 0) DESC,
+           avg_rating DESC NULLS LAST,
+           review_count DESC NULLS LAST,
+           id ASC`
+        : `(avg_rating IS NOT NULL AND avg_rating > 0) DESC, avg_rating DESC NULLS LAST, review_count DESC NULLS LAST, id ASC`;
+      break;
     case "rating":
     case "top-rated":
       orderBySql = hasUserLocation

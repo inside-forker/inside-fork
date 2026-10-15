@@ -347,6 +347,12 @@ export async function queryPaginatedListings(filters: QueryListingsFilters) {
   let orderByClause =
     "ORDER BY is_featured DESC NULLS LAST, avg_rating DESC NULLS LAST, id ASC";
   switch (sort) {
+    case "best-nearby":
+    case "best_nearby":
+    case "open-now":
+    case "open_now":
+    case "open-tonight":
+    case "tonight":
     case "rating":
     case "top-rated":
       orderByClause = "ORDER BY avg_rating DESC NULLS LAST, id ASC";
