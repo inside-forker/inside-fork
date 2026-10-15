@@ -9,6 +9,7 @@ import { Calendar, MapPin, Navigation, Ticket, Sparkles } from "lucide-react";
 import { EventHeroProps } from "@/types/events.types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ShareButton } from "@/components/shared/ShareButton";
+import { formatEventDateTimeRange } from "@/lib/events/datetime";
 
 export function EventHero({
   event,
@@ -27,43 +28,11 @@ export function EventHero({
     }
   }, [images]);
 
-  const formatEventDate = (startTime: string, endTime: string) => {
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-
-    const formatDate = (date: Date) => {
-      return date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-    };
-
-    const formatTime = (date: Date) => {
-      return date.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
-    };
-
-    const isSameDay = start.toDateString() === end.toDateString();
-
-    if (isSameDay) {
-      return {
-        date: formatDate(start),
-        time: `${formatTime(start)} - ${formatTime(end)}`,
-      };
-    } else {
-      return {
-        date: `${formatDate(start)} - ${formatDate(end)}`,
-        time: `${formatTime(start)} - ${formatTime(end)}`,
-      };
-    }
-  };
-
-  const eventDateTime = formatEventDate(event.start_time, event.end_time);
+  // Asia/Karachi so SSR and the browser never disagree (was UTC vs PKT).
+  const eventDateTime = formatEventDateTimeRange(
+    event.start_time,
+    event.end_time,
+  );
 
   // Google Maps: exact pin when we have coordinates, else search the address
   const directionsUrl =

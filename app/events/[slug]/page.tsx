@@ -15,6 +15,10 @@ import { EventVenueMap } from "@/components/events/EventVenueMap";
 import { EventDescription } from "@/components/events/EventDescription";
 import { isPrismfestSlug, PRISMFEST_VENUE_MAP } from "@/lib/events/prismfest";
 import { getParchiOffer, type ParchiOffer } from "@/lib/parchi/service";
+import {
+  formatEventDateLong,
+  formatEventTime,
+} from "@/lib/events/datetime";
 
 // Containers
 import { EventTicketsContainer } from "@/components/events/containers/EventTicketsContainer";
@@ -189,25 +193,11 @@ export default async function EventPage({
                   <div>
                     <h4 className="font-medium mb-2">Date & Time</h4>
                     <p className="text-muted-foreground">
-                      {new Date(event.start_time).toLocaleDateString("en-US", {
-                        weekday: "long",
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
+                      {formatEventDateLong(event.start_time)}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(event.start_time).toLocaleTimeString("en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: true,
-                      })}{" "}
-                      -{" "}
-                      {new Date(event.end_time).toLocaleTimeString("en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: true,
-                      })}
+                      {formatEventTime(event.start_time)} -{" "}
+                      {formatEventTime(event.end_time)}
                     </p>
                   </div>
 
