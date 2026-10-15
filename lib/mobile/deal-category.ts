@@ -13,8 +13,18 @@ export type MobileDealCategory =
 
 const SLUG_TO_DEAL_CATEGORY: Record<string, MobileDealCategory> = {
   // Dining
+  "food-drinks": "dining",
   "food-dining": "dining",
   "restaurants-cafes": "dining",
+  restaurants: "dining",
+  "fast-food": "dining",
+  pakistani: "dining",
+  chinese: "dining",
+  coffee: "dining",
+  bakeries: "dining",
+  desserts: "dining",
+  icecream: "dining",
+  beverages: "dining",
   "pakistani-desi-cuisine": "dining",
   "cafes-coworking-spots": "dining",
   "fast-food-street-food": "dining",
@@ -69,13 +79,22 @@ const SLUG_TO_DEAL_CATEGORY: Record<string, MobileDealCategory> = {
 
 /** Leaf / family → dining sub-filter chip labels on category drill-down. */
 const SLUG_TO_SUB: Record<string, string> = {
-  "cafes-coworking-spots": "Cafés",
+  "fast-food": "Fast Food",
   "fast-food-street-food": "Fast Food",
-  "fine-dining-buffets": "Fine Dining",
-  "pakistani-desi-cuisine": "BBQ",
-  "bakeries-desserts": "Cafés",
-  "juice-bars-beverages": "Cafés",
+  pakistani: "Pakistani",
+  "pakistani-desi-cuisine": "Pakistani",
+  chinese: "Chinese",
+  coffee: "Cafés",
+  "cafes-coworking-spots": "Cafés",
+  bakeries: "Bakeries & Desserts",
+  "bakeries-desserts": "Bakeries & Desserts",
+  desserts: "Bakeries & Desserts",
+  icecream: "Bakeries & Desserts",
+  beverages: "Beverages",
+  "juice-bars-beverages": "Beverages",
+  restaurants: "Fine Dining",
   "restaurants-cafes": "Fine Dining",
+  "fine-dining-buffets": "Fine Dining",
   "groceries-fresh-food": "Groceries",
 };
 
