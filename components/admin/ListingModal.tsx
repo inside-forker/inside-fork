@@ -207,6 +207,7 @@ export function ListingModal({
       isClosed: false,
     })),
   );
+  const [syncHoursToAllBranches, setSyncHoursToAllBranches] = React.useState(false);
 
   // Deals state
   const [deals, setDeals] = React.useState<
@@ -812,6 +813,7 @@ export function ListingModal({
           isClosed: false,
         })),
       );
+      setSyncHoursToAllBranches(false);
     }
   }, [listing?.id, isOpen]);
 
@@ -1227,49 +1229,64 @@ export function ListingModal({
         const hoursListingId = effectiveListingId;
 
         if (hoursListingId) {
-          // Fetch ACTUAL branch count from DB (don't trust state which might not be loaded yet)
-          const branchCheckResponse = await fetch(
-            `/api/admin/listings/${hoursListingId}/branches`,
-          );
-          const branchCheckData = await branchCheckResponse.json();
-          const actualBranchCount = branchCheckData.branches?.length || 0;
-          const hasAnyBranch = actualBranchCount > 0;
-
-          if (hasAnyBranch) {
-            // No-op: listings with a branch manage hours per branch.
-          } else {
-            const sanitizedHours = openingHours.map((h) => {
-              const isClosed = Boolean(h.isClosed);
-              const openTime = isClosed || !h.openTime || !h.openTime.trim() ? null : h.openTime.trim();
-              const closeTime = isClosed || !h.closeTime || !h.closeTime.trim() ? null : h.closeTime.trim();
-              return {
-                dayOfWeek: h.dayOfWeek,
-                openTime,
-                closeTime,
-                isClosed: isClosed || (!openTime && !closeTime),
-                branch_id: h.branch_id ?? null,
-              };
-            });
-
-            const response = await fetch(
-              `/api/admin/listings/${hoursListingId}/opening-hours`,
-              {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ opening_hours: sanitizedHours }),
-              },
+          // Fetch primary branch if exists to link branch_id
+          let primaryBranchId: number | null = null;
+          try {
+            const branchCheckResponse = await fetch(
+              `/api/admin/listings/${hoursListingId}/branches`,
             );
+            const branchCheckData = await branchCheckResponse.json();
+            const primaryBranch =
+              branchCheckData.branches?.find((b: { is_primary?: boolean }) => b.is_primary) ||
+              branchCheckData.branches?.[0];
+            primaryBranchId = primaryBranch?.id
+              ? Number(primaryBranch.id)
+              : null;
+          } catch {
+            // non-blocking
+          }
 
-            const result = await response.json();
+          const sanitizedHours = openingHours.map((h) => {
+            const isClosed = Boolean(h.isClosed);
+            const openTime =
+              isClosed || !h.openTime || !h.openTime.trim()
+                ? null
+                : h.openTime.trim();
+            const closeTime =
+              isClosed || !h.closeTime || !h.closeTime.trim()
+                ? null
+                : h.closeTime.trim();
+            return {
+              dayOfWeek: h.dayOfWeek,
+              openTime,
+              closeTime,
+              isClosed: isClosed || (!openTime && !closeTime),
+              branch_id: h.branch_id ?? primaryBranchId,
+            };
+          });
 
-            if (!response.ok) {
-              console.error("[OPENING HOURS SAVE] Save failed:", result);
-              toast({
-                title: "Save Failed",
-                description: result.error || "Opening hours could not be saved",
-                variant: "destructive",
-              });
-            }
+          const response = await fetch(
+            `/api/admin/listings/${hoursListingId}/opening-hours`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                opening_hours: sanitizedHours,
+                sync_to_brand_group: syncHoursToAllBranches,
+                sync_to_branches: syncHoursToAllBranches,
+              }),
+            },
+          );
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            console.error("[OPENING HOURS SAVE] Save failed:", result);
+            toast({
+              title: "Save Failed",
+              description: result.error || "Opening hours could not be saved",
+              variant: "destructive",
+            });
           }
         }
       } catch (err) {
@@ -1818,10 +1835,13 @@ export function ListingModal({
 
               {activeTab === "hours" && (
                 <HoursTab
+                  listingId={listing?.id || null}
                   openingHours={openingHours}
                   onChange={setOpeningHours}
                   isLoading={isLoading}
                   branches={branches}
+                  syncToAllBranches={syncHoursToAllBranches}
+                  onSyncToAllBranchesChange={setSyncHoursToAllBranches}
                 />
               )}
 

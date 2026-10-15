@@ -15,6 +15,7 @@ import {
 import { getAttendeesPreviewByEvent } from "@/lib/mobile/attendees";
 import { formatDiscount } from "@/lib/mobile/deal-format";
 import { getParchiOffer, type ParchiOffer } from "@/lib/parchi/service";
+import { isPrismfestSlug } from "@/lib/events/prismfest";
 import { effectiveQuantitySql } from "@/lib/ticketing/sellable-quantity";
 
 export const dynamic = "force-dynamic";
@@ -225,6 +226,9 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
     images: images.map(toEventImage),
     ticket_types: tickets.map(toTicketType),
     parchi_offer: parchiOffer,
+    // Prismfest only: the discount checkout applies to every app booking
+    // (same coupon, see applyPrismfestDiscount). Drives the slashed prices.
+    event_discount: isPrismfestSlug(slug) ? parchiOffer : null,
     // The detail tabs' extras. Only the venue map is stored so far; the rest
     // stay empty and the app hides their sections.
     event_info: {

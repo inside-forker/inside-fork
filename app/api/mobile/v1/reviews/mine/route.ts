@@ -18,7 +18,9 @@ const REVIEW_SQL_COLUMNS =
   "ELSE NULL END AS profiles, " +
   "l.name AS listing_name, l.slug AS listing_slug, l.address AS listing_address, " +
   "(SELECT li.url FROM listing_images li WHERE li.listing_id = l.id " +
-  " ORDER BY li.is_primary DESC NULLS LAST, li.display_order ASC LIMIT 1) AS listing_image_url";
+  " ORDER BY li.is_primary DESC NULLS LAST, li.display_order ASC LIMIT 1) AS listing_image_url, " +
+  // Same count GET /reviews gives each review: approved comments, replies included.
+  "(SELECT COUNT(*) FROM review_comments rc WHERE rc.review_id = r.id AND rc.status = 'approved') AS comment_count";
 
 function toNumericReviewRow(row: Record<string, unknown>): ReviewRowLike {
   return {
@@ -84,6 +86,7 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     listing_slug: row.listing_slug ?? null,
     listing_address: row.listing_address ?? null,
     listing_image_url: row.listing_image_url ?? null,
+    comment_count: Number(row.comment_count ?? 0),
   }));
 
   return ok(reviews, {
