@@ -27,7 +27,9 @@ export const GET = mobileRoute(async (request: NextRequest) => {
       slides: slides.map((s) =>
         s.kind === "event"
           ? { kind: "event" as const, event: s.event }
-          : { kind: "listing" as const, listing: s.listing },
+          : s.kind === "listing"
+          ? { kind: "listing" as const, listing: s.listing }
+          : { kind: "brand" as const, brand: s.brand },
       ),
     });
   } catch (error) {

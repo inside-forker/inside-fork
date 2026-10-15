@@ -21,12 +21,38 @@ import {
   type HomeOpenerSlideRef,
 } from "@/lib/home-opener/types";
 
+export type BrandMemberInfo = {
+  id: number;
+  name: string;
+  slug: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  avg_rating: number;
+  review_count: number;
+  category_name?: string | null;
+  image_url?: string | null;
+};
+
+export type BrandOpenerSlideDTO = {
+  id: number;
+  name: string;
+  slug: string;
+  image_url: string | null;
+  kicker: string;
+  category_name: string | null;
+  pinned_listing_id: number | null;
+  members: BrandMemberInfo[];
+  default_listing: ListingCardDTO | null;
+};
+
 export type HomeOpenerResolvedSlide =
   | { kind: "event"; event: EventCardDTO }
-  | { kind: "listing"; listing: ListingCardDTO };
+  | { kind: "listing"; listing: ListingCardDTO }
+  | { kind: "brand"; brand: BrandOpenerSlideDTO };
 
 export type HomeOpenerPreview = {
-  kind: "event" | "listing";
+  kind: "event" | "listing" | "brand";
   id: number;
   title: string;
   image_url: string | null;
@@ -34,6 +60,9 @@ export type HomeOpenerPreview = {
   status: string | null;
   valid: boolean;
   warning: string | null;
+  custom_image_url?: string | null;
+  pinned_listing_id?: number | null;
+  members?: BrandMemberInfo[];
 };
 
 async function loadConfigFromDb(): Promise<HomeOpenerConfig> {
@@ -143,6 +172,80 @@ async function fetchListingsByIds(ids: number[]): Promise<Map<number, ListingCar
   return map;
 }
 
+type BrandFetchResult = {
+  id: number;
+  name: string;
+  slug: string;
+  members: BrandMemberInfo[];
+  sampleImage: string | null;
+  categoryName: string | null;
+};
+
+async function fetchBrandsByIds(ids: number[]): Promise<Map<number, BrandFetchResult>> {
+  const map = new Map<number, BrandFetchResult>();
+  if (ids.length === 0) return map;
+
+  const { rows: brandRows } = await query(
+    `SELECT id, name, slug FROM brand_groups WHERE id = ANY($1)`,
+    [ids],
+  );
+  if (brandRows.length === 0) return map;
+
+  const { rows: memberRows } = await query(
+    `SELECT m.group_id, l.id, l.name, l.slug, l.status, l.address,
+            l.latitude, l.longitude, l.avg_rating, l.review_count,
+            l.category_name,
+            img.url AS image_url
+     FROM brand_group_members m
+     JOIN listings_with_details l ON l.id = m.listing_id
+     LEFT JOIN LATERAL (
+       SELECT url FROM listing_images
+       WHERE listing_id = l.id
+       ORDER BY is_primary DESC NULLS LAST, display_order ASC NULLS LAST, id ASC
+       LIMIT 1
+     ) img ON true
+     WHERE m.group_id = ANY($1) AND l.status = 'published'
+     ORDER BY m.sort_order ASC, l.name ASC`,
+    [ids],
+  );
+
+  const membersByGroup = new Map<number, BrandMemberInfo[]>();
+  for (const m of memberRows) {
+    const gid = Number(m.group_id);
+    if (!membersByGroup.has(gid)) membersByGroup.set(gid, []);
+    membersByGroup.get(gid)!.push({
+      id: Number(m.id),
+      name: m.name,
+      slug: m.slug,
+      address: m.address,
+      latitude: m.latitude != null ? Number(m.latitude) : null,
+      longitude: m.longitude != null ? Number(m.longitude) : null,
+      avg_rating: m.avg_rating != null ? Number(m.avg_rating) : 0,
+      review_count: m.review_count != null ? Number(m.review_count) : 0,
+      category_name: m.category_name ?? null,
+      image_url: m.image_url ?? null,
+    });
+  }
+
+  for (const b of brandRows) {
+    const id = Number(b.id);
+    const members = membersByGroup.get(id) || [];
+    const sampleImage = members.find((m) => m.image_url)?.image_url ?? null;
+    const categoryName = members.find((m) => m.category_name)?.category_name ?? null;
+
+    map.set(id, {
+      id,
+      name: b.name,
+      slug: b.slug,
+      members,
+      sampleImage,
+      categoryName,
+    });
+  }
+
+  return map;
+}
+
 function eventIsLive(event: EventCardDTO): boolean {
   if (event.event_status !== "published") return false;
   if (!event.end_time) return true;
@@ -159,10 +262,12 @@ export async function previewHomeOpenerSlides(
 ): Promise<HomeOpenerPreview[]> {
   const eventIds = refs.filter((r) => r.kind === "event").map((r) => r.id);
   const listingIds = refs.filter((r) => r.kind === "listing").map((r) => r.id);
+  const brandIds = refs.filter((r) => r.kind === "brand").map((r) => r.id);
 
-  const [eventsMap, listingsMap] = await Promise.all([
+  const [eventsMap, listingsMap, brandsMap] = await Promise.all([
     fetchEventsByIds(eventIds),
     fetchListingsByIds(listingIds),
+    fetchBrandsByIds(brandIds),
   ]);
 
   const previews: HomeOpenerPreview[] = [];
@@ -202,6 +307,35 @@ export async function previewHomeOpenerSlides(
           : event.event_status !== "published"
             ? `Status: ${event.event_status ?? "unknown"}`
             : "Event has ended",
+      });
+    } else if (ref.kind === "brand") {
+      const brand = brandsMap.get(ref.id);
+      if (!brand) {
+        previews.push({
+          kind: "brand",
+          id: ref.id,
+          title: `Brand #${ref.id}`,
+          image_url: null,
+          subtitle: null,
+          status: null,
+          valid: false,
+          warning: "Brand group not found",
+        });
+        continue;
+      }
+      const live = brand.members.length > 0;
+      previews.push({
+        kind: "brand",
+        id: ref.id,
+        title: brand.name,
+        image_url: ref.custom_image_url || brand.sampleImage,
+        subtitle: `${brand.members.length} published branch${brand.members.length !== 1 ? "es" : ""}`,
+        status: live ? "active" : "empty",
+        valid: live,
+        warning: live ? null : "No published branches in this brand group",
+        custom_image_url: ref.custom_image_url || null,
+        pinned_listing_id: ref.pinned_listing_id || null,
+        members: brand.members,
       });
     } else {
       const listing = listingsMap.get(ref.id);
@@ -263,9 +397,6 @@ async function fetchTrendingListings(
 ): Promise<ListingCardDTO[]> {
   if (limit <= 0) return [];
 
-  // Prefer featured + high-rated published listings (same spirit as HomeOpener's
-  // client sort of trending). Keep the query simple so this resolver stays
-  // independent of the heavier weekly-engagement trending CTE.
   const { rows } = await query(
     `SELECT ${LISTING_CARD_COLUMNS}
      FROM listings_with_details
@@ -331,13 +462,16 @@ export async function resolveHomeOpenerSlides(): Promise<{
   const curated: HomeOpenerResolvedSlide[] = [];
   const usedListings = new Set<number>();
   const usedEvents = new Set<number>();
+  const usedBrands = new Set<number>();
 
   const eventIds = config.slides.filter((r) => r.kind === "event").map((r) => r.id);
   const listingIds = config.slides.filter((r) => r.kind === "listing").map((r) => r.id);
+  const brandIds = config.slides.filter((r) => r.kind === "brand").map((r) => r.id);
 
-  const [eventsMap, listingsMap] = await Promise.all([
+  const [eventsMap, listingsMap, brandsMap] = await Promise.all([
     fetchEventsByIds(eventIds),
     fetchListingsByIds(listingIds),
+    fetchBrandsByIds(brandIds),
   ]);
 
   for (const ref of config.slides) {
@@ -348,6 +482,26 @@ export async function resolveHomeOpenerSlides(): Promise<{
       if (usedEvents.has(event.event_id)) continue;
       curated.push({ kind: "event", event });
       usedEvents.add(event.event_id);
+    } else if (ref.kind === "brand") {
+      const brand = brandsMap.get(ref.id);
+      if (!brand || brand.members.length === 0) continue;
+      if (usedBrands.has(brand.id)) continue;
+      usedBrands.add(brand.id);
+
+      curated.push({
+        kind: "brand",
+        brand: {
+          id: brand.id,
+          name: brand.name,
+          slug: brand.slug,
+          image_url: ref.custom_image_url || brand.sampleImage,
+          kicker: ref.kicker || "Trending in Karachi",
+          category_name: brand.categoryName,
+          pinned_listing_id: ref.pinned_listing_id || null,
+          members: brand.members,
+          default_listing: null,
+        },
+      });
     } else {
       const listing = listingsMap.get(ref.id);
       if (!listing || !listingIsLive(listing) || listing.id == null) continue;
@@ -380,7 +534,10 @@ export async function resolveHomeOpenerSlides(): Promise<{
     if (s.kind === "event") {
       return s.event.event_id == null || !usedEvents.has(s.event.event_id);
     }
-    return s.listing.id == null || !usedListings.has(s.listing.id);
+    if (s.kind === "listing") {
+      return s.listing.id == null || !usedListings.has(s.listing.id);
+    }
+    return true;
   });
 
   return {
@@ -414,7 +571,7 @@ export async function saveHomeOpenerConfig(
     [
       HOME_OPENER_CONFIG_KEY,
       serialized,
-      "Ordered slides for the mobile Home hero (event/listing refs, max 4).",
+      "Ordered slides for the mobile Home hero (event/listing/brand refs, max 4).",
       updatedBy,
     ],
   );

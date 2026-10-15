@@ -519,8 +519,8 @@ export function FullScreenDeals({
 
                       {/* Card Types for Bank Deals */}
                       {deal.deal_type === "bank_discount" && deal.banks && (
-                        <div className="flex items-center gap-2 mb-3">
-                          <span className="text-xs text-muted-foreground">
+                        <div className="flex items-start gap-2 mb-3">
+                          <span className="text-xs text-muted-foreground flex-shrink-0 pt-1">
                             Valid on:
                           </span>
                           <div className="flex-1">
@@ -529,6 +529,7 @@ export function FullScreenDeals({
                               bankId={deal.bank_id || undefined}
                               dealId={deal.id}
                               size="sm"
+                              maxCards={24}
                             />
                           </div>
                         </div>
