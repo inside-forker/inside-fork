@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   parseGoogleMapsLink,
   isLikelyGoogleMapsHost,
@@ -13,6 +13,8 @@ import type {
 } from "@/types/listing.types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
@@ -34,9 +36,24 @@ import {
   MessageCircle,
   Youtube,
   MapPin,
+  Store,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+
+type BrandGroupSummary = {
+  id: number;
+  name: string;
+  slug: string;
+  members: Array<{
+    listing_id: number;
+    name: string;
+    slug: string;
+    status: string;
+  }>;
+};
 
 interface Category {
   value: string;
@@ -70,8 +87,36 @@ export function DetailsTab({
   branches,
   hideAdminFields = false,
 }: DetailsTabProps) {
+  const { toast } = useToast();
   const [urlErrors, setUrlErrors] = useState<Record<string, string>>({});
   const [categorySearch, setCategorySearch] = useState("");
+  const [brandGroup, setBrandGroup] = useState<BrandGroupSummary | null>(null);
+  const [isSyncingSubcategories, setIsSyncingSubcategories] = useState(false);
+
+  useEffect(() => {
+    if (!listing?.id) {
+      setBrandGroup(null);
+      return;
+    }
+    let isMounted = true;
+    fetch(`/api/admin/listings/${listing.id}/brand-group`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (isMounted && data?.group) {
+          setBrandGroup(data.group);
+        }
+      })
+      .catch((err) => console.error("Error loading brand group in DetailsTab:", err));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [listing?.id]);
+
+  const siblingMembers = useMemo(() => {
+    if (!brandGroup?.members || !listing?.id) return [];
+    return brandGroup.members.filter((m) => m.listing_id !== listing.id);
+  }, [brandGroup, listing?.id]);
 
   // Group subcategories under their main categories
   const categoryGroups = useMemo(() => {
@@ -171,6 +216,44 @@ export function DetailsTab({
     const rest = selectedCategoryIds.filter((id) => id !== categoryValue);
     onInputChange("category_ids", [categoryValue, ...rest]);
     onInputChange("category_id", categoryValue);
+  };
+
+  const handleSyncSubcategoriesNow = async () => {
+    if (!listing?.id || selectedCategoryIds.length === 0) return;
+    setIsSyncingSubcategories(true);
+    try {
+      const res = await fetch(
+        `/api/admin/listings/${listing.id}/categories/sync-to-brand-group`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category_ids: selectedCategoryIds,
+            primary_category_id: formData.category_id,
+          }),
+        },
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to sync subcategories");
+      }
+
+      toast({
+        title: "Subcategories Synced",
+        description: `Successfully synced subcategories to ${data.synced_count} other branch(es) of ${brandGroup?.name}!`,
+      });
+    } catch (err) {
+      console.error("Sync subcategories error:", err);
+      toast({
+        title: "Sync Failed",
+        description:
+          err instanceof Error ? err.message : "Failed to sync subcategories",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncingSubcategories(false);
+    }
   };
 
   const validateUrl = (url: string, fieldName: string) => {
@@ -404,14 +487,55 @@ export function DetailsTab({
               </div>
             )}
             <div className="space-y-2">
-              <div className="flex items-center gap-1">
-                <Label>Categories</Label>
-                <span className="text-destructive text-sm">*</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <Label>Categories & Subcategories</Label>
+                  <span className="text-destructive text-sm">*</span>
+                </div>
               </div>
               <p className="text-xs text-muted-foreground">
                 Select one or more subcategories under each main category. The primary category is used
                 for display cards and legacy fields.
               </p>
+
+              {brandGroup && siblingMembers.length > 0 && (
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <Store className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-semibold text-foreground">
+                          {brandGroup.name} ({brandGroup.members.length} branches)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Apply these selected subcategories to all {siblingMembers.length} other branches of this brand.
+                      </p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isSyncingSubcategories || selectedCategoryIds.length === 0}
+                      onClick={handleSyncSubcategoriesNow}
+                      className="text-xs h-8 bg-background border-primary/30 hover:bg-primary/10 hover:text-primary gap-1.5 self-start sm:self-auto shrink-0 whitespace-nowrap"
+                    >
+                      {isSyncingSubcategories ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-3.5 w-3.5 text-primary" />
+                          Sync Subcategories
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {categories.length > 6 && (
                 <Input

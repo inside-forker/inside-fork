@@ -8,6 +8,7 @@ import {
   normalizeCategoryIds,
   syncListingCategories,
 } from "@/lib/listings/sync-listing-categories";
+import { getBrandGroupForListing } from "@/lib/listings/brand-groups";
 
 const ROUTE = "/api/admin/listings/[id]";
 
@@ -415,6 +416,26 @@ export async function PATCH(
           body.category_id,
         );
         listing = { ...listing, category_id: synced.primaryCategoryId };
+
+        if (body.sync_categories_to_brand_group) {
+          try {
+            const group = await getBrandGroupForListing(listingId);
+            if (group && group.members.length > 1) {
+              const siblingIds = group.members
+                .map((m) => m.listing_id)
+                .filter((sId) => sId !== listingId);
+              for (const sibId of siblingIds) {
+                await syncListingCategories(
+                  sibId,
+                  synced.categoryIds,
+                  synced.primaryCategoryId,
+                );
+              }
+            }
+          } catch (syncBrandErr) {
+            console.error("Failed to sync categories to brand group:", syncBrandErr);
+          }
+        }
       } catch (syncError) {
         console.error("Failed to sync listing categories:", syncError);
         captureRouteError(syncError, { route: ROUTE, method: "PATCH" });
