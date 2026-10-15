@@ -4,6 +4,7 @@ import {
   toListingAccessResponse,
 } from "@/lib/listings/route-access";
 import { query } from "@/lib/db";
+import { getBrandGroupForListing } from "@/lib/listings/brand-groups";
 
 export async function GET(
   request: NextRequest,
@@ -119,6 +120,64 @@ export async function POST(
       }
 
       deal = { ...inserted, banks: bank };
+
+      let appliedCount = 0;
+      if (
+        Array.isArray(body.apply_to_listing_ids) &&
+        body.apply_to_listing_ids.length > 0
+      ) {
+        const group = await getBrandGroupForListing(listingId);
+        const validMemberIds = new Set(
+          group ? group.members.map((m) => m.listing_id) : [],
+        );
+        const validTargetIds = body.apply_to_listing_ids
+          .map((tid: unknown) => parseInt(String(tid), 10))
+          .filter(
+            (tid: number) =>
+              Number.isFinite(tid) &&
+              validMemberIds.has(tid) &&
+              tid !== listingId,
+          );
+
+        for (const targetId of validTargetIds) {
+          const { rows: existing } = await query(
+            `SELECT id FROM deals
+             WHERE listing_id = $1
+               AND title = $2
+               AND (bank_id = $3 OR (bank_id IS NULL AND $3 IS NULL))
+               AND discount_value = $4
+               AND is_active = true`,
+            [targetId, body.title, body.bank_id || null, body.discount_value],
+          );
+
+          if (existing.length === 0) {
+            await query(
+              `INSERT INTO deals (
+                 listing_id, title, description, deal_type, bank_id, discount_value,
+                 start_date, end_date, is_active, valid_card_variants
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+              [
+                targetId,
+                body.title,
+                body.description,
+                body.deal_type,
+                body.bank_id || null,
+                body.discount_value,
+                startDate,
+                endDate,
+                body.is_active ?? true,
+                body.valid_card_variants || null,
+              ],
+            );
+            appliedCount++;
+          }
+        }
+      }
+
+      return NextResponse.json({
+        deal,
+        applied_to_count: appliedCount,
+      });
     } catch (error) {
       console.error("Error creating deal:", error);
       return NextResponse.json(
@@ -126,8 +185,6 @@ export async function POST(
         { status: 500 }
       );
     }
-
-    return NextResponse.json({ deal });
   } catch (error) {
     if (error instanceof Error && error.name === "ListingRouteAccessError") {
       return toListingAccessResponse(error);

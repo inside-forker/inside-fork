@@ -32,10 +32,27 @@ import {
   CreditCard,
   Loader2,
   Check,
+  Store,
 } from "lucide-react";
 import { TabsContent } from "@/components/ui/tabs";
 import { Database } from "@/types/database";
 import { BankCardImage } from "@/components/bank-cards/BankCardImage";
+
+type BrandGroupMember = {
+  listing_id: number;
+  name: string;
+  slug: string;
+  status: string;
+  sort_order: number;
+  source: string;
+};
+
+type BrandGroupSummary = {
+  id: number;
+  name: string;
+  slug: string;
+  members: BrandGroupMember[];
+};
 
 type Deal = Database["public"]["Tables"]["deals"]["Row"] & {
   banks?: {
@@ -106,6 +123,90 @@ export function DealsTab({
   const [cards, setCards] = React.useState<CardVariant[]>([]);
   const [cardsLoading, setCardsLoading] = React.useState(false);
   const [selectedBankName, setSelectedBankName] = React.useState<string>("");
+
+  // Brand Group states
+  const [brandGroup, setBrandGroup] = React.useState<BrandGroupSummary | null>(null);
+  const [applyToSiblings, setApplyToSiblings] = React.useState(true);
+  const [selectedSiblingIds, setSelectedSiblingIds] = React.useState<number[]>([]);
+  const [applyModalOpen, setApplyModalOpen] = React.useState(false);
+  const [applyingDeal, setApplyingDeal] = React.useState<Deal | null>(null);
+  const [applySelectedIds, setApplySelectedIds] = React.useState<number[]>([]);
+  const [isApplying, setIsApplying] = React.useState(false);
+
+  // Fetch Brand Group for this listing
+  React.useEffect(() => {
+    if (!listingId) return;
+    let isMounted = true;
+    fetch(`/api/admin/listings/${listingId}/brand-group`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (isMounted && data?.group) {
+          setBrandGroup(data.group);
+        }
+      })
+      .catch((err) => console.error("Error loading brand group:", err));
+    return () => {
+      isMounted = false;
+    };
+  }, [listingId]);
+
+  const siblingMembers = React.useMemo(() => {
+    if (!brandGroup?.members) return [];
+    return brandGroup.members.filter(
+      (m) => m.listing_id.toString() !== listingId,
+    );
+  }, [brandGroup, listingId]);
+
+  // Sync sibling IDs selection when siblingMembers load
+  React.useEffect(() => {
+    setSelectedSiblingIds(siblingMembers.map((m) => m.listing_id));
+  }, [siblingMembers]);
+
+  const handleOpenApplyModal = (deal: Deal) => {
+    setApplyingDeal(deal);
+    setApplySelectedIds(siblingMembers.map((m) => m.listing_id));
+    setApplyModalOpen(true);
+  };
+
+  const handleApplyToSiblingsSubmit = async () => {
+    if (!applyingDeal || applySelectedIds.length === 0) return;
+    setIsApplying(true);
+    try {
+      const res = await fetch(
+        `/api/admin/listings/${listingId}/deals/apply-to-brand-group`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            dealId: applyingDeal.id,
+            targetListingIds: applySelectedIds,
+          }),
+        },
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to apply deal to other branches");
+      }
+
+      toast({
+        title: "Deal Applied",
+        description: `Successfully applied "${applyingDeal.title}" to ${data.applied_count} branch(es) of ${brandGroup?.name}!`,
+      });
+      setApplyModalOpen(false);
+      setApplyingDeal(null);
+    } catch (err) {
+      console.error("Apply to siblings error:", err);
+      toast({
+        title: "Error",
+        description:
+          err instanceof Error ? err.message : "Failed to apply deal",
+        variant: "destructive",
+      });
+    } finally {
+      setIsApplying(false);
+    }
+  };
 
   // Auto-Fix: Map Peekaboo IDs to Local IDs if mismatch detected
   React.useEffect(() => {
@@ -250,6 +351,11 @@ export function DealsTab({
         end_date: formData.end_date || null,
         is_active: formData.is_active,
         valid_card_variants: formData.valid_card_variants,
+        ...(!editingDeal &&
+          applyToSiblings &&
+          selectedSiblingIds.length > 0 && {
+            apply_to_listing_ids: selectedSiblingIds,
+          }),
       };
 
       const response = await fetch(url, {
@@ -262,20 +368,35 @@ export function DealsTab({
         throw new Error("Failed to save deal");
       }
 
-      const { deal } = await response.json();
+      const data = await response.json();
+      const deal = data.deal;
 
       if (editingDeal) {
         // Update existing deal
         const updatedDeals = deals.map((d) => (d.id === deal.id ? deal : d));
         onDealsChange(updatedDeals);
+        toast({
+          title: "Deal Updated",
+          description: "Deal has been updated successfully",
+        });
       } else {
         // Add new deal
         onDealsChange([...deals, deal]);
+        const appliedCount = data.applied_to_count || 0;
+        toast({
+          title: "Deal Created",
+          description:
+            appliedCount > 0
+              ? `Deal created and applied to ${appliedCount} other branch(es) of ${brandGroup?.name}!`
+              : "Deal created successfully",
+        });
       }
 
       // Reset form
       setFormData(initialFormData);
       setCards([]);
+      setApplyToSiblings(true);
+      setSelectedSiblingIds(siblingMembers.map((m) => m.listing_id));
       setIsFormOpen(false);
       setEditingDeal(null);
     } catch (error) {
@@ -358,6 +479,8 @@ export function DealsTab({
       setEditingDeal(null);
       setFormData(initialFormData);
       setCards([]);
+      setApplyToSiblings(true);
+      setSelectedSiblingIds(siblingMembers.map((m) => m.listing_id));
     }
   };
 
@@ -374,19 +497,37 @@ export function DealsTab({
   return (
     <TabsContent value="deals" className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Tag className="h-4 w-4 text-primary" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-start gap-2.5">
+          <Tag className="h-5 w-5 text-primary mt-0.5" />
           <div>
-            <h3 className="text-lg font-medium">Deals & Discounts</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-medium">Deals & Discounts</h3>
+              {brandGroup && (
+                <Badge
+                  variant="outline"
+                  className="text-xs bg-primary/5 text-primary border-primary/20 flex items-center gap-1"
+                >
+                  <Store className="h-3 w-3" />
+                  {brandGroup.name} ({brandGroup.members.length} branches)
+                </Badge>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">
               Manage special offers and discounts for this listing
             </p>
           </div>
         </div>
         <Button
-          onClick={() => setIsFormOpen(true)}
-          className="flex items-center gap-2"
+          onClick={() => {
+            setEditingDeal(null);
+            setFormData(initialFormData);
+            setCards([]);
+            setApplyToSiblings(siblingMembers.length > 0);
+            setSelectedSiblingIds(siblingMembers.map((m) => m.listing_id));
+            setIsFormOpen(true);
+          }}
+          className="flex items-center gap-2 self-start sm:self-auto"
         >
           <Plus className="h-4 w-4" />
           Add Deal
@@ -463,6 +604,18 @@ export function DealsTab({
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
+                    {siblingMembers.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title={`Apply deal to other branches of ${brandGroup?.name || "brand"}`}
+                        onClick={() => handleOpenApplyModal(deal)}
+                        className="h-8 px-2 text-xs flex items-center gap-1 hover:bg-primary/10 hover:text-primary"
+                      >
+                        <Store className="h-3.5 w-3.5 text-primary" />
+                        <span className="hidden md:inline">Apply to branches</span>
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -839,6 +992,86 @@ export function DealsTab({
               </div>
             </div>
 
+            {!editingDeal && siblingMembers.length > 0 && (
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label
+                      htmlFor="apply_to_siblings"
+                      className="text-sm font-semibold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Store className="h-4 w-4 text-primary" />
+                      Apply to other branches in {brandGroup?.name || "brand group"}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Automatically create this deal for other branches of this brand
+                    </p>
+                  </div>
+                  <Switch
+                    id="apply_to_siblings"
+                    checked={applyToSiblings}
+                    onCheckedChange={setApplyToSiblings}
+                  />
+                </div>
+
+                {applyToSiblings && (
+                  <div className="pt-2 border-t border-primary/10 space-y-2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground pb-1">
+                      <span>
+                        Target branches ({selectedSiblingIds.length} of {siblingMembers.length} selected):
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedSiblingIds.length === siblingMembers.length) {
+                            setSelectedSiblingIds([]);
+                          } else {
+                            setSelectedSiblingIds(siblingMembers.map((m) => m.listing_id));
+                          }
+                        }}
+                        className="text-primary hover:underline font-medium"
+                      >
+                        {selectedSiblingIds.length === siblingMembers.length
+                          ? "Deselect All"
+                          : "Select All"}
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                      {siblingMembers.map((member) => {
+                        const isChecked = selectedSiblingIds.includes(member.listing_id);
+                        return (
+                          <label
+                            key={member.listing_id}
+                            className={`flex items-center gap-2 text-xs p-2 rounded-lg border cursor-pointer transition-colors ${
+                              isChecked
+                                ? "bg-background border-primary/40 text-foreground"
+                                : "bg-muted/40 border-border/50 text-muted-foreground"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                setSelectedSiblingIds((prev) =>
+                                  isChecked
+                                    ? prev.filter((id) => id !== member.listing_id)
+                                    : [...prev, member.listing_id]
+                                );
+                              }}
+                              className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
+                            />
+                            <span className="truncate" title={member.name}>
+                              {member.name}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center space-x-2">
               <Switch
                 id="is_active"
@@ -872,6 +1105,104 @@ export function DealsTab({
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+      {/* Apply Existing Deal to Siblings Modal */}
+      <Dialog open={applyModalOpen} onOpenChange={setApplyModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Store className="h-5 w-5 text-primary" />
+              Apply Deal to Other Branches
+            </DialogTitle>
+            <DialogDescription>
+              Copy &ldquo;{applyingDeal?.title}&rdquo;{" "}
+              {applyingDeal?.discount_value ? `(${applyingDeal.discount_value})` : ""} to
+              other branches of <strong>{brandGroup?.name}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                Target branches ({applySelectedIds.length} of {siblingMembers.length} selected):
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (applySelectedIds.length === siblingMembers.length) {
+                    setApplySelectedIds([]);
+                  } else {
+                    setApplySelectedIds(siblingMembers.map((m) => m.listing_id));
+                  }
+                }}
+                className="text-primary hover:underline font-medium"
+              >
+                {applySelectedIds.length === siblingMembers.length
+                  ? "Deselect All"
+                  : "Select All"}
+              </button>
+            </div>
+
+            <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+              {siblingMembers.map((member) => {
+                const isChecked = applySelectedIds.includes(member.listing_id);
+                return (
+                  <label
+                    key={member.listing_id}
+                    className={`flex items-center gap-2.5 text-xs p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                      isChecked
+                        ? "bg-primary/5 border-primary/40 text-foreground"
+                        : "bg-muted/30 border-border/50 text-muted-foreground"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {
+                        setApplySelectedIds((prev) =>
+                          isChecked
+                            ? prev.filter((id) => id !== member.listing_id)
+                            : [...prev, member.listing_id]
+                        );
+                      }}
+                      className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{member.name}</p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setApplyModalOpen(false)}
+              disabled={isApplying}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleApplyToSiblingsSubmit}
+              disabled={isApplying || applySelectedIds.length === 0}
+            >
+              {isApplying ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Applying...
+                </>
+              ) : (
+                `Apply to ${applySelectedIds.length} Branch${
+                  applySelectedIds.length !== 1 ? "es" : ""
+                }`
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </TabsContent>
