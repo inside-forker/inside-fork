@@ -9,11 +9,14 @@
 export const HOME_OPENER_CONFIG_KEY = "mobile.home_opener.slides";
 export const HOME_OPENER_MAX_SLIDES = 4;
 
-export type HomeOpenerSlideKind = "event" | "listing";
+export type HomeOpenerSlideKind = "event" | "listing" | "brand";
 
 export type HomeOpenerSlideRef = {
   kind: HomeOpenerSlideKind;
   id: number;
+  custom_image_url?: string | null;
+  pinned_listing_id?: number | null;
+  kicker?: string | null;
 };
 
 export type HomeOpenerConfig = {
@@ -52,13 +55,29 @@ export function parseHomeOpenerConfig(raw: unknown): HomeOpenerConfig {
     if (slides.length >= HOME_OPENER_MAX_SLIDES) break;
     if (typeof item !== "object" || item === null) continue;
     const row = item as Record<string, unknown>;
-    const kind = row.kind === "event" || row.kind === "listing" ? row.kind : null;
+    const kind =
+      row.kind === "event" || row.kind === "listing" || row.kind === "brand"
+        ? (row.kind as HomeOpenerSlideKind)
+        : null;
     const id = typeof row.id === "number" ? row.id : Number(row.id);
     if (!kind || !Number.isFinite(id) || id <= 0) continue;
     const key = `${kind}:${id}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    slides.push({ kind, id: Math.trunc(id) });
+
+    const ref: HomeOpenerSlideRef = { kind, id: Math.trunc(id) };
+
+    if (typeof row.custom_image_url === "string" && row.custom_image_url.trim()) {
+      ref.custom_image_url = row.custom_image_url.trim();
+    }
+    if (row.pinned_listing_id != null && Number.isFinite(Number(row.pinned_listing_id)) && Number(row.pinned_listing_id) > 0) {
+      ref.pinned_listing_id = Math.trunc(Number(row.pinned_listing_id));
+    }
+    if (typeof row.kicker === "string" && row.kicker.trim()) {
+      ref.kicker = row.kicker.trim();
+    }
+
+    slides.push(ref);
   }
 
   const fillRemaining =

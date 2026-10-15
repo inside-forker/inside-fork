@@ -5,6 +5,7 @@ import Image from "next/image";
 import {
   ArrowDown,
   ArrowUp,
+  Building2,
   Calendar,
   CalendarRange,
   Clock,
@@ -29,6 +30,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -39,8 +47,24 @@ import {
   type PageSectionsConfig,
 } from "@/lib/page-sections/types";
 
-type SlideKind = "event" | "listing";
-type SlideRef = { kind: SlideKind; id: number };
+type SlideKind = "event" | "listing" | "brand";
+type SlideRef = {
+  kind: SlideKind;
+  id: number;
+  custom_image_url?: string | null;
+  pinned_listing_id?: number | null;
+  kicker?: string | null;
+};
+
+type BrandMemberSummary = {
+  id: number;
+  name: string;
+  slug: string;
+  address: string | null;
+  avg_rating: number;
+  review_count: number;
+  image_url?: string | null;
+};
 
 type Preview = {
   kind: SlideKind;
@@ -51,6 +75,9 @@ type Preview = {
   status: string | null;
   valid: boolean;
   warning: string | null;
+  custom_image_url?: string | null;
+  pinned_listing_id?: number | null;
+  members?: BrandMemberSummary[];
 };
 
 type SearchHit = {
@@ -61,6 +88,7 @@ type SearchHit = {
   subtitle: string | null;
   status: string | null;
   is_featured: boolean;
+  members?: BrandMemberSummary[];
 };
 
 type FeaturedEvent = {
@@ -300,20 +328,55 @@ export function AppLayoutPage() {
       toast({ title: "Already pinned", description: hit.title });
       return;
     }
-    setSlides((prev) => [...prev, { kind: hit.kind, id: hit.id }]);
+    const newSlide: SlideRef = {
+      kind: hit.kind,
+      id: hit.id,
+      custom_image_url: hit.image_url ?? null,
+      pinned_listing_id: null,
+    };
+    setSlides((prev) => [...prev, newSlide]);
     setPreviews((prev) => [
       ...prev,
       {
         kind: hit.kind,
         id: hit.id,
         title: hit.title,
-        image_url: null,
+        image_url: hit.image_url ?? null,
         subtitle: hit.subtitle,
         status: hit.status,
         valid: true,
         warning: null,
+        custom_image_url: hit.image_url ?? null,
+        pinned_listing_id: null,
+        members: hit.members ?? [],
       },
     ]);
+  };
+
+  const updateSlide = (index: number, patch: Partial<SlideRef>) => {
+    setSlides((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], ...patch };
+      return copy;
+    });
+    setPreviews((prev) => {
+      const copy = [...prev];
+      if (copy[index]) {
+        copy[index] = {
+          ...copy[index],
+          ...(patch.custom_image_url !== undefined
+            ? {
+                image_url: patch.custom_image_url,
+                custom_image_url: patch.custom_image_url,
+              }
+            : {}),
+          ...(patch.pinned_listing_id !== undefined
+            ? { pinned_listing_id: patch.pinned_listing_id }
+            : {}),
+        };
+      }
+      return copy;
+    });
   };
 
   const removeAt = (index: number) => {
@@ -676,80 +739,202 @@ export function AppLayoutPage() {
                       <li
                         key={`${slide.kind}-${slide.id}`}
                         className={cn(
-                          "flex items-center gap-3 rounded-lg border p-3",
+                          "rounded-lg border p-3 space-y-3",
                           preview && !preview.valid && "border-amber-500/50 bg-amber-500/5",
                         )}
                       >
-                        <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md bg-muted">
-                          {preview?.image_url ? (
-                            <Image
-                              src={preview.image_url}
-                              alt=""
-                              fill
-                              className="object-cover"
-                              unoptimized
-                            />
-                          ) : (
-                            <div className="flex h-full items-center justify-center text-muted-foreground">
-                              {slide.kind === "event" ? (
-                                <Calendar className="h-5 w-5" />
-                              ) : (
-                                <MapPin className="h-5 w-5" />
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary">
-                              {index + 1}. {slide.kind}
-                            </Badge>
-                            {preview?.warning ? (
-                              <Badge variant="outline" className="text-amber-700">
-                                {preview.warning}
+                        <div className="flex items-center gap-3">
+                          <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md bg-muted">
+                            {preview?.image_url ? (
+                              <Image
+                                src={preview.image_url}
+                                alt=""
+                                fill
+                                className="object-cover"
+                                unoptimized
+                              />
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-muted-foreground">
+                                {slide.kind === "event" ? (
+                                  <Calendar className="h-5 w-5" />
+                                ) : slide.kind === "brand" ? (
+                                  <Building2 className="h-5 w-5" />
+                                ) : (
+                                  <MapPin className="h-5 w-5" />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="secondary">
+                                {index + 1}. {slide.kind}
                               </Badge>
+                              {preview?.warning ? (
+                                <Badge variant="outline" className="text-amber-700">
+                                  {preview.warning}
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <p className="truncate font-medium">
+                              {preview?.title ?? `#${slide.id}`}
+                            </p>
+                            {preview?.subtitle ? (
+                              <p className="truncate text-sm text-muted-foreground">
+                                {preview.subtitle}
+                              </p>
                             ) : null}
                           </div>
-                          <p className="truncate font-medium">
-                            {preview?.title ?? `#${slide.id}`}
-                          </p>
-                          {preview?.subtitle ? (
-                            <p className="truncate text-sm text-muted-foreground">
-                              {preview.subtitle}
-                            </p>
-                          ) : null}
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => move(index, -1)}
+                              disabled={index === 0}
+                              aria-label="Move up"
+                            >
+                              <ArrowUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => move(index, 1)}
+                              disabled={index === slides.length - 1}
+                              aria-label="Move down"
+                            >
+                              <ArrowDown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removeAt(index)}
+                              aria-label="Remove"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => move(index, -1)}
-                            disabled={index === 0}
-                            aria-label="Move up"
-                          >
-                            <ArrowUp className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => move(index, 1)}
-                            disabled={index === slides.length - 1}
-                            aria-label="Move down"
-                          >
-                            <ArrowDown className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => removeAt(index)}
-                            aria-label="Remove"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+
+                        {/* Brand slide specific configurations: Hero image & Case 3 Override */}
+                        {slide.kind === "brand" && (
+                          <div className="rounded-md border bg-muted/30 p-3 space-y-3 text-sm">
+                            {/* Hero Image Selection */}
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-semibold text-foreground">
+                                Hero Carousel Image
+                              </Label>
+                              <Input
+                                placeholder="Custom image URL (or select below)"
+                                value={slide.custom_image_url ?? ""}
+                                onChange={(e) =>
+                                  updateSlide(index, {
+                                    custom_image_url: e.target.value.trim() || null,
+                                  })
+                                }
+                                className="h-8 text-xs"
+                              />
+                              {preview?.members && preview.members.filter((m) => m.image_url).length > 0 && (
+                                <div className="pt-1">
+                                  <span className="text-[11px] text-muted-foreground block mb-1">
+                                    Pick from branch photos:
+                                  </span>
+                                  <div className="flex flex-wrap gap-2">
+                                    {preview.members
+                                      .filter((m) => m.image_url)
+                                      .map((m) => {
+                                        const isSelected =
+                                          (slide.custom_image_url || preview.image_url) === m.image_url;
+                                        return (
+                                          <button
+                                            key={m.id}
+                                            type="button"
+                                            onClick={() =>
+                                              updateSlide(index, {
+                                                custom_image_url: m.image_url,
+                                              })
+                                            }
+                                            className={cn(
+                                              "relative h-12 w-16 rounded border overflow-hidden transition-all",
+                                              isSelected
+                                                ? "ring-2 ring-primary border-primary shadow-sm"
+                                                : "opacity-70 hover:opacity-100 hover:border-foreground/40",
+                                            )}
+                                            title={`${m.name} (${m.address || "Karachi"})`}
+                                          >
+                                            <Image
+                                              src={m.image_url!}
+                                              alt={m.name}
+                                              fill
+                                              className="object-cover"
+                                              unoptimized
+                                            />
+                                          </button>
+                                        );
+                                      })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Mobile Tap Destination: Cases 1, 2, 3 */}
+                            <div className="border-t pt-2.5 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                  <Label
+                                    htmlFor={`pin-toggle-${slide.id}`}
+                                    className="text-xs font-semibold cursor-pointer"
+                                  >
+                                    Case 3 Override: Pin specific branch
+                                  </Label>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {slide.pinned_listing_id
+                                      ? "Override active: Tapping will always open this branch on phone."
+                                      : "Auto: Opens highest rated & closest branch (Case 1), or closest unrated (Case 2)."}
+                                  </p>
+                                </div>
+                                <Switch
+                                  id={`pin-toggle-${slide.id}`}
+                                  checked={Boolean(slide.pinned_listing_id)}
+                                  onCheckedChange={(checked) => {
+                                    const defaultId = preview?.members?.[0]?.id ?? null;
+                                    updateSlide(index, {
+                                      pinned_listing_id: checked ? defaultId : null,
+                                    });
+                                  }}
+                                />
+                              </div>
+
+                              {Boolean(slide.pinned_listing_id) && preview?.members && (
+                                <Select
+                                  value={String(slide.pinned_listing_id)}
+                                  onValueChange={(val) =>
+                                    updateSlide(index, {
+                                      pinned_listing_id: Number(val),
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Choose branch listing..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {preview.members.map((m) => (
+                                      <SelectItem
+                                        key={m.id}
+                                        value={String(m.id)}
+                                        className="text-xs"
+                                      >
+                                        {m.name} {m.address ? `(${m.address})` : ""} {m.avg_rating > 0 ? `· ⭐ ${m.avg_rating.toFixed(1)}` : "· No rating"}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </li>
                     );
                   })}
@@ -773,6 +958,7 @@ export function AppLayoutPage() {
                 <TabsList>
                   <TabsTrigger value="event">Events</TabsTrigger>
                   <TabsTrigger value="listing">Places</TabsTrigger>
+                  <TabsTrigger value="brand">Brands</TabsTrigger>
                 </TabsList>
               </Tabs>
 
@@ -783,7 +969,9 @@ export function AppLayoutPage() {
                   placeholder={
                     searchKind === "event"
                       ? "Search live events…"
-                      : "Search published places…"
+                      : searchKind === "listing"
+                      ? "Search published places…"
+                      : "Search brand groups…"
                   }
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
