@@ -101,6 +101,19 @@ export const GET = mobileRoute(async (request: NextRequest) => {
   }
   const minRating = searchParams.get("rating");
   const excludeFeatured = searchParams.get("exclude_featured") === "true";
+  const verifiedOnly =
+    searchParams.get("verified_only") === "true" ||
+    searchParams.get("verified") === "true" ||
+    searchParams.get("member") === "true";
+  const hasDeals =
+    searchParams.get("has_deals") === "true" ||
+    searchParams.get("deals") === "true";
+  const minPrice = searchParams.get("min_price") ? parseFloat(searchParams.get("min_price")!) : null;
+  const maxPrice = searchParams.get("max_price") ? parseFloat(searchParams.get("max_price")!) : null;
+  const minCapacity = searchParams.get("min_capacity") ? parseInt(searchParams.get("min_capacity")!, 10) : null;
+  const maxCapacity = searchParams.get("max_capacity") ? parseInt(searchParams.get("max_capacity")!, 10) : null;
+  const maxDistance = searchParams.get("max_distance") ? parseFloat(searchParams.get("max_distance")!) : null;
+  const areaParam = searchParams.get("area");
   const openNowParam = searchParams.get("open_now");
   const openNow = openNowParam === "true" || openNowParam === "1" || sort === "open-now";
   const openTonightParam = searchParams.get("open_tonight") ?? searchParams.get("tonight");
@@ -166,6 +179,52 @@ export const GET = mobileRoute(async (request: NextRequest) => {
     }
   }
 
+  if (verifiedOnly) {
+    whereClauses.push(`show_member_badge = true`);
+  }
+
+  if (hasDeals) {
+    whereClauses.push(
+      `EXISTS (SELECT 1 FROM deals WHERE deals.listing_id = listings_with_details.id AND deals.is_active = true)`,
+    );
+  }
+
+  if (minPrice != null && !Number.isNaN(minPrice)) {
+    params.push(minPrice);
+    whereClauses.push(
+      `EXISTS (SELECT 1 FROM listings l WHERE l.id = listings_with_details.id AND (l.max_price_per_person >= $${params.length} OR l.min_price_per_person >= $${params.length}))`,
+    );
+  }
+
+  if (maxPrice != null && !Number.isNaN(maxPrice)) {
+    params.push(maxPrice);
+    whereClauses.push(
+      `EXISTS (SELECT 1 FROM listings l WHERE l.id = listings_with_details.id AND (l.min_price_per_person <= $${params.length} OR l.max_price_per_person <= $${params.length}))`,
+    );
+  }
+
+  if (minCapacity != null && !Number.isNaN(minCapacity)) {
+    params.push(minCapacity);
+    whereClauses.push(
+      `EXISTS (SELECT 1 FROM listings l WHERE l.id = listings_with_details.id AND (l.max_guest_capacity >= $${params.length} OR l.min_guest_capacity >= $${params.length}))`,
+    );
+  }
+
+  if (maxCapacity != null && !Number.isNaN(maxCapacity)) {
+    params.push(maxCapacity);
+    whereClauses.push(
+      `EXISTS (SELECT 1 FROM listings l WHERE l.id = listings_with_details.id AND (l.min_guest_capacity <= $${params.length} OR l.max_guest_capacity <= $${params.length}))`,
+    );
+  }
+
+  if (areaParam && areaParam.trim()) {
+    params.push(`%${areaParam.trim()}%`);
+    const idx = params.length;
+    whereClauses.push(
+      `(address ILIKE $${idx} OR (custom_attributes->>'area') ILIKE $${idx})`,
+    );
+  }
+
   if (excludeFeatured) {
     whereClauses.push(`is_featured = false`);
   }
@@ -200,6 +259,12 @@ export const GET = mobileRoute(async (request: NextRequest) => {
         )
       )`
     : null;
+
+  if (hasUserLocation && maxDistance != null && !Number.isNaN(maxDistance) && haversineDistanceExpr) {
+    whereClauses.push(
+      `latitude IS NOT NULL AND longitude IS NOT NULL AND ${haversineDistanceExpr} <= ${maxDistance}`,
+    );
+  }
 
   // Placeholder swapped for the real $N once dataParams is finalized below -
   // kept out of the shared `params` array so the COUNT query (which doesn't
