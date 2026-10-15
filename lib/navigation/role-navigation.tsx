@@ -118,6 +118,7 @@ export const adminNavigation: RoleNavItem[] = [
   },
   { name: "Listing Management", href: "/admin/listings", icon: MapPin, description: "Manage all listings" },
   { name: "Brand Groups", href: "/admin/brand-groups", icon: Link2, description: "Link listings into brand sibling groups" },
+  { name: "Bank Cards", href: "/admin/cards", icon: CreditCard, description: "Manage bank cards and discount variants" },
 
   { name: "Listing Capacity", href: "/admin/listing-capacity", icon: Store, description: "Update capacity fields" },
   { name: "Listing Approvals", href: "/admin/listings/approvals", icon: ClipboardCheck, description: "Review pending listings" },

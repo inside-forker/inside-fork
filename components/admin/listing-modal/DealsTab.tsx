@@ -37,6 +37,7 @@ import {
 import { TabsContent } from "@/components/ui/tabs";
 import { Database } from "@/types/database";
 import { BankCardImage } from "@/components/bank-cards/BankCardImage";
+import { AddCardDialog } from "@/components/admin/cards/AddCardDialog";
 
 type BrandGroupMember = {
   listing_id: number;
@@ -123,6 +124,7 @@ export function DealsTab({
   const [cards, setCards] = React.useState<CardVariant[]>([]);
   const [cardsLoading, setCardsLoading] = React.useState(false);
   const [selectedBankName, setSelectedBankName] = React.useState<string>("");
+  const [isAddCardOpen, setIsAddCardOpen] = React.useState(false);
 
   // Brand Group states
   const [brandGroup, setBrandGroup] = React.useState<BrandGroupSummary | null>(null);
@@ -812,17 +814,29 @@ export function DealsTab({
               )}
               {formData.deal_type === "bank_discount" && formData.bank_id && (
                 <div className="space-y-3 col-span-2">
-                  <Label
-                    htmlFor="card_variants"
-                    className="text-sm font-medium"
-                  >
-                    Valid Cards
-                    {formData.valid_card_variants.length > 0 && (
-                      <span className="ml-2 text-xs text-muted-foreground">
-                        ({formData.valid_card_variants.length} selected)
-                      </span>
-                    )}
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label
+                      htmlFor="card_variants"
+                      className="text-sm font-medium"
+                    >
+                      Valid Cards
+                      {formData.valid_card_variants.length > 0 && (
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          ({formData.valid_card_variants.length} selected)
+                        </span>
+                      )}
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsAddCardOpen(true)}
+                      className="h-7 text-xs flex items-center gap-1.5 text-primary border-primary/30 hover:bg-primary/5 hover:text-primary"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Add New Card</span>
+                    </Button>
+                  </div>
                   {cardsLoading ? (
                     <div className="flex items-center justify-center p-8 border-2 border-dashed border-muted rounded-lg">
                       <div className="flex items-center space-x-3">
@@ -956,11 +970,21 @@ export function DealsTab({
                       )}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-muted rounded-lg">
-                      <CreditCard className="h-8 w-8 text-muted-foreground mb-2" />
+                    <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-muted rounded-lg text-center space-y-2">
+                      <CreditCard className="h-8 w-8 text-muted-foreground mb-1" />
                       <p className="text-sm text-muted-foreground text-center">
                         No cards available for this bank
                       </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsAddCardOpen(true)}
+                        className="h-8 text-xs gap-1.5 mt-1 text-primary border-primary/30 hover:bg-primary/5"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Add First Card</span>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -1205,6 +1229,26 @@ export function DealsTab({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Add Card Dialog */}
+      <AddCardDialog
+        open={isAddCardOpen}
+        onOpenChange={setIsAddCardOpen}
+        defaultBankId={formData.bank_id}
+        defaultBankName={selectedBankName}
+        banks={banks}
+        onSuccess={async (newCard) => {
+          if (formData.bank_id) {
+            await fetchCardsForBank(formData.bank_id);
+          }
+          const current = Array.isArray(formData.valid_card_variants)
+            ? formData.valid_card_variants
+            : [];
+          if (!current.includes(newCard.id)) {
+            handleInputChange("valid_card_variants", [...current, newCard.id]);
+          }
+        }}
+      />
     </TabsContent>
   );
 }
