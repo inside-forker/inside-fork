@@ -86,11 +86,12 @@ export function PremiumHeader({
     searchQuery,
     setSearchQuery,
     searchResults,
+    totalResults,
     isSearching,
     showResults,
     setShowResults,
     getResultUrl,
-  } = useSearch();
+  } = useSearch({ limit: 12 });
 
   // Glow animation state for search field discoverability
   const [isGlowing, setIsGlowing] = useState(false);
@@ -279,6 +280,7 @@ export function PremiumHeader({
             }}
             searchQuery={searchQuery}
             searchResults={searchResults}
+            totalResults={totalResults}
             isSearching={isSearching}
             showSearchResults={showResults}
             onSearchSelect={handleSearchNavigate}

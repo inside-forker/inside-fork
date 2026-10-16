@@ -83,10 +83,10 @@ async function searchUpcomingEvents({
   offset: number;
   lat: number | null;
   lng: number | null;
-}): Promise<{ rows: PlacesSearchListing[]; hasMore: boolean }> {
+}): Promise<{ rows: PlacesSearchListing[]; hasMore: boolean; total: number }> {
   const hasLoc = lat != null && lng != null;
   const cleanTerm = sanitizeSearchTerm(searchTerm);
-  if (!cleanTerm) return { rows: [], hasMore: false };
+  if (!cleanTerm) return { rows: [], hasMore: false, total: 0 };
 
   const queryParams: unknown[] = [`${cleanTerm}%`, `%${cleanTerm}%`];
   let latIdx = 0;
@@ -122,7 +122,8 @@ async function searchUpcomingEvents({
         WHEN c.name ILIKE $2 OR e.location_name ILIKE $2 THEN 3
         ELSE 4
       END AS match_rank,
-      ${distanceExpr} AS distance_meters
+      ${distanceExpr} AS distance_meters,
+      COUNT(*) OVER()::int AS total_count
     FROM events e
     LEFT JOIN categories c ON c.id = e.category_id
     LEFT JOIN venues v ON v.id = e.venue_id
@@ -166,7 +167,10 @@ async function searchUpcomingEvents({
     match_rank: Number(row.match_rank),
   }));
 
-  return { rows, hasMore };
+  const total =
+    res.rows.length > 0 ? Number(res.rows[0].total_count ?? res.rows.length) : 0;
+
+  return { rows, hasMore, total };
 }
 
 export type QueryPlacesInput = {
@@ -209,7 +213,7 @@ export async function queryPlaces(
       categories: [],
       subcategories: [],
       listings: eventsRes.rows,
-      total: eventsRes.rows.length,
+      total: eventsRes.total,
       listings_offset: offset,
       listings_limit: limit,
       listings_has_more: eventsRes.hasMore,
@@ -456,7 +460,8 @@ export async function queryPlaces(
          c.match_rank,
          c.name_sim,
          c.category_relevance,
-         c.distance_meters
+         c.distance_meters,
+         COUNT(*) OVER()::int AS total_count
        FROM capped c
        LEFT JOIN LATERAL (
          SELECT
@@ -534,12 +539,20 @@ export async function queryPlaces(
     );
   }
 
+  const listingTotal =
+    listingRows.length > 0
+      ? Number(listingRows[0].total_count ?? listingRows.length)
+      : 0;
+
   return {
     query: rawQuery,
     categories: [],
     subcategories: [],
     listings: finalListings,
-    total: finalListings.length,
+    total:
+      searchType === "places"
+        ? listingTotal
+        : listingTotal + (eventsRes?.total ?? 0),
     listings_offset: offset,
     listings_limit: limit,
     listings_has_more: listingsHasMore || (eventsRes?.hasMore ?? false),

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { resolveCategoryIdScope } from "@/lib/listings/category-scope";
+import { BRANCH_COPIES_CTE } from "@/lib/listings/branch-duplicates";
 
 /**
  * GET ALL LISTING IDS (for bulk selection across pages)
@@ -38,6 +39,8 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status") || "";
     const categoryId = searchParams.get("category_id") || "";
+    const branchFilter = searchParams.get("branch_filter") || "";
+    const isBranchCopies = branchFilter === "branch_copies";
 
     // Build query to get only IDs, applying same filters as main listing endpoint
     const whereClauses: string[] = [];
@@ -46,13 +49,13 @@ export async function GET(request: NextRequest) {
     if (search) {
       params.push(`%${search}%`);
       whereClauses.push(
-        `(name ILIKE $${params.length} OR description ILIKE $${params.length})`,
+        `(listings.name ILIKE $${params.length} OR listings.description ILIKE $${params.length})`,
       );
     }
 
     if (status && status !== "all") {
       params.push(status);
-      whereClauses.push(`status = $${params.length}`);
+      whereClauses.push(`listings.status = $${params.length}`);
     }
 
     if (categoryId && categoryId !== "all") {
@@ -79,10 +82,15 @@ export async function GET(request: NextRequest) {
     const whereSql =
       whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
+    const cteSql = isBranchCopies ? BRANCH_COPIES_CTE : "";
+    const fromSql = isBranchCopies
+      ? `FROM listings JOIN duplicate_pairs dp ON dp.id = listings.id`
+      : `FROM listings`;
+
     let listings;
     try {
       const result = await query(
-        `SELECT id FROM listings ${whereSql}`,
+        `${cteSql} SELECT listings.id ${fromSql} ${whereSql}`,
         params,
       );
       listings = result.rows;

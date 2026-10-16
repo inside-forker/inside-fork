@@ -55,6 +55,7 @@ interface PremiumDiscoveryPanelProps {
   // Search integration props
   searchQuery?: string;
   searchResults?: SearchResult[];
+  totalResults?: number;
   isSearching?: boolean;
   showSearchResults?: boolean;
   onSearchSelect?: (result: SearchResult) => void;
@@ -91,6 +92,7 @@ export function PremiumDiscoveryPanel({
   mobileMode = false,
   searchQuery = "",
   searchResults = [],
+  totalResults = 0,
   isSearching = false,
   showSearchResults = false,
   onSearchSelect,
@@ -290,8 +292,9 @@ export function PremiumDiscoveryPanel({
                 </h4>
                 {searchResults.length > 0 && (
                   <span className="text-sm text-muted-foreground">
-                    {searchResults.length} result
-                    {searchResults.length !== 1 ? "s" : ""}
+                    {totalResults && totalResults > searchResults.length
+                      ? `Showing ${searchResults.length} of ${totalResults} results`
+                      : `${totalResults || searchResults.length} result${(totalResults || searchResults.length) !== 1 ? "s" : ""}`}
                   </span>
                 )}
               </div>
@@ -381,6 +384,18 @@ export function PremiumDiscoveryPanel({
                       </div>
                     </motion.button>
                   ))}
+                  {totalResults > searchResults.length ? (
+                    <div className="pt-2">
+                      <Link
+                        href={`/search?q=${encodeURIComponent(searchQuery)}`}
+                        onClick={onClose}
+                        className="flex items-center justify-center gap-2 w-full py-2.5 px-4 text-xs font-semibold text-primary bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 hover:border-primary/40 transition-all duration-200"
+                      >
+                        <span>View all {totalResults} results on search page</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="text-center py-8">

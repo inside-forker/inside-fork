@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -39,6 +41,7 @@ import {
   FileText,
   FolderInput,
   GripVertical,
+  Copy,
 } from "lucide-react";
 import type { Listing } from "@/types/listing.types";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
@@ -57,6 +60,7 @@ export function ListingsManagementPage() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [categoryFilter, setCategoryFilter] = React.useState<string>("all");
+  const [branchFilter, setBranchFilter] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [listingToDelete, setListingToDelete] = React.useState<Listing | null>(
@@ -244,6 +248,7 @@ export function ListingsManagementPage() {
       search: string = "",
       status: string = "",
       category: string = "",
+      branch: string = "",
       silent: boolean = false,
       append: boolean = false,
       customLimit?: number,
@@ -276,6 +281,8 @@ export function ListingsManagementPage() {
         if (status && status !== "all") params.append("status", status);
         if (category && category !== "all")
           params.append("category_id", category);
+        if (branch && branch !== "all")
+          params.append("branch_filter", branch);
         // Append loads don't need global tab counts — skip 5 COUNT(*) queries
         if (append) params.append("skip_stats", "1");
 
@@ -359,6 +366,7 @@ export function ListingsManagementPage() {
         debouncedSearchQuery,
         statusFilter,
         categoryFilter,
+        branchFilter,
         silent,
         false,
         loadedCount,
@@ -369,6 +377,7 @@ export function ListingsManagementPage() {
       debouncedSearchQuery,
       statusFilter,
       categoryFilter,
+      branchFilter,
       isBulkMode,
       selectedListings.size,
       isModalOpen,
@@ -419,6 +428,7 @@ export function ListingsManagementPage() {
       debouncedSearchQuery,
       statusFilter,
       categoryFilter,
+      branchFilter,
       false,
       true,
       itemsPerPage,
@@ -434,6 +444,7 @@ export function ListingsManagementPage() {
     debouncedSearchQuery,
     statusFilter,
     categoryFilter,
+    branchFilter,
   ]);
 
   // Re-fetch when any filter or debounced search changes (resets to page 1)
@@ -444,10 +455,11 @@ export function ListingsManagementPage() {
       debouncedSearchQuery,
       statusFilter,
       categoryFilter,
+      branchFilter,
       false,
       false,
     );
-  }, [fetchListings, debouncedSearchQuery, statusFilter, categoryFilter]);
+  }, [fetchListings, debouncedSearchQuery, statusFilter, categoryFilter, branchFilter]);
 
   // Debounce search query - wait 500ms after user stops typing
   React.useEffect(() => {
@@ -764,6 +776,8 @@ export function ListingsManagementPage() {
         params.append("status", statusFilter);
       if (categoryFilter && categoryFilter !== "all")
         params.append("category_id", categoryFilter);
+      if (branchFilter && branchFilter !== "all")
+        params.append("branch_filter", branchFilter);
 
       const response = await fetch(
         `/api/admin/listings/ids?${params.toString()}`,
@@ -860,6 +874,54 @@ export function ListingsManagementPage() {
       setIsBulkStatusUpdating(false);
     }
   };
+
+  const handleListingStatusChange = React.useCallback(
+    async (listing: Listing, nextStatus: "published" | "draft" | "archived") => {
+      try {
+        const response = await fetch("/api/admin/listings", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ids: [listing.id],
+            status: nextStatus,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          toast({
+            title: "Status Updated",
+            description: `Listing "${listing.name}" set to ${nextStatus}`,
+          });
+
+          if (
+            (statusFilter !== "all" && statusFilter !== nextStatus) ||
+            (branchFilter === "branch_copies" && nextStatus === "archived")
+          ) {
+            removeListingsLocally([listing]);
+          } else {
+            setListings((prev) =>
+              prev.map((l) => (l.id === listing.id ? { ...l, status: nextStatus } : l)),
+            );
+          }
+          refreshListings(true, true);
+        } else {
+          throw new Error(result.error || "Failed to update listing status");
+        }
+      } catch (error) {
+        console.error("Error updating listing status:", error);
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to update listing status",
+          variant: "destructive",
+        });
+      }
+    },
+    [toast, statusFilter, branchFilter, removeListingsLocally, refreshListings],
+  );
 
   const handleConfirmBulkDelete = async () => {
     if (selectedListings.size === 0 || !isBulkMode) return;
@@ -1186,6 +1248,33 @@ export function ListingsManagementPage() {
                 )}
               </SelectContent>
             </Select>
+
+            {/* Branch Copies / Duplicates Filter */}
+            <Button
+              type="button"
+              variant={branchFilter === "branch_copies" ? "default" : "outline"}
+              onClick={() => {
+                setBranchFilter((prev) => (prev === "branch_copies" ? "all" : "branch_copies"));
+              }}
+              className={cn(
+                "h-11 px-3.5 text-xs font-semibold gap-1.5 transition-all shrink-0 cursor-pointer",
+                branchFilter === "branch_copies"
+                  ? "bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-600/20 border-amber-600"
+                  : "border-border/50 bg-background/50 text-muted-foreground hover:text-amber-600 hover:border-amber-500/40 hover:bg-amber-500/5",
+              )}
+              title="Filter single-branch listings that have an accidental branch copy created"
+            >
+              <Copy className="h-4 w-4" />
+              <span>Branch Copies</span>
+              {branchFilter === "branch_copies" && (
+                <Badge
+                  variant="secondary"
+                  className="ml-1 px-1.5 py-0 text-[10px] h-4 bg-white/20 text-white"
+                >
+                  Active
+                </Badge>
+              )}
+            </Button>
           </div>
 
           <div className="flex gap-3">
@@ -1401,6 +1490,7 @@ export function ListingsManagementPage() {
           isBulkMode={isBulkMode}
           userRole={userProfile?.role}
           editorsMap={editorsMap}
+          onStatusChange={handleListingStatusChange}
         />
       </motion.div>
 

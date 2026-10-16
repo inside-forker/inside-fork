@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { syncListingCategories, syncListingCategoriesBulk, normalizeCategoryIds, getListingCategoryIdsMap } from "@/lib/listings/sync-listing-categories";
 import { deleteListingsBulk } from "@/lib/utils/listing-deletion";
 import { resolveCategoryIdScope } from "@/lib/listings/category-scope";
+import { BRANCH_COPIES_CTE } from "@/lib/listings/branch-duplicates";
 
 async function generateUniqueListingSlug(name: string): Promise<string> {
   const baseSlug =
@@ -49,6 +50,8 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status") || "";
     const categoryId = searchParams.get("category_id") || "";
+    const branchFilter = searchParams.get("branch_filter") || "";
+    const isBranchCopies = branchFilter === "branch_copies";
     const skipStats =
       searchParams.get("skip_stats") === "1" ||
       searchParams.get("skip_stats") === "true";
@@ -65,13 +68,13 @@ export async function GET(request: NextRequest) {
     if (search) {
       whereParams.push(`%${search}%`);
       whereClauses.push(
-        `(name ILIKE $${whereParams.length} OR description ILIKE $${whereParams.length})`,
+        `(listings.name ILIKE $${whereParams.length} OR listings.description ILIKE $${whereParams.length})`,
       );
     }
 
     if (status && status !== "all") {
       whereParams.push(status);
-      whereClauses.push(`status = $${whereParams.length}`);
+      whereClauses.push(`listings.status = $${whereParams.length}`);
     }
 
     if (categoryId && categoryId !== "all") {
@@ -98,18 +101,29 @@ export async function GET(request: NextRequest) {
     const whereSql =
       whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
+    const cteSql = isBranchCopies ? BRANCH_COPIES_CTE : "";
+    const fromSql = isBranchCopies
+      ? `FROM listings JOIN duplicate_pairs dp ON dp.id = listings.id`
+      : `FROM listings`;
+    const orderSql = isBranchCopies
+      ? `ORDER BY dp.match_stem ASC, listings.created_at ASC, listings.id ASC`
+      : `ORDER BY created_at DESC, id DESC`;
+    const selectFields = isBranchCopies
+      ? `listings.*, dp.match_stem`
+      : `listings.*`;
+
     let listings, count;
     try {
       const countResult = await query(
-        `SELECT COUNT(*) FROM listings ${whereSql}`,
+        `${cteSql} SELECT COUNT(*) ${fromSql} ${whereSql}`,
         whereParams,
       );
       count = parseInt(countResult.rows[0].count, 10);
 
       const listParams = [...whereParams, limit, offset];
       const listingsResult = await query(
-        `SELECT * FROM listings ${whereSql}
-         ORDER BY created_at DESC, id DESC
+        `${cteSql} SELECT ${selectFields} ${fromSql} ${whereSql}
+         ${orderSql}
          LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
         listParams,
       );
@@ -199,6 +213,7 @@ export async function GET(request: NextRequest) {
 
           return {
             ...l,
+            match_stem: l.match_stem || null,
             creator_full_name: creator?.full_name || null,
             category_name: categoryNames.join(", ") || null,
           };

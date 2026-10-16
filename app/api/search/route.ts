@@ -102,11 +102,16 @@ export async function GET(request: NextRequest) {
           "Vercel-CDN-Cache-Control": "max-age=300",
         };
 
+    const totalCount =
+      searchType === "all"
+        ? places.total + results.filter((r) => r.type === "post").length
+        : places.total;
+
     return NextResponse.json(
       {
         query: q,
         results,
-        total: results.length,
+        total: totalCount,
         listings_offset: places.listings_offset,
         listings_limit: places.listings_limit,
         listings_has_more: places.listings_has_more,

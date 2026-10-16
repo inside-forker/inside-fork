@@ -226,7 +226,7 @@ export function BrandGroupsManagementPage() {
         const res = await fetch(
           `/api/admin/brand-groups/search-listings?q=${encodeURIComponent(
             listingSearchQuery.trim(),
-          )}&limit=15`,
+          )}&limit=150`,
         );
         if (!res.ok) throw new Error("Search failed");
         const data = await res.json();
@@ -777,6 +777,11 @@ export function BrandGroupsManagementPage() {
                             </div>
                           ) : (
                             <div className="divide-y divide-border/60">
+                              <div className="px-3 py-1.5 bg-muted/40 text-[11px] font-medium text-muted-foreground flex items-center justify-between">
+                                <span>
+                                  {listingSearchResults.length} listing{listingSearchResults.length === 1 ? "" : "s"} found
+                                </span>
+                              </div>
                               {listingSearchResults.map((listing) => {
                                 const isAlreadyInThisGroup =
                                   listing.current_group_id === selectedGroup.id;
