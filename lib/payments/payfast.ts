@@ -131,6 +131,59 @@ function allowSandbox(): boolean {
 }
 
 /**
+ * Repair common mis-set PAYFAST_*_URL values from Vercel / .env.
+ *
+ * The IIS HTML 404 on card checkout almost always means the path is missing
+ * `/Ecommerce` (e.g. `…/api/Transaction/GetAccessToken`). That exact response
+ * is what the payment page was surfacing to buyers.
+ */
+function normalizePayFastApiUrl(url: string, kind: "token" | "transaction"): string {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+    if (host !== "ipg1.apps.net.pk" && host !== "ipguat.apps.net.pk") {
+      return trimmed;
+    }
+
+    let path = parsed.pathname.replace(/\/+$/, "") || "/";
+    // `…/api/Transaction/…` without Ecommerce → IIS XHTML 404 page.
+    if (/^\/api\/Transaction\//i.test(path)) {
+      path = `/Ecommerce${path}`;
+    }
+    // Newer docs mention Token/; ecommerce form flow is Transaction/.
+    if (/\/api\/Token\//i.test(path)) {
+      path = path.replace(/\/api\/Token\//i, "/api/Transaction/");
+    }
+
+    const expected =
+      kind === "token" ? "GetAccessToken" : "PostTransaction";
+    if (!new RegExp(`/${expected}$`, "i").test(path)) {
+      path =
+        kind === "token"
+          ? "/Ecommerce/api/Transaction/GetAccessToken"
+          : "/Ecommerce/api/Transaction/PostTransaction";
+    }
+
+    parsed.pathname = path;
+    parsed.search = "";
+    parsed.hash = "";
+    const fixed = parsed.toString().replace(/\/$/, "");
+    if (fixed !== trimmed.replace(/\/$/, "")) {
+      console.warn(`[PayFast] Normalized ${kind} URL`, {
+        from: trimmed,
+        to: fixed,
+      });
+    }
+    return fixed;
+  } catch {
+    return trimmed;
+  }
+}
+
+/**
  * Resolve a PayFast API URL.
  *
  * - Merchant 102 (PayFast's published UAT test account): always use UAT hosts.
@@ -141,7 +194,11 @@ function resolvePayFastUrl(
   liveDefault: string,
   sandboxDefault: string,
 ): string {
-  const configured = process.env[envKey]?.trim();
+  const kind = envKey === "PAYFAST_TOKEN_URL" ? "token" : "transaction";
+  const configured = normalizePayFastApiUrl(
+    process.env[envKey]?.trim() || "",
+    kind,
+  );
 
   // Test merchant 102 only exists on UAT — never send it to live.
   if (isUatTestMerchant()) {
@@ -170,7 +227,7 @@ function resolvePayFastUrl(
     url = liveDefault;
   }
 
-  return url;
+  return normalizePayFastApiUrl(url, kind);
 }
 
 /** Access-token endpoint (server-to-server). */
@@ -378,20 +435,25 @@ export async function fetchPayFastToken(
       merchant_id: merchantId,
       body: responseText.slice(0, 500),
     });
+    const looksLikeHtml = /^\s*</.test(responseText);
     const hostHint = isSandboxHost(tokenUrl)
       ? " UAT rejected this merchant — production needs ipg1.apps.net.pk + live credentials."
-      : " Check live PAYFAST_MERCHANT_ID / PAYFAST_SECURED_KEY on Vercel.";
-    throw new Error(
-      `PayFast token failed (${response.status}): ${payfastError || responseText.slice(0, 200)}.${hostHint}`,
-    );
+      : looksLikeHtml
+        ? " PayFast URL looks wrong — set PAYFAST_TOKEN_URL to https://ipg1.apps.net.pk/Ecommerce/api/Transaction/GetAccessToken on Vercel."
+        : " Check live PAYFAST_MERCHANT_ID / PAYFAST_SECURED_KEY on Vercel.";
+    const detail = payfastError || (looksLikeHtml ? "gateway returned an HTML error page" : "request failed");
+    throw new Error(`PayFast token failed (${response.status}): ${detail}.${hostHint}`);
   }
 
   if (!parsed) {
     console.error("[PayFast Token] Invalid JSON response:", {
       responseText: responseText.slice(0, 500),
     });
+    const looksLikeHtml = /^\s*</.test(responseText);
     throw new Error(
-      `PayFast returned invalid JSON response: ${responseText.substring(0, 200)}`,
+      looksLikeHtml
+        ? "PayFast returned an HTML page instead of a token. Check PAYFAST_TOKEN_URL on Vercel (must include /Ecommerce/api/Transaction/GetAccessToken)."
+        : "PayFast returned an invalid token response. Please try again.",
     );
   }
 

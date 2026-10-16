@@ -24,12 +24,14 @@ import {
   Globe,
   ChevronDown,
   Loader2,
+  Archive,
 } from "lucide-react";
 import { Database } from "@/types/database";
 import type { ListingEditorInfo } from "@/lib/hooks/useListingEditors";
 
 type Listing = Database["public"]["Tables"]["listings"]["Row"] & {
   category_name?: string | null;
+  match_stem?: string | null;
 };
 
 interface ListingsTableProps {
@@ -51,6 +53,7 @@ interface ListingsTableProps {
   isBulkMode?: boolean;
   userRole?: string;
   editorsMap?: Map<number, ListingEditorInfo[]>;
+  onStatusChange?: (listing: Listing, status: "published" | "draft" | "archived") => void;
 }
 
 const CATEGORY_BADGES = [
@@ -164,6 +167,7 @@ interface ListingCardItemProps {
   onEditListing: (listing: Listing) => void;
   onDeleteListing: (listing: Listing) => void;
   onSelectListing?: (listingId: number, selected: boolean) => void;
+  onStatusChange?: (listing: Listing, status: "published" | "draft" | "archived") => void;
 }
 
 // Highly optimized memoized listing card item
@@ -176,6 +180,7 @@ const ListingCardItem = React.memo(function ListingCardItem({
   onEditListing,
   onDeleteListing,
   onSelectListing,
+  onStatusChange,
 }: ListingCardItemProps) {
   const glow = getCategoryGlow(listing.category_id);
 
@@ -249,16 +254,27 @@ const ListingCardItem = React.memo(function ListingCardItem({
                     </button>
                   )}
                 </div>
-                {listing.category_name && (
-                  <Badge
-                    variant="outline"
-                    className={`text-xs font-medium px-2 py-0.5 hover:opacity-90 transition-all duration-200 w-fit ${getCategoryBadgeClasses(
-                      listing.category_id,
-                    )}`}
-                  >
-                    {listing.category_name}
-                  </Badge>
-                )}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {listing.category_name && (
+                    <Badge
+                      variant="outline"
+                      className={`text-xs font-medium px-2 py-0.5 hover:opacity-90 transition-all duration-200 w-fit ${getCategoryBadgeClasses(
+                        listing.category_id,
+                      )}`}
+                    >
+                      {listing.category_name}
+                    </Badge>
+                  )}
+                  {listing.match_stem && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] font-semibold px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 flex items-center gap-1 w-fit"
+                      title="Flagged as a duplicate branch pair"
+                    >
+                      <span>⚠️ Duplicate Pair: {listing.match_stem}</span>
+                    </Badge>
+                  )}
+                </div>
                 {editors?.length ? (
                   <div className="flex items-center gap-1.5 mt-1">
                     <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
@@ -289,6 +305,24 @@ const ListingCardItem = React.memo(function ListingCardItem({
                   <Eye className="h-4 w-4 mr-2" />
                   View Details
                 </DropdownMenuItem>
+                {onStatusChange && listing.status === "published" && (
+                  <DropdownMenuItem
+                    onClick={() => onStatusChange(listing, "archived")}
+                    className="text-amber-600 focus:text-amber-600 cursor-pointer"
+                  >
+                    <Archive className="h-4 w-4 mr-2" />
+                    Archive Listing
+                  </DropdownMenuItem>
+                )}
+                {onStatusChange && listing.status === "archived" && (
+                  <DropdownMenuItem
+                    onClick={() => onStatusChange(listing, "published")}
+                    className="text-emerald-600 focus:text-emerald-600 cursor-pointer"
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    Publish Listing
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={handleDelete}
                   className="text-red-600 focus:text-red-600"
@@ -370,6 +404,7 @@ function ListingsTableInner({
   isBulkMode = false,
   userRole,
   editorsMap,
+  onStatusChange,
 }: ListingsTableProps) {
   const columns = useGridColumnCount();
   const listRef = React.useRef<HTMLDivElement>(null);
@@ -519,6 +554,7 @@ function ListingsTableInner({
                         onEditListing={onEditListing}
                         onDeleteListing={onDeleteListing}
                         onSelectListing={onSelectListing}
+                        onStatusChange={onStatusChange}
                       />
                     );
                   })}

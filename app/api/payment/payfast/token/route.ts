@@ -238,10 +238,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[PayFast Token API] Error:", error);
 
+    const raw =
+      error instanceof Error ? error.message : "Failed to generate payment form";
+    // Never echo gateway HTML / stack dumps into the Card Payment UI.
     const errorMessage =
-      error instanceof Error
-        ? error.message
-        : "Failed to generate payment form";
+      /^\s*</.test(raw) || raw.length > 280
+        ? "Payment could not be started. Please try again in a moment."
+        : raw;
 
     return NextResponse.json(
       {
