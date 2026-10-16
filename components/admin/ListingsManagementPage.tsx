@@ -1262,10 +1262,10 @@ export function ListingsManagementPage() {
                   ? "bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-600/20 border-amber-600"
                   : "border-border/50 bg-background/50 text-muted-foreground hover:text-amber-600 hover:border-amber-500/40 hover:bg-amber-500/5",
               )}
-              title="Filter single-branch listings that have an accidental branch copy created"
+              title="Filter businesses with only 1 branch that have an unlinked duplicate copy"
             >
               <Copy className="h-4 w-4" />
-              <span>Branch Copies</span>
+              <span>Single Branch Copies</span>
               {branchFilter === "branch_copies" && (
                 <Badge
                   variant="secondary"

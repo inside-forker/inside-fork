@@ -106,10 +106,10 @@ export async function GET(request: NextRequest) {
       ? `FROM listings JOIN duplicate_pairs dp ON dp.id = listings.id`
       : `FROM listings`;
     const orderSql = isBranchCopies
-      ? `ORDER BY dp.match_stem ASC, listings.created_at ASC, listings.id ASC`
+      ? `ORDER BY dp.match_stem ASC, dp.duplicate_role ASC, listings.id ASC`
       : `ORDER BY created_at DESC, id DESC`;
     const selectFields = isBranchCopies
-      ? `listings.*, dp.match_stem`
+      ? `listings.*, dp.match_stem, dp.duplicate_role`
       : `listings.*`;
 
     let listings, count;
@@ -214,6 +214,7 @@ export async function GET(request: NextRequest) {
           return {
             ...l,
             match_stem: l.match_stem || null,
+            duplicate_role: l.duplicate_role || null,
             creator_full_name: creator?.full_name || null,
             category_name: categoryNames.join(", ") || null,
           };
