@@ -27,6 +27,7 @@ import {
   Sparkles,
   FolderTree,
   Files,
+  Copy,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/types/auth.types";
@@ -117,6 +118,7 @@ export const adminNavigation: RoleNavItem[] = [
     requiredEmail: "testadminzaki@gmail.com",
   },
   { name: "Listing Management", href: "/admin/listings", icon: MapPin, description: "Manage all listings" },
+  { name: "Listings Duplicator", href: "/admin/listings-duplicator", icon: Copy, description: "Duplicate listings into multiple branch outlets" },
   { name: "Brand Groups", href: "/admin/brand-groups", icon: Link2, description: "Link listings into brand sibling groups" },
   { name: "Bank Cards", href: "/admin/cards", icon: CreditCard, description: "Manage bank cards and discount variants" },
 
@@ -147,6 +149,7 @@ export const adminNavigation: RoleNavItem[] = [
 export const listerNavigation: RoleNavItem[] = [
   { name: "Scan QR", href: "/dashboard/scan", icon: ScanLine, description: "Check in with a QR code" },
   { name: "Listing Management", href: "/admin/listings", icon: MapPin, description: "Manage all listings" },
+  { name: "Listings Duplicator", href: "/admin/listings-duplicator", icon: Copy, description: "Duplicate listings into multiple branch outlets" },
   { name: "Listing Approvals", href: "/admin/listings/approvals", icon: ClipboardCheck, description: "Review pending listings" },
   { name: "Listing Capacity", href: "/admin/listing-capacity", icon: Store, description: "Update capacity fields" },
   { name: "Event Management", href: "/admin/events", icon: Calendar, description: "Manage all events" },
