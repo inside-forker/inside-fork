@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireSessionUser } from "@/lib/auth/require-session";
 import { BrandGroupsManagementPage } from "@/components/admin/BrandGroupsManagementPage";
-import { Link2 } from "lucide-react";
+import { Link2, Copy } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -45,7 +45,13 @@ export default async function AdminBrandGroupsPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link href="/admin/listings-duplicator">
+              <Button size="sm" className="gap-1.5">
+                <Copy className="h-4 w-4" />
+                Listings Duplicator
+              </Button>
+            </Link>
             <Link href="/admin/listings">
               <Button variant="outline" size="sm">
                 Go to Listings
