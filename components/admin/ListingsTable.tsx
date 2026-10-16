@@ -32,6 +32,7 @@ import type { ListingEditorInfo } from "@/lib/hooks/useListingEditors";
 type Listing = Database["public"]["Tables"]["listings"]["Row"] & {
   category_name?: string | null;
   match_stem?: string | null;
+  duplicate_role?: "branch_copy" | "original_parent" | string | null;
 };
 
 interface ListingsTableProps {
@@ -268,10 +269,22 @@ const ListingCardItem = React.memo(function ListingCardItem({
                   {listing.match_stem && (
                     <Badge
                       variant="outline"
-                      className="text-[10px] font-semibold px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 flex items-center gap-1 w-fit"
-                      title="Flagged as a duplicate branch pair"
+                      className={`text-[10px] font-semibold px-2 py-0.5 flex items-center gap-1 w-fit ${
+                        listing.duplicate_role === "branch_copy"
+                          ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                          : "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30"
+                      }`}
+                      title={
+                        listing.duplicate_role === "branch_copy"
+                          ? "Single branch copy (separated listing with location suffix)"
+                          : "Original standalone listing"
+                      }
                     >
-                      <span>⚠️ Duplicate Pair: {listing.match_stem}</span>
+                      <span>
+                        {listing.duplicate_role === "branch_copy"
+                          ? `⚠️ Branch Copy: ${listing.match_stem}`
+                          : `Original: ${listing.match_stem}`}
+                      </span>
                     </Badge>
                   )}
                 </div>

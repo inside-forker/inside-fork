@@ -3,6 +3,7 @@ import { Database } from "./supabase";
 export type Listing = Database["public"]["Tables"]["listings"]["Row"] & {
   category_name?: string | null;
   match_stem?: string | null;
+  duplicate_role?: "branch_copy" | "original_parent" | string | null;
   /** All category IDs for this listing (primary first). category_id remains primary. */
   category_ids?: number[];
   // Social Links
