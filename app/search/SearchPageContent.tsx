@@ -64,6 +64,7 @@ export default function SearchPageContent() {
     hasMore,
     loadMore,
     setSearchType,
+    totalResults,
   } = useSearch({
     limit: 20,
     type: searchType,
@@ -226,8 +227,7 @@ export default function SearchPageContent() {
               {searchResults.length > 0 ? (
                 <>
                   <div className="text-sm text-muted-foreground mb-4">
-                    Found {searchResults.length}
-                    {hasMore ? "+" : ""} results for &ldquo;{searchQuery}&rdquo;
+                    Found {totalResults || searchResults.length} result{(totalResults || searchResults.length) !== 1 ? "s" : ""} for &ldquo;{searchQuery}&rdquo;
                   </div>
                   <div className="grid gap-3">
                     {searchResults.map((result) => {

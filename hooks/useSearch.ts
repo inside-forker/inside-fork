@@ -45,6 +45,7 @@ interface UseSearchReturn {
   loadMore: () => void;
   searchType: SearchEntityType;
   setSearchType: (type: SearchEntityType) => void;
+  totalResults: number;
 }
 
 type ApiSearchResult = {
@@ -101,6 +102,7 @@ export function useSearch({
   const [showResults, setShowResults] = useState(false);
   const [searchType, setSearchType] = useState<SearchEntityType>(typeProp);
   const [hasMore, setHasMore] = useState(false);
+  const [totalResults, setTotalResults] = useState(0);
   const offsetRef = useRef(0);
   const requestIdRef = useRef(0);
 
@@ -136,6 +138,7 @@ export function useSearch({
         setSearchResults([]);
         setShowResults(false);
         setHasMore(false);
+        setTotalResults(0);
         offsetRef.current = 0;
         return;
       }
@@ -163,6 +166,7 @@ export function useSearch({
 
         setSearchResults(transformedResults);
         setHasMore(Boolean(data.listings_has_more));
+        setTotalResults(Number(data.total ?? transformedResults.length));
         offsetRef.current =
           Number(data.listings_offset ?? 0) +
           Number(data.listings_limit ?? limit);
@@ -196,6 +200,7 @@ export function useSearch({
         console.error("Search error:", error);
         setSearchResults([]);
         setHasMore(false);
+        setTotalResults(0);
         setShowResults(true);
       } finally {
         if (requestId === requestIdRef.current) {
@@ -210,6 +215,7 @@ export function useSearch({
       setSearchResults([]);
       setShowResults(false);
       setHasMore(false);
+      setTotalResults(0);
       offsetRef.current = 0;
     }
   }, [
@@ -312,5 +318,6 @@ export function useSearch({
     loadMore,
     searchType,
     setSearchType,
+    totalResults,
   };
 }

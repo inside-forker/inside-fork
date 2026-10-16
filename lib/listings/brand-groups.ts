@@ -464,7 +464,7 @@ export type SearchListingResult = {
 
 export async function searchListingsForBrandGrouping(
   queryStr: string,
-  limit = 20,
+  limit = 100,
 ): Promise<SearchListingResult[]> {
   const trimmed = queryStr.trim();
   if (!trimmed) return [];
