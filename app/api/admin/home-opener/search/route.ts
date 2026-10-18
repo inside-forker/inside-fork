@@ -70,8 +70,23 @@ export async function GET(request: NextRequest) {
       const params: unknown[] = [];
       let whereClause = "";
       if (q) {
+        const qNorm = q.toLowerCase().replace(/['’]/g, "");
         params.push(`%${q}%`);
-        whereClause = `WHERE g.name ILIKE $${params.length} OR g.slug ILIKE $${params.length}`;
+        params.push(`%${qNorm}%`);
+        whereClause = `WHERE (
+          g.name ILIKE $1
+          OR g.slug ILIKE $1
+          OR replace(replace(lower(g.name), '''', ''), '’', '') ILIKE $2
+          OR EXISTS (
+            SELECT 1 FROM brand_group_members bgm
+            JOIN listings l ON l.id = bgm.listing_id
+            WHERE bgm.group_id = g.id AND (
+              l.name ILIKE $1
+              OR l.slug ILIKE $1
+              OR replace(replace(lower(l.name), '''', ''), '’', '') ILIKE $2
+            )
+          )
+        )`;
       }
       params.push(25);
 
@@ -97,7 +112,7 @@ export async function GET(request: NextRequest) {
                   l.latitude, l.longitude, l.avg_rating, l.review_count,
                   img.url AS image_url
            FROM brand_group_members m
-           JOIN listings l ON l.id = m.listing_id
+           JOIN listings_with_details l ON l.id = m.listing_id
            LEFT JOIN LATERAL (
              SELECT url FROM listing_images
              WHERE listing_id = l.id
@@ -186,6 +201,9 @@ export async function GET(request: NextRequest) {
       );
     }
     console.error("[admin/home-opener/search] failed:", error);
-    return NextResponse.json({ error: "Search failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Search failed" },
+      { status: 500 },
+    );
   }
 }
