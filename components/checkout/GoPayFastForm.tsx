@@ -133,8 +133,12 @@ export function GoPayFastForm({
               type="tel"
               value={mobileInput}
               onChange={(e) => setMobileInput(formatPhone(e.target.value))}
+              onFocus={() => {
+                if (!digitsOnly(mobileInput)) setMobileInput("03");
+              }}
               placeholder="03XX-XXXXXXX"
               maxLength={12}
+              inputMode="numeric"
               className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground outline-none focus:border-primary"
             />
             <Button
