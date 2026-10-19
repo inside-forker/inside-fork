@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, Phone, User, CreditCard } from "lucide-react";
+import { formatPhone } from "./checkoutFormat";
 
 interface BuyerDetailsFormProps {
   values: {
@@ -57,14 +58,9 @@ export function BuyerDetailsForm({
               placeholder="03XX-XXXXXXX"
               className="pl-9"
               value={values.phone}
-              onChange={(e) => {
-                let val = e.target.value.replace(/\D/g, "");
-                if (val.length > 11) val = val.slice(0, 11);
-                // Format as 03XX-XXXXXXX
-                if (val.length > 4) {
-                  val = val.slice(0, 4) + "-" + val.slice(4);
-                }
-                onChange("phone", val);
+              onChange={(e) => onChange("phone", formatPhone(e.target.value))}
+              onFocus={() => {
+                if (!values.phone.replace(/\D/g, "")) onChange("phone", "03");
               }}
               readOnly={readOnly}
             />

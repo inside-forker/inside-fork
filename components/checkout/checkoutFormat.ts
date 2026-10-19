@@ -16,9 +16,23 @@ export function formatCnic(raw: string): string {
   return val;
 }
 
-/** "0300-1234567", built up as the buyer types. */
+/**
+ * "0300-1234567" — Pakistani mobile only. Always keeps prefix `03` once the
+ * user has entered anything (PayFast/booking still receive digits as before).
+ */
 export function formatPhone(raw: string): string {
   let val = raw.replace(/\D/g, "");
+  if (val.length === 0) return "";
+
+  if (val.startsWith("92") && val.length >= 12) {
+    val = "0" + val.slice(2, 13);
+  }
+
+  if (!val.startsWith("03")) {
+    const tail = val.replace(/^0*/, "").replace(/^3?/, "");
+    val = "03" + tail;
+  }
+
   if (val.length > 11) val = val.slice(0, 11);
   if (val.length > 4) val = val.slice(0, 4) + "-" + val.slice(4);
   return val;

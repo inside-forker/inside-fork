@@ -3,7 +3,7 @@
 import { User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CheckoutField } from "./CheckoutField";
-import { formatCnic, formatPhone } from "./checkoutFormat";
+import { digitsOnly, formatCnic, formatPhone } from "./checkoutFormat";
 
 export type BuyerDetails = {
   name: string;
@@ -123,9 +123,13 @@ export function CheckoutContactCard({
             label="Phone"
             value={values.phone}
             onChange={(e) => onChange("phone", formatPhone(e.target.value))}
+            onFocus={() => {
+              if (!digitsOnly(values.phone)) onChange("phone", "03");
+            }}
             placeholder="03XX-XXXXXXX"
             type="tel"
             autoComplete="tel"
+            inputMode="numeric"
             maxLength={12}
             error={errors?.phone}
             id="contact-phone"

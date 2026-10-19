@@ -5,6 +5,7 @@
 
 import { query } from "@/lib/db";
 import { fetchPrimaryImagesByEventId } from "@/lib/mobile/event-images";
+import { resolveListingCovers } from "@/lib/mobile/listing-covers";
 import {
   MIN_QUERY_LENGTH,
   NEW_TAXONOMY_PARENT_IDS,
@@ -507,8 +508,15 @@ export async function queryPlaces(
     ? listingRows.slice(0, limit)
     : listingRows;
 
+  const coverInputs = listingSlice.map((row) => ({
+    id: Number(row.id),
+    name: row.name as string | null,
+  }));
+  const covers = await resolveListingCovers(coverInputs, { candidateCap: 1 });
+
   const listings: PlacesSearchListing[] = listingSlice.map((row) => {
     const id = Number(row.id);
+    const cover = covers.get(id);
     return {
       type: "listing" as const,
       id,
@@ -522,7 +530,7 @@ export async function queryPlaces(
         row.distance_meters !== null && row.distance_meters !== undefined
           ? Number(row.distance_meters)
           : null,
-      image_url: null,
+      image_url: cover?.headerUrl ?? null,
     };
   });
 
