@@ -8,7 +8,7 @@ const TICKET_TYPE_COLUMNS =
   "id, event_id, name, description, price, quantity_available, " +
   "to_json(sale_starts_at) #>> '{}' AS sale_starts_at, " +
   "to_json(sale_ends_at) #>> '{}' AS sale_ends_at, " +
-  "max_per_person";
+  "max_per_person, ticket_url";
 
 function toNumericTicketType(row: Record<string, unknown>) {
   return {
@@ -100,6 +100,7 @@ export async function PUT(
       sale_starts_at,
       sale_ends_at,
       max_per_person,
+      ticket_url,
     } = body;
 
     // Get current ticket data for comparison
@@ -209,6 +210,11 @@ export async function PUT(
       pushField("sale_ends_at", saleEnd ? saleEnd.toISOString() : null);
     if (max_per_person !== undefined)
       pushField("max_per_person", max_per_person);
+    if (ticket_url !== undefined)
+      pushField(
+        "ticket_url",
+        ticket_url ? String(ticket_url).trim() || null : null
+      );
 
     if (setClauses.length === 0) {
       return NextResponse.json(

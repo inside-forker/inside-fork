@@ -48,7 +48,7 @@ const EVENTS_FROM_SQL =
 const EVENT_IMAGE_SQL_COLUMNS = "id, url, alt_text, display_order";
 
 const TICKET_TYPE_SQL_COLUMNS =
-  "id, name, price, " +
+  "id, name, price, ticket_url, " +
   // Same stock as /admin/ticket-pdf-inventory (free PDF rows when present).
   `${effectiveQuantitySql("ticket_types")} AS quantity_available, ` +
   "to_json(sale_starts_at) #>> '{}' AS sale_starts_at, " +

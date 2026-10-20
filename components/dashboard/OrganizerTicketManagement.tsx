@@ -14,6 +14,7 @@ import {
   Banknote,
   Clock,
   Upload,
+  ExternalLink,
 } from "lucide-react";
 import {
   Dialog,
@@ -41,6 +42,7 @@ interface TicketType {
   sale_starts_at: string | null;
   sale_ends_at: string | null;
   max_per_person: number;
+  ticket_url?: string | null;
 }
 
 interface TicketFormData {
@@ -51,6 +53,7 @@ interface TicketFormData {
   sale_starts_at: string;
   sale_ends_at: string;
   max_per_person: string;
+  ticket_url: string;
 }
 
 interface PdfTierStock {
@@ -90,6 +93,7 @@ export function OrganizerTicketManagement({
     sale_starts_at: "",
     sale_ends_at: "",
     max_per_person: "10",
+    ticket_url: "",
   });
   const { toast } = useToast();
 
@@ -231,6 +235,7 @@ export function OrganizerTicketManagement({
           ? new Date(ticket.sale_ends_at).toISOString().slice(0, 16)
           : "",
         max_per_person: ticket.max_per_person.toString(),
+        ticket_url: ticket.ticket_url || "",
       });
     } else {
       setEditingTicket(null);
@@ -242,6 +247,7 @@ export function OrganizerTicketManagement({
         sale_starts_at: "",
         sale_ends_at: "",
         max_per_person: "10",
+        ticket_url: "",
       });
     }
     setIsDialogOpen(true);
@@ -258,6 +264,7 @@ export function OrganizerTicketManagement({
       sale_starts_at: "",
       sale_ends_at: "",
       max_per_person: "10",
+      ticket_url: "",
     });
   };
 
@@ -491,6 +498,14 @@ export function OrganizerTicketManagement({
                       Sale ends: {formatDate(ticket.sale_ends_at)}
                     </span>
                   </div>
+                  {ticket.ticket_url && (
+                    <div className="flex items-center gap-2 text-primary">
+                      <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-xs truncate max-w-[260px]" title={ticket.ticket_url}>
+                        {ticket.ticket_url}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between gap-2">
@@ -624,6 +639,28 @@ export function OrganizerTicketManagement({
                 }
                 placeholder="10"
               />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="ticket-url">External Ticket Link (Optional)</Label>
+                <span className="text-xs text-muted-foreground">Redirect instead of Inside checkout</span>
+              </div>
+              <Input
+                id="ticket-url"
+                type="url"
+                value={formData.ticket_url}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    ticket_url: e.target.value,
+                  }))
+                }
+                placeholder="https://ticketwala.pk/... or your site"
+              />
+              <p className="text-xs text-muted-foreground">
+                If provided, buyers on Inside Karachi will be redirected directly to this link to buy this pass.
+              </p>
             </div>
 
             <Separator />
