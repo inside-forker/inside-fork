@@ -4172,6 +4172,7 @@ export type Database = {
           quantity_available: number | null
           sale_ends_at: string
           sale_starts_at: string
+          ticket_url: string | null
         }
         Insert: {
           description?: string | null
@@ -4183,6 +4184,7 @@ export type Database = {
           quantity_available?: number | null
           sale_ends_at: string
           sale_starts_at: string
+          ticket_url?: string | null
         }
         Update: {
           description?: string | null
@@ -4194,6 +4196,7 @@ export type Database = {
           quantity_available?: number | null
           sale_ends_at?: string
           sale_starts_at?: string
+          ticket_url?: string | null
         }
         Relationships: [
           {

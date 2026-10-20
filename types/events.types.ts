@@ -102,6 +102,7 @@ export type TicketType = {
   sale_starts_at: string;
   sale_ends_at: string;
   max_per_person: number | null;
+  ticket_url?: string | null;
 };
 
 // Event page props
@@ -162,4 +163,5 @@ export interface TicketFormData {
   sale_starts_at: string;
   sale_ends_at: string;
   max_per_person: string;
+  ticket_url?: string;
 }

@@ -47,6 +47,7 @@ export async function EventTicketsContainer({
                     : null,
             max_per_person:
                 row.max_per_person !== null ? Number(row.max_per_person) : null,
+            ticket_url: row.ticket_url ? String(row.ticket_url).trim() : null,
         };
     });
 

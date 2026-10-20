@@ -414,13 +414,14 @@ export async function POST(request: NextRequest) {
               sale_starts_at: string;
               sale_ends_at: string;
               max_per_person?: number;
+              ticket_url?: string | null;
             }>;
             if (Array.isArray(tempTickets) && tempTickets.length > 0) {
               for (const t of tempTickets) {
                 if (t.name && t.price !== undefined && t.quantity_available !== undefined) {
                   await client.query(
-                    `INSERT INTO ticket_types (event_id, name, description, price, quantity_available, sale_starts_at, sale_ends_at, max_per_person)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                    `INSERT INTO ticket_types (event_id, name, description, price, quantity_available, sale_starts_at, sale_ends_at, max_per_person, ticket_url)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
                     [
                       newEventId,
                       t.name,
@@ -430,6 +431,7 @@ export async function POST(request: NextRequest) {
                       t.sale_starts_at || null,
                       t.sale_ends_at || null,
                       t.max_per_person ? Number(t.max_per_person) : 10,
+                      t.ticket_url ? t.ticket_url.trim() : null,
                     ]
                   );
                 }

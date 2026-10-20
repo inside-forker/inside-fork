@@ -549,13 +549,14 @@ export async function POST(request: NextRequest) {
           // 3. Upsert (Update existing or Insert new)
           for (const ticket of tempTickets) {
             const description = ticket.description || null;
+            const ticketUrl = ticket.ticket_url ? ticket.ticket_url.trim() : null;
 
             if (ticket.id) {
               try {
                 await query(
                   `UPDATE ticket_types SET name = $1, description = $2, price = $3, quantity_available = $4,
-                     sale_starts_at = $5, sale_ends_at = $6, max_per_person = $7
-                   WHERE id = $8`,
+                     sale_starts_at = $5, sale_ends_at = $6, max_per_person = $7, ticket_url = $8
+                   WHERE id = $9`,
                   [
                     ticket.name,
                     description,
@@ -564,6 +565,7 @@ export async function POST(request: NextRequest) {
                     ticket.sale_starts_at,
                     ticket.sale_ends_at,
                     ticket.max_per_person || 10,
+                    ticketUrl,
                     ticket.id,
                   ]
                 );
@@ -574,8 +576,8 @@ export async function POST(request: NextRequest) {
             } else {
               try {
                 await query(
-                  `INSERT INTO ticket_types (event_id, name, description, price, quantity_available, sale_starts_at, sale_ends_at, max_per_person)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                  `INSERT INTO ticket_types (event_id, name, description, price, quantity_available, sale_starts_at, sale_ends_at, max_per_person, ticket_url)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
                   [
                     response.event_id,
                     ticket.name,
@@ -585,6 +587,7 @@ export async function POST(request: NextRequest) {
                     ticket.sale_starts_at,
                     ticket.sale_ends_at,
                     ticket.max_per_person || 10,
+                    ticketUrl,
                   ]
                 );
                 console.log(`Created new ticket: ${ticket.name}`);

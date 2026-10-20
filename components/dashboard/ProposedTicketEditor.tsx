@@ -24,6 +24,7 @@ import {
   Clock,
   AlertCircle,
   Upload,
+  ExternalLink,
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import type { ProposedTicketType } from "@/types/event-change-request.types";
@@ -48,6 +49,7 @@ interface TicketFormData {
   sale_starts_at: string;
   sale_ends_at: string;
   max_per_person: string;
+  ticket_url: string;
 }
 
 interface ProposedTicketEditorProps {
@@ -84,6 +86,7 @@ export function ProposedTicketEditor({
     sale_starts_at: "",
     sale_ends_at: "",
     max_per_person: "10",
+    ticket_url: "",
   });
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
@@ -168,6 +171,7 @@ export function ProposedTicketEditor({
           ? new Date(ticket.sale_ends_at).toISOString().slice(0, 16)
           : "",
         max_per_person: ticket.max_per_person?.toString() || "10",
+        ticket_url: ticket.ticket_url || "",
       });
     } else {
       setEditingTicket(null);
@@ -194,6 +198,7 @@ export function ProposedTicketEditor({
         sale_starts_at: defaultStart,
         sale_ends_at: defaultEnd,
         max_per_person: "10",
+        ticket_url: "",
       });
     }
     setErrors({});
@@ -211,6 +216,7 @@ export function ProposedTicketEditor({
       sale_starts_at: "",
       sale_ends_at: "",
       max_per_person: "10",
+      ticket_url: "",
     });
     setErrors({});
   };
@@ -249,6 +255,17 @@ export function ProposedTicketEditor({
       }
     }
 
+    if (formData.ticket_url.trim()) {
+      try {
+        const parsed = new URL(formData.ticket_url.trim());
+        if (!["http:", "https:"].includes(parsed.protocol)) {
+          newErrors.ticket_url = "URL must start with http:// or https://";
+        }
+      } catch {
+        newErrors.ticket_url = "Please enter a valid URL (e.g. https://...)";
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -268,6 +285,7 @@ export function ProposedTicketEditor({
       sale_starts_at: new Date(formData.sale_starts_at).toISOString(),
       sale_ends_at: new Date(formData.sale_ends_at).toISOString(),
       max_per_person: parseInt(formData.max_per_person) || 10,
+      ticket_url: formData.ticket_url.trim() || null,
     };
 
     if (editingTicket) {
@@ -452,6 +470,14 @@ export function ProposedTicketEditor({
                       Sale ends: {formatDate(ticket.sale_ends_at)}
                     </span>
                   </div>
+                  {ticket.ticket_url && (
+                    <div className="flex items-center gap-2 text-primary">
+                      <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-xs truncate max-w-[260px]" title={ticket.ticket_url}>
+                        {ticket.ticket_url}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between gap-2">
@@ -598,6 +624,33 @@ export function ProposedTicketEditor({
                 }
                 placeholder="10"
               />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="ticket-url">External Ticket Link (Optional)</Label>
+                <span className="text-xs text-muted-foreground">Redirect instead of Inside checkout</span>
+              </div>
+              <Input
+                id="ticket-url"
+                type="url"
+                value={formData.ticket_url}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    ticket_url: e.target.value,
+                  }))
+                }
+                placeholder="https://ticketwala.pk/... or your site"
+                className={errors.ticket_url ? "border-red-500" : ""}
+              />
+              {errors.ticket_url ? (
+                <p className="text-sm text-red-500">{errors.ticket_url}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  If provided, buyers clicking this pass on Inside Karachi will be redirected directly to this link to buy.
+                </p>
+              )}
             </div>
 
             <Separator />

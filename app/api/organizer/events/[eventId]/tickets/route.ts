@@ -11,7 +11,7 @@ const TICKET_TYPE_COLUMNS =
   "id, event_id, name, description, price, quantity_available, " +
   "to_json(sale_starts_at) #>> '{}' AS sale_starts_at, " +
   "to_json(sale_ends_at) #>> '{}' AS sale_ends_at, " +
-  "max_per_person";
+  "max_per_person, ticket_url";
 
 function toNumericTicketType<T extends { id: unknown; event_id: unknown; price: unknown }>(
   row: T
@@ -177,11 +177,16 @@ export async function POST(
     }
 
     // Create ticket type
+    const ticketUrl =
+      body.ticket_url !== undefined && typeof body.ticket_url === "string"
+        ? body.ticket_url.trim() || null
+        : null;
+
     let ticketType;
     try {
       const { rows } = await query(
-        `INSERT INTO ticket_types (event_id, name, description, price, quantity_available, sale_starts_at, sale_ends_at, max_per_person)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO ticket_types (event_id, name, description, price, quantity_available, sale_starts_at, sale_ends_at, max_per_person, ticket_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING ${TICKET_TYPE_COLUMNS}`,
         [
           eventIdNum,
@@ -192,6 +197,7 @@ export async function POST(
           body.sale_starts_at || null,
           body.sale_ends_at || null,
           maxPerPerson,
+          ticketUrl,
         ]
       );
       ticketType = toNumericTicketType(rows[0]);
@@ -306,6 +312,13 @@ export async function PATCH(
       }
       updateParams.push(maxPerPerson);
       setClauses.push(`max_per_person = $${updateParams.length}`);
+    }
+
+    if (body.ticket_url !== undefined) {
+      const ticketUrl =
+        typeof body.ticket_url === "string" ? body.ticket_url.trim() || null : null;
+      updateParams.push(ticketUrl);
+      setClauses.push(`ticket_url = $${updateParams.length}`);
     }
 
     if (setClauses.length === 0) {

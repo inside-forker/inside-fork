@@ -51,6 +51,7 @@ export interface ProposedTicketType {
   sale_starts_at: string;
   sale_ends_at: string;
   max_per_person?: number;
+  ticket_url?: string | null;
 }
 
 // Proposed event data structure

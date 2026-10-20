@@ -14,6 +14,7 @@ import {
   Users,
   Banknote,
   Clock,
+  ExternalLink,
 } from "lucide-react";
 import {
   Dialog,
@@ -52,6 +53,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
     sale_starts_at: "",
     sale_ends_at: "",
     max_per_person: "10",
+    ticket_url: "",
   });
   const { toast } = useToast();
 
@@ -537,6 +539,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       sale_starts_at: "",
       sale_ends_at: "",
       max_per_person: "10",
+      ticket_url: "",
     });
   };
 
@@ -553,6 +556,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
         .slice(0, 16),
       sale_ends_at: new Date(ticket.sale_ends_at).toISOString().slice(0, 16),
       max_per_person: ticket.max_per_person?.toString() || "10",
+      ticket_url: ticket.ticket_url || "",
     });
     setIsDialogOpen(true);
   };
@@ -692,6 +696,14 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                       Sale ends: {formatDate(ticket.sale_ends_at)}
                     </span>
                   </div>
+                  {ticket.ticket_url && (
+                    <div className="flex items-center gap-2 text-primary">
+                      <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-xs truncate max-w-[260px]" title={ticket.ticket_url}>
+                        {ticket.ticket_url}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {ticket.max_per_person && (
@@ -839,6 +851,27 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                   }
                   placeholder="10"
                 />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="ticket-url" className="text-sm font-medium">
+                  External Ticket Link (Optional)
+                </Label>
+                <Input
+                  id="ticket-url"
+                  type="url"
+                  value={formData.ticket_url}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      ticket_url: e.target.value,
+                    }))
+                  }
+                  placeholder="https://ticketwala.pk/... or organizer site"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Redirects buyers directly to this URL instead of Inside checkout.
+                </p>
               </div>
             </div>
 

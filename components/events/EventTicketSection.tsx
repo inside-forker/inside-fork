@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Minus, CreditCard } from "lucide-react";
+import { Plus, Minus, CreditCard, ExternalLink } from "lucide-react";
 import { EventTicketSectionProps, TicketType } from "@/types/events.types";
 import { PremiumHeading } from "@/components/brand/Typography";
 import { useRouter } from "next/navigation";
@@ -216,13 +216,30 @@ export function EventTicketSection({
                     </div>
                   </div>
 
-                  {isAvailable
-                    ? renderStepper(ticket, selectedQuantity, maxQuantity)
-                    : status && (
-                        <Badge variant={status.variant} className="shrink-0">
-                          {status.text}
-                        </Badge>
-                      )}
+                  {ticket.ticket_url ? (
+                    <Button
+                      size="sm"
+                      className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-3 py-1.5 text-xs shrink-0 inline-flex items-center gap-1 shadow-sm"
+                      asChild
+                    >
+                      <a
+                        href={ticket.ticket_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Buy Pass
+                        <ExternalLink className="w-3 h-3 ml-0.5" />
+                      </a>
+                    </Button>
+                  ) : isAvailable ? (
+                    renderStepper(ticket, selectedQuantity, maxQuantity)
+                  ) : (
+                    status && (
+                      <Badge variant={status.variant} className="shrink-0">
+                        {status.text}
+                      </Badge>
+                    )
+                  )}
                 </div>
 
                 {/* Tablet & desktop */}
@@ -269,11 +286,28 @@ export function EventTicketSection({
                     </div>
                   </div>
 
-                  {isAvailable && (
+                  {ticket.ticket_url ? (
+                    <div className="flex justify-end">
+                      <Button
+                        size="default"
+                        className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-5 py-2 inline-flex items-center gap-2 shadow-md shadow-primary/20"
+                        asChild
+                      >
+                        <a
+                          href={ticket.ticket_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Buy Pass
+                          <ExternalLink className="w-4 h-4 ml-1" />
+                        </a>
+                      </Button>
+                    </div>
+                  ) : isAvailable ? (
                     <div className="flex justify-end">
                       {renderStepper(ticket, selectedQuantity, maxQuantity)}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </Card>
             </motion.div>
