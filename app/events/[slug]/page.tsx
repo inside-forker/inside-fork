@@ -182,9 +182,12 @@ export default async function EventPage({
             </Suspense>
           </div>
 
-          {/* Right Column - Sidebar */}
-          <AnimatedSection className="space-y-8 md:space-y-10 lg:space-y-12">
-            <div className="sticky lg:top-20 lg:self-start space-y-8 md:space-y-10 lg:space-y-12">
+          {/* Right Column - Sidebar. The fade-in sits on the sticky box, not
+              the column: the column stretches to the left column's height, and
+              on long pages (many ticket types) 20% of it never fits on screen,
+              so it would never fade in. */}
+          <div className="space-y-8 md:space-y-10 lg:space-y-12">
+            <AnimatedSection className="sticky lg:top-20 lg:self-start space-y-8 md:space-y-10 lg:space-y-12">
               {/* Desktop sidebar only - on smaller screens it repeats the header */}
               <div className="group relative overflow-hidden bg-card border rounded-2xl p-5 md:p-8 hover:border-primary/40 transition-all duration-300 space-y-4 md:space-y-6 hidden lg:block">
                 <h3 className="text-lg md:text-xl font-semibold">Event Information</h3>
@@ -236,8 +239,8 @@ export default async function EventPage({
                   itemSlug={event.slug}
                 />
               </div>
-            </div>
-          </AnimatedSection>
+            </AnimatedSection>
+          </div>
         </div>
       </div>
     </div>
