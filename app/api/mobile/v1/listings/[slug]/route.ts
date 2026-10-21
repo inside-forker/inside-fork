@@ -51,7 +51,7 @@ function toNumericListingRow<T extends Record<string, unknown>>(
 
 /** Explicit column list for `listings_with_details` - never use `*`. */
 const LISTING_DETAIL_SQL_COLUMNS =
-  "id, name, slug, description, address, category_id, category_name, latitude, longitude, avg_rating, review_count, is_featured, status, menu_pdf_url, google_maps_url, place_id, phone_number, email, website, custom_attributes";
+  "id, name, slug, description, address, category_id, category_name, latitude, longitude, avg_rating, review_count, is_featured, status, menu_pdf_url, google_maps_url, place_id, phone_number, email, website, whatsapp_number, instagram_url, facebook_url, youtube_url, custom_attributes";
 
 /**
  * GET /api/mobile/v1/listings/{slug}
@@ -84,6 +84,10 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
       phone_number: string | null;
       email: string | null;
       website: string | null;
+      whatsapp_number: string | null;
+      instagram_url: string | null;
+      facebook_url: string | null;
+      youtube_url: string | null;
       custom_attributes: Record<string, unknown> | null;
     },
   );
@@ -451,6 +455,10 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
     phone_number: row.phone_number,
     email: row.email,
     website: row.website,
+    whatsapp_number: row.whatsapp_number,
+    instagram_url: row.instagram_url,
+    facebook_url: row.facebook_url,
+    youtube_url: row.youtube_url,
     is_restaurant: isRestaurant,
     favorited,
   };

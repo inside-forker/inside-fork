@@ -16,7 +16,6 @@ export function CheckoutContactCard({
   values,
   onChange,
   errors,
-  ticketName,
   avatarUrl,
   buyerHoldsFirst = true,
   onToggleBuyerHoldsFirst,
@@ -26,7 +25,6 @@ export function CheckoutContactCard({
   values: BuyerDetails;
   onChange: (field: keyof BuyerDetails, value: string) => void;
   errors?: Partial<Record<keyof BuyerDetails, string>>;
-  ticketName?: string;
   avatarUrl?: string | null;
   buyerHoldsFirst?: boolean;
   onToggleBuyerHoldsFirst?: () => void;
@@ -73,9 +71,7 @@ export function CheckoutContactCard({
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{display}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {buyerHoldsFirst
-                    ? `You · ${ticketName || "Ticket 1"}`
-                    : "Buyer (Not attending)"}
+                  {buyerHoldsFirst ? "Buyer · also going" : "Buyer · not going"}
                 </p>
               </div>
             </div>
@@ -136,17 +132,20 @@ export function CheckoutContactCard({
             required
           />
 
-          <CheckoutField
-            label={buyerHoldsFirst ? "Your CNIC" : "Buyer's CNIC"}
-            value={values.cnic}
-            onChange={(e) => onChange("cnic", formatCnic(e.target.value))}
-            placeholder="42101-1234567-1"
-            inputMode="numeric"
-            maxLength={15}
-            error={errors?.cnic}
-            id="contact-cnic"
-            required
-          />
+          {/* Going: their CNIC is on their ticket card under "Who's going". */}
+          {!buyerHoldsFirst ? (
+            <CheckoutField
+              label="Your CNIC"
+              value={values.cnic}
+              onChange={(e) => onChange("cnic", formatCnic(e.target.value))}
+              placeholder="42101-1234567-1"
+              inputMode="numeric"
+              maxLength={15}
+              error={errors?.cnic}
+              id="contact-cnic"
+              required
+            />
+          ) : null}
         </>
       )}
     </div>

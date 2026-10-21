@@ -47,6 +47,7 @@ import type {
 import type { EventImage } from "@/types/events.types";
 import { EventGalleryUpload } from "@/components/admin/EventGalleryUpload";
 import { ProposedTicketEditor } from "./ProposedTicketEditor";
+import { fromKarachiInput, toKarachiInput } from "@/lib/events/datetime";
 
 interface Category {
   value: string;
@@ -176,10 +177,10 @@ export function RejectedRequestModal({
             name: proposed.name || "",
             description: proposed.description || "",
             start_time: proposed.start_time
-              ? new Date(proposed.start_time).toISOString().slice(0, 16)
+              ? toKarachiInput(proposed.start_time)
               : "",
             end_time: proposed.end_time
-              ? new Date(proposed.end_time).toISOString().slice(0, 16)
+              ? toKarachiInput(proposed.end_time)
               : "",
             location_name: proposed.location_name || "",
             address: proposed.address || "",
@@ -468,6 +469,8 @@ export function RejectedRequestModal({
 
     const submitData = {
       ...formData,
+      start_time: fromKarachiInput(formData.start_time),
+      end_time: fromKarachiInput(formData.end_time),
       ...(activeImages.length > 0
         ? {
             temp_images: activeImages.map((img, index) => ({

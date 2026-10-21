@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
+import {
+  normalizeMinPeople,
+  normalizePeoplePerTicket,
+  sanitizeAttendeeFields,
+} from "@/lib/ticketing/attendee-fields";
+
+/** Group size range for storage: max, and min (null when it equals max). */
+function groupSize(maxRaw: unknown, minRaw: unknown) {
+  const max = normalizePeoplePerTicket(maxRaw);
+  const min = normalizeMinPeople(minRaw, max);
+  return { max, min: min === max ? null : min };
+}
 
 // Force dynamic to ensure fresh ticket data
 export const dynamic = "force-dynamic";
@@ -11,7 +23,7 @@ const TICKET_TYPE_COLUMNS =
   "id, event_id, name, description, price, quantity_available, " +
   "to_json(sale_starts_at) #>> '{}' AS sale_starts_at, " +
   "to_json(sale_ends_at) #>> '{}' AS sale_ends_at, " +
-  "max_per_person, ticket_url";
+  "max_per_person, ticket_url, people_per_ticket, min_people_per_ticket, attendee_fields";
 
 function toNumericTicketType(row: Record<string, unknown>) {
   return {
@@ -70,7 +82,7 @@ export async function GET(
 
     // Verify event exists and user has access
     const { rows: eventRows } = await query(
-      `SELECT id, organizer_id FROM events WHERE id = $1`,
+      `SELECT id, organizer_id, attendee_fields FROM events WHERE id = $1`,
       [eventId]
     );
     if (!eventRows[0]) {
@@ -105,6 +117,10 @@ export async function GET(
       success: true,
       data: {
         ticket_types: ticketTypes || [],
+        // Checkout questions every ticket of the event asks.
+        event_attendee_fields: sanitizeAttendeeFields(
+          eventRows[0].attendee_fields
+        ),
       },
     });
   } catch (error) {
@@ -170,7 +186,11 @@ export async function POST(
       sale_ends_at,
       max_per_person,
       ticket_url,
+      people_per_ticket,
+      min_people_per_ticket,
+      attendee_fields,
     } = body;
+    const size = groupSize(people_per_ticket, min_people_per_ticket);
 
     // Validation
     if (!name?.trim()) {
@@ -246,8 +266,8 @@ export async function POST(
     let ticketType;
     try {
       const { rows } = await query(
-        `INSERT INTO ticket_types (event_id, name, description, price, quantity_available, sale_starts_at, sale_ends_at, max_per_person, ticket_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO ticket_types (event_id, name, description, price, quantity_available, sale_starts_at, sale_ends_at, max_per_person, ticket_url, people_per_ticket, attendee_fields, min_people_per_ticket)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12)
          RETURNING ${TICKET_TYPE_COLUMNS}`,
         [
           eventId,
@@ -259,6 +279,9 @@ export async function POST(
           saleEnd.toISOString(),
           normalizedMaxPerPerson,
           ticket_url ? String(ticket_url).trim() || null : null,
+          size.max,
+          JSON.stringify(sanitizeAttendeeFields(attendee_fields)),
+          size.min,
         ]
       );
       ticketType = toNumericTicketType(rows[0]);
@@ -276,6 +299,65 @@ export async function POST(
     });
   } catch (error) {
     console.error("Error in admin tickets POST:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/admin/events/[id]/tickets - Save the checkout questions every
+// ticket of the event asks ({ event_attendee_fields }).
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const session = await getSession(request);
+
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const access = await requireAdminRole(session.userId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { success: false, error: access.error },
+        { status: access.status }
+      );
+    }
+
+    const eventId = parseInt(id);
+    if (isNaN(eventId)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid event ID" },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const fields = sanitizeAttendeeFields(body.event_attendee_fields);
+    const { rowCount } = await query(
+      `UPDATE events SET attendee_fields = $2::jsonb WHERE id = $1`,
+      [eventId, JSON.stringify(fields)]
+    );
+    if (!rowCount) {
+      return NextResponse.json(
+        { success: false, error: "Event not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: { event_attendee_fields: fields },
+    });
+  } catch (error) {
+    console.error("Error in admin tickets PUT:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }

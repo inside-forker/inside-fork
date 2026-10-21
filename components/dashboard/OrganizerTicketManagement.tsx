@@ -29,6 +29,12 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { TicketPdfUploadDialog } from "@/components/ticketing/TicketPdfUploadDialog";
+import { fromKarachiInput, toKarachiInput } from "@/lib/events/datetime";
+import {
+  AttendeeFieldsEditor,
+  GroupSizeInputs,
+} from "@/components/ticketing/AttendeeFieldsEditor";
+import type { AttendeeField } from "@/lib/ticketing/attendee-fields";
 
 const DESCRIPTION_MAX_LENGTH = 500;
 
@@ -43,6 +49,9 @@ interface TicketType {
   sale_ends_at: string | null;
   max_per_person: number;
   ticket_url?: string | null;
+  people_per_ticket?: number;
+  min_people_per_ticket?: number | null;
+  attendee_fields?: AttendeeField[];
 }
 
 interface TicketFormData {
@@ -54,6 +63,9 @@ interface TicketFormData {
   sale_ends_at: string;
   max_per_person: string;
   ticket_url: string;
+  people_per_ticket: string;
+  min_people_per_ticket: string;
+  attendee_fields: AttendeeField[];
 }
 
 interface PdfTierStock {
@@ -94,8 +106,14 @@ export function OrganizerTicketManagement({
     sale_ends_at: "",
     max_per_person: "10",
     ticket_url: "",
+    people_per_ticket: "1",
+    min_people_per_ticket: "1",
+    attendee_fields: [],
   });
   const { toast } = useToast();
+  // Checkout questions every ticket of this event asks.
+  const [eventFields, setEventFields] = React.useState<AttendeeField[]>([]);
+  const [isSavingEventFields, setIsSavingEventFields] = React.useState(false);
 
   const modalRef = React.useRef<HTMLDivElement>(null);
 
@@ -137,6 +155,7 @@ export function OrganizerTicketManagement({
       if (response.ok) {
         const data = await response.json();
         setTicketTypes(data.data?.ticket_types || []);
+        setEventFields(data.data?.event_attendee_fields || []);
         void fetchPdfInventory();
       } else {
         toast({
@@ -229,13 +248,18 @@ export function OrganizerTicketManagement({
         price: ticket.price.toString(),
         quantity_available: ticket.quantity_available.toString(),
         sale_starts_at: ticket.sale_starts_at
-          ? new Date(ticket.sale_starts_at).toISOString().slice(0, 16)
+          ? toKarachiInput(ticket.sale_starts_at)
           : "",
         sale_ends_at: ticket.sale_ends_at
-          ? new Date(ticket.sale_ends_at).toISOString().slice(0, 16)
+          ? toKarachiInput(ticket.sale_ends_at)
           : "",
         max_per_person: ticket.max_per_person.toString(),
         ticket_url: ticket.ticket_url || "",
+        people_per_ticket: String(ticket.people_per_ticket ?? 1),
+        min_people_per_ticket: String(
+          ticket.min_people_per_ticket ?? ticket.people_per_ticket ?? 1
+        ),
+        attendee_fields: ticket.attendee_fields ?? [],
       });
     } else {
       setEditingTicket(null);
@@ -248,6 +272,9 @@ export function OrganizerTicketManagement({
         sale_ends_at: "",
         max_per_person: "10",
         ticket_url: "",
+        people_per_ticket: "1",
+        min_people_per_ticket: "1",
+        attendee_fields: [],
       });
     }
     setIsDialogOpen(true);
@@ -265,6 +292,9 @@ export function OrganizerTicketManagement({
       sale_ends_at: "",
       max_per_person: "10",
       ticket_url: "",
+      people_per_ticket: "1",
+      min_people_per_ticket: "1",
+      attendee_fields: [],
     });
   };
 
@@ -292,6 +322,8 @@ export function OrganizerTicketManagement({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
+          sale_starts_at: fromKarachiInput(formData.sale_starts_at) || null,
+          sale_ends_at: fromKarachiInput(formData.sale_ends_at) || null,
           description: formData.description.trim() || null,
         }),
       });
@@ -317,6 +349,29 @@ export function OrganizerTicketManagement({
           error instanceof Error ? error.message : "Failed to save ticket type",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleSaveEventFields = async () => {
+    setIsSavingEventFields(true);
+    try {
+      const response = await fetch(`/api/organizer/events/${eventId}/tickets`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event_attendee_fields: eventFields }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to save");
+      setEventFields(result.data?.event_attendee_fields || []);
+      toast({ title: "Saved", description: "Additional fields updated" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingEventFields(false);
     }
   };
 
@@ -397,6 +452,30 @@ export function OrganizerTicketManagement({
         </Button>
       </div>
 
+      {/* Questions every ticket of the event asks at checkout */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Additional fields (all tickets)</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Extra details buyers fill in at checkout, e.g. university name.
+            These apply to every ticket of this event; add fields for one
+            ticket only inside that ticket type.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <AttendeeFieldsEditor value={eventFields} onChange={setEventFields} />
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => void handleSaveEventFields()}
+              disabled={isSavingEventFields}
+            >
+              {isSavingEventFields ? "Saving…" : "Save fields"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Ticket List */}
       {ticketTypes.length === 0 ? (
         <Card className="p-8">
@@ -452,6 +531,15 @@ export function OrganizerTicketManagement({
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
+                {(ticket.people_per_ticket ?? 1) > 1 && (
+                  <Badge variant="secondary">
+                    Group of{" "}
+                    {ticket.min_people_per_ticket &&
+                    ticket.min_people_per_ticket < (ticket.people_per_ticket ?? 1)
+                      ? `${ticket.min_people_per_ticket}–${ticket.people_per_ticket}`
+                      : ticket.people_per_ticket}
+                  </Badge>
+                )}
                 {ticket.description && (
                   <p className="text-sm text-muted-foreground line-clamp-2">
                     {ticket.description}
@@ -534,7 +622,7 @@ export function OrganizerTicketManagement({
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent ref={modalRef} className="max-w-md">
+        <DialogContent ref={modalRef} className="max-h-[90vh] max-w-md overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingTicket ? "Edit Ticket Type" : "Create Ticket Type"}
@@ -625,7 +713,7 @@ export function OrganizerTicketManagement({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ticket-max">Max Per Person</Label>
+              <Label htmlFor="ticket-max">Max tickets per buyer</Label>
               <Input
                 id="ticket-max"
                 type="number"
@@ -638,6 +726,28 @@ export function OrganizerTicketManagement({
                   }))
                 }
                 placeholder="10"
+              />
+            </div>
+
+            <GroupSizeInputs
+              min={formData.min_people_per_ticket}
+              max={formData.people_per_ticket}
+              onChange={({ min, max }) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  min_people_per_ticket: min,
+                  people_per_ticket: max,
+                }))
+              }
+            />
+
+            <div className="space-y-2">
+              <Label>Additional fields for this ticket only (optional)</Label>
+              <AttendeeFieldsEditor
+                value={formData.attendee_fields}
+                onChange={(next) =>
+                  setFormData((prev) => ({ ...prev, attendee_fields: next }))
+                }
               />
             </div>
 

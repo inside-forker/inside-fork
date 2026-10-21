@@ -7,6 +7,7 @@ import {
   getPdfInventoryTicketTypeIds,
 } from "@/lib/ticketing/pdf-inventory";
 import { scheduleParchiRedemptionReport } from "@/lib/parchi/service";
+import { planBookingPasses } from "@/lib/ticketing/holder-slots";
 import { createNotification } from "@/lib/notifications/service";
 
 /**
@@ -107,31 +108,40 @@ export async function confirmBookingWithoutPayment(
       signature: string;
       index: number;
       guestName: string;
+      cnicLast4: string | null;
+      metadata: Record<string, unknown> | null;
     }> = [];
-    for (const item of items) {
-      if (pdfTypeIds.has(Number(item.ticket_type_id))) continue;
-      for (let i = 0; i < Number(item.quantity); i++) {
-        const code = `IK-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
-        const signature = crypto
-          .createHmac("sha256", signingSecret)
-          .update(`${code}:${booking.event_id}:${bookingId}`)
-          .digest("hex")
-          .slice(0, 16);
-        passes.push({
-          ticketTypeId: item.ticket_type_id,
-          code,
-          signature,
-          index: i,
-          guestName: booking.customer_name || `Guest ${i + 1}`,
-        });
-      }
+    // One pass per person (group tickets), with the holder details saved on
+    // the booking at checkout.
+    const planned = await planBookingPasses(
+      bookingId,
+      items,
+      pdfTypeIds,
+      booking.customer_name || null,
+    );
+    for (const p of planned) {
+      const code = `IK-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+      const signature = crypto
+        .createHmac("sha256", signingSecret)
+        .update(`${code}:${booking.event_id}:${bookingId}`)
+        .digest("hex")
+        .slice(0, 16);
+      passes.push({
+        ticketTypeId: p.ticket_type_id,
+        code,
+        signature,
+        index: p.quantity_index,
+        guestName: p.guest_name ?? `Guest ${p.quantity_index + 1}`,
+        cnicLast4: p.cnic_last4,
+        metadata: p.metadata,
+      });
     }
 
     if (passes.length > 0) {
       const values: unknown[] = [];
       const placeholders = passes
         .map((p, idx) => {
-          const base = idx * 9;
+          const base = idx * 11;
           values.push(
             bookingId,
             booking.event_id,
@@ -142,13 +152,15 @@ export async function confirmBookingWithoutPayment(
             p.index,
             p.guestName,
             assignedGateIndex,
+            p.cnicLast4,
+            p.metadata ? JSON.stringify(p.metadata) : null,
           );
-          return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9})`;
+          return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}::jsonb)`;
         })
         .join(", ");
       await query(
         `INSERT INTO ticket_passes
-           (booking_id, event_id, ticket_type_id, code, signature, status, quantity_index, guest_name, assigned_gate_index)
+           (booking_id, event_id, ticket_type_id, code, signature, status, quantity_index, guest_name, assigned_gate_index, cnic_last4, metadata)
          VALUES ${placeholders}`,
         values,
       );

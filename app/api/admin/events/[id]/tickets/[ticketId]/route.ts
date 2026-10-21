@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
+import {
+  normalizeMinPeople,
+  normalizePeoplePerTicket,
+  sanitizeAttendeeFields,
+} from "@/lib/ticketing/attendee-fields";
+
+/** Group size range for storage: max, and min (null when it equals max). */
+function groupSize(maxRaw: unknown, minRaw: unknown) {
+  const max = normalizePeoplePerTicket(maxRaw);
+  const min = normalizeMinPeople(minRaw, max);
+  return { max, min: min === max ? null : min };
+}
 
 const ADMIN_ROLES = ["admin", "super_admin", "lister"];
 
@@ -8,7 +20,7 @@ const TICKET_TYPE_COLUMNS =
   "id, event_id, name, description, price, quantity_available, " +
   "to_json(sale_starts_at) #>> '{}' AS sale_starts_at, " +
   "to_json(sale_ends_at) #>> '{}' AS sale_ends_at, " +
-  "max_per_person, ticket_url";
+  "max_per_person, ticket_url, people_per_ticket, min_people_per_ticket, attendee_fields";
 
 function toNumericTicketType(row: Record<string, unknown>) {
   return {
@@ -101,6 +113,9 @@ export async function PUT(
       sale_ends_at,
       max_per_person,
       ticket_url,
+      people_per_ticket,
+      min_people_per_ticket,
+      attendee_fields,
     } = body;
 
     // Get current ticket data for comparison
@@ -210,6 +225,16 @@ export async function PUT(
       pushField("sale_ends_at", saleEnd ? saleEnd.toISOString() : null);
     if (max_per_person !== undefined)
       pushField("max_per_person", max_per_person);
+    if (people_per_ticket !== undefined) {
+      const size = groupSize(people_per_ticket, min_people_per_ticket);
+      pushField("people_per_ticket", size.max);
+      pushField("min_people_per_ticket", size.min);
+    }
+    if (attendee_fields !== undefined)
+      pushField(
+        "attendee_fields",
+        JSON.stringify(sanitizeAttendeeFields(attendee_fields))
+      );
     if (ticket_url !== undefined)
       pushField(
         "ticket_url",

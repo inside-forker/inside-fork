@@ -45,6 +45,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import type { AdminEvent } from "@/types/events.types";
 import type { EventImage } from "@/types/events.types";
+import { fromKarachiInput, toKarachiInput } from "@/lib/events/datetime";
 
 interface Category {
   value: string;
@@ -243,12 +244,8 @@ export function EventModal({
             setFormData({
               name: eventData.event_name || "",
               description: eventData.event_description || "",
-              start_time: eventData.start_time
-                ? new Date(eventData.start_time).toISOString().slice(0, 16)
-                : "",
-              end_time: eventData.end_time
-                ? new Date(eventData.end_time).toISOString().slice(0, 16)
-                : "",
+              start_time: toKarachiInput(eventData.start_time),
+              end_time: toKarachiInput(eventData.end_time),
               organizer_id: eventData.organizer_id || "",
               location_name: eventData.location_name || "",
               address: eventData.address || "",
@@ -672,8 +669,8 @@ export function EventModal({
       const eventData = {
         name: formData.name.trim(),
         description: formData.description?.trim() || null,
-        start_time: new Date(formData.start_time).toISOString(),
-        end_time: new Date(formData.end_time).toISOString(),
+        start_time: fromKarachiInput(formData.start_time),
+        end_time: fromKarachiInput(formData.end_time),
         organizer_id:
           formData.organizer_id && formData.organizer_id !== ""
             ? formData.organizer_id

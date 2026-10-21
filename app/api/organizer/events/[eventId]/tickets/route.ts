@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
+import {
+  normalizeMinPeople,
+  normalizePeoplePerTicket,
+  sanitizeAttendeeFields,
+} from "@/lib/ticketing/attendee-fields";
+
+/** Group size range for storage: max, and min (null when it equals max). */
+function groupSize(maxRaw: unknown, minRaw: unknown) {
+  const max = normalizePeoplePerTicket(maxRaw);
+  const min = normalizeMinPeople(minRaw, max);
+  return { max, min: min === max ? null : min };
+}
 
 // Force dynamic to ensure fresh ticket data
 export const dynamic = "force-dynamic";
@@ -11,7 +23,7 @@ const TICKET_TYPE_COLUMNS =
   "id, event_id, name, description, price, quantity_available, " +
   "to_json(sale_starts_at) #>> '{}' AS sale_starts_at, " +
   "to_json(sale_ends_at) #>> '{}' AS sale_ends_at, " +
-  "max_per_person, ticket_url";
+  "max_per_person, ticket_url, people_per_ticket, min_people_per_ticket, attendee_fields";
 
 function toNumericTicketType<T extends { id: unknown; event_id: unknown; price: unknown }>(
   row: T
@@ -105,10 +117,19 @@ export async function GET(
       );
     }
 
+    // Checkout questions every ticket of the event asks.
+    const { rows: fieldRows } = await query(
+      `SELECT attendee_fields FROM events WHERE id = $1`,
+      [eventIdNum]
+    );
+
     return NextResponse.json({
       success: true,
       data: {
         ticket_types: ticketTypes || [],
+        event_attendee_fields: sanitizeAttendeeFields(
+          fieldRows[0]?.attendee_fields
+        ),
       },
     });
   } catch (error) {
@@ -185,8 +206,8 @@ export async function POST(
     let ticketType;
     try {
       const { rows } = await query(
-        `INSERT INTO ticket_types (event_id, name, description, price, quantity_available, sale_starts_at, sale_ends_at, max_per_person, ticket_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO ticket_types (event_id, name, description, price, quantity_available, sale_starts_at, sale_ends_at, max_per_person, ticket_url, people_per_ticket, attendee_fields, min_people_per_ticket)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12)
          RETURNING ${TICKET_TYPE_COLUMNS}`,
         [
           eventIdNum,
@@ -198,6 +219,9 @@ export async function POST(
           body.sale_ends_at || null,
           maxPerPerson,
           ticketUrl,
+          groupSize(body.people_per_ticket, body.min_people_per_ticket).max,
+          JSON.stringify(sanitizeAttendeeFields(body.attendee_fields)),
+          groupSize(body.people_per_ticket, body.min_people_per_ticket).min,
         ]
       );
       ticketType = toNumericTicketType(rows[0]);
@@ -314,6 +338,19 @@ export async function PATCH(
       setClauses.push(`max_per_person = $${updateParams.length}`);
     }
 
+    if (body.people_per_ticket !== undefined) {
+      const size = groupSize(body.people_per_ticket, body.min_people_per_ticket);
+      updateParams.push(size.max);
+      setClauses.push(`people_per_ticket = $${updateParams.length}`);
+      updateParams.push(size.min);
+      setClauses.push(`min_people_per_ticket = $${updateParams.length}`);
+    }
+
+    if (body.attendee_fields !== undefined) {
+      updateParams.push(JSON.stringify(sanitizeAttendeeFields(body.attendee_fields)));
+      setClauses.push(`attendee_fields = $${updateParams.length}::jsonb`);
+    }
+
     if (body.ticket_url !== undefined) {
       const ticketUrl =
         typeof body.ticket_url === "string" ? body.ticket_url.trim() || null : null;
@@ -426,6 +463,54 @@ export async function DELETE(
     });
   } catch (error) {
     console.error("Error in organizer tickets DELETE:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/organizer/events/[eventId]/tickets - Save the checkout questions
+// every ticket of the event asks ({ event_attendee_fields }). Lives here so it
+// shares the tickets screen's access check.
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ eventId: string }> }
+) {
+  try {
+    const { eventId } = await params;
+    const body = await request.json();
+    const session = await getSession(request);
+
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const eventIdNum = parseInt(eventId, 10);
+
+    const access = await verifyEventAccess(session.userId, eventIdNum);
+    if (!access.ok) {
+      return NextResponse.json(
+        { success: false, error: access.error },
+        { status: access.status }
+      );
+    }
+
+    const fields = sanitizeAttendeeFields(body.event_attendee_fields);
+    await query(`UPDATE events SET attendee_fields = $2::jsonb WHERE id = $1`, [
+      eventIdNum,
+      JSON.stringify(fields),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      data: { event_attendee_fields: fields },
+    });
+  } catch (error) {
+    console.error("Error in organizer tickets PUT:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }
