@@ -63,6 +63,7 @@ import { cn } from "@/lib/utils";
 import { PARCHI_BLUE, PARCHI_YELLOW } from "@/lib/parchi/discount";
 import { TicketPdfUploadDialog } from "@/components/ticketing/TicketPdfUploadDialog";
 import { useToast } from "@/hooks/use-toast";
+import { fromKarachiInput } from "@/lib/events/datetime";
 
 type InventoryTicket = {
   id: number;
@@ -363,8 +364,8 @@ export function TicketPdfInventoryPage() {
             quantity_available: createForm.quantity_available.trim()
               ? parseInt(createForm.quantity_available, 10)
               : null,
-            sale_starts_at: createForm.sale_starts_at,
-            sale_ends_at: createForm.sale_ends_at,
+            sale_starts_at: fromKarachiInput(createForm.sale_starts_at),
+            sale_ends_at: fromKarachiInput(createForm.sale_ends_at),
             max_per_person: createForm.max_per_person
               ? parseInt(createForm.max_per_person, 10)
               : 10,

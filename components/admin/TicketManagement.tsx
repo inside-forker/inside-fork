@@ -32,6 +32,7 @@ import type {
   TicketManagementProps,
   TicketFormData,
 } from "@/types/events.types";
+import { fromKarachiInput, toKarachiInput } from "@/lib/events/datetime";
 
 const DESCRIPTION_MAX_LENGTH = 500;
 
@@ -449,8 +450,8 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
           quantity_available: formData.quantity_available
             ? parseInt(formData.quantity_available)
             : null,
-          sale_starts_at: formData.sale_starts_at,
-          sale_ends_at: formData.sale_ends_at,
+          sale_starts_at: fromKarachiInput(formData.sale_starts_at),
+          sale_ends_at: fromKarachiInput(formData.sale_ends_at),
           max_per_person: formData.max_per_person
             ? parseInt(formData.max_per_person)
             : 10,
@@ -551,10 +552,8 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       description: ticket.description || "",
       price: ticket.price.toString(),
       quantity_available: ticket.quantity_available?.toString() || "",
-      sale_starts_at: new Date(ticket.sale_starts_at)
-        .toISOString()
-        .slice(0, 16),
-      sale_ends_at: new Date(ticket.sale_ends_at).toISOString().slice(0, 16),
+      sale_starts_at: toKarachiInput(ticket.sale_starts_at),
+      sale_ends_at: toKarachiInput(ticket.sale_ends_at),
       max_per_person: ticket.max_per_person?.toString() || "10",
       ticket_url: ticket.ticket_url || "",
     });

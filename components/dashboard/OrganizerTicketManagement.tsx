@@ -29,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { TicketPdfUploadDialog } from "@/components/ticketing/TicketPdfUploadDialog";
+import { fromKarachiInput, toKarachiInput } from "@/lib/events/datetime";
 
 const DESCRIPTION_MAX_LENGTH = 500;
 
@@ -229,10 +230,10 @@ export function OrganizerTicketManagement({
         price: ticket.price.toString(),
         quantity_available: ticket.quantity_available.toString(),
         sale_starts_at: ticket.sale_starts_at
-          ? new Date(ticket.sale_starts_at).toISOString().slice(0, 16)
+          ? toKarachiInput(ticket.sale_starts_at)
           : "",
         sale_ends_at: ticket.sale_ends_at
-          ? new Date(ticket.sale_ends_at).toISOString().slice(0, 16)
+          ? toKarachiInput(ticket.sale_ends_at)
           : "",
         max_per_person: ticket.max_per_person.toString(),
         ticket_url: ticket.ticket_url || "",
@@ -292,6 +293,8 @@ export function OrganizerTicketManagement({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
+          sale_starts_at: fromKarachiInput(formData.sale_starts_at) || null,
+          sale_ends_at: fromKarachiInput(formData.sale_ends_at) || null,
           description: formData.description.trim() || null,
         }),
       });
