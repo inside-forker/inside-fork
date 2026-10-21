@@ -62,6 +62,10 @@ export interface AttendeeTicketItem {
   quantityIndex?: number;
   buyerEmail: string | null;
   buyerPhone: string | null;
+  /** Organizer's checkout questions (holder's, then once-per-booking). */
+  answers?: { label: string; value: string }[];
+  /** Place in a group ticket ("Group of 3"). */
+  group?: { ticket: number; person: number; size: number } | null;
 }
 
 interface EventMetadata {
@@ -264,6 +268,14 @@ export function SoldTicketsModal({
       "Checked In At",
       "Issued At",
     ];
+    // One column per checkout question ("University name", ...), plus the
+    // pass's place in a group ticket.
+    const answerLabels = Array.from(
+      new Set(attendees.flatMap((a) => (a.answers ?? []).map((x) => x.label))),
+    );
+    const hasGroups = attendees.some((a) => a.group);
+    if (hasGroups) headers.push("Booking", "Group");
+    headers.push(...answerLabels);
 
     const rows = attendees.map((a) => [
       a.code,
@@ -276,6 +288,15 @@ export function SoldTicketsModal({
       a.status,
       a.checkedInAt ? format(new Date(a.checkedInAt), "yyyy-MM-dd HH:mm:ss") : "",
       a.issuedAt ? format(new Date(a.issuedAt), "yyyy-MM-dd HH:mm:ss") : "",
+      ...(hasGroups
+        ? [
+            a.bookingCode || "",
+            a.group ? `Ticket ${a.group.ticket}, person ${a.group.person} of ${a.group.size}` : "",
+          ]
+        : []),
+      ...answerLabels.map(
+        (label) => a.answers?.find((x) => x.label === label)?.value ?? "",
+      ),
     ]);
 
     const csv = [headers, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -557,6 +578,16 @@ export function SoldTicketsModal({
                               <span className="font-mono text-xs">CNIC: {ticket.guestCnicFormatted}</span>
                             </div>
                           )}
+                          {ticket.group && (
+                            <span className="text-xs">
+                              Group · person {ticket.group.person} of {ticket.group.size}
+                            </span>
+                          )}
+                          {ticket.answers?.map((answer) => (
+                            <span key={answer.label} className="text-xs">
+                              {answer.label}: {answer.value}
+                            </span>
+                          ))}
                         </div>
 
                         {/* Timing */}

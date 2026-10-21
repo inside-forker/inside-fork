@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { passAttendeeInfo } from "@/lib/ticketing/attendee-fields";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
            to_json(tp.checked_in_at) #>> '{}' AS checked_in_at,
            to_json(tp.issued_at) #>> '{}' AS issued_at,
            tp.quantity_index, tp.assigned_gate_index AS assigned_device_index,
+           tp.metadata, b.attendee_details,
            b.id AS booking_id, b.user_id AS booking_user_id,
            COALESCE(b.booking_reference, b.id::text) AS booking_code,
            b.customer_name, b.customer_email, b.customer_phone,
@@ -120,6 +122,8 @@ export async function GET(request: NextRequest) {
       buyerPhone: pass.customer_phone || pass.buyer_phone,
       isParchi: Boolean(pass.is_parchi),
       parchiId: pass.parchi_id || null,
+      // Checkout questions + group position (group tickets).
+      ...passAttendeeInfo(pass.metadata, pass.attendee_details),
     }));
 
     // Calculate stats
