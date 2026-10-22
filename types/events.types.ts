@@ -1,4 +1,5 @@
 import type { ParchiOffer } from "@/lib/parchi/discount";
+import type { AttendeeField } from "@/lib/ticketing/attendee-fields";
 
 // Admin event type matching events_with_details view (snake_case)
 export type AdminEvent = {
@@ -103,6 +104,12 @@ export type TicketType = {
   sale_ends_at: string;
   max_per_person: number | null;
   ticket_url?: string | null;
+  /** >1 = group ticket: one sale, one pass per person. */
+  people_per_ticket?: number;
+  /** People required per ticket (null = people_per_ticket, a fixed size). */
+  min_people_per_ticket?: number | null;
+  /** This tier's own checkout questions (event-wide ones live on the event). */
+  attendee_fields?: AttendeeField[];
 };
 
 // Event page props
@@ -164,4 +171,7 @@ export interface TicketFormData {
   sale_ends_at: string;
   max_per_person: string;
   ticket_url?: string;
+  people_per_ticket?: string;
+  min_people_per_ticket?: string;
+  attendee_fields?: AttendeeField[];
 }

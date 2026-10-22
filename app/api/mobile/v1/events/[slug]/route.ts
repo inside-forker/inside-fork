@@ -12,6 +12,11 @@ import {
   type EventImageRow,
   type TicketTypeRow,
 } from "@/lib/mobile/mappers";
+import {
+  mergeAttendeeFields,
+  normalizeMinPeople,
+  normalizePeoplePerTicket,
+} from "@/lib/ticketing/attendee-fields";
 import { getAttendeesPreviewByEvent } from "@/lib/mobile/attendees";
 import { formatDiscount } from "@/lib/mobile/deal-format";
 import { getParchiOffer, type ParchiOffer } from "@/lib/parchi/service";
@@ -52,7 +57,10 @@ const TICKET_TYPE_SQL_COLUMNS =
   // Same stock as /admin/ticket-pdf-inventory (free PDF rows when present).
   `${effectiveQuantitySql("ticket_types")} AS quantity_available, ` +
   "to_json(sale_starts_at) #>> '{}' AS sale_starts_at, " +
-  "to_json(sale_ends_at) #>> '{}' AS sale_ends_at";
+  "to_json(sale_ends_at) #>> '{}' AS sale_ends_at, " +
+  // Group tickets + checkout questions (event-wide merged with the tier's).
+  "people_per_ticket, min_people_per_ticket, attendee_fields, " +
+  "(SELECT e2.attendee_fields FROM events e2 WHERE e2.id = ticket_types.event_id) AS event_attendee_fields";
 
 /**
  * GET /api/mobile/v1/events/{slug}
@@ -224,7 +232,23 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
       best_offer: bestOffer,
     },
     images: images.map(toEventImage),
-    ticket_types: tickets.map(toTicketType),
+    ticket_types: tickets.map((t) => {
+      const extra = t as unknown as Record<string, unknown>;
+      const maxPeople = normalizePeoplePerTicket(extra.people_per_ticket);
+      return {
+        ...toTicketType(t),
+        people_per_ticket: maxPeople,
+        // People required per ticket; the rest up to the max are optional.
+        min_people_per_ticket: normalizeMinPeople(
+          extra.min_people_per_ticket,
+          maxPeople,
+        ),
+        attendee_fields: mergeAttendeeFields(
+          extra.event_attendee_fields,
+          extra.attendee_fields,
+        ),
+      };
+    }),
     parchi_offer: parchiOffer,
     // Prismfest only: the discount checkout applies to every app booking
     // (same coupon, see applyPrismfestDiscount). Drives the slashed prices.

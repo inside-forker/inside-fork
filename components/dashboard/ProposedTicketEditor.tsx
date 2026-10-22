@@ -31,6 +31,7 @@ import type { ProposedTicketType } from "@/types/event-change-request.types";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { TicketPdfUploadDialog } from "@/components/ticketing/TicketPdfUploadDialog";
+import { fromKarachiInput, toKarachiInput } from "@/lib/events/datetime";
 
 const DESCRIPTION_MAX_LENGTH = 500;
 
@@ -165,10 +166,10 @@ export function ProposedTicketEditor({
         price: ticket.price.toString(),
         quantity_available: ticket.quantity_available?.toString() || "",
         sale_starts_at: ticket.sale_starts_at
-          ? new Date(ticket.sale_starts_at).toISOString().slice(0, 16)
+          ? toKarachiInput(ticket.sale_starts_at)
           : "",
         sale_ends_at: ticket.sale_ends_at
-          ? new Date(ticket.sale_ends_at).toISOString().slice(0, 16)
+          ? toKarachiInput(ticket.sale_ends_at)
           : "",
         max_per_person: ticket.max_per_person?.toString() || "10",
         ticket_url: ticket.ticket_url || "",
@@ -177,17 +178,18 @@ export function ProposedTicketEditor({
       setEditingTicket(null);
       // Set default sale times: starts NOW, ends 1 hour before event starts
       const now = new Date();
-      const defaultStart = now.toISOString().slice(0, 16);
+      const defaultStart = toKarachiInput(now.toISOString());
 
       // Sale ends 1 hour before event starts (or event start if not enough time)
       let defaultEnd = "";
       if (eventStartTime) {
-        const eventStart = new Date(eventStartTime);
+        // eventStartTime is the form's Karachi wall-clock value
+        const eventStart = new Date(fromKarachiInput(eventStartTime));
         const oneHourBefore = new Date(eventStart.getTime() - 60 * 60 * 1000);
         // If event is less than 1 hour away, use event start time
-        defaultEnd = (oneHourBefore > now ? oneHourBefore : eventStart)
-          .toISOString()
-          .slice(0, 16);
+        defaultEnd = toKarachiInput(
+          (oneHourBefore > now ? oneHourBefore : eventStart).toISOString(),
+        );
       }
 
       setFormData({
@@ -282,8 +284,8 @@ export function ProposedTicketEditor({
       description: formData.description.trim() || null,
       price: parseFloat(formData.price),
       quantity_available: parseInt(formData.quantity_available),
-      sale_starts_at: new Date(formData.sale_starts_at).toISOString(),
-      sale_ends_at: new Date(formData.sale_ends_at).toISOString(),
+      sale_starts_at: fromKarachiInput(formData.sale_starts_at),
+      sale_ends_at: fromKarachiInput(formData.sale_ends_at),
       max_per_person: parseInt(formData.max_per_person) || 10,
       ticket_url: formData.ticket_url.trim() || null,
     };

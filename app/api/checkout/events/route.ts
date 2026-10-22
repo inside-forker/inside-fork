@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import {
+  mergeAttendeeFields,
+  normalizeMinPeople,
+  normalizePeoplePerTicket,
+} from "@/lib/ticketing/attendee-fields";
 
 // Public, read-only lookup of a small set of event fields for the checkout
 // page: what its ticket card shows (name, when, where, poster) and whether
@@ -33,6 +38,17 @@ export async function GET(request: NextRequest) {
       [ids],
     );
 
+    // Group size + checkout questions per ticket type (event-wide fields
+    // merged with each tier's own).
+    const { rows: ticketRows } = await query(
+      `SELECT tt.id, tt.event_id, tt.people_per_ticket, tt.min_people_per_ticket,
+              tt.attendee_fields,
+              e.attendee_fields AS event_attendee_fields
+       FROM ticket_types tt JOIN events e ON e.id = tt.event_id
+       WHERE tt.event_id = ANY($1)`,
+      [ids],
+    );
+
     const events = rows.map((row) => ({
       id: Number(row.id),
       require_guest_details: row.require_guest_details,
@@ -41,6 +57,20 @@ export async function GET(request: NextRequest) {
       start_time: row.start_time ? new Date(row.start_time).toISOString() : null,
       location_name: (row.location_name as string | null) ?? null,
       image_url: (row.image_url as string | null) ?? null,
+      ticket_types: ticketRows
+        .filter((t) => Number(t.event_id) === Number(row.id))
+        .map((t) => ({
+          id: Number(t.id),
+          people_per_ticket: normalizePeoplePerTicket(t.people_per_ticket),
+          min_people_per_ticket: normalizeMinPeople(
+            t.min_people_per_ticket,
+            normalizePeoplePerTicket(t.people_per_ticket),
+          ),
+          attendee_fields: mergeAttendeeFields(
+            t.event_attendee_fields,
+            t.attendee_fields,
+          ),
+        })),
     }));
 
     return NextResponse.json({ events });

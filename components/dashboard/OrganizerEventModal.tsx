@@ -44,6 +44,7 @@ import type {
   ProposedTicketType,
 } from "@/types/event-change-request.types";
 import type { EventImage } from "@/types/events.types";
+import { fromKarachiInput, toKarachiInput } from "@/lib/events/datetime";
 
 interface Category {
   value: string;
@@ -334,10 +335,10 @@ export function OrganizerEventModal({
         name: event.event_name || "",
         description: event.event_description || "",
         start_time: event.start_time
-          ? new Date(event.start_time).toISOString().slice(0, 16)
+          ? toKarachiInput(event.start_time)
           : "",
         end_time: event.end_time
-          ? new Date(event.end_time).toISOString().slice(0, 16)
+          ? toKarachiInput(event.end_time)
           : "",
         location_name: event.location_name || "",
         address: event.address || "",
@@ -493,6 +494,8 @@ export function OrganizerEventModal({
     // Include temp images, session ID, and proposed tickets for new events (before approval)
     const submitData = {
       ...formData,
+      start_time: fromKarachiInput(formData.start_time),
+      end_time: fromKarachiInput(formData.end_time),
       // Only include temp images and tickets for new events (not for updates of existing events)
       ...((!event || !event.event_id) && images.length > 0
         ? {

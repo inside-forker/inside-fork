@@ -32,6 +32,12 @@ import type {
   TicketManagementProps,
   TicketFormData,
 } from "@/types/events.types";
+import { fromKarachiInput, toKarachiInput } from "@/lib/events/datetime";
+import {
+  AttendeeFieldsEditor,
+  GroupSizeInputs,
+} from "@/components/ticketing/AttendeeFieldsEditor";
+import type { AttendeeField } from "@/lib/ticketing/attendee-fields";
 
 const DESCRIPTION_MAX_LENGTH = 500;
 
@@ -54,8 +60,14 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
     sale_ends_at: "",
     max_per_person: "10",
     ticket_url: "",
+    people_per_ticket: "1",
+    min_people_per_ticket: "1",
+    attendee_fields: [],
   });
   const { toast } = useToast();
+  // Checkout questions every ticket of this event asks.
+  const [eventFields, setEventFields] = React.useState<AttendeeField[]>([]);
+  const [isSavingEventFields, setIsSavingEventFields] = React.useState(false);
 
   const modalRef = React.useRef<HTMLDivElement>(null);
 
@@ -82,6 +94,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       if (response.ok) {
         const data = await response.json();
         setTicketTypes(data.data.ticket_types || []);
+        setEventFields(data.data.event_attendee_fields || []);
       } else {
         toast({
           title: "Error",
@@ -449,11 +462,15 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
           quantity_available: formData.quantity_available
             ? parseInt(formData.quantity_available)
             : null,
-          sale_starts_at: formData.sale_starts_at,
-          sale_ends_at: formData.sale_ends_at,
+          sale_starts_at: fromKarachiInput(formData.sale_starts_at),
+          sale_ends_at: fromKarachiInput(formData.sale_ends_at),
           max_per_person: formData.max_per_person
             ? parseInt(formData.max_per_person)
             : 10,
+          people_per_ticket: parseInt(formData.people_per_ticket || "1") || 1,
+          min_people_per_ticket:
+            parseInt(formData.min_people_per_ticket || "") || null,
+          attendee_fields: formData.attendee_fields ?? [],
         }),
       });
 
@@ -540,7 +557,33 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       sale_ends_at: "",
       max_per_person: "10",
       ticket_url: "",
+      people_per_ticket: "1",
+      min_people_per_ticket: "1",
+      attendee_fields: [],
     });
+  };
+
+  const handleSaveEventFields = async () => {
+    setIsSavingEventFields(true);
+    try {
+      const response = await fetch(`/api/admin/events/${eventId}/tickets`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event_attendee_fields: eventFields }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to save");
+      setEventFields(result.data?.event_attendee_fields || []);
+      toast({ title: "Saved", description: "Additional fields updated" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingEventFields(false);
+    }
   };
 
   // Open edit dialog
@@ -551,12 +594,15 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       description: ticket.description || "",
       price: ticket.price.toString(),
       quantity_available: ticket.quantity_available?.toString() || "",
-      sale_starts_at: new Date(ticket.sale_starts_at)
-        .toISOString()
-        .slice(0, 16),
-      sale_ends_at: new Date(ticket.sale_ends_at).toISOString().slice(0, 16),
+      sale_starts_at: toKarachiInput(ticket.sale_starts_at),
+      sale_ends_at: toKarachiInput(ticket.sale_ends_at),
       max_per_person: ticket.max_per_person?.toString() || "10",
       ticket_url: ticket.ticket_url || "",
+      people_per_ticket: String(ticket.people_per_ticket ?? 1),
+      min_people_per_ticket: String(
+        ticket.min_people_per_ticket ?? ticket.people_per_ticket ?? 1,
+      ),
+      attendee_fields: ticket.attendee_fields ?? [],
     });
     setIsDialogOpen(true);
   };
@@ -600,6 +646,30 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
           Add Ticket Type
         </Button>
       </div>
+
+      {/* Questions every ticket of the event asks at checkout */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Additional fields (all tickets)</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Extra details buyers fill in at checkout, e.g. university name.
+            These apply to every ticket of this event; add fields for one
+            ticket only inside that ticket type.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <AttendeeFieldsEditor value={eventFields} onChange={setEventFields} />
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => void handleSaveEventFields()}
+              disabled={isSavingEventFields}
+            >
+              {isSavingEventFields ? "Saving…" : "Save fields"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Ticket Types List */}
       {isLoading && ticketTypes.length === 0 ? (
@@ -661,6 +731,15 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
+                {(ticket.people_per_ticket ?? 1) > 1 && (
+                  <span className="inline-block rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold">
+                    Group of{" "}
+                    {ticket.min_people_per_ticket &&
+                    ticket.min_people_per_ticket < (ticket.people_per_ticket ?? 1)
+                      ? `${ticket.min_people_per_ticket}–${ticket.people_per_ticket}`
+                      : ticket.people_per_ticket}
+                  </span>
+                )}
                 {ticket.description && (
                   <p className="text-sm text-muted-foreground line-clamp-2">
                     {ticket.description}
@@ -724,7 +803,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent
           ref={modalRef}
-          className="max-w-2xl"
+          className="max-h-[90vh] max-w-2xl overflow-y-auto"
           style={{
             contain: "layout style paint",
             isolation: "isolate",
@@ -836,7 +915,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
               {/* Max Per Person */}
               <div className="space-y-2">
                 <Label htmlFor="max-per-person" className="text-sm font-medium">
-                  Max Per Person
+                  Max tickets per buyer
                 </Label>
                 <Input
                   id="max-per-person"
@@ -850,6 +929,30 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                     }))
                   }
                   placeholder="10"
+                />
+              </div>
+
+              <GroupSizeInputs
+                min={formData.min_people_per_ticket ?? "1"}
+                max={formData.people_per_ticket ?? "1"}
+                onChange={({ min, max }) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    min_people_per_ticket: min,
+                    people_per_ticket: max,
+                  }))
+                }
+              />
+
+              <div className="space-y-2 md:col-span-2">
+                <Label className="text-sm font-medium">
+                  Additional fields for this ticket only (optional)
+                </Label>
+                <AttendeeFieldsEditor
+                  value={formData.attendee_fields ?? []}
+                  onChange={(next) =>
+                    setFormData((prev) => ({ ...prev, attendee_fields: next }))
+                  }
                 />
               </div>
 

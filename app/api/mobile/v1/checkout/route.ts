@@ -21,6 +21,10 @@ import {
 } from "@/lib/ticketing/sellable-quantity";
 import { isPrismfestSlug } from "@/lib/events/prismfest";
 import { computeParchiDiscount } from "@/lib/parchi/discount";
+import {
+  buildAttendeeDetails,
+  loadTicketAttendeeConfig,
+} from "@/lib/ticketing/holder-slots";
 
 export const dynamic = "force-dynamic";
 
@@ -116,9 +120,23 @@ const bodySchema = z.object({
       z.object({
         ticket_type_id: z.number().int().positive(),
         quantity: z.number().int().positive(),
+        // One per pass, in quantity_index order (a group ticket has one per
+        // person): name, raw CNIC (only last 4 kept), custom-field answers.
+        guests: z
+          .array(
+            z.object({
+              name: z.string().max(200).optional(),
+              cnic: z.string().max(20).optional(),
+              answers: z.record(z.string().max(300)).optional(),
+            }),
+          )
+          .max(200)
+          .optional(),
       }),
     )
     .min(1),
+  // Answers to the event's once-per-booking questions, by field id.
+  order_answers: z.record(z.string().max(300)).optional(),
   customer: z.object({
     name: z.string().min(1).max(200),
     email: z.string().email(),
@@ -286,6 +304,32 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     }
   }
 
+  // Group tickets + organizer-defined fields (see lib/ticketing/holder-slots).
+  // Guests of a ticket type are concatenated in case the cart repeats it.
+  const guestsByType = new Map<number, NonNullable<(typeof tickets)[number]["guests"]>>();
+  for (const t of tickets) {
+    guestsByType.set(t.ticket_type_id, [
+      ...(guestsByType.get(t.ticket_type_id) ?? []),
+      ...(t.guests ?? []),
+    ]);
+  }
+  let attendeeDetails;
+  try {
+    attendeeDetails = buildAttendeeDetails(
+      items,
+      await loadTicketAttendeeConfig(ids),
+      (ticketTypeId, index) => guestsByType.get(ticketTypeId)?.[index],
+      parsed.data.order_answers,
+    );
+  } catch (err) {
+    throw new MobileApiError(
+      "attendee_details_invalid",
+      err instanceof Error ? err.message : "Check the attendee details.",
+      400,
+      "tickets",
+    );
+  }
+
   const basket = computeBasketHash(
     user.id,
     eventId,
@@ -401,6 +445,15 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     if (!couponCode && !parchiVerificationId) {
       await applyPrismfestDiscount(bookingId, eventId);
     }
+  }
+
+  // Saved for when the passes are issued (after payment). A reused booking
+  // takes the latest details the buyer entered.
+  if (attendeeDetails) {
+    await query(
+      `UPDATE bookings SET attendee_details = $2::jsonb WHERE id = $1`,
+      [bookingId, JSON.stringify(attendeeDetails)],
+    );
   }
 
   const { rows: bookingRows } = await query(

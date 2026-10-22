@@ -69,3 +69,30 @@ export function formatEventDateTimeRange(
     time: `${timeFmt.format(start)} - ${timeFmt.format(end)}`,
   };
 }
+
+/**
+ * <input type="datetime-local"> values carry no zone. Treat them as Karachi
+ * wall clock (PKT is fixed +05:00, no DST) instead of browser/server local.
+ */
+const KARACHI_OFFSET = "+05:00";
+const KARACHI_OFFSET_MS = 5 * 60 * 60 * 1000;
+
+/** Stored ISO → "2026-10-24T17:00" (Karachi wall clock) for datetime-local. */
+export function toKarachiInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = parse(iso);
+  return d ? new Date(d.getTime() + KARACHI_OFFSET_MS).toISOString().slice(0, 16) : "";
+}
+
+/** datetime-local value (Karachi wall clock) → UTC ISO string for the API. */
+export function fromKarachiInput(value: string | null | undefined): string {
+  if (!value) return "";
+  // Already zoned (e.g. a stored ISO passed straight through) — keep as is.
+  if (/(Z|[+-]\d{2}:?\d{2})$/.test(value)) {
+    const d = parse(value);
+    return d ? d.toISOString() : "";
+  }
+  const withSeconds = value.length === 16 ? `${value}:00` : value;
+  const d = parse(`${withSeconds}${KARACHI_OFFSET}`);
+  return d ? d.toISOString() : "";
+}

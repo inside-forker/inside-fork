@@ -4,8 +4,110 @@ import { Ticket } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CheckoutField } from "./CheckoutField";
 import { formatCnic } from "./checkoutFormat";
+import type { AttendeeField } from "@/lib/ticketing/attendee-fields";
 
-export type HolderInfo = { name: string; cnic: string };
+/** answers: the organizer's extra questions, by field id. */
+export type HolderInfo = {
+  name: string;
+  cnic: string;
+  answers?: Record<string, string>;
+};
+
+/**
+ * The organizer's extra questions ("University name", "Student ID"), drawn
+ * in the checkout's one field shape. A dropdown gets the same box.
+ */
+export function AttendeeFieldInputs({
+  fields,
+  values,
+  onChange,
+  errors,
+  idPrefix,
+}: {
+  fields: AttendeeField[];
+  values?: Record<string, string>;
+  onChange: (fieldId: string, value: string) => void;
+  errors?: Record<string, string | undefined>;
+  idPrefix: string;
+}) {
+  return (
+    <>
+      {fields.map((field) => {
+        const id = `${idPrefix}-${field.id}`;
+        const label = field.required ? field.label : `${field.label} (optional)`;
+        const value = values?.[field.id] ?? "";
+        const error = errors?.[field.id];
+        if (field.type === "select") {
+          return (
+            <div key={field.id} className="flex-1 space-y-2">
+              <label htmlFor={id} className="block text-sm font-semibold">
+                {label}
+              </label>
+              <select
+                id={id}
+                value={value}
+                onChange={(e) => onChange(field.id, e.target.value)}
+                aria-invalid={!!error}
+                className={`w-full rounded-lg border bg-muted px-3.5 py-3 text-sm text-foreground outline-none focus:border-foreground/30 ${
+                  error ? "border-destructive" : "border-border"
+                }`}
+              >
+                <option value="">Select…</option>
+                {field.options?.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              {error ? <p className="text-xs text-destructive">{error}</p> : null}
+            </div>
+          );
+        }
+        return (
+          <CheckoutField
+            key={field.id}
+            id={id}
+            label={label}
+            value={value}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            type={field.type === "email" ? "email" : field.type === "phone" ? "tel" : "text"}
+            inputMode={
+              field.type === "number" || field.type === "phone" ? "numeric" : undefined
+            }
+            error={error}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+/** Once-per-booking questions, in their own card under "Who's going". */
+export function OrderFieldsCard({
+  fields,
+  values,
+  onChange,
+  errors,
+}: {
+  fields: AttendeeField[];
+  values: Record<string, string>;
+  onChange: (fieldId: string, value: string) => void;
+  errors?: Record<string, string | undefined>;
+}) {
+  if (fields.length === 0) return null;
+  return (
+    <HolderFrame>
+      <p className="text-sm font-semibold">Booking details</p>
+      <AttendeeFieldInputs
+        fields={fields}
+        values={values}
+        onChange={onChange}
+        errors={errors}
+        idPrefix="order"
+      />
+    </HolderFrame>
+  );
+}
 
 /** The frame both holder cards share: one ticket, one card. */
 function HolderFrame({ children }: { children: React.ReactNode }) {
@@ -37,6 +139,10 @@ export function BuyerHolderCard({
   onChangeCnic,
   error,
   onHandOff,
+  fields = [],
+  answers,
+  onChangeAnswer,
+  answerErrors,
 }: {
   name: string;
   avatarUrl?: string | null;
@@ -45,6 +151,11 @@ export function BuyerHolderCard({
   onChangeCnic: (value: string) => void;
   error?: string;
   onHandOff: () => void;
+  /** The organizer's per-person questions. */
+  fields?: AttendeeField[];
+  answers?: Record<string, string>;
+  onChangeAnswer?: (fieldId: string, value: string) => void;
+  answerErrors?: Record<string, string | undefined>;
 }) {
   const display = name.trim() || "You";
   return (
@@ -72,6 +183,15 @@ export function BuyerHolderCard({
         error={error}
         id="holder-buyer-cnic"
       />
+      {fields.length && onChangeAnswer ? (
+        <AttendeeFieldInputs
+          fields={fields}
+          values={answers}
+          onChange={onChangeAnswer}
+          errors={answerErrors}
+          idPrefix="holder-buyer"
+        />
+      ) : null}
     </HolderFrame>
   );
 }
@@ -82,18 +202,31 @@ export function BuyerHolderCard({
  */
 export function GuestHolderCard({
   index,
+  heading,
   ticketName,
   value,
   onChange,
   errors,
   onClaim,
+  onRemove,
+  fields = [],
+  onChangeAnswer,
+  answerErrors,
 }: {
   index: number;
+  /** Overrides "Ticket N · Guest", e.g. "Ticket 1 · Person 2 of 3". */
+  heading?: string;
   ticketName: string;
   value: HolderInfo;
-  onChange: (field: keyof HolderInfo, value: string) => void;
+  onChange: (field: "name" | "cnic", value: string) => void;
   errors?: { name?: string; cnic?: string };
   onClaim?: () => void;
+  /** Takes an optional group member off the ticket again. */
+  onRemove?: () => void;
+  /** The organizer's per-person questions. */
+  fields?: AttendeeField[];
+  onChangeAnswer?: (fieldId: string, value: string) => void;
+  answerErrors?: Record<string, string | undefined>;
 }) {
   return (
     <HolderFrame>
@@ -102,10 +235,13 @@ export function GuestHolderCard({
           <Ticket className="h-[17px] w-[17px] text-primary" strokeWidth={2} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">Ticket {index + 1} · Guest</p>
+          <p className="truncate text-sm font-semibold">
+            {heading ?? `Ticket ${index + 1} · Guest`}
+          </p>
           <p className="truncate text-xs text-muted-foreground">{ticketName}</p>
         </div>
         {onClaim ? <CardLink label="It's me" onClick={onClaim} /> : null}
+        {onRemove ? <CardLink label="Remove" onClick={onRemove} /> : null}
       </div>
       <CheckoutField
         label="Full name"
@@ -125,6 +261,15 @@ export function GuestHolderCard({
         error={errors?.cnic}
         id={`holder-${index}-cnic`}
       />
+      {fields.length && onChangeAnswer ? (
+        <AttendeeFieldInputs
+          fields={fields}
+          values={value.answers}
+          onChange={onChangeAnswer}
+          errors={answerErrors}
+          idPrefix={`holder-${index}`}
+        />
+      ) : null}
     </HolderFrame>
   );
 }

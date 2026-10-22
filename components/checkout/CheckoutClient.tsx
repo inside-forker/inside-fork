@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Loader2, Lock, ShoppingBag } from "lucide-react";
+import { ChevronLeft, Loader2, Lock, Plus, ShoppingBag } from "lucide-react";
 import { useCartStore } from "@/lib/context/cartStore";
 import { useSupabaseUser } from "@/hooks/useSupabaseUser";
 import { Button } from "@/components/ui/button";
@@ -17,8 +17,15 @@ import {
 import {
   BuyerHolderCard,
   GuestHolderCard,
+  OrderFieldsCard,
   type HolderInfo,
 } from "./CheckoutHolderCards";
+import {
+  attendeeFieldError,
+  collectOrderFields,
+  personFields,
+  type AttendeeField,
+} from "@/lib/ticketing/attendee-fields";
 import { CheckoutContactCard, type BuyerDetails } from "./CheckoutContactCard";
 import { digitsOnly, formatPhone, formatPkr } from "./checkoutFormat";
 import {
@@ -39,7 +46,15 @@ const RESUME_DISMISS_KEY = "ik:resume:dismissed";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type BuyerErrors = Partial<Record<keyof BuyerDetails, string>>;
-type HolderErrors = Record<number, { name?: string; cnic?: string }>;
+type HolderErrors = Record<
+  number,
+  { name?: string; cnic?: string; answers?: Record<string, string> }
+>;
+/** Per ticket type: people one ticket admits + the questions it asks. */
+type TicketAttendeeConfig = Record<
+  number,
+  { people: number; minPeople: number; fields: AttendeeField[] }
+>;
 type ProfileInfo = {
   full_name?: string | null;
   phone?: string | null;
@@ -98,20 +113,57 @@ export function CheckoutClient() {
   // Once the buyer has opened the contact fields they stay open.
   const [editingContact, setEditingContact] = useState(false);
 
-  // One holder per ticket, in cart order - the order the booking API hands
-  // guests out to ticket types.
-  const slots = useMemo(
-    () =>
-      items.flatMap((item) =>
-        Array.from({ length: item.quantity }, (_, index) => ({
+  const [ticketConfig, setTicketConfig] = useState<TicketAttendeeConfig>({});
+
+  // One holder per person, in cart order - the order the booking API hands
+  // guests out to ticket types. A group ticket ("Group of 3") has one holder
+  // per person; `index` is the pass's quantity_index within its ticket type.
+  const slots = useMemo(() => {
+    let ticketNo = 0;
+    return items.flatMap((item) => {
+      const size = ticketConfig[item.ticketTypeId]?.people ?? 1;
+      const min = ticketConfig[item.ticketTypeId]?.minPeople ?? size;
+      const fields = personFields(ticketConfig[item.ticketTypeId]?.fields ?? []);
+      return Array.from({ length: item.quantity * size }, (_, index) => {
+        if (index % size === 0) ticketNo += 1;
+        return {
           ticketTypeId: item.ticketTypeId,
           ticketName: item.ticketName,
           index,
-        })),
+          ticketNo,
+          person: (index % size) + 1,
+          size,
+          min,
+          // Above the ticket's minimum: only there once the buyer adds them.
+          optional: (index % size) + 1 > min,
+          fields,
+        };
+      });
+    });
+  }, [items, ticketConfig]);
+  const orderFields = useMemo(
+    () =>
+      collectOrderFields(
+        items.map((item) => ticketConfig[item.ticketTypeId]?.fields ?? []),
       ),
-    [items],
+    [items, ticketConfig],
   );
+  const [orderAnswers, setOrderAnswers] = useState<Record<string, string>>({});
+  const [orderErrors, setOrderErrors] = useState<Record<string, string>>({});
   const slotCount = slots.length;
+
+  // Optional people (a "2–3" team's third) the buyer has added, per ticket.
+  const [extraPeople, setExtraPeople] = useState<Record<string, number>>({});
+  type Slot = (typeof slots)[number];
+  const ticketKey = (slot: Slot) => `${slot.ticketTypeId}:${slot.ticketNo}`;
+  const isSlotShown = (slot: Slot | undefined) =>
+    !slot || slot.person <= slot.min + (extraPeople[ticketKey(slot)] ?? 0);
+  const slotHeading = (slot: Slot) =>
+    slot.size === 1
+      ? `Ticket ${slot.ticketNo} · Guest`
+      : slot.min === slot.size
+        ? `Ticket ${slot.ticketNo} · Person ${slot.person} of ${slot.size}`
+        : `Ticket ${slot.ticketNo} · Person ${slot.person}${slot.optional ? " (optional)" : ""}`;
   const [guests, setGuests] = useState<HolderInfo[]>([]);
   const [guestErrors, setGuestErrors] = useState<HolderErrors>({});
 
@@ -237,7 +289,24 @@ export function CheckoutClient() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         const event = data?.events?.[0];
-        if (!cancelled && event) setEventInfo(event);
+        if (!cancelled && event) {
+          setEventInfo(event);
+          const config: TicketAttendeeConfig = {};
+          for (const t of (event.ticket_types ?? []) as Array<{
+            id: number;
+            people_per_ticket: number;
+            min_people_per_ticket?: number;
+            attendee_fields: AttendeeField[];
+          }>) {
+            config[t.id] = {
+              people: t.people_per_ticket || 1,
+              minPeople:
+                t.min_people_per_ticket || t.people_per_ticket || 1,
+              fields: t.attendee_fields ?? [],
+            };
+          }
+          setTicketConfig(config);
+        }
       })
       .catch(() => {});
     return () => {
@@ -360,9 +429,38 @@ export function CheckoutClient() {
     }
   };
 
+  const handleAnswerChange = (index: number, fieldId: string, value: string) => {
+    setGuests((prev) => {
+      const next = [...prev];
+      next[index] = {
+        ...next[index],
+        answers: { ...next[index]?.answers, [fieldId]: value },
+      };
+      return next;
+    });
+    if (guestErrors[index]?.answers?.[fieldId]) {
+      setGuestErrors((prev) => {
+        const answers = { ...prev[index]?.answers };
+        delete answers[fieldId];
+        return { ...prev, [index]: { ...prev[index], answers } };
+      });
+    }
+  };
+
+  const handleOrderAnswerChange = (fieldId: string, value: string) => {
+    setOrderAnswers((prev) => ({ ...prev, [fieldId]: value }));
+    if (orderErrors[fieldId]) {
+      setOrderErrors((prev) => {
+        const next = { ...prev };
+        delete next[fieldId];
+        return next;
+      });
+    }
+  };
+
   const handleGuestChange = (
     index: number,
-    field: keyof HolderInfo,
+    field: "name" | "cnic",
     value: string,
   ) => {
     setGuests((prev) => {
@@ -404,17 +502,35 @@ export function CheckoutClient() {
 
     const nextGuestErrors: HolderErrors = {};
     guests.forEach((guest, index) => {
-      if (isBuyerSlot(index)) return;
-      const errors: { name?: string; cnic?: string } = {};
-      if (!guest.name.trim()) errors.name = "Name is required";
-      if (digitsOnly(guest.cnic).length < 13) errors.cnic = "Enter a valid CNIC";
+      if (!isSlotShown(slots[index])) return;
+      const errors: HolderErrors[number] = {};
+      if (!isBuyerSlot(index)) {
+        if (!guest.name.trim()) errors.name = "Name is required";
+        if (digitsOnly(guest.cnic).length < 13) errors.cnic = "Enter a valid CNIC";
+      }
+      const answers: Record<string, string> = {};
+      for (const field of slots[index]?.fields ?? []) {
+        const problem = attendeeFieldError(field, guest.answers?.[field.id]);
+        if (problem) answers[field.id] = problem;
+      }
+      if (Object.keys(answers).length) errors.answers = answers;
       if (Object.keys(errors).length) nextGuestErrors[index] = errors;
     });
+    const nextOrderErrors: Record<string, string> = {};
+    for (const field of orderFields) {
+      const problem = attendeeFieldError(field, orderAnswers[field.id]);
+      if (problem) nextOrderErrors[field.id] = problem;
+    }
 
     setBuyerErrors(nextBuyerErrors);
     setGuestErrors(nextGuestErrors);
+    setOrderErrors(nextOrderErrors);
 
-    if (Object.keys(nextBuyerErrors).length || Object.keys(nextGuestErrors).length) {
+    if (
+      Object.keys(nextBuyerErrors).length ||
+      Object.keys(nextGuestErrors).length ||
+      Object.keys(nextOrderErrors).length
+    ) {
       if (nextBuyerErrors.phone) {
         toast({
           title: "Mobile number required",
@@ -424,7 +540,7 @@ export function CheckoutClient() {
       } else {
         toast({
           title: "Check your details",
-          description: "Each ticket needs a valid CNIC.",
+          description: "Fill in the highlighted details for each person.",
           variant: "destructive",
         });
       }
@@ -441,8 +557,13 @@ export function CheckoutClient() {
     }
 
     // A ticket the buyer holds carries the buyer's own name and CNIC.
+    // An optional person who wasn't added goes as an empty slot: no pass.
     const holders = guests.map((guest, index) =>
-      isBuyerSlot(index) ? { name: effectiveName, cnic: buyer.cnic } : guest,
+      !isSlotShown(slots[index])
+        ? { name: "", cnic: "" }
+        : isBuyerSlot(index)
+          ? { name: effectiveName, cnic: buyer.cnic, answers: guest.answers }
+          : guest,
     );
     const bookingItems = items.map((item) => {
       const guestInfo: Record<number, HolderInfo> = {};
@@ -465,6 +586,7 @@ export function CheckoutClient() {
             phone: effectivePhone,
           },
           items: bookingItems,
+          orderAnswers,
           parchiVerificationId,
         }),
       });
@@ -580,12 +702,13 @@ export function CheckoutClient() {
         </div>
       ) : null}
 
+      {/* Who pays and where the tickets go - not a ticket holder by itself. */}
       <section className="space-y-3">
         <div className="space-y-1">
-          <h2 className="text-xl font-bold">Attendee & Contact Details</h2>
+          <h2 className="text-xl font-bold">Payment &amp; contact</h2>
           <p className="text-xs text-muted-foreground">
             {user
-              ? "Each ticket requires a CNIC. Tickets and receipt will be sent to your contact info."
+              ? "You pay for the booking. Tickets and the receipt are sent here."
               : "Tickets and receipt will be linked to your account."}
           </p>
         </div>
@@ -594,33 +717,130 @@ export function CheckoutClient() {
           values={buyer}
           onChange={handleBuyerChange}
           errors={buyerErrors}
-          ticketName={slots[0]?.ticketName ?? ""}
           avatarUrl={profile?.avatar_url ?? user?.avatar_url}
           buyerHoldsFirst={buyerHoldsFirst}
-          onToggleBuyerHoldsFirst={() => setBuyerHoldsFirst((prev) => !prev)}
           isLoggedIn={!!user}
           onAuthRequest={() => setAuthOpen(true)}
         />
+      </section>
 
-        {user && (!buyerHoldsFirst || slotCount > 1) ? (
-          <div className="space-y-3 pt-1">
+      {/* Who's going: one card per person, the buyer's first by default. */}
+      {user ? (
+        <section className="space-y-3">
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold">Who&apos;s going</h2>
+            <p className="text-xs text-muted-foreground">
+              Every person going needs a name and CNIC.
+            </p>
+          </div>
+
+          <div className="space-y-3">
             {guests.map((guest, index) => {
-              if (index === 0 && buyerHoldsFirst) return null;
+              const slot = slots[index];
+              if (!isSlotShown(slot)) return null;
+              const next = slots[index + 1];
+              // The last person shown on a ticket that has room for more.
+              const canAddAfter =
+                !!slot &&
+                !!next &&
+                ticketKey(next) === ticketKey(slot) &&
+                !isSlotShown(next);
+              // Only the last added optional person can be taken off again.
+              const canRemove =
+                !!slot?.optional && (!next || ticketKey(next) !== ticketKey(slot) || !isSlotShown(next));
+              const addButton = canAddAfter ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExtraPeople((prev) => ({
+                      ...prev,
+                      [ticketKey(slot)]: (prev[ticketKey(slot)] ?? 0) + 1,
+                    }))
+                  }
+                  className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-primary/40 py-3 text-sm font-semibold text-primary hover:bg-primary/5"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add person {next.person} to ticket {slot.ticketNo} (optional)
+                </button>
+              ) : null;
+              if (isBuyerSlot(index)) {
+                return (
+                  <div key={`guest-${index}`} className="space-y-3">
+                    <BuyerHolderCard
+                      name={buyer.name}
+                      avatarUrl={profile?.avatar_url ?? user?.avatar_url}
+                      ticketName={
+                        slot && slot.size > 1
+                          ? `${slot.ticketName} · Person 1${
+                              slot.min === slot.size ? ` of ${slot.size}` : ""
+                            }`
+                          : slot?.ticketName ?? ""
+                      }
+                      cnic={buyer.cnic}
+                      onChangeCnic={(value) => handleBuyerChange("cnic", value)}
+                      error={buyerErrors.cnic}
+                      onHandOff={() => setBuyerHoldsFirst(false)}
+                      fields={slot?.fields}
+                      answers={guest.answers}
+                      onChangeAnswer={(fieldId, value) =>
+                        handleAnswerChange(index, fieldId, value)
+                      }
+                      answerErrors={guestErrors[index]?.answers}
+                    />
+                    {addButton}
+                  </div>
+                );
+              }
               return (
-                <GuestHolderCard
-                  key={`guest-${index}`}
-                  index={index}
-                  ticketName={slots[index]?.ticketName ?? ""}
-                  value={guest}
-                  onChange={(field, value) => handleGuestChange(index, field, value)}
-                  errors={guestErrors[index]}
-                  onClaim={index === 0 ? () => setBuyerHoldsFirst(true) : undefined}
-                />
+                <div key={`guest-${index}`} className="space-y-3">
+                  <GuestHolderCard
+                    index={index}
+                    heading={slot ? slotHeading(slot) : undefined}
+                    onRemove={
+                      canRemove
+                        ? () => {
+                            setGuests((prev) => {
+                              const nextGuests = [...prev];
+                              nextGuests[index] = { name: "", cnic: "" };
+                              return nextGuests;
+                            });
+                            setGuestErrors((prev) => {
+                              const nextErrors = { ...prev };
+                              delete nextErrors[index];
+                              return nextErrors;
+                            });
+                            setExtraPeople((prev) => ({
+                              ...prev,
+                              [ticketKey(slot)]: Math.max(0, (prev[ticketKey(slot)] ?? 0) - 1),
+                            }));
+                          }
+                        : undefined
+                    }
+                    ticketName={slots[index]?.ticketName ?? ""}
+                    value={guest}
+                    onChange={(field, value) => handleGuestChange(index, field, value)}
+                    errors={guestErrors[index]}
+                    onClaim={index === 0 ? () => setBuyerHoldsFirst(true) : undefined}
+                    fields={slots[index]?.fields}
+                    onChangeAnswer={(fieldId, value) =>
+                      handleAnswerChange(index, fieldId, value)
+                    }
+                    answerErrors={guestErrors[index]?.answers}
+                  />
+                  {addButton}
+                </div>
               );
             })}
           </div>
-        ) : null}
-      </section>
+
+          <OrderFieldsCard
+            fields={orderFields}
+            values={orderAnswers}
+            onChange={handleOrderAnswerChange}
+            errors={orderErrors}
+          />
+        </section>
+      ) : null}
 
       <div className="space-y-1 text-center text-xs text-muted-foreground">
         <p className="flex items-center justify-center gap-1.5">

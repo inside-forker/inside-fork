@@ -13,6 +13,7 @@ import {
 } from "@/lib/ticketing/pdf-inventory";
 import crypto from "crypto";
 import { scheduleParchiRedemptionReport } from "@/lib/parchi/service";
+import { planBookingPasses } from "@/lib/ticketing/holder-slots";
 
 export type PayFastProcessResult = {
   ok: boolean;
@@ -300,32 +301,37 @@ export async function processPayFastCallbackParams(
             );
           }
 
-          for (const item of bookingItems) {
-            if (pdfTypeIds.has(Number(item.ticket_type_id))) {
-              continue;
-            }
-            for (let i = 0; i < item.quantity; i++) {
-              const code = `IK-${crypto
-                .randomBytes(3)
-                .toString("hex")
-                .toUpperCase()}`;
-              const signature = crypto
-                .createHmac("sha256", SIGNING_SECRET)
-                .update(`${code}:${booking.event_id}:${booking.id}`)
-                .digest("hex")
-                .slice(0, 16);
+          // One pass per person (group tickets), with the holder details
+          // saved on the booking at checkout.
+          const planned = await planBookingPasses(
+            Number(booking.id),
+            bookingItems,
+            pdfTypeIds,
+            booking.customer_name || null,
+          );
+          for (const p of planned) {
+            const code = `IK-${crypto
+              .randomBytes(3)
+              .toString("hex")
+              .toUpperCase()}`;
+            const signature = crypto
+              .createHmac("sha256", SIGNING_SECRET)
+              .update(`${code}:${booking.event_id}:${booking.id}`)
+              .digest("hex")
+              .slice(0, 16);
 
-              passesToCreate.push({
-                booking_id: booking.id,
-                event_id: booking.event_id,
-                ticket_type_id: item.ticket_type_id,
-                code,
-                signature,
-                status: "issued" as const,
-                quantity_index: i,
-                guest_name: booking.customer_name || `Guest ${i + 1}`,
-              });
-            }
+            passesToCreate.push({
+              booking_id: booking.id,
+              event_id: booking.event_id,
+              ticket_type_id: p.ticket_type_id,
+              code,
+              signature,
+              status: "issued" as const,
+              quantity_index: p.quantity_index,
+              guest_name: p.guest_name ?? `Guest ${p.quantity_index + 1}`,
+              cnic_last4: p.cnic_last4,
+              metadata: p.metadata,
+            });
           }
 
           if (passesToCreate.length > 0) {
@@ -351,7 +357,7 @@ export async function processPayFastCallbackParams(
                 const values: unknown[] = [];
                 const placeholders = passesToCreate
                   .map((p, idx) => {
-                    const base = idx * 9;
+                    const base = idx * 11;
                     values.push(
                       p.booking_id,
                       p.event_id,
@@ -362,13 +368,15 @@ export async function processPayFastCallbackParams(
                       p.quantity_index,
                       p.guest_name,
                       assignedGateIndex,
+                      p.cnic_last4,
+                      p.metadata ? JSON.stringify(p.metadata) : null,
                     );
-                    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9})`;
+                    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}::jsonb)`;
                   })
                   .join(", ");
                 const { rows: createdPasses } = await query(
                   `INSERT INTO ticket_passes
-                     (booking_id, event_id, ticket_type_id, code, signature, status, quantity_index, guest_name, assigned_gate_index)
+                     (booking_id, event_id, ticket_type_id, code, signature, status, quantity_index, guest_name, assigned_gate_index, cnic_last4, metadata)
                    VALUES ${placeholders}
                    RETURNING id`,
                   values,

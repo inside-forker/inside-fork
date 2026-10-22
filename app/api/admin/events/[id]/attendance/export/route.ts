@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { passAttendeeInfo } from "@/lib/ticketing/attendee-fields";
 import { query } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/admin";
 import { captureRouteError } from "@/lib/sentry/captureRouteError";
@@ -54,6 +55,9 @@ export async function GET(
         b.customer_email,
         b.customer_phone,
         tt.name AS ticket_type_name,
+        tp.metadata,
+        b.booking_reference,
+        b.attendee_details,
         (
           SELECT COUNT(*)::int 
           FROM public.scan_audit_log sal 
@@ -82,9 +86,21 @@ export async function GET(
       "Device ID",
       "Duplicate Scan Attempts",
     ];
+    // One column per checkout question ("University name", ...), plus the
+    // pass's place in a group ticket.
+    const infos = attendees.map((a) =>
+      passAttendeeInfo(a.metadata, a.attendee_details),
+    );
+    const answerLabels = Array.from(
+      new Set(infos.flatMap((i) => i.answers.map((x) => x.label))),
+    );
+    const hasGroups = infos.some((i) => i.group);
+    if (hasGroups) headers.push("Booking", "Group");
+    headers.push(...answerLabels);
 
-    const rows = attendees.map((a) => {
+    const rows = attendees.map((a, index) => {
       const isPresent = a.status === "checked_in" || !!a.checked_in_at;
+      const info = infos[index];
       return [
         escapeCsvField(a.guest_name || a.customer_name),
         escapeCsvField(a.customer_email),
@@ -98,6 +114,21 @@ export async function GET(
         escapeCsvField(a.operator_name || ""),
         escapeCsvField(a.checked_in_device_id || ""),
         escapeCsvField(Number(a.duplicate_scans) || 0),
+        ...(hasGroups
+          ? [
+              escapeCsvField(a.booking_reference || ""),
+              escapeCsvField(
+                info.group
+                  ? `Ticket ${info.group.ticket}, person ${info.group.person} of ${info.group.size}`
+                  : "",
+              ),
+            ]
+          : []),
+        ...answerLabels.map((label) =>
+          escapeCsvField(
+            info.answers.find((x) => x.label === label)?.value ?? "",
+          ),
+        ),
       ].join(",");
     });
 

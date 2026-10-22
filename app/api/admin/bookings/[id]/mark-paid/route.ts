@@ -9,6 +9,7 @@ import {
 } from "@/lib/ticketing/pdf-inventory";
 import crypto from "crypto";
 import { scheduleParchiRedemptionReport } from "@/lib/parchi/service";
+import { planBookingPasses } from "@/lib/ticketing/holder-slots";
 
 /**
  * Admin API: Mark Booking as Paid
@@ -339,6 +340,8 @@ export async function POST(
       guest_name: string;
       status: "issued";
       quantity_index: number;
+      cnic_last4: string | null;
+      metadata: Record<string, unknown> | null;
     }> = [];
 
     const pdfTypeIds = needsTickets
@@ -348,24 +351,30 @@ export async function POST(
       : new Set<number>();
 
     if (needsTickets) {
-      for (const item of bookingItems) {
-        if (pdfTypeIds.has(Number(item.ticket_type_id))) continue;
-        for (let i = 0; i < item.quantity; i++) {
-          const code = generateTicketCode();
-          const signature = generateSignature(code, eventId, bookingId);
-          const guestName = booking.customer_name || `Guest ${i + 1}`;
+      // One pass per person (group tickets), with the holder details saved
+      // on the booking at checkout.
+      const planned = await planBookingPasses(
+        bookingId,
+        bookingItems,
+        pdfTypeIds,
+        booking.customer_name || null,
+      );
+      for (const p of planned) {
+        const code = generateTicketCode();
+        const signature = generateSignature(code, eventId, bookingId);
 
-          passesToCreate.push({
-            booking_id: bookingId,
-            event_id: eventId,
-            ticket_type_id: item.ticket_type_id,
-            code,
-            signature,
-            guest_name: guestName,
-            status: "issued",
-            quantity_index: i + 1,
-          });
-        }
+        passesToCreate.push({
+          booking_id: bookingId,
+          event_id: eventId,
+          ticket_type_id: p.ticket_type_id,
+          code,
+          signature,
+          guest_name: p.guest_name ?? `Guest ${p.quantity_index + 1}`,
+          status: "issued",
+          quantity_index: p.quantity_index + 1,
+          cnic_last4: p.cnic_last4,
+          metadata: p.metadata,
+        });
       }
     }
 
@@ -428,7 +437,7 @@ export async function POST(
         const values: unknown[] = [];
         const placeholders = passesToCreate
           .map((p, idx) => {
-            const base = idx * 9;
+            const base = idx * 11;
             values.push(
               p.booking_id,
               p.event_id,
@@ -439,13 +448,15 @@ export async function POST(
               p.status,
               p.quantity_index,
               fallbackGateIndex,
+              p.cnic_last4,
+              p.metadata ? JSON.stringify(p.metadata) : null,
             );
-            return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9})`;
+            return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}::jsonb)`;
           })
           .join(", ");
         const { rows: createdPasses } = await query(
           `INSERT INTO ticket_passes
-             (booking_id, event_id, ticket_type_id, code, signature, guest_name, status, quantity_index, assigned_gate_index)
+             (booking_id, event_id, ticket_type_id, code, signature, guest_name, status, quantity_index, assigned_gate_index, cnic_last4, metadata)
            VALUES ${placeholders}
            RETURNING id`,
           values,
