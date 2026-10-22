@@ -348,7 +348,7 @@ export function AdminBookingsManagement() {
     const failed = bookings.filter((b) => b.payment_status === "failed").length;
     const revenue = bookings
       .filter((b) => b.payment_status === "paid")
-      .reduce((sum, b) => sum + b.total_amount, 0);
+      .reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
     return { total, paid, awaiting, failed, revenue };
   }, [bookings]);
 
@@ -621,7 +621,7 @@ export function AdminBookingsManagement() {
                           </TableCell>
                           <TableCell>
                             <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                              PKR {booking.total_amount.toLocaleString()}
+                              PKR {Number(booking.total_amount).toLocaleString()}
                             </span>
                           </TableCell>
                           <TableCell>
@@ -726,7 +726,7 @@ export function AdminBookingsManagement() {
                       Total Amount
                     </div>
                     <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
-                      PKR {selectedBooking.total_amount.toLocaleString()}
+                      PKR {Number(selectedBooking.total_amount).toLocaleString()}
                     </div>
                   </CardContent>
                 </Card>

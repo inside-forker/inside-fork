@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
         booking_reference: booking.booking_reference,
         payment_status: normalizedPaymentStatus,
         status: booking.status,
-        total_amount: booking.total_amount,
+        total_amount: Number(booking.total_amount) || 0,
         created_at: booking.created_at,
         customer_name: booking.customer_name,
         customer_email: booking.customer_email,
@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
         total_tickets: totalTickets,
         items: items.map((item) => ({
           quantity: item.quantity,
-          price_per_ticket: item.price_per_ticket,
+          price_per_ticket: Number(item.price_per_ticket) || 0,
           ticket_type_name:
             (item.ticket_type as { name?: string })?.name || "Standard",
         })),

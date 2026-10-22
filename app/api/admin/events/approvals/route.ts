@@ -513,6 +513,7 @@ export async function POST(request: NextRequest) {
           sale_starts_at: string;
           sale_ends_at: string;
           max_per_person?: number;
+          ticket_url?: string | null;
         }>;
 
         if (tempTickets.length > 0) {
