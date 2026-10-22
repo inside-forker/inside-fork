@@ -29,11 +29,9 @@ export function EventStudentBanners({
   const { user, isLoading } = useSupabaseUser();
   const fromParchi = useArrivedFromParchi();
   const isPrismfest = isPrismfestSlug(eventSlug);
-  // Non-Prismfest: only show when a real coupon exists. Prismfest: always
-  // resolve so IK/Parchi branding cannot vanish if getParchiOffer returned null.
-  const resolved =
-    offer ?? (isPrismfest ? resolveStudentOffer(null) : null);
+  if (isPrismfest) return null;
 
+  const resolved = offer;
   if (!resolved) return null;
 
   if (fromParchi) {

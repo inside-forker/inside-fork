@@ -16,7 +16,7 @@ import {
   resolveStudentOffer,
 } from "@/lib/parchi/discount";
 import { useArrivedFromParchi } from "@/lib/parchi/prefill";
-import { isPrismfestSlug } from "@/lib/events/prismfest";
+import { isPrismfestSlug, getPrismfestOriginalPrice } from "@/lib/events/prismfest";
 import {
   sectionVariants,
   cardGridVariants,
@@ -34,8 +34,9 @@ export function EventTicketSection({
   // Prismfest: Inside Karachi slashed prices (coupon or 20% fallback).
   const arrivedFromParchi = useArrivedFromParchi();
   const isPrismfest = isPrismfestSlug(event.slug);
+  // Prismfest ticket prices are already flat discounted prices matching Ticketwala.
   const studentOffer =
-    isPrismfest && !arrivedFromParchi ? resolveStudentOffer(parchiOffer) : null;
+    !isPrismfest && !arrivedFromParchi ? resolveStudentOffer(parchiOffer) : null;
   const showIkStudentPrice = !!studentOffer;
   const studentPrice = (amount: number) =>
     studentOffer
@@ -182,6 +183,9 @@ export function EventTicketSection({
           const description = ticket.description?.trim()
             ? ticket.description
             : FALLBACK_TICKET_DESCRIPTION;
+          const originalPrice = isPrismfest
+            ? getPrismfestOriginalPrice(ticket.name)
+            : null;
 
           return (
             <motion.div key={ticket.id} variants={cardVariants}>
@@ -199,7 +203,16 @@ export function EventTicketSection({
                       </p>
                     )}
                     <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2">
-                      {showIkStudentPrice && ticket.price > 0 ? (
+                      {originalPrice && originalPrice > ticket.price ? (
+                        <>
+                          <span className="text-lg font-bold whitespace-nowrap text-primary">
+                            {formatPrice(ticket.price)}
+                          </span>
+                          <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
+                            {formatPrice(originalPrice)}
+                          </span>
+                        </>
+                      ) : showIkStudentPrice && ticket.price > 0 ? (
                         <>
                           <span className="text-lg font-bold whitespace-nowrap text-primary">
                             {formatPrice(studentPrice(ticket.price))}
@@ -259,7 +272,19 @@ export function EventTicketSection({
                           {status.text}
                         </Badge>
                       )}
-                      {showIkStudentPrice && ticket.price > 0 ? (
+                      {originalPrice && originalPrice > ticket.price ? (
+                        <>
+                          <div className="text-sm text-muted-foreground line-through whitespace-nowrap">
+                            {formatPrice(originalPrice)}
+                          </div>
+                          <div className="text-3xl font-bold whitespace-nowrap text-primary">
+                            {formatPrice(ticket.price)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            per ticket
+                          </div>
+                        </>
+                      ) : showIkStudentPrice && ticket.price > 0 ? (
                         <>
                           <div className="text-sm text-muted-foreground line-through whitespace-nowrap">
                             {formatPrice(ticket.price)}

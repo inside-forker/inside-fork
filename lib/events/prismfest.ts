@@ -7,3 +7,20 @@ export function isPrismfestSlug(slug: string | null | undefined): boolean {
 
 /** Organiser's venue layout (same artwork as on Ticketwala), shown above the tickets. */
 export const PRISMFEST_VENUE_MAP = "/events/prismfest-26-venue-map.jpg";
+
+/** Original pre-discount prices shown crossed out matching Ticketwala. */
+export const PRISMFEST_ORIGINAL_PRICES: Record<string, number> = {
+  "prism fam": 6000,
+  "prism her": 6000,
+  "prism front": 12000,
+  "prism exclusive": 16000,
+};
+
+export function getPrismfestOriginalPrice(ticketName: string): number | null {
+  const lower = ticketName.toLowerCase();
+  for (const [key, price] of Object.entries(PRISMFEST_ORIGINAL_PRICES)) {
+    if (lower.includes(key)) return price;
+  }
+  return null;
+}
+
