@@ -369,7 +369,10 @@ export function AdminBookingsManagement() {
           variants={itemVariants}
           whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
         >
-          <Card className="bg-gradient-to-br from-blue-500/20 via-blue-500/10 to-blue-500/5 dark:from-blue-500/10 dark:via-blue-500/5 dark:to-blue-500/0 border-blue-500/30 dark:border-blue-500/20 hover:shadow-xl hover:shadow-blue-500/25 transition-all duration-300 group cursor-pointer">
+          <Card
+            onClick={() => setStatusFilter("all")}
+            className="bg-gradient-to-br from-blue-500/20 via-blue-500/10 to-blue-500/5 dark:from-blue-500/10 dark:via-blue-500/5 dark:to-blue-500/0 border-blue-500/30 dark:border-blue-500/20 hover:shadow-xl hover:shadow-blue-500/25 transition-all duration-300 group cursor-pointer"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-blue-900 dark:text-blue-100 group-hover:text-blue-800 dark:group-hover:text-blue-200 transition-colors">
                 Total Bookings
@@ -391,7 +394,10 @@ export function AdminBookingsManagement() {
           variants={itemVariants}
           whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
         >
-          <Card className="bg-gradient-to-br from-emerald-500/20 via-emerald-500/10 to-emerald-500/5 dark:from-emerald-500/10 dark:via-emerald-500/5 dark:to-emerald-500/0 border-emerald-500/30 dark:border-emerald-500/20 hover:shadow-xl hover:shadow-emerald-500/25 transition-all duration-300 group cursor-pointer">
+          <Card
+            onClick={() => setStatusFilter("paid")}
+            className="bg-gradient-to-br from-emerald-500/20 via-emerald-500/10 to-emerald-500/5 dark:from-emerald-500/10 dark:via-emerald-500/5 dark:to-emerald-500/0 border-emerald-500/30 dark:border-emerald-500/20 hover:shadow-xl hover:shadow-emerald-500/25 transition-all duration-300 group cursor-pointer"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-emerald-900 dark:text-emerald-100 group-hover:text-emerald-800 dark:group-hover:text-emerald-200 transition-colors">
                 Paid
@@ -413,7 +419,10 @@ export function AdminBookingsManagement() {
           variants={itemVariants}
           whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
         >
-          <Card className="bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-amber-500/5 dark:from-amber-500/10 dark:via-amber-500/5 dark:to-amber-500/0 border-amber-500/30 dark:border-amber-500/20 hover:shadow-xl hover:shadow-amber-500/25 transition-all duration-300 group cursor-pointer">
+          <Card
+            onClick={() => setStatusFilter("awaiting_payment")}
+            className="bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-amber-500/5 dark:from-amber-500/10 dark:via-amber-500/5 dark:to-amber-500/0 border-amber-500/30 dark:border-amber-500/20 hover:shadow-xl hover:shadow-amber-500/25 transition-all duration-300 group cursor-pointer"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-amber-900 dark:text-amber-100 group-hover:text-amber-800 dark:group-hover:text-amber-200 transition-colors">
                 Awaiting
@@ -435,7 +444,10 @@ export function AdminBookingsManagement() {
           variants={itemVariants}
           whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
         >
-          <Card className="bg-gradient-to-br from-red-500/20 via-red-500/10 to-red-500/5 dark:from-red-500/10 dark:via-red-500/5 dark:to-red-500/0 border-red-500/30 dark:border-red-500/20 hover:shadow-xl hover:shadow-red-500/25 transition-all duration-300 group cursor-pointer">
+          <Card
+            onClick={() => setStatusFilter("failed")}
+            className="bg-gradient-to-br from-red-500/20 via-red-500/10 to-red-500/5 dark:from-red-500/10 dark:via-red-500/5 dark:to-red-500/0 border-red-500/30 dark:border-red-500/20 hover:shadow-xl hover:shadow-red-500/25 transition-all duration-300 group cursor-pointer"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-red-900 dark:text-red-100 group-hover:text-red-800 dark:group-hover:text-red-200 transition-colors">
                 Failed
@@ -452,15 +464,18 @@ export function AdminBookingsManagement() {
           </Card>
         </motion.div>
 
-        {/* Revenue */}
+        {/* Paid Revenue */}
         <motion.div
           variants={itemVariants}
           whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
         >
-          <Card className="bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 dark:from-primary/10 dark:via-primary/5 dark:to-primary/0 border-primary/30 dark:border-primary/20 hover:shadow-xl hover:shadow-primary/25 transition-all duration-300 group cursor-pointer">
+          <Card
+            onClick={() => setStatusFilter("paid")}
+            className="bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 dark:from-primary/10 dark:via-primary/5 dark:to-primary/0 border-primary/30 dark:border-primary/20 hover:shadow-xl hover:shadow-primary/25 transition-all duration-300 group cursor-pointer"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-primary/90 dark:text-primary/80 group-hover:text-primary transition-colors">
-                Revenue
+                Paid Revenue
               </CardTitle>
               <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
                 <TrendingUp className="h-4 w-4 text-primary" />
@@ -469,6 +484,9 @@ export function AdminBookingsManagement() {
             <CardContent>
               <div className="text-xl font-bold text-primary group-hover:text-primary/90 transition-colors">
                 PKR {stats.revenue.toLocaleString()}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1 font-normal">
+                Excludes {stats.awaiting} awaiting
               </div>
             </CardContent>
           </Card>
