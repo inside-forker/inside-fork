@@ -29,9 +29,9 @@ export function EventStudentBanners({
   const { user, isLoading } = useSupabaseUser();
   const fromParchi = useArrivedFromParchi();
   const isPrismfest = isPrismfestSlug(eventSlug);
-  if (isPrismfest) return null;
+  const resolved =
+    offer ?? (isPrismfest ? resolveStudentOffer(null) : null);
 
-  const resolved = offer;
   if (!resolved) return null;
 
   if (fromParchi) {
