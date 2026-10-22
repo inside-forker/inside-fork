@@ -19,7 +19,7 @@ import {
   effectiveQuantitySql,
   syncPdfStockForTicketTypes,
 } from "@/lib/ticketing/sellable-quantity";
-import { isPrismfestSlug } from "@/lib/events/prismfest";
+import { isPrismfestSlug, getPrismfestTicketDiscount } from "@/lib/events/prismfest";
 import { computeParchiDiscount } from "@/lib/parchi/discount";
 import {
   buildAttendeeDetails,
@@ -81,21 +81,21 @@ async function applyPrismfestDiscount(bookingId: number, eventId: number) {
   if (!coupon) return;
 
   const { rows: itemRows } = await query(
-    `SELECT COALESCE(SUM(quantity * price_per_ticket), 0) AS subtotal
-     FROM booking_items WHERE booking_id = $1`,
+    `SELECT bi.quantity, bi.price_per_ticket, tt.name
+     FROM booking_items bi
+     JOIN ticket_types tt ON tt.id = bi.ticket_type_id
+     WHERE bi.booking_id = $1`,
     [bookingId],
   );
-  // numeric columns come back from pg as strings.
-  const discount = computeParchiDiscount(
-    {
-      discount_type: coupon.discount_type,
-      discount_value: Number(coupon.discount_value),
-      max_discount_amount:
-        coupon.max_discount_amount != null
-          ? Number(coupon.max_discount_amount)
-          : null,
-    },
-    Number(itemRows[0]?.subtotal ?? 0),
+  const discount = itemRows.reduce(
+    (sum: number, item: { name?: string; price_per_ticket: string | number; quantity: string | number }) =>
+      sum +
+      getPrismfestTicketDiscount(
+        (item.name as string) ?? "",
+        Number(item.price_per_ticket),
+      ) *
+        Number(item.quantity),
+    0,
   );
   if (discount <= 0) return;
 

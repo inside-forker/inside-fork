@@ -25,7 +25,7 @@ import {
 } from "@/lib/parchi/service";
 import { computeParchiDiscount } from "@/lib/parchi/discount";
 import { readParchiChannelCookie } from "@/lib/parchi/channel";
-import { PRISMFEST_SLUG } from "@/lib/events/prismfest";
+import { PRISMFEST_SLUG, getPrismfestTicketDiscount } from "@/lib/events/prismfest";
 
 export async function POST(request: NextRequest) {
   try {
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
       (i: { ticketTypeId: number }) => i.ticketTypeId,
     );
     const { rows: ticketTypes } = await query(
-      `SELECT id, price, event_id FROM ticket_types WHERE id = ANY($1::int[])`,
+      `SELECT id, price, event_id, name FROM ticket_types WHERE id = ANY($1::int[])`,
       [ticketTypeIds],
     );
 
@@ -113,7 +113,12 @@ export async function POST(request: NextRequest) {
         if (!tt) throw new Error(`Invalid ticket type: ${item.ticketTypeId}`);
         const price = Number(tt.price);
         subtotal += price * item.quantity;
-        return { ...item, price, eventId: Number(tt.event_id) };
+        return {
+          ...item,
+          price,
+          name: tt.name as string | undefined,
+          eventId: Number(tt.event_id),
+        };
       },
     );
 
@@ -210,6 +215,7 @@ export async function POST(request: NextRequest) {
           eventId,
           requestId: parchiVerificationId,
           subtotal,
+          items: verifiedItems,
         });
       } catch (err) {
         if (err instanceof ParchiServiceError) {
@@ -229,11 +235,17 @@ export async function POST(request: NextRequest) {
       );
       const slug = (eventRows[0]?.slug as string | undefined) ?? "";
       if (slug === PRISMFEST_SLUG) {
-        const offer = await getParchiOffer(eventId);
-        if (offer) {
-          discountAmount = computeParchiDiscount(offer, subtotal);
-          allowOpenStudentDiscount = discountAmount > 0;
-        }
+        discountAmount = verifiedItems.reduce(
+          (
+            sum: number,
+            item: { name?: string; price: number; quantity: number },
+          ) => {
+            const disc = getPrismfestTicketDiscount(item.name ?? "", item.price);
+            return sum + disc * item.quantity;
+          },
+          0,
+        );
+        allowOpenStudentDiscount = discountAmount > 0;
       }
     }
     const discountedSubtotal = subtotal - discountAmount;

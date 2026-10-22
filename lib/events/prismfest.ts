@@ -24,3 +24,30 @@ export function getPrismfestOriginalPrice(ticketName: string): number | null {
   return null;
 }
 
+/** Discounted prices for Inside Karachi / verified Parchi users. */
+export const PRISMFEST_DISCOUNTED_PRICES: Record<string, number> = {
+  "prism fam": 2999,
+  "prism her": 4800,
+  "prism front": 5999,
+  "prism exclusive": 9999,
+};
+
+export function getPrismfestDiscountedPrice(ticketName: string): number | null {
+  const lower = ticketName.toLowerCase();
+  for (const [key, price] of Object.entries(PRISMFEST_DISCOUNTED_PRICES)) {
+    if (lower.includes(key)) return price;
+  }
+  return null;
+}
+
+export function getPrismfestTicketDiscount(
+  ticketName: string,
+  basePrice: number,
+): number {
+  const discounted = getPrismfestDiscountedPrice(ticketName);
+  if (discounted != null && discounted < basePrice) {
+    return basePrice - discounted;
+  }
+  return 0;
+}
+
