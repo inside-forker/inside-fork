@@ -221,20 +221,7 @@ export async function POST(request: NextRequest) {
         throw err;
       }
     } else if (!fromParchiChannel) {
-      // Open IK student discount: Prismfest shoppers who did NOT arrive from
-      // the Parchi app. Parchi-channel bookings must verify via 2FA above.
-      const { rows: eventRows } = await query(
-        `SELECT slug FROM events WHERE id = $1 LIMIT 1`,
-        [eventId],
-      );
-      const slug = (eventRows[0]?.slug as string | undefined) ?? "";
-      if (slug === PRISMFEST_SLUG) {
-        const offer = await getParchiOffer(eventId);
-        if (offer) {
-          discountAmount = computeParchiDiscount(offer, subtotal);
-          allowOpenStudentDiscount = discountAmount > 0;
-        }
-      }
+      // Open IK student discount is disabled for Prismfest (already flat discounted prices)
     }
     const discountedSubtotal = subtotal - discountAmount;
 

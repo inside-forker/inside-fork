@@ -216,12 +216,8 @@ export function CheckoutClient() {
         (i.eventName && i.eventName.toLowerCase().includes("prism")),
     );
 
-  // Open IK discount only when NOT on the Parchi channel. Parchi visitors
-  // must complete 2FA (parchiVerificationId) before any student discount.
-  const ikOpenStudentDiscount =
-    isPrismfestCart &&
-    !arrivedFromParchi &&
-    !parchiVerificationId;
+  // Open IK discount is disabled for Prismfest (already flat discounted prices)
+  const ikOpenStudentDiscount = false;
 
   // Same arithmetic as app/api/bookings/create/route.ts: student discount
   // comes off the subtotal, then fees on what's left.

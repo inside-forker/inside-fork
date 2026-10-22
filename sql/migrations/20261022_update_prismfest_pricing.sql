@@ -29,33 +29,7 @@ SET price = 9999.00,
 WHERE event_id = (SELECT id FROM events WHERE lower(slug) = 'prismfest-26' LIMIT 1)
   AND (name ILIKE '%prism exclusive%' OR id = 103);
 
--- Insert Prism Core if not exists
-INSERT INTO ticket_types (
-  event_id,
-  name,
-  description,
-  price,
-  quantity_available,
-  sale_starts_at,
-  sale_ends_at,
-  max_per_person,
-  people_per_ticket,
-  attendee_fields
-)
-SELECT
-  e.id,
-  'Prism Core',
-  '(Complimentary Led Bands Included)',
-  99999.00,
-  10,
-  '2026-09-20 13:00:00+00',
-  '2026-10-25 02:00:00+00',
-  10,
-  1,
-  '[]'::jsonb
-FROM events e
-WHERE lower(e.slug) = 'prismfest-26'
-  AND NOT EXISTS (
-    SELECT 1 FROM ticket_types tt
-    WHERE tt.event_id = e.id AND tt.name ILIKE '%prism core%'
-  );
+-- Ensure Prism Core is removed if present
+DELETE FROM ticket_types
+WHERE event_id = (SELECT id FROM events WHERE lower(slug) = 'prismfest-26' LIMIT 1)
+  AND name ILIKE '%prism core%';
