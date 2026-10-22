@@ -31,12 +31,11 @@ export function EventTicketSection({
 }: EventTicketSectionProps) {
   const router = useRouter();
   // Parchi-app visitors: full prices + Parchi 2FA later. Anyone else on
-  // Prismfest: Inside Karachi slashed prices (coupon or 20% fallback).
+  // Prismfest: Inside Karachi slashed prices (coupon or 50% fallback).
   const arrivedFromParchi = useArrivedFromParchi();
   const isPrismfest = isPrismfestSlug(event.slug);
-  // Prismfest ticket prices are already flat discounted prices matching Ticketwala.
   const studentOffer =
-    !isPrismfest && !arrivedFromParchi ? resolveStudentOffer(parchiOffer) : null;
+    !arrivedFromParchi ? resolveStudentOffer(parchiOffer) : null;
   const showIkStudentPrice = !!studentOffer;
   const studentPrice = (amount: number) =>
     studentOffer
@@ -203,22 +202,17 @@ export function EventTicketSection({
                       </p>
                     )}
                     <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2">
-                      {originalPrice && originalPrice > ticket.price ? (
-                        <>
-                          <span className="text-lg font-bold whitespace-nowrap text-primary">
-                            {formatPrice(ticket.price)}
-                          </span>
-                          <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
-                            {formatPrice(originalPrice)}
-                          </span>
-                        </>
-                      ) : showIkStudentPrice && ticket.price > 0 ? (
+                      {showIkStudentPrice && ticket.price > 0 ? (
                         <>
                           <span className="text-lg font-bold whitespace-nowrap text-primary">
                             {formatPrice(studentPrice(ticket.price))}
                           </span>
                           <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
-                            {formatPrice(ticket.price)}
+                            {formatPrice(
+                              originalPrice && originalPrice > ticket.price
+                                ? originalPrice
+                                : ticket.price,
+                            )}
                           </span>
                         </>
                       ) : (
@@ -272,22 +266,14 @@ export function EventTicketSection({
                           {status.text}
                         </Badge>
                       )}
-                      {originalPrice && originalPrice > ticket.price ? (
+                      {showIkStudentPrice && ticket.price > 0 ? (
                         <>
                           <div className="text-sm text-muted-foreground line-through whitespace-nowrap">
-                            {formatPrice(originalPrice)}
-                          </div>
-                          <div className="text-3xl font-bold whitespace-nowrap text-primary">
-                            {formatPrice(ticket.price)}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            per ticket
-                          </div>
-                        </>
-                      ) : showIkStudentPrice && ticket.price > 0 ? (
-                        <>
-                          <div className="text-sm text-muted-foreground line-through whitespace-nowrap">
-                            {formatPrice(ticket.price)}
+                            {formatPrice(
+                              originalPrice && originalPrice > ticket.price
+                                ? originalPrice
+                                : ticket.price,
+                            )}
                           </div>
                           <div className="text-3xl font-bold whitespace-nowrap text-primary">
                             {formatPrice(studentPrice(ticket.price))}
