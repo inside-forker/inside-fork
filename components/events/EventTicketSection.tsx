@@ -16,7 +16,11 @@ import {
   resolveStudentOffer,
 } from "@/lib/parchi/discount";
 import { useArrivedFromParchi } from "@/lib/parchi/prefill";
-import { isPrismfestSlug, getPrismfestOriginalPrice } from "@/lib/events/prismfest";
+import {
+  isPrismfestSlug,
+  getPrismfestOriginalPrice,
+  getPrismfestDiscountedPrice,
+} from "@/lib/events/prismfest";
 import {
   sectionVariants,
   cardGridVariants,
@@ -60,6 +64,22 @@ export function EventTicketSection({
     return Object.entries(selectedTickets).reduce((total, [id, quantity]) => {
       const ticket = ticketTypes.find((t) => t.id === parseInt(id));
       return total + (ticket?.price || 0) * quantity;
+    }, 0);
+  };
+
+  const getTicketDiscountedPrice = (ticket: TicketType) => {
+    if (isPrismfest) {
+      const prismPrice = getPrismfestDiscountedPrice(ticket.name);
+      if (prismPrice != null) return prismPrice;
+    }
+    return studentPrice(ticket.price);
+  };
+
+  const getTotalDiscountedPrice = () => {
+    return Object.entries(selectedTickets).reduce((total, [id, quantity]) => {
+      const ticket = ticketTypes.find((t) => t.id === parseInt(id));
+      if (!ticket || quantity <= 0) return total;
+      return total + getTicketDiscountedPrice(ticket) * quantity;
     }, 0);
   };
 
@@ -205,7 +225,7 @@ export function EventTicketSection({
                       {showIkStudentPrice && ticket.price > 0 ? (
                         <>
                           <span className="text-lg font-bold whitespace-nowrap text-primary">
-                            {formatPrice(studentPrice(ticket.price))}
+                            {formatPrice(getTicketDiscountedPrice(ticket))}
                           </span>
                           <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
                             {formatPrice(
@@ -276,7 +296,7 @@ export function EventTicketSection({
                             )}
                           </div>
                           <div className="text-3xl font-bold whitespace-nowrap text-primary">
-                            {formatPrice(studentPrice(ticket.price))}
+                            {formatPrice(getTicketDiscountedPrice(ticket))}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Inside Karachi price
@@ -347,7 +367,7 @@ export function EventTicketSection({
                         {formatPrice(getTotalPrice())}
                       </span>
                       <span className="font-semibold text-primary">
-                        {formatPrice(studentPrice(getTotalPrice()))}
+                        {formatPrice(getTotalDiscountedPrice())}
                       </span>{" "}
                       <span className="text-xs">with Inside Karachi</span>
                     </>

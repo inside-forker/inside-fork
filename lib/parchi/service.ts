@@ -14,6 +14,7 @@ import {
   type ParchiStatus,
 } from "./client";
 import { computeParchiDiscount, type ParchiOffer } from "./discount";
+import { PRISMFEST_SLUG, getPrismfestTicketDiscount } from "@/lib/events/prismfest";
 
 export type { ParchiOffer };
 
@@ -385,6 +386,7 @@ export async function previewParchiDiscount(input: {
   eventId: number;
   requestId: string;
   subtotal: number;
+  items?: Array<{ name?: string; price: number; quantity: number }>;
 }): Promise<number> {
   const invalid = new ParchiServiceError(
     "parchi_invalid",
@@ -413,6 +415,19 @@ export async function previewParchiDiscount(input: {
       "The Parchi student discount isn't available for this event.",
       400,
     );
+  }
+  if (input.items && input.items.length > 0) {
+    const { rows: eventRows } = await query(
+      `SELECT slug FROM events WHERE id = $1 LIMIT 1`,
+      [input.eventId],
+    );
+    const slug = (eventRows[0]?.slug as string | undefined) ?? "";
+    if (slug === PRISMFEST_SLUG) {
+      return input.items.reduce((sum, item) => {
+        const disc = getPrismfestTicketDiscount(item.name ?? "", item.price);
+        return sum + disc * item.quantity;
+      }, 0);
+    }
   }
   return computeParchiDiscount(offer, input.subtotal);
 }

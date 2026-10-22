@@ -34,7 +34,7 @@ import {
   type ParchiOffer,
 } from "@/lib/parchi/discount";
 import { useArrivedFromParchi } from "@/lib/parchi/prefill";
-import { isPrismfestSlug } from "@/lib/events/prismfest";
+import { isPrismfestSlug, getPrismfestTicketDiscount } from "@/lib/events/prismfest";
 import { AuthModal } from "@/components/auth/AuthModal";
 import type {
   ResumableBookingDTO,
@@ -228,16 +228,19 @@ export function CheckoutClient() {
   const totals: CheckoutTotals = useMemo(() => {
     const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     let discount = 0;
-    if (parchiVerificationId) {
-      discount = computeParchiDiscount(
-        resolveStudentOffer(parchiOffer),
-        subtotal,
-      );
-    } else if (ikOpenStudentDiscount) {
-      discount = computeParchiDiscount(
-        resolveStudentOffer(parchiOffer),
-        subtotal,
-      );
+    const shouldApplyDiscount = !!parchiVerificationId || ikOpenStudentDiscount;
+    if (shouldApplyDiscount) {
+      if (isPrismfestCart) {
+        discount = items.reduce((sum, item) => {
+          const disc = getPrismfestTicketDiscount(item.ticketName, item.price);
+          return sum + disc * item.quantity;
+        }, 0);
+      } else {
+        discount = computeParchiDiscount(
+          resolveStudentOffer(parchiOffer),
+          subtotal,
+        );
+      }
     }
     const discounted = subtotal - discount;
     const platformFee =
@@ -260,6 +263,7 @@ export function CheckoutClient() {
     parchiOffer,
     parchiVerificationId,
     ikOpenStudentDiscount,
+    isPrismfestCart,
   ]);
 
   // Fetch Config
