@@ -216,8 +216,12 @@ export function CheckoutClient() {
         (i.eventName && i.eventName.toLowerCase().includes("prism")),
     );
 
-  // Open IK discount is disabled for Prismfest (already flat discounted prices)
-  const ikOpenStudentDiscount = false;
+  // Open IK discount only when NOT on the Parchi channel. Parchi visitors
+  // must complete 2FA (parchiVerificationId) before any student discount.
+  const ikOpenStudentDiscount =
+    isPrismfestCart &&
+    !arrivedFromParchi &&
+    !parchiVerificationId;
 
   // Same arithmetic as app/api/bookings/create/route.ts: student discount
   // comes off the subtotal, then fees on what's left.
@@ -693,7 +697,9 @@ export function CheckoutClient() {
         <div className="rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm">
           <p className="font-semibold text-foreground">Inside Karachi Discount Applied</p>
           <p className="text-muted-foreground">
-            Your 20% discount is included in the total.
+            {parchiOffer?.discount_type === "percentage"
+              ? `${Math.round(parchiOffer.discount_value)}% discount applied.`
+              : "50% discount applied."}
           </p>
         </div>
       ) : null}

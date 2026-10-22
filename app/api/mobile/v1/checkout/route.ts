@@ -57,9 +57,60 @@ function normalizeTicketTypeRows(
  * path, so it is applied here on the freshly created booking, before fees.
  * Same coupon row and math as the web (getParchiOffer + computeParchiDiscount).
  */
-async function applyPrismfestDiscount(_bookingId: number, _eventId: number) {
-  // Prismfest ticket prices are already flat discounted prices
-  return;
+async function applyPrismfestDiscount(bookingId: number, eventId: number) {
+  const { rows: eventRows } = await query(
+    `SELECT slug FROM events WHERE id = $1 LIMIT 1`,
+    [eventId],
+  );
+  if (!isPrismfestSlug(eventRows[0]?.slug as string | undefined)) return;
+
+  const { rows: couponRows } = await query(
+    `SELECT id, discount_type, discount_value, max_discount_amount
+     FROM coupons
+     WHERE requires_parchi = true
+       AND is_active = true
+       AND (event_id IS NULL OR event_id = $1)
+       AND (starts_at IS NULL OR starts_at <= NOW())
+       AND (ends_at IS NULL OR ends_at >= NOW())
+       AND (usage_limit IS NULL OR usage_count < usage_limit)
+     ORDER BY event_id NULLS LAST, id
+     LIMIT 1`,
+    [eventId],
+  );
+  const coupon = couponRows[0];
+  if (!coupon) return;
+
+  const { rows: itemRows } = await query(
+    `SELECT COALESCE(SUM(quantity * price_per_ticket), 0) AS subtotal
+     FROM booking_items WHERE booking_id = $1`,
+    [bookingId],
+  );
+  // numeric columns come back from pg as strings.
+  const discount = computeParchiDiscount(
+    {
+      discount_type: coupon.discount_type,
+      discount_value: Number(coupon.discount_value),
+      max_discount_amount:
+        coupon.max_discount_amount != null
+          ? Number(coupon.max_discount_amount)
+          : null,
+    },
+    Number(itemRows[0]?.subtotal ?? 0),
+  );
+  if (discount <= 0) return;
+
+  const { rowCount } = await query(
+    `UPDATE bookings
+     SET total_amount = total_amount - $2, discount_amount = $2, coupon_id = $3
+     WHERE id = $1 AND coupon_id IS NULL`,
+    [bookingId, discount, coupon.id],
+  );
+  if (rowCount) {
+    await query(
+      `UPDATE coupons SET usage_count = usage_count + 1 WHERE id = $1`,
+      [coupon.id],
+    );
+  }
 }
 
 const bodySchema = z.object({
