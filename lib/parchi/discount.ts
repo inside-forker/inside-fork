@@ -14,7 +14,7 @@ export interface ParchiOffer {
 /** Prismfest open-discount fallback when the coupon row is missing/unreadable. */
 export const PRISMFEST_FALLBACK_OFFER: ParchiOffer = {
   discount_type: "percentage",
-  discount_value: 20,
+  discount_value: 50,
   max_discount_amount: null,
 };
 
