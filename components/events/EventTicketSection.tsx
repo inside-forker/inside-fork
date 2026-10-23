@@ -39,7 +39,11 @@ export function EventTicketSection({
   const arrivedFromParchi = useArrivedFromParchi();
   const isPrismfest = isPrismfestSlug(event.slug);
   const studentOffer =
-    !arrivedFromParchi ? resolveStudentOffer(parchiOffer) : null;
+    !arrivedFromParchi
+      ? isPrismfest
+        ? resolveStudentOffer(parchiOffer)
+        : (parchiOffer ?? null)
+      : null;
   const showIkStudentPrice = !!studentOffer;
   const studentPrice = (amount: number) =>
     studentOffer

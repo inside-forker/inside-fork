@@ -235,9 +235,9 @@ export function CheckoutClient() {
           const disc = getPrismfestTicketDiscount(item.ticketName, item.price);
           return sum + disc * item.quantity;
         }, 0);
-      } else {
+      } else if (parchiOffer) {
         discount = computeParchiDiscount(
-          resolveStudentOffer(parchiOffer),
+          parchiOffer,
           subtotal,
         );
       }
