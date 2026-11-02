@@ -33,3 +33,4 @@ export {
   type SegmentedControlProps,
   type SegmentedOption,
 } from "./SegmentedControl";
+export { AdminPageShell, LiveIndicator, type AdminPageShellProps } from "./AdminPageShell";
