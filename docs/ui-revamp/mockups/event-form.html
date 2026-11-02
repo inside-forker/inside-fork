@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Edit event · Inside admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>/* Theme tokens: verbatim from app/globals.css :root, plus the two approved additions */
+:root{
+  color-scheme:light;
+  --cream:51 45% 91%; --ink:207 19% 9%;
+  --background:0 0% 100%; --foreground:var(--ink);
+  --popover:0 0% 100%;
+  --primary:346 100% 55%; --primary-foreground:0 0% 100%;
+  --muted:220 14.3% 95.9%; --muted-foreground:220 8.9% 40.1%;
+  --destructive:0 84.2% 60.2%; --destructive-foreground:0 0% 98%;
+  --border:220 13% 91%; --input:220 13% 91%; --ring:346 100% 55%;
+  --radius:0.75rem;
+  --success:152 62% 26%; --warning:30 92% 30%;
+  --r-sm:calc(var(--radius) - 4px); --r-lg:var(--radius);
+  --fast:120ms; --base:160ms; --slow:200ms;
+  --font:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --on-ink:var(--primary-foreground);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%}
+body{font-family:var(--font);font-size:14px;line-height:20px;color:hsl(var(--foreground));background:hsl(var(--background));-webkit-font-smoothing:antialiased;font-feature-settings:"cv11","ss01"}
+a{color:inherit;text-decoration:none}
+button,input{font:inherit;color:inherit}
+img{display:block;max-width:100%}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:hsl(var(--muted-foreground))}
+.w500{font-weight:500}.w600{font-weight:600}
+svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg.i.s14{width:14px;height:14px}svg.i.s20{width:20px;height:20px}
+:focus-visible{outline:2px solid hsl(var(--ring));outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- Shell ---------- */
+.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.side{background:hsl(var(--ink));color:hsl(var(--on-ink)/.72);position:sticky;top:0;height:100vh;overflow-y:auto;padding:20px 12px 16px;display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:12px;padding:0 8px 0 8px;height:28px}
+.brand img{height:18px;width:auto}
+.brand .lg-dark{display:none}
+.brand span{font-size:12px;font-weight:500;padding-left:12px;border-left:1px solid hsl(var(--on-ink)/.16);color:hsl(var(--on-ink)/.55)}
+.city{width:100%;background:none;cursor:pointer;display:flex;align-items:center;gap:8px;margin:16px 0 8px;height:36px;padding:0 12px;border:1px solid hsl(var(--on-ink)/.12);border-radius:var(--r-sm);font-size:13px;color:hsl(var(--on-ink))}
+.city .dot{width:6px;height:6px;border-radius:99px;background:hsl(var(--primary))}
+.city svg{margin-left:auto;opacity:.55}
+.nav-g{margin-top:20px}
+.nav-g h6{font-size:12px;line-height:16px;font-weight:500;color:hsl(var(--on-ink)/.5);padding:0 12px;margin-bottom:4px}
+.nav a{position:relative;display:flex;align-items:center;gap:12px;height:34px;padding:0 12px;border-radius:var(--r-sm);font-size:13px;transition:background var(--fast) ease-out,color var(--fast) ease-out}
+.nav a svg{opacity:.7}
+.nav a:hover{background:hsl(var(--on-ink)/.06);color:hsl(var(--on-ink))}
+.nav a.on{background:hsl(var(--on-ink)/.1);color:hsl(var(--on-ink));font-weight:500}
+.nav a.on svg{opacity:1}
+.nav a.on::before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:3px;background:hsl(var(--primary));border-radius:0 3px 3px 0}
+.nav a .ct{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:99px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:hsl(var(--primary));background:hsl(var(--primary)/.14);display:grid;place-items:center}
+.me{margin-top:auto;display:flex;align-items:center;gap:12px;padding:12px 8px 0;border-top:1px solid hsl(var(--on-ink)/.1)}
+.me .av{width:32px;height:32px;border-radius:99px;background:hsl(var(--primary));color:hsl(var(--primary-foreground));display:grid;place-items:center;font-size:12px;font-weight:600}
+.me .n{font-size:13px;font-weight:500;color:hsl(var(--on-ink))}.me .r{font-size:12px;line-height:16px}
+/* light sidebar variant (mockup toggle) */
+.side-light .side{background:hsl(var(--background));color:hsl(var(--muted-foreground));border-right:1px solid hsl(var(--border))}
+.side-light .brand .lg-light{display:none}.side-light .brand .lg-dark{display:block}
+.side-light .brand span{border-color:hsl(var(--border));color:hsl(var(--muted-foreground))}
+.side-light .city{border-color:hsl(var(--border));color:hsl(var(--foreground));background:none}
+.side-light .nav-g h6{color:hsl(var(--muted-foreground))}
+.side-light .nav a:hover{background:hsl(var(--muted));color:hsl(var(--foreground))}
+.side-light .nav a.on{background:hsl(var(--muted));color:hsl(var(--foreground))}
+.side-light .me{border-color:hsl(var(--border))}.side-light .me .n{color:hsl(var(--foreground))}
+
+.main{min-width:0;background:hsl(var(--muted)/.6);display:flex;flex-direction:column}
+.top{height:60px;display:flex;align-items:center;gap:12px;padding:0 32px;position:sticky;top:0;z-index:5;background:hsl(var(--muted)/.6);border-bottom:1px solid hsl(var(--border))}
+.top{background:color-mix(in srgb,hsl(var(--muted)) 60%,hsl(var(--background)))}
+.crumbs{display:flex;align-items:center;gap:8px;font-size:13px;color:hsl(var(--muted-foreground))}
+.crumbs .cur{color:hsl(var(--foreground));font-weight:500}
+.cmdk{margin-left:auto;display:flex;align-items:center;gap:8px;height:36px;width:320px;padding:0 12px;border:1px solid hsl(var(--border));border-radius:var(--r-sm);color:hsl(var(--muted-foreground));font-size:13px;background:hsl(var(--background))}
+.cmdk kbd{margin-left:auto;font:inherit;font-size:12px;border:1px solid hsl(var(--border));border-radius:4px;padding:0 6px;background:hsl(var(--muted)/.6)}
+.iconbtn{position:relative;width:36px;height:36px;display:grid;place-items:center;border-radius:var(--r-sm);border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))}
+.iconbtn .pip{position:absolute;top:8px;right:8px;width:6px;height:6px;border-radius:99px;background:hsl(var(--primary))}
+.page{padding:32px 32px 80px;max-width:1440px;width:100%}
+
+/* ---------- Page header ---------- */
+.ph{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:24px;flex-wrap:wrap}
+.eyebrow{font-size:12px;line-height:16px;font-weight:500;color:hsl(var(--muted-foreground));margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.ph h1{font-size:30px;line-height:36px;font-weight:600;letter-spacing:-0.022em}
+.ph p{color:hsl(var(--muted-foreground));margin-top:8px;font-size:14px}
+.ph .acts{display:flex;gap:8px;align-items:center}
+.live{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 10px;border-radius:99px;background:hsl(var(--success)/.1);font-size:12px;font-weight:500;color:hsl(var(--success));margin-right:4px}
+.live i{width:6px;height:6px;border-radius:99px;background:hsl(var(--success));animation:breathe 2.4s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.35}}
+
+/* ---------- Buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 14px;border-radius:var(--r-sm);font-size:14px;font-weight:500;border:1px solid transparent;cursor:pointer;white-space:nowrap;transition:background var(--fast) ease-out,border-color var(--fast) ease-out;background:none}
+.btn.solid{background:hsl(var(--ink));color:hsl(var(--primary-foreground))}
+.btn.solid:hover{background:hsl(var(--ink)/.88)}
+.btn.sec{background:hsl(var(--background));border-color:hsl(var(--border))}
+.btn.sec:hover{background:hsl(var(--muted))}
+.btn.ghost:hover{background:hsl(var(--muted))}
+.btn.sm{height:32px;padding:0 12px;font-size:13px}
+.btn.xs{height:28px;padding:0 10px;font-size:13px}
+.btn.icon{width:36px;padding:0}.btn.icon.sm{width:32px}.btn.icon.xs{width:28px}
+.btn[disabled]{opacity:.6;cursor:not-allowed}
+.btn kbd{font:inherit;font-size:12px;opacity:.6;margin-left:4px}
+.spin{animation:spin 800ms linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- Panels ---------- */
+.panel{background:hsl(var(--background));border:1px solid hsl(var(--border));border-radius:var(--r-lg);overflow:clip;min-width:0}
+.pn-h{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid hsl(var(--border))}
+.pn-h h2{font-size:15px;line-height:22px;font-weight:600;letter-spacing:-0.005em}
+.pn-h p{font-size:13px;color:hsl(var(--muted-foreground))}
+.pn-h .sp{flex:1}
+.pn-b{padding:20px}
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:20px}
+.c4{grid-column:span 4}.c5{grid-column:span 5}.c7{grid-column:span 7}.c8{grid-column:span 8}.c12{grid-column:span 12}
+.stack{display:flex;flex-direction:column;gap:20px}
+
+/* ---------- Metrics ---------- */
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.metric{padding:20px 24px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.metric+.metric{border-left:1px solid hsl(var(--border))}
+a.metric{transition:background var(--fast) ease-out}a.metric:hover{background:hsl(var(--muted)/.5)}
+.metric .l{font-size:13px;font-weight:500;color:hsl(var(--muted-foreground));display:flex;align-items:center;gap:8px}
+.metric .v{font-size:30px;line-height:38px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-0.022em;margin-top:4px}
+.metric .v small{font-size:16px;font-weight:500;color:hsl(var(--muted-foreground));letter-spacing:0;margin-right:2px}
+.metric .v.key{color:hsl(var(--primary))}
+.metric .f{display:flex;align-items:center;gap:8px;font-size:12px;line-height:16px;color:hsl(var(--muted-foreground));margin-top:4px}
+.delta{display:inline-flex;align-items:center;gap:2px;height:20px;padding:0 6px;border-radius:6px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.delta.up{color:hsl(var(--success));background:hsl(var(--success)/.1)}
+.delta.down{color:hsl(var(--foreground));background:hsl(var(--destructive)/.12)}
+.meter{height:6px;border-radius:99px;background:hsl(var(--muted));overflow:hidden;display:flex}
+.meter i{display:block;height:100%;background:hsl(var(--ink));border-radius:99px}
+.meter i.hot{background:hsl(var(--primary))}
+
+/* ---------- Status tags ---------- */
+.tag{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap}
+.tag i{width:6px;height:6px;border-radius:99px;flex:none}
+.tag.pos{color:hsl(var(--success));background:hsl(var(--success)/.1)}.tag.pos i{background:hsl(var(--success))}
+.tag.att{color:hsl(var(--warning));background:hsl(var(--warning)/.1)}.tag.att i{background:hsl(var(--warning))}
+.tag.neg{color:hsl(var(--foreground));background:hsl(var(--destructive)/.12)}.tag.neg i{background:hsl(var(--destructive))}
+.tag.neu{color:hsl(var(--muted-foreground));background:hsl(var(--muted))}.tag.neu i{background:hsl(var(--muted-foreground))}
+.tag.end{color:hsl(var(--muted-foreground));background:none;box-shadow:inset 0 0 0 1px hsl(var(--border))}.tag.end i{background:none;box-shadow:inset 0 0 0 1px hsl(var(--muted-foreground))}
+.tag.feat{color:hsl(var(--primary-foreground));background:hsl(var(--ink))}
+.tag.feat svg{color:hsl(var(--primary));fill:hsl(var(--primary));stroke:none}
+.chip-s{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:500;background:hsl(var(--muted));color:hsl(var(--foreground));white-space:nowrap}
+
+/* ---------- Avatars / media ---------- */
+.av{width:28px;height:28px;border-radius:99px;display:grid;place-items:center;font-size:11px;font-weight:600;flex:none;background:hsl(var(--muted));color:hsl(var(--foreground));border:1px solid hsl(var(--border))}
+.av.ink{background:hsl(var(--ink));color:hsl(var(--primary-foreground));border-color:hsl(var(--ink))}
+.av.pink{background:hsl(var(--primary)/.12);color:hsl(var(--foreground));border-color:hsl(var(--primary)/.2)}
+.av.cream{background:hsl(var(--cream));border-color:hsl(var(--cream))}
+.poster{position:relative;border-radius:var(--r-sm);overflow:hidden;background:hsl(var(--muted));flex:none}
+.poster img{width:100%;height:100%;object-fit:cover}
+.poster.none{display:grid;place-items:center;color:hsl(var(--muted-foreground));border:1px dashed hsl(var(--border));background:hsl(var(--muted)/.5)}
+
+/* ---------- Toolbar / chips ---------- */
+.toolbar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid hsl(var(--border));min-height:60px;flex-wrap:wrap}
+.toolbar .sp{flex:1}
+.search{display:flex;align-items:center;gap:8px;height:34px;width:260px;padding:0 12px;border:1px solid hsl(var(--border));border-radius:var(--r-sm);color:hsl(var(--muted-foreground));font-size:13px;background:hsl(var(--background))}
+.search input{border:0;outline:0;flex:1;min-width:0;font-size:13px;background:none;color:hsl(var(--foreground))}
+.search input::placeholder{color:hsl(var(--muted-foreground))}
+.chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border:1px dashed hsl(var(--foreground)/.2);border-radius:var(--r-sm);font-size:13px;background:hsl(var(--background));color:hsl(var(--muted-foreground));cursor:pointer}
+.chip:hover{background:hsl(var(--muted)/.6)}
+.chip.on{border-style:solid;border-color:hsl(var(--border));color:hsl(var(--foreground));background:hsl(var(--background))}
+.chip.on .val{display:inline-flex;align-items:center;height:22px;padding:0 6px;border-radius:5px;background:hsl(var(--ink));color:hsl(var(--primary-foreground));font-size:12px;font-weight:500}
+.seg{display:inline-flex;padding:3px;gap:2px;background:hsl(var(--muted));border-radius:var(--r-sm)}
+.seg button{height:28px;padding:0 12px;border:0;border-radius:6px;background:none;font-size:13px;color:hsl(var(--muted-foreground));display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:500}
+.seg button.on{background:hsl(var(--background));color:hsl(var(--foreground));box-shadow:0 0 0 1px hsl(var(--border))}
+.seg .ct{color:hsl(var(--primary));font-variant-numeric:tabular-nums;font-weight:600}
+
+/* ---------- Tables ---------- */
+.tbl{width:100%;border-collapse:collapse}
+.tbl thead th{position:sticky;top:60px;z-index:1;background:color-mix(in srgb,hsl(var(--muted)) 45%,hsl(var(--background)));font-size:12px;line-height:16px;font-weight:500;color:hsl(var(--muted-foreground));text-align:left;height:40px;padding:0 16px;border-bottom:1px solid hsl(var(--border));white-space:nowrap}
+.tbl th.r,.tbl td.r{text-align:right}
+.tbl th .sort{display:inline-flex;align-items:center;gap:4px;color:hsl(var(--foreground))}
+.tbl tbody td{padding:12px 16px;font-size:13px;line-height:20px;border-bottom:1px solid hsl(var(--border));vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:0}
+.tbl tbody tr{transition:background var(--fast) ease-out}
+.tbl tbody tr:hover{background:hsl(var(--muted)/.45)}
+.tbl tbody tr.sel{background:hsl(var(--primary)/.045)}
+.tbl tbody tr.sel td:first-child{box-shadow:inset 3px 0 0 hsl(var(--primary))}
+.tbl td.r{font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl td.two-line{white-space:nowrap}
+.tbl .cb{width:48px;padding-right:0}
+.tbl .rowacts{opacity:0;transition:opacity var(--fast) ease-out;display:inline-flex;gap:4px}
+.tbl tr:hover .rowacts,.tbl tr:focus-within .rowacts{opacity:1}
+.cbx{width:16px;height:16px;border:1px solid hsl(var(--foreground)/.25);border-radius:4px;display:inline-grid;place-items:center;background:hsl(var(--background));vertical-align:middle}
+.cbx.on,.cbx.mid{background:hsl(var(--primary));border-color:hsl(var(--primary))}
+.cbx.mid::after{content:"";width:8px;height:2px;background:hsl(var(--primary-foreground));border-radius:1px}
+.cbx svg{width:12px;height:12px;stroke:hsl(var(--primary-foreground));stroke-width:2.5;fill:none}
+.ev{display:flex;align-items:center;gap:14px;min-width:0}
+.ev .poster{width:72px;height:48px}
+.ev .t{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:8px}
+.ev .s{font-size:13px;color:hsl(var(--muted-foreground));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px;margin-top:2px}
+.pend{color:hsl(var(--warning));font-weight:500}
+.two-line div:first-child{font-weight:500}.two-line div:last-child{color:hsl(var(--muted-foreground));font-size:12px;line-height:16px;margin-top:2px}
+.who{display:flex;align-items:center;gap:10px;min-width:0;white-space:nowrap}
+.sold{min-width:140px}
+.sold .row1{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums;margin-bottom:6px}
+.sold .row1 span:last-child{color:hsl(var(--muted-foreground));font-size:12px}
+.sold .hot-l{color:hsl(var(--primary));font-weight:600}
+.tfoot{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid hsl(var(--border));font-size:13px;color:hsl(var(--muted-foreground));font-variant-numeric:tabular-nums}
+.tfoot .pg{display:flex;align-items:center;gap:4px}
+.pgn{min-width:28px;height:28px;display:grid;place-items:center;border-radius:6px;font-size:13px;color:hsl(var(--foreground))}
+.pgn.on{background:hsl(var(--ink));color:hsl(var(--primary-foreground));font-weight:500}
+
+/* bulk bar */
+.bulk{display:flex;align-items:center;gap:8px;padding:12px 16px;min-height:60px;background:hsl(var(--ink));color:hsl(var(--primary-foreground));animation:rise var(--base) ease-out;flex-wrap:wrap}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+.bulk .n{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;margin:0 8px 0 4px}
+.bulk .btn{color:hsl(var(--primary-foreground));border-color:hsl(var(--on-ink)/.18)}
+.bulk .btn:hover{background:hsl(var(--on-ink)/.08)}
+.bulk .div{width:1px;height:20px;background:hsl(var(--on-ink)/.18);margin:0 4px}
+.bulk .cbx{border-color:hsl(var(--primary))}
+
+/* Annotation + toggle (mockup only) */
+.note{font-size:12px;line-height:18px;color:hsl(var(--muted-foreground));border:1px dashed hsl(var(--foreground)/.15);border-radius:var(--r-sm);padding:10px 14px;margin-top:20px}
+.mock-toggle{margin-left:auto;display:flex;align-items:center;gap:8px;padding:3px 3px 3px 12px;border-radius:10px;border:1px dashed hsl(var(--foreground)/.2);font-size:12px;color:hsl(var(--muted-foreground));white-space:nowrap}
+.mock-toggle+.cmdk{margin-left:0}
+.mock-toggle .seg{padding:2px}.mock-toggle .seg button{height:24px;padding:0 10px;font-size:12px}
+
+@media (max-width:1199px){.c4,.c5,.c7,.c8{grid-column:span 12}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.metric:nth-child(3){border-left:0}.metric:nth-child(n+3){border-top:1px solid hsl(var(--border))}}
+@media (max-width:1023px){.app{grid-template-columns:1fr}.side{display:none}.cmdk{width:auto}.cmdk span,.cmdk kbd{display:none}.hide-md{display:none}}
+@media (max-width:767px){.page{padding:24px 16px 64px}.top{padding:0 16px}.ph{flex-direction:column;align-items:flex-start}.ph h1{font-size:24px;line-height:32px}.hide-sm{display:none}.search{width:100%}.btn{height:40px}.metric{padding:16px}.metric .v{font-size:24px;line-height:32px}}
+
+.scrim{position:fixed;inset:0;background:hsl(var(--ink)/.45);z-index:20}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(720px,100%);background:hsl(var(--background));z-index:21;display:flex;flex-direction:column;box-shadow:0 20px 25px -5px rgb(0 0 0 / .1),0 8px 10px -6px rgb(0 0 0 / .1);animation:slidein var(--slow) ease-out}
+@keyframes slidein{from{transform:translateX(100%)}}
+.dr-h{padding:20px 32px 0;border-bottom:1px solid hsl(var(--border))}
+.dr-top{display:flex;align-items:center;gap:16px}
+.dr-top h2{font-size:20px;line-height:28px;font-weight:600;letter-spacing:-0.015em}
+.dr-top .s{font-size:13px;color:hsl(var(--muted-foreground));display:flex;gap:8px;align-items:center;margin-top:2px;flex-wrap:wrap}
+.tabs{display:flex;gap:24px;margin-top:20px}
+.tabs a{position:relative;padding:10px 0 12px;font-size:14px;color:hsl(var(--muted-foreground));font-weight:500;display:flex;gap:6px;align-items:center}
+.tabs a.on{color:hsl(var(--foreground))}
+.tabs a.on::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:hsl(var(--primary));border-radius:2px}
+.tabs .ct{font-size:12px;color:hsl(var(--muted-foreground));font-variant-numeric:tabular-nums}
+.tabs .err{width:6px;height:6px;border-radius:99px;background:hsl(var(--destructive))}
+.dr-b{flex:1;overflow-y:auto;padding:32px}
+.fs{display:grid;grid-template-columns:180px minmax(0,1fr);gap:24px;padding-bottom:32px;margin-bottom:32px;border-bottom:1px solid hsl(var(--border))}
+.fs:last-child{border-bottom:0;margin-bottom:0}
+.fs h3{font-size:14px;font-weight:600}.fs .fsd{font-size:13px;color:hsl(var(--muted-foreground));margin-top:4px}
+.f{margin-bottom:20px}.f:last-child{margin-bottom:0}
+.f label{display:block;font-size:13px;font-weight:500;margin-bottom:8px}
+.f .hint{font-size:12px;line-height:16px;color:hsl(var(--muted-foreground));margin-top:8px}
+.in{display:flex;align-items:center;gap:8px;width:100%;height:38px;white-space:nowrap;overflow:hidden;padding:0 12px;border:1px solid hsl(var(--border));border-radius:var(--r-sm);font-size:14px;background:hsl(var(--background))}
+.in.ta{white-space:normal;height:auto;min-height:92px;padding:10px 12px;align-items:flex-start;line-height:20px}
+.in.err{border-color:hsl(var(--destructive))}
+.in.focus{outline:2px solid hsl(var(--ring));outline-offset:2px}
+.in .sfx{margin-left:auto;color:hsl(var(--muted-foreground))}
+.errmsg{display:flex;align-items:flex-start;gap:8px;line-height:18px;font-size:13px;margin-top:8px}
+.errmsg svg{color:hsl(var(--destructive));margin-top:2px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.media{display:flex;gap:16px;align-items:center;padding:12px;border:1px solid hsl(var(--border));border-radius:10px}
+.media .poster{width:160px;height:90px;border-radius:8px}
+.media .t{font-weight:500;font-size:13px}.media .d{font-size:12px;color:hsl(var(--muted-foreground));margin-top:2px}
+.media .acts{display:flex;gap:8px;margin-top:10px}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid hsl(var(--border))}
+.sw:first-child{border-top:0;padding-top:0}
+.sw .t{font-weight:500;font-size:13px}.sw .d{font-size:12px;line-height:16px;color:hsl(var(--muted-foreground));margin-top:2px}
+.tg{width:36px;height:20px;border-radius:99px;background:hsl(var(--muted));border:1px solid hsl(var(--border));position:relative;flex:none}
+.tg::after{content:"";position:absolute;top:1px;left:1px;width:16px;height:16px;border-radius:99px;background:hsl(var(--background));box-shadow:0 1px 2px rgb(0 0 0 / .15);transition:transform var(--fast) ease-out}
+.tg.on{background:hsl(var(--primary));border-color:hsl(var(--primary))}.tg.on::after{transform:translateX(16px)}
+.dr-f{display:flex;align-items:center;gap:8px;padding:14px 32px;border-top:1px solid hsl(var(--border));background:hsl(var(--background))}
+.dr-f .sp{flex:1}
+@media (max-width:767px){.fs{grid-template-columns:1fr;gap:12px}.g2{grid-template-columns:1fr}.dr-b,.dr-h,.dr-f{padding-left:16px;padding-right:16px}.media{flex-direction:column;align-items:flex-start}}
+</style></head>
+<body><div class="app"><aside class="side" aria-label="Admin navigation"><div class="brand"><img class="lg-light" src="img/logo-white.png" alt="Inside"><img class="lg-dark" src="img/logo-black.png" alt="Inside"><span>Admin</span></div><button class="city" aria-label="City: Karachi"><span class="dot"></span>Karachi<svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><nav class="nav-g nav"><a href="overview.html"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>Overview</a></nav><nav class="nav-g nav"><h6>Events & ticketing</h6><a href="events.html" class="on" aria-current="page"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>Events</a><a href="event-approval.html"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Event approvals<span class="ct" aria-label="3 waiting">3</span></a><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>Bookings</a><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Ticket inventory</a><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg>Gate & devices</a></nav><nav class="nav-g nav"><h6>Catalog</h6><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>Listings</a><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Listing approvals<span class="ct" aria-label="7 waiting">7</span></a><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>Brand groups</a><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></svg>Categories</a></nav><nav class="nav-g nav"><h6>Offers</h6><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5"/></svg>Bank cards</a><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5"/></svg>Redemptions</a><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>Creator codes</a></nav><nav class="nav-g nav"><h6>Community</h6><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Users</a><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>Reviews</a><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg>Reports<span class="ct" aria-label="4 waiting">4</span></a></nav><nav class="nav-g nav"><h6>Growth</h6><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>Gamification</a><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>App layout</a><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Analytics</a></nav><nav class="nav-g nav"><h6>System</h6><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>Security</a><a href="#"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></svg>Settings</a></nav><div class="me"><div class="av">SS</div><div><div class="n">Shuja</div><div class="r">Super admin</div></div></div></aside><div class="main"><header class="top"><div class="crumbs"><span class="">Events & ticketing</span><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg><span class="cur">Events</span></div><div class="mock-toggle" aria-label="Mockup control">Mockup sidebar<div class="seg"><button data-s="ink" class="on">Ink</button><button data-s="light">Light</button></div></div><div class="cmdk"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span>Search events, people, bookings</span><kbd>⌘K</kbd></div><a class="iconbtn" href="#" aria-label="View site"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></a><a class="iconbtn" href="#" aria-label="Notifications, 2 unread"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="pip"></span></a></header><main class="page"><div class="ph"><div><div class="eyebrow">Events &amp; ticketing</div><h1>Events</h1><p>23 events across 14 organizers. 8 happen this month.</p></div>
+<div class="acts"><span class="live"><i></i>Live</span><button class="btn sec"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Import</button><button class="btn solid"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New event<kbd>N</kbd></button></div></div>
+<div class="panel" style="margin-bottom:20px"><div class="metrics">
+<div class="metric"><div class="l">Upcoming events</div><div class="v">14</div><div class="f">8 this month · 2 drafts</div></div>
+<div class="metric"><div class="l">Tickets sold · 30 days</div><div class="v">4,312</div><div class="f"><span class="delta up">↑ 18%</span>vs previous 30 days</div></div>
+<div class="metric"><div class="l">Capacity sold, upcoming</div><div class="v">71<small>%</small></div><div class="meter" style="margin-top:8px"><i style="width:71%"></i></div></div>
+<a class="metric" href="event-approval.html"><div class="l">Awaiting approval</div><div class="v key">3</div><div class="f">Oldest 2 h ago <svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div></a>
+</div></div><div class="panel"><div class="toolbar"><label class="search"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Search events, venues, organizers" aria-label="Search events"></label><button class="chip on">Status <span class="val">Published, Draft</span><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button><button class="chip"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Organizer</button><button class="chip"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Date</button><button class="btn ghost xs">Clear all</button><div class="sp"></div><div class="seg" role="tablist" aria-label="View"><button role="tab" class="on" data-v="table"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></svg>Table</button><button role="tab" class="" data-v="cal"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>Calendar</button></div><button class="btn sec icon sm" aria-label="Choose columns"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg></button></div><table class="tbl"><thead><tr><th class="cb"><span class="cbx" role="checkbox" aria-checked="false" tabindex="0"></span></th><th>Event</th><th><span class="sort">Date <svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></span></th><th class="hide-md">Organizer</th><th>Status</th><th>Tickets sold</th><th class="r hide-sm">Gross sales</th><th class="r"><span style="position:absolute;left:-9999px">Actions</span></th></tr></thead><tbody><tr class=""><td class="cb"><span class="cbx" role="checkbox" aria-checked="false" tabindex="0"></span></td>
+<td><div class="ev"><div class="poster" style="width:72px;height:48px;"><img src="img/venue-map.jpg" alt="PRISMFEST 2026" style="object-position:35% center" loading="lazy"></div><div style="min-width:0"><div class="t">PRISMFEST 2026<span class="tag feat"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>Featured</span></div><div class="s"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>Beach Luxury Hotel</div></div></div></td>
+<td class="two-line num"><div>Sat 21 Nov</div><div>6:00 pm</div></td>
+<td class="hide-md"><div class="who"><span class="av ink" style="width:28px;height:28px">PE</span>Prism Events</div></td><td><span class="tag pos"><i></i>Published</span></td>
+<td><div class="sold"><div class="row1"><span>1,840 <span class="muted">/ 2,500</span></span><span>74%</span></div><div class="meter"><i class="" style="width:74%"></i></div></div></td>
+<td class="r hide-sm"><span class="w500">Rs 7,360,000</span></td>
+<td class="r" style="width:120px"><span class="rowacts"><button class="btn sec xs">Edit</button><button class="btn ghost icon xs" aria-label="More actions for PRISMFEST 2026"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></span></td></tr><tr class=""><td class="cb"><span class="cbx" role="checkbox" aria-checked="false" tabindex="0"></span></td>
+<td><div class="ev"><div class="poster" style="width:72px;height:48px;"><img src="img/frere-hall.jpg" alt="Qawwali Night at Frere Hall" style="object-position:center" loading="lazy"></div><div style="min-width:0"><div class="t">Qawwali Night at Frere Hall</div><div class="s"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>Frere Hall, Saddar</div></div></div></td>
+<td class="two-line num"><div>Fri 13 Nov</div><div>8:00 pm</div></td>
+<td class="hide-md"><div class="who"><span class="av cream" style="width:28px;height:28px">SC</span>Saaz Collective</div></td><td><span class="tag pos"><i></i>Published</span></td>
+<td><div class="sold"><div class="row1"><span>282 <span class="muted">/ 300</span></span><span class="hot-l">94%</span></div><div class="meter"><i class="hot" style="width:94%"></i></div></div></td>
+<td class="r hide-sm"><span class="w500">Rs 846,000</span></td>
+<td class="r" style="width:120px"><span class="rowacts"><button class="btn sec xs">Edit</button><button class="btn ghost icon xs" aria-label="More actions for Qawwali Night at Frere Hall"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></span></td></tr><tr class=""><td class="cb"><span class="cbx" role="checkbox" aria-checked="false" tabindex="0"></span></td>
+<td><div class="ev"><div class="poster" style="width:72px;height:48px;"><img src="img/port-grand.jpg" alt="Port Grand Food Carnival" style="object-position:center" loading="lazy"></div><div style="min-width:0"><div class="t">Port Grand Food Carnival</div><div class="s"><span class="pend">1 change awaiting approval</span></div></div></div></td>
+<td class="two-line num"><div>Fri 27 Nov</div><div>5:00 pm</div></td>
+<td class="hide-md"><div class="who"><span class="av pink" style="width:28px;height:28px">HE</span>Harbourfront Events</div></td><td><span class="tag pos"><i></i>Published</span></td>
+<td><div class="sold"><div class="row1"><span>640 <span class="muted">/ 1,500</span></span><span>43%</span></div><div class="meter"><i class="" style="width:43%"></i></div></div></td>
+<td class="r hide-sm"><span class="w500">Rs 960,000</span></td>
+<td class="r" style="width:120px"><span class="rowacts"><button class="btn sec xs">Edit</button><button class="btn ghost icon xs" aria-label="More actions for Port Grand Food Carnival"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></span></td></tr><tr class=""><td class="cb"><span class="cbx" role="checkbox" aria-checked="false" tabindex="0"></span></td>
+<td><div class="ev"><div class="poster" style="width:72px;height:48px;"><img src="img/clifton-beach.jpg" alt="Sea View Run 10K" style="object-position:center" loading="lazy"></div><div style="min-width:0"><div class="t">Sea View Run 10K</div><div class="s"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>Sea View, Clifton</div></div></div></td>
+<td class="two-line num"><div>Sun 15 Nov</div><div>6:00 am</div></td>
+<td class="hide-md"><div class="who"><span class="av " style="width:28px;height:28px">RK</span>Run Karachi</div></td><td><span class="tag pos"><i></i>Published</span></td>
+<td><div class="sold"><div class="row1"><span>962 <span class="muted">/ 1,200</span></span><span>80%</span></div><div class="meter"><i class="" style="width:80%"></i></div></div></td>
+<td class="r hide-sm"><span class="w500">Rs 1,443,000</span></td>
+<td class="r" style="width:120px"><span class="rowacts"><button class="btn sec xs">Edit</button><button class="btn ghost icon xs" aria-label="More actions for Sea View Run 10K"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></span></td></tr><tr class=""><td class="cb"><span class="cbx" role="checkbox" aria-checked="false" tabindex="0"></span></td>
+<td><div class="ev"><div class="poster" style="width:72px;height:48px;"><img src="img/mazar-e-quaid.jpg" alt="Quaid Heritage Walk" style="object-position:center 30%" loading="lazy"></div><div style="min-width:0"><div class="t">Quaid Heritage Walk</div><div class="s"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>Mazar-e-Quaid</div></div></div></td>
+<td class="two-line num"><div>Fri 25 Dec</div><div>4:00 pm</div></td>
+<td class="hide-md"><div class="who"><span class="av cream" style="width:28px;height:28px">OK</span>Old Karachi Walks</div></td><td><span class="tag pos"><i></i>Published</span></td>
+<td><div class="sold"><div class="row1"><span>118 <span class="muted">/ 200</span></span><span>59%</span></div><div class="meter"><i class="" style="width:59%"></i></div></div></td>
+<td class="r hide-sm"><span class="w500">Rs 177,000</span></td>
+<td class="r" style="width:120px"><span class="rowacts"><button class="btn sec xs">Edit</button><button class="btn ghost icon xs" aria-label="More actions for Quaid Heritage Walk"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></span></td></tr><tr class=""><td class="cb"><span class="cbx" role="checkbox" aria-checked="false" tabindex="0"></span></td>
+<td><div class="ev"><div class="poster" style="width:72px;height:48px;"><img src="img/port-grand.jpg" alt="Clifton Comedy Night" style="object-position:80% 40%" loading="lazy"></div><div style="min-width:0"><div class="t">Clifton Comedy Night</div><div class="s"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>Arts Council, Karachi</div></div></div></td>
+<td class="two-line num"><div>Sat 7 Nov</div><div>9:00 pm</div></td>
+<td class="hide-md"><div class="who"><span class="av " style="width:28px;height:28px">LT</span>Laugh Track PK</div></td><td><span class="tag pos"><i></i>Published</span></td>
+<td><div class="sold"><div class="row1"><span>288 <span class="muted">/ 350</span></span><span>82%</span></div><div class="meter"><i class="" style="width:82%"></i></div></div></td>
+<td class="r hide-sm"><span class="w500">Rs 576,000</span></td>
+<td class="r" style="width:120px"><span class="rowacts"><button class="btn sec xs">Edit</button><button class="btn ghost icon xs" aria-label="More actions for Clifton Comedy Night"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></span></td></tr><tr class=""><td class="cb"><span class="cbx" role="checkbox" aria-checked="false" tabindex="0"></span></td>
+<td><div class="ev"><div class="poster none" style="width:72px;height:48px;" aria-label="No poster yet"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div><div style="min-width:0"><div class="t">Winter Craft Bazaar</div><div class="s"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>Dolmen Mall Clifton</div></div></div></td>
+<td class="two-line num"><div>Sat 12 Dec</div><div>11:00 am</div></td>
+<td class="hide-md"><div class="who"><span class="av pink" style="width:28px;height:28px">KM</span>Karachi Makers</div></td><td><span class="tag neu"><i></i>Draft</span></td>
+<td><div class="sold"><div class="row1"><span>0 <span class="muted">/ 800</span></span><span>0%</span></div><div class="meter"><i class="" style="width:0%"></i></div></div></td>
+<td class="r hide-sm"><span class="w500"><span class="muted">—</span></span></td>
+<td class="r" style="width:120px"><span class="rowacts"><button class="btn sec xs">Edit</button><button class="btn ghost icon xs" aria-label="More actions for Winter Craft Bazaar"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></span></td></tr><tr class=""><td class="cb"><span class="cbx" role="checkbox" aria-checked="false" tabindex="0"></span></td>
+<td><div class="ev"><div class="poster none" style="width:72px;height:48px;" aria-label="No poster yet"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div><div style="min-width:0"><div class="t">Indie Night at T2F</div><div class="s"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>T2F, DHA Phase 2</div></div></div></td>
+<td class="two-line num"><div>Fri 4 Dec</div><div>8:30 pm</div></td>
+<td class="hide-md"><div class="who"><span class="av " style="width:28px;height:28px">BS</span>Basement Sessions</div></td><td><span class="tag neu"><i></i>Draft</span></td>
+<td><div class="sold"><div class="row1"><span>0 <span class="muted">/ 150</span></span><span>0%</span></div><div class="meter"><i class="" style="width:0%"></i></div></div></td>
+<td class="r hide-sm"><span class="w500"><span class="muted">—</span></span></td>
+<td class="r" style="width:120px"><span class="rowacts"><button class="btn sec xs">Edit</button><button class="btn ghost icon xs" aria-label="More actions for Indie Night at T2F"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></span></td></tr><tr class=""><td class="cb"><span class="cbx" role="checkbox" aria-checked="false" tabindex="0"></span></td>
+<td><div class="ev"><div class="poster" style="width:72px;height:48px;"><img src="img/clifton-beach.jpg" alt="Halloween Night at Do Darya" style="object-position:right center" loading="lazy"></div><div style="min-width:0"><div class="t">Halloween Night at Do Darya</div><div class="s"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>Do Darya</div></div></div></td>
+<td class="two-line num"><div>Sat 31 Oct</div><div>9:00 pm</div></td>
+<td class="hide-md"><div class="who"><span class="av pink" style="width:28px;height:28px">HE</span>Harbourfront Events</div></td><td><span class="tag end"><i></i>Archived</span></td>
+<td><div class="sold"><div class="row1"><span>388 <span class="muted">/ 400</span></span><span class="hot-l">97%</span></div><div class="meter"><i class="hot" style="width:97%"></i></div></div></td>
+<td class="r hide-sm"><span class="w500">Rs 776,000</span></td>
+<td class="r" style="width:120px"><span class="rowacts"><button class="btn sec xs">Edit</button><button class="btn ghost icon xs" aria-label="More actions for Halloween Night at Do Darya"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button></span></td></tr></tbody></table></div><div class="scrim"></div>
+<aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="dr-t">
+<div class="dr-h"><div class="dr-top"><div class="poster" style="width:64px;height:48px;"><img src="img/venue-map.jpg" alt="" style="object-position:35% center" loading="lazy"></div><div style="flex:1;min-width:0"><h2 id="dr-t">PRISMFEST 2026</h2>
+<div class="s"><span class="tag pos"><i></i>Published</span><span class="tag feat"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>Featured</span><span>Prism Events · Sat 21 Nov</span></div></div>
+<a class="btn sec icon sm" href="#" aria-label="Open public page"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a><button class="btn ghost icon sm" aria-label="Close"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+<nav class="tabs" aria-label="Edit sections"><a class="on" href="#">Details<span class="err" aria-label="has an error"></span></a><a href="#">Tickets <span class="ct">5</span></a><a href="#">Gates <span class="ct">3</span></a><a href="#">Media <span class="ct">8</span></a><a href="#">Questions</a></nav></div>
+<div class="dr-b">
+<section class="fs"><div><h3>Basics</h3><p class="fsd">What people see first on the event page and in the app.</p></div><div>
+<div class="f"><label for="n">Name</label><div class="in focus" id="n">PRISMFEST 2026</div></div>
+<div class="g2"><div class="f"><label>Category</label><div class="in">Music &amp; nightlife<span class="sfx"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></div></div>
+<div class="f"><label>Organizer</label><div class="in"><span class="av ink" style="width:22px;height:22px">PE</span>Prism Events<span class="sfx"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></div></div></div>
+<div class="f"><label>Description</label><div class="in ta">Karachi's biggest night of music returns to the Beach Luxury lawns. Five zones, from Prism Core at the stage to Prism Fam on the open floor.</div><div class="hint">142 of 2,000 characters.</div></div>
+</div></section>
+<section class="fs"><div><h3>Schedule</h3><p class="fsd">Pakistan Standard Time.</p></div><div>
+<div class="g2"><div class="f"><label>Doors open</label><div class="in num">21 Nov 2026, 6:00 pm<span class="sfx"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg></span></div></div>
+<div class="f"><label>Ends</label><div class="in err num" aria-invalid="true" aria-describedby="e1">21 Nov 2026, 5:00 pm<span class="sfx"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg></span></div>
+<div class="errmsg" id="e1"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>Ends before doors open. Did you mean Sun 22 Nov, 2:00 am?</div></div></div>
+</div></section>
+<section class="fs"><div><h3>Venue</h3><p class="fsd">The map pin, directions and the zone map buyers see at checkout.</p></div><div>
+<div class="f"><label>Venue</label><div class="in"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>Beach Luxury Hotel, M.T. Khan Road</div></div>
+<div class="f"><label>Zone map</label><div class="media"><div class="poster" style=""><img src="img/venue-map.jpg" alt="" style="object-position:center" loading="lazy"></div><div><div class="t">prismfest-26-venue-map.jpg</div><div class="d">1920 × 1080 · shown on the ticket step</div>
+<div class="acts"><button class="btn sec xs"><svg class="i s14" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Replace</button><button class="btn ghost xs">Remove</button></div></div></div></div>
+</div></section>
+<section class="fs"><div><h3>Visibility</h3><p class="fsd">Where this event shows up.</p></div><div>
+<div class="sw"><div><div class="t">Feature on home</div><div class="d">Top carousel in the app and on the website.</div></div><span class="tg on" role="switch" aria-checked="true" tabindex="0"></span></div>
+<div class="sw"><div><div class="t">Multi-gate scanning</div><div class="d">3 gates, assigned automatically by zone.</div></div><span class="tg on" role="switch" aria-checked="true" tabindex="0"></span></div>
+<div class="sw"><div><div class="t">Hide from search</div><div class="d">Only people with the link can find it.</div></div><span class="tg" role="switch" aria-checked="false" tabindex="0"></span></div>
+</div></section>
+</div>
+<div class="dr-f"><span style="font-size:13px;color:hsl(var(--muted-foreground))">Unsaved changes · 1 to fix</span><div class="sp"></div><button class="btn sec">Discard</button><button class="btn solid">Save changes<kbd>⌘S</kbd></button></div>
+</aside></main></div></div><script>(function(){var b=document.body,k='ik-admin-side';function set(v){b.classList.toggle('side-light',v==='light');document.querySelectorAll('[data-s]').forEach(function(x){x.classList.toggle('on',x.dataset.s===v)});try{localStorage.setItem(k,v)}catch(e){}}
+var v='ink';try{v=localStorage.getItem(k)||'ink'}catch(e){}set(v);document.querySelectorAll('[data-s]').forEach(function(x){x.addEventListener('click',function(){set(x.dataset.s)})});})();</script></body></html>
