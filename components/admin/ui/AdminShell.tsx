@@ -58,8 +58,8 @@ export interface AdminShellProfile {
   id: string;
   full_name?: string | null;
   avatar_url?: string | null;
-  role?: string;
-  active_role?: string;
+  role?: string | null;
+  active_role?: string | null;
 }
 
 export interface AdminShellProps {

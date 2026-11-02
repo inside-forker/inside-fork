@@ -180,6 +180,14 @@ export const dataEntrySecondaryNavigation: RoleNavItem[] = [];
 // Presentation only: how the admin sidebar groups and labels links. Which links a
 // person sees still comes from the role lists above (adminNavigation etc.); an
 // allowed link missing from these groups is shown under "More", never dropped.
+/** Active roles that get the admin shell. Everyone else keeps PremiumDashboardLayout. */
+export const ADMIN_SHELL_ROLES = ["admin", "super_admin", "lister", "data_entry"] as const;
+
+export function usesAdminShell(profile: { role?: string | null; active_role?: string | null } | null) {
+  const active = profile?.active_role || profile?.role || "";
+  return (ADMIN_SHELL_ROLES as readonly string[]).includes(active);
+}
+
 export interface AdminNavGroup {
   /** Null for the ungrouped top item (Overview). */
   label: string | null;

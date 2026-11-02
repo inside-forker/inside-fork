@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { PremiumDashboardLayout } from "@/components/dashboard/PremiumDashboardLayout";
+import { AdminShell } from "@/components/admin/ui/AdminShell";
+import { usesAdminShell } from "@/lib/navigation/role-navigation";
 import { requireSessionUser } from "@/lib/auth/require-session";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +18,14 @@ export default async function DashboardLayout({
   }
 
   const layoutUser = { id: user.id, email: user.email };
+
+  if (usesAdminShell(profile)) {
+    return (
+      <AdminShell user={layoutUser} profile={profile}>
+        {children}
+      </AdminShell>
+    );
+  }
 
   return (
     <PremiumDashboardLayout
