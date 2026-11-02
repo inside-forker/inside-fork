@@ -27,6 +27,9 @@ const config = {
   			// Brand palette (logo): cream surfaces and ink text alongside the pink primary
   			cream: 'hsl(var(--cream) / <alpha-value>)',
   			ink: 'hsl(var(--ink) / <alpha-value>)',
+  			// Status tones for admin badges and deltas
+  			success: 'hsl(var(--success) / <alpha-value>)',
+  			warning: 'hsl(var(--warning) / <alpha-value>)',
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',
@@ -60,6 +63,10 @@ const config = {
   				DEFAULT: 'hsl(var(--card))',
   				foreground: 'hsl(var(--card-foreground))'
   			}
+  		},
+  		fontSize: {
+  			// 13/20 data step for dense admin tables, chips and meta
+  			data: ['0.8125rem', { lineHeight: '1.25rem' }]
   		},
   		borderRadius: {
   			lg: 'var(--radius)',

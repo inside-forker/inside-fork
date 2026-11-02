@@ -46,6 +46,10 @@
     --input: 220 13% 91%;
     --ring: 346 100% 55%;
 
+    /* Status tones (admin StatusBadge, deltas). Text contrast on white: 6.47 / 6.39 */
+    --success: 152 62% 26%;
+    --warning: 30 92% 30%;
+
     --radius: 0.75rem; /* Slightly larger radius for a softer look */
   }
 
@@ -78,6 +82,9 @@
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 349 100% 55%;
+
+    --success: 152 55% 52%;
+    --warning: 38 92% 58%;
   }
 }
 
