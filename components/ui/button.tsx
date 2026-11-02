@@ -72,10 +72,15 @@ function Button({
       data-loading={loading || undefined}
       {...props}
     >
-      {showSpinner && (
-        <Loader2 data-spinner="" aria-hidden="true" className="animate-spin" />
+      {/* Slot (asChild) needs exactly one child, so the spinner is only added for real buttons. */}
+      {showSpinner ? (
+        <>
+          <Loader2 data-spinner="" aria-hidden="true" className="animate-spin" />
+          {children}
+        </>
+      ) : (
+        children
       )}
-      {children}
     </Comp>
   )
 }
