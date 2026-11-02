@@ -104,6 +104,30 @@
   }
 }
 
+/* Admin scope. Applies only inside the admin shell root ([data-admin]).
+   Consumer pages are untouched. See docs/ui-revamp/02-design-system.md. */
+@layer components {
+  /* Focus: a crisp 2px outline with offset instead of ring halos. The :is()
+     raises specificity above Tailwind's focus-visible:outline-none utilities. */
+  [data-admin] :is(a, button, input, select, textarea, summary, [tabindex], [role]):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    --tw-ring-shadow: 0 0 transparent;
+    --tw-ring-offset-shadow: 0 0 transparent;
+  }
+
+  /* One icon stroke weight across admin. */
+  [data-admin] svg.lucide {
+    stroke-width: 1.75;
+  }
+
+  /* Page surfaces are flat. Shadows belong only to floating layers (menus,
+     popovers, modals), which portal outside [data-admin]. */
+  [data-admin] [data-slot="button"] {
+    box-shadow: none;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
