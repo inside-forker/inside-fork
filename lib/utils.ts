@@ -1,5 +1,11 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+// Teach tailwind-merge the custom `text-data` size (tailwind.config.ts), or it
+// treats it as a colour and drops the real text colour beside it.
+const twMerge = extendTailwindMerge({
+  extend: { classGroups: { "font-size": [{ text: ["data"] }] } },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
