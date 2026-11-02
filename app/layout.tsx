@@ -8,6 +8,7 @@ import { Footer } from "@/components/layout/Footer";
 import { query } from "@/lib/db";
 import { ScrollProvider } from "@/lib/context/scroll-context";
 import { RoleProvider } from "@/lib/context/RoleContext";
+import { CityProvider } from "@/lib/context/city-context";
 import { Toaster } from "@/components/ui/toaster";
 import { ConditionalLayout } from "@/components/layout/ConditionalLayout";
 import { Analytics } from "@vercel/analytics/next";
@@ -122,6 +123,7 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <RoleProvider>
+            <CityProvider>
             <ScrollProvider>
               <ConditionalLayout
                 header={
@@ -142,6 +144,7 @@ export default async function RootLayout({
               </ConditionalLayout>
               <Toaster />
             </ScrollProvider>
+          </CityProvider>
           </RoleProvider>
         </ThemeProvider>
       </body>

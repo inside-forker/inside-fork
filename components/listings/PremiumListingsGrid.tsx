@@ -22,6 +22,7 @@ import {
   type ListingsFilterParams,
   getCanonicalSubParam,
 } from "@/lib/utils/listings-filters";
+import { useCity } from "@/lib/context/city-context";
 
 import { Grid3X3, ChevronDown, Building2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -95,6 +96,7 @@ export function PremiumListingsGrid({
 }: PremiumListingsGridProps) {
   const urlSearchParams = useSearchParams();
   const pathname = usePathname();
+  const { activeCity } = useCity();
 
   // Support both old 'listings' prop and new 'initialListings' for backward compatibility
   // useMemo to prevent unnecessary re-renders
@@ -348,34 +350,30 @@ export function PremiumListingsGrid({
     [itemsPerPage, pathname, fetchListings, scrollToGridTop]
   );
 
-  // Track previous serverListings to detect actual data changes
+  // Track previous serverListings fingerprint to detect actual data changes
   const prevServerListingsRef = useRef<Listing[]>(serverListings);
-  const prevServerListingsLengthRef = useRef<number>(serverListings.length);
+  // Store a content fingerprint (all IDs joined) to catch filter changes that
+  // return the same count but different results. The old length+first/last ID
+  // check missed this case and was the root cause of filters appearing broken.
+  const prevFingerprintRef = useRef<string>(
+    serverListings.map((l) => l.id).join(",")
+  );
 
   // Reset data ONLY when serverListings actually change (new server render with different data)
   // Not when itemsPerPage changes - that's handled by handleItemsPerPageChange
   // Not when navigating back - that's handled by URL sync effect
   useEffect(() => {
-    // Check if serverListings actually changed (compare length and first/last IDs)
+    const currentFingerprint = serverListings.map((l) => l.id).join(",");
     const isSameReference = prevServerListingsRef.current === serverListings;
-    const isSameLength =
-      prevServerListingsLengthRef.current === serverListings.length;
-    const isSameFirstItem =
-      prevServerListingsRef.current[0]?.id === serverListings[0]?.id;
-    const isSameLastItem =
-      prevServerListingsRef.current[prevServerListingsRef.current.length - 1]
-        ?.id === serverListings[serverListings.length - 1]?.id;
+    const isSameFingerprint = prevFingerprintRef.current === currentFingerprint;
 
-    // Only reset if data actually changed (not just re-render or navigation)
-    if (
-      isSameReference ||
-      (isSameLength && isSameFirstItem && isSameLastItem)
-    ) {
+    // Only reset if data actually changed (different IDs from server render)
+    if (isSameReference || isSameFingerprint) {
       return;
     }
 
     prevServerListingsRef.current = serverListings;
-    prevServerListingsLengthRef.current = serverListings.length;
+    prevFingerprintRef.current = currentFingerprint;
 
     // When serverListings change (from actual server re-render with new filters),
     // reset to page 1. Use current itemsPerPage for slicing
@@ -454,10 +452,10 @@ export function PremiumListingsGrid({
                   searchParams.card
                 ? `Discover ${totalItems.toLocaleString()} ${
                     totalItems === 1 ? "place" : "places"
-                  } with active card discounts in Karachi`
+                  } with active card discounts in ${activeCity.name}`
                 : `Discover ${totalItems.toLocaleString()} amazing ${
                     totalItems === 1 ? "place" : "places"
-                  } in Karachi`}
+                  } in ${activeCity.name}`}
           </p>
         </div>
 
