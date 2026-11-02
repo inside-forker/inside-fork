@@ -41,7 +41,12 @@ export function FormField({
   className,
 }: FormFieldProps) {
   const autoId = React.useId();
-  const controlId = id ?? autoId;
+  // Keep an id the control already has (callers may look it up), else generate one.
+  const childId =
+    typeof children === "function"
+      ? undefined
+      : (children.props as { id?: string }).id;
+  const controlId = id ?? childId ?? autoId;
   const messageId = `${controlId}-message`;
   const message = error ?? hint;
 
