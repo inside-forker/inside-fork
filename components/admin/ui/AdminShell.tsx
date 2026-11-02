@@ -316,7 +316,7 @@ function SidebarBody(props: {
   return (
     <div className="flex h-full flex-col gap-4 bg-foreground px-3 pb-3 pt-5 text-background/70">
       <Link href="/dashboard" onClick={props.onNavigate} className="flex h-7 items-center gap-3 px-2">
-        <Image src="/logo-white.png" alt="Inside" width={75} height={20} className="h-5 w-auto" priority />
+        <Image src="/logo-white.png" alt="Inside" width={75} height={20} priority />
         <span className="border-l border-background/15 pl-3 text-xs font-medium text-background/60">Admin</span>
       </Link>
       <CitySwitcher />
