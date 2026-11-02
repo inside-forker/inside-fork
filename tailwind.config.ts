@@ -89,11 +89,17 @@ const config = {
   				to: {
   					height: '0'
   				}
+  			},
+  			// Admin refetch bar: a 40% segment sweeping across a 2px track
+  			indeterminate: {
+  				from: { transform: 'translateX(-100%)' },
+  				to: { transform: 'translateX(250%)' }
   			}
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			indeterminate: 'indeterminate 1.2s ease-in-out infinite'
   		}
   	}
   },

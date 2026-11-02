@@ -42,3 +42,11 @@ export {
   type Facet,
   type FacetOption,
 } from "./AdminFilterBar";
+export {
+  AdminDataTable,
+  BulkAction,
+  ColumnPicker,
+  type AdminColumn,
+  type AdminDataTableProps,
+  type SortState,
+} from "./AdminDataTable";
