@@ -153,9 +153,16 @@ export interface EventsTableProps {
   onEditEvent: (event: AdminEvent) => void;
   onViewEvent: (event: AdminEvent) => void;
   onDeleteEvent: (event: AdminEvent) => void;
+  onCreateEvent: () => void;
   currentPage: number;
-  totalPages: number;
+  pageSize: number;
+  /** Events matching the current filters (all pages). */
+  total: number;
   onPageChange: (page: number) => void;
+  /** Filter bar rendered above the rows. */
+  toolbar: React.ReactNode;
+  hasFilters: boolean;
+  onClearFilters: () => void;
 }
 
 export interface TicketManagementProps {
