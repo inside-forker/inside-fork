@@ -12,7 +12,7 @@ This repo is Coral9 project `inside-karachi-backend-restructure-react-native-app
    - Description: why, scope, and acceptance criteria.
    - Add `tags` (bug, feature, design) when obvious. Leave `priority` at medium unless told; `urgent` pings people on Discord immediately.
 4. Skip tracking only for questions, explanations, or reading code with no change.
-5. `start_work` returns `branch`. Work on a git branch with that name, and keep its KEY-NUMBER (like INSID-42) in commit messages and the PR title. The PR then shows on the ticket, and merging it moves the ticket to Shipped on its own.
+5. This repo commits straight to `main`, with no branches or PRs. Ignore the `branch` that `start_work` returns, and start every commit message with the ticket key (like `INSID-42: …`) so Coral9 links the commit to the ticket. Since no PR merge moves the ticket, call `finish_work` yourself when it's done.
 
 One ticket per deliverable, not per file or command. Follow-ups on the same deliverable stay on the same ticket.
 
