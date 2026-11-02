@@ -1,19 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -24,30 +13,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Search,
   RefreshCw,
-  Clock,
   CheckCircle2,
   XCircle,
   AlertCircle,
   Calendar,
-  Plus,
-  Edit2,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  ArrowUpDown,
   CalendarClock,
   Users,
   MapPin,
   Image as ImageIcon,
   Ticket,
-  FileCheck,
   ClipboardList,
   Eye,
   Sparkles,
   Building2,
   Tag,
+  Inbox,
+  Clock,
+  FileCheck,
+  ArrowUpDown,
 } from "lucide-react";
 import type {
   EventChangeRequestWithDetails,
@@ -59,157 +43,32 @@ import type {
 import { eventFieldValuesEqual } from "@/lib/events/mergeEventUpdateProposed";
 import { format } from "date-fns";
 import { OptimizedImage } from "@/components/ui/optimized-image";
+import {
+  AdminAvatar,
+  AdminFilterBar,
+  AdminModal,
+  AdminPageShell,
+  DiffField,
+  DiffGroup,
+  EmptyState,
+  FormField,
+  Pagination,
+  SegmentedControl,
+  StatusBadge,
+} from "@/components/admin/ui";
+import { cn } from "@/lib/utils";
 
-// Stat card variant styles - match EventsManagementPage patterns
-type StatVariant = "blue" | "orange" | "green" | "red" | "purple" | "yellow";
-
-const statVariantStyles: Record<
-  StatVariant,
-  {
-    card: string;
-    title: string;
-    value: string;
-    iconWrapper: string;
-    icon: string;
-  }
-> = {
-  blue: {
-    card: "bg-gradient-to-br from-blue-500/20 via-blue-500/10 to-blue-500/5 dark:from-blue-500/10 dark:via-blue-500/5 dark:to-blue-500/0 border-blue-500/30 dark:border-blue-500/20 hover:shadow-xl hover:shadow-blue-500/25 transition-all duration-300 group cursor-pointer",
-    title:
-      "text-sm font-medium text-blue-900 dark:text-blue-100 group-hover:text-blue-800 dark:group-hover:text-blue-200 transition-colors",
-    value:
-      "text-2xl font-bold text-blue-700 dark:text-blue-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors",
-    iconWrapper:
-      "p-2 bg-blue-500/10 rounded-lg group-hover:bg-blue-500/20 transition-colors",
-    icon: "h-4 w-4 text-blue-600 dark:text-blue-400",
-  },
-  orange: {
-    card: "bg-gradient-to-br from-orange-500/20 via-orange-500/10 to-orange-500/5 dark:from-orange-500/10 dark:via-orange-500/5 dark:to-orange-500/0 border-orange-500/30 dark:border-orange-500/20 hover:shadow-xl hover:shadow-orange-500/25 transition-all duration-300 group cursor-pointer",
-    title:
-      "text-sm font-medium text-orange-900 dark:text-orange-100 group-hover:text-orange-800 dark:group-hover:text-orange-200 transition-colors",
-    value:
-      "text-2xl font-bold text-orange-700 dark:text-orange-300 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors",
-    iconWrapper:
-      "p-2 bg-orange-500/10 rounded-lg group-hover:bg-orange-500/20 transition-colors",
-    icon: "h-4 w-4 text-orange-600 dark:text-orange-400",
-  },
-  green: {
-    card: "bg-gradient-to-br from-green-500/20 via-green-500/10 to-green-500/5 dark:from-green-500/10 dark:via-green-500/5 dark:to-green-500/0 border-green-500/30 dark:border-green-500/20 hover:shadow-xl hover:shadow-green-500/25 transition-all duration-300 group cursor-pointer",
-    title:
-      "text-sm font-medium text-green-900 dark:text-green-100 group-hover:text-green-800 dark:group-hover:text-green-200 transition-colors",
-    value:
-      "text-2xl font-bold text-green-700 dark:text-green-300 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors",
-    iconWrapper:
-      "p-2 bg-green-500/10 rounded-lg group-hover:bg-green-500/20 transition-colors",
-    icon: "h-4 w-4 text-green-600 dark:text-green-400",
-  },
-  red: {
-    card: "bg-gradient-to-br from-red-500/20 via-red-500/10 to-red-500/5 dark:from-red-500/10 dark:via-red-500/5 dark:to-red-500/0 border-red-500/30 dark:border-red-500/20 hover:shadow-xl hover:shadow-red-500/25 transition-all duration-300 group cursor-pointer",
-    title:
-      "text-sm font-medium text-red-900 dark:text-red-100 group-hover:text-red-800 dark:group-hover:text-red-200 transition-colors",
-    value:
-      "text-2xl font-bold text-red-700 dark:text-red-300 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors",
-    iconWrapper:
-      "p-2 bg-red-500/10 rounded-lg group-hover:bg-red-500/20 transition-colors",
-    icon: "h-4 w-4 text-red-600 dark:text-red-400",
-  },
-  purple: {
-    card: "bg-gradient-to-br from-purple-500/20 via-purple-500/10 to-purple-500/5 dark:from-purple-500/10 dark:via-purple-500/5 dark:to-purple-500/0 border-purple-500/30 dark:border-purple-500/20 hover:shadow-xl hover:shadow-purple-500/25 transition-all duration-300 group cursor-pointer",
-    title:
-      "text-sm font-medium text-purple-900 dark:text-purple-100 group-hover:text-purple-800 dark:group-hover:text-purple-200 transition-colors",
-    value:
-      "text-2xl font-bold text-purple-700 dark:text-purple-300 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors",
-    iconWrapper:
-      "p-2 bg-purple-500/10 rounded-lg group-hover:bg-purple-500/20 transition-colors",
-    icon: "h-4 w-4 text-purple-600 dark:text-purple-400",
-  },
-  yellow: {
-    card: "bg-gradient-to-br from-yellow-500/20 via-yellow-500/10 to-yellow-500/5 dark:from-yellow-500/10 dark:via-yellow-500/5 dark:to-yellow-500/0 border-yellow-500/30 dark:border-yellow-500/20 hover:shadow-xl hover:shadow-yellow-500/25 transition-all duration-300 group cursor-pointer",
-    title:
-      "text-sm font-medium text-yellow-900 dark:text-yellow-100 group-hover:text-yellow-800 dark:group-hover:text-yellow-200 transition-colors",
-    value:
-      "text-2xl font-bold text-yellow-700 dark:text-yellow-300 group-hover:text-yellow-600 dark:group-hover:text-yellow-400 transition-colors",
-    iconWrapper:
-      "p-2 bg-yellow-500/10 rounded-lg group-hover:bg-yellow-500/20 transition-colors",
-    icon: "h-4 w-4 text-yellow-600 dark:text-yellow-400",
-  },
+const ACTION_LABEL: Record<EventChangeAction, string> = {
+  create: "New event",
+  update: "Update",
+  delete: "Delete",
 };
 
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.08 } },
+const STATUS_LABEL: Record<EventChangeRequestStatus, string> = {
+  pending: "Pending review",
+  approved: "Approved",
+  rejected: "Rejected",
 };
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
-};
-
-// Action type configuration
-const actionTypeConfig: Record<
-  EventChangeAction,
-  { icon: React.ReactNode; label: string; color: string; bgColor: string }
-> = {
-  create: {
-    icon: <Plus className="h-4 w-4" />,
-    label: "New Event",
-    color: "text-blue-600 dark:text-blue-400",
-    bgColor: "bg-blue-100 dark:bg-blue-900/50",
-  },
-  update: {
-    icon: <Edit2 className="h-4 w-4" />,
-    label: "Update",
-    color: "text-amber-600 dark:text-amber-400",
-    bgColor: "bg-amber-100 dark:bg-amber-900/50",
-  },
-  delete: {
-    icon: <Trash2 className="h-4 w-4" />,
-    label: "Delete",
-    color: "text-rose-600 dark:text-rose-400",
-    bgColor: "bg-rose-100 dark:bg-rose-900/50",
-  },
-};
-
-// Status badge component
-function RequestStatusBadge({ status }: { status: EventChangeRequestStatus }) {
-  const config: Record<
-    EventChangeRequestStatus,
-    {
-      className: string;
-      icon: React.ReactNode;
-      label: string;
-    }
-  > = {
-    pending: {
-      className:
-        "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
-      icon: <Clock className="h-3 w-3" />,
-      label: "Pending Review",
-    },
-    approved: {
-      className:
-        "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
-      icon: <CheckCircle2 className="h-3 w-3" />,
-      label: "Approved",
-    },
-    rejected: {
-      className:
-        "bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800",
-      icon: <XCircle className="h-3 w-3" />,
-      label: "Rejected",
-    },
-  };
-
-  const c = config[status];
-
-  return (
-    <Badge variant="outline" className={`gap-1.5 font-medium ${c.className}`}>
-      {c.icon}
-      {c.label}
-    </Badge>
-  );
-}
 
 // Format value for display
 function formatValue(value: unknown): string {
@@ -228,119 +87,98 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-// Compact diff viewer component
-function CompactDiffViewer({
-  original,
-  proposed,
-  actionType,
-}: {
-  original: Record<string, unknown> | null;
-  proposed: Record<string, unknown> | null;
-  actionType: EventChangeAction;
-}) {
-  if (!proposed && actionType !== "delete") return null;
+// Fields compared between the live event and the organizer's proposal.
+const DIFF_FIELDS = [
+  { key: "name", label: "Event name" },
+  { key: "start_time", label: "Starts" },
+  { key: "end_time", label: "Ends" },
+  { key: "max_capacity", label: "Capacity" },
+  { key: "status", label: "Status" },
+  { key: "require_guest_details", label: "Guest details" },
+] as const;
 
-  const fieldsToShow = [
-    { key: "name", label: "Event Name", icon: <Tag className="h-3.5 w-3.5" /> },
-    {
-      key: "start_time",
-      label: "Start",
-      icon: <Calendar className="h-3.5 w-3.5" />,
-    },
-    {
-      key: "end_time",
-      label: "End",
-      icon: <CalendarClock className="h-3.5 w-3.5" />,
-    },
-    {
-      key: "max_capacity",
-      label: "Capacity",
-      icon: <Users className="h-3.5 w-3.5" />,
-    },
-    {
-      key: "status",
-      label: "Status",
-      icon: <FileCheck className="h-3.5 w-3.5" />,
-    },
-    {
-      key: "require_guest_details",
-      label: "Guest Details",
-      icon: <ClipboardList className="h-3.5 w-3.5" />,
-    },
-  ];
-
-  const diffs: EventChangeDiff[] = fieldsToShow.map((field) => {
+function buildDiffs(request: EventChangeRequestWithDetails): EventChangeDiff[] {
+  const actionType = request.action_type as EventChangeAction;
+  const original = request.original_data as Record<string, unknown> | null;
+  const proposed = request.proposed_data as Record<string, unknown> | null;
+  return DIFF_FIELDS.map((field) => {
     const oldValue = original ? original[field.key] : null;
     const newValue = proposed ? proposed[field.key] : null;
     const changed =
       actionType === "update"
         ? !eventFieldValuesEqual(field.key, oldValue, newValue)
         : !original || !eventFieldValuesEqual(field.key, oldValue, newValue);
-
     return {
       field: field.key,
       label: field.label,
       old_value: oldValue as string | number | boolean | null,
-      new_value: (newValue === undefined ? oldValue : newValue) as
-        | string
-        | number
-        | boolean
-        | null,
+      new_value: (newValue === undefined ? oldValue : newValue) as string | number | boolean | null,
       changed,
     };
   });
+}
 
-  const relevantDiffs =
-    actionType === "create"
-      ? diffs.filter((d) => d.new_value !== null && d.new_value !== undefined)
-      : diffs.filter((d) => d.changed);
+function requestTitle(request: EventChangeRequestWithDetails) {
+  const proposed = request.proposed_data as EventProposedData | null;
+  return request.action_type === "create"
+    ? proposed?.name || "New event"
+    : request.current_event_name || "Unknown event";
+}
 
-  if (relevantDiffs.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground italic">
-        No changes detected
-      </p>
-    );
-  }
+function requestPoster(request: EventChangeRequestWithDetails) {
+  const temp = (request.proposed_data as Record<string, unknown> | null)?.temp_images as
+    | Array<{ url: string }>
+    | undefined;
+  return temp?.[0]?.url;
+}
 
+function RequestQueueItem({
+  request,
+  selected,
+  onSelect,
+}: {
+  request: EventChangeRequestWithDetails;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const poster = requestPoster(request);
+  const changedCount =
+    request.action_type === "update" ? buildDiffs(request).filter((d) => d.changed).length : null;
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-      {relevantDiffs.slice(0, 6).map((diff) => {
-        const fieldConfig = fieldsToShow.find((f) => f.key === diff.field);
-        return (
-          <div
-            key={diff.field}
-            className="flex items-start gap-2 p-2 bg-muted/30 rounded-lg text-xs"
-          >
-            <div className="mt-0.5 text-muted-foreground">
-              {fieldConfig?.icon}
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className="font-medium text-muted-foreground">
-                {diff.label}
-              </span>
-              <div className="mt-0.5">
-                {actionType === "update" &&
-                  original &&
-                  diff.old_value !== null && (
-                    <span className="text-rose-600 dark:text-rose-400 line-through mr-1.5">
-                      {formatValue(diff.old_value)}
-                    </span>
-                  )}
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                  {formatValue(diff.new_value)}
-                </span>
-              </div>
-            </div>
+    <li>
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-current={selected ? "true" : undefined}
+        className={cn(
+          "relative flex w-full gap-3 border-b px-4 py-3 text-left transition-colors duration-150 hover:bg-muted/50",
+          selected && "bg-primary/5 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary hover:bg-primary/5",
+        )}
+      >
+        <div className="relative size-12 shrink-0 overflow-hidden rounded-md border bg-muted">
+          {poster ? (
+            <OptimizedImage src={poster} alt="" fill className="object-cover" sizes="48px" />
+          ) : (
+            <ImageIcon aria-hidden="true" className="absolute inset-0 m-auto size-4 text-muted-foreground" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-data font-medium">{requestTitle(request)}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <span className="inline-flex h-5 items-center rounded bg-muted px-2 font-medium text-foreground">
+              {ACTION_LABEL[request.action_type as EventChangeAction]}
+              {changedCount ? ` · ${changedCount} changes` : ""}
+            </span>
+            <span className="truncate">{request.organizer_name || "Unknown organizer"}</span>
+            <span className="tabular-nums">{format(new Date(request.created_at), "d MMM, h:mm a")}</span>
           </div>
-        );
-      })}
-    </div>
+        </div>
+      </button>
+    </li>
   );
 }
 
-// Event Request Card Component
-function EventRequestCard({
+function RequestDetail({
   request,
   onApprove,
   onReject,
@@ -351,174 +189,101 @@ function EventRequestCard({
   onReject: () => void;
   onViewDetails: () => void;
 }) {
-  const actionConfig =
-    actionTypeConfig[request.action_type as EventChangeAction];
-  const proposedData = request.proposed_data as EventProposedData | null;
-
-  // Get temp images from proposed data if available
-  const tempImages = (proposedData as Record<string, unknown> | null)
-    ?.temp_images as Array<{ url: string; alt_text?: string }> | undefined;
-  const primaryImage = tempImages?.[0]?.url;
+  const actionType = request.action_type as EventChangeAction;
+  const status = request.status as EventChangeRequestStatus;
+  const poster = requestPoster(request);
+  const diffs = buildDiffs(request);
+  const rows =
+    actionType === "create" ? diffs.filter((d) => d.new_value !== null && d.new_value !== undefined) : diffs;
 
   return (
-    <motion.div
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.2 }}
-      className="group"
-    >
-      <Card className="overflow-hidden border-border/50 hover:border-primary/30 hover:shadow-lg transition-all duration-300">
-        <div className="flex flex-col lg:flex-row">
-          {/* Image Section */}
-          <div className="relative w-full lg:w-48 h-32 lg:h-auto bg-muted/30 flex-shrink-0">
-            {primaryImage ? (
-              <OptimizedImage
-                src={primaryImage}
-                alt={proposedData?.name || "Event"}
-                fill
-                className="object-cover"
-                sizes="(max-width: 1024px) 100vw, 192px"
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center text-muted-foreground">
-                  <ImageIcon className="h-8 w-8 mx-auto mb-1 opacity-50" />
-                  <span className="text-xs">No image</span>
-                </div>
-              </div>
-            )}
-            {/* Action Type Badge */}
-            <div className="absolute top-2 left-2">
-              <div
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${actionConfig.bgColor} ${actionConfig.color}`}
-              >
-                {actionConfig.icon}
-                {actionConfig.label}
-              </div>
+    <section aria-labelledby="request-title" className="flex min-w-0 flex-col">
+      <div className="border-b p-6">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 id="request-title" className="text-xl font-semibold tracking-tight">
+                {requestTitle(request)}
+              </h2>
+              <StatusBadge status={status} label={STATUS_LABEL[status]} />
+              <span className="inline-flex h-5 items-center rounded bg-muted px-2 text-xs font-medium">{ACTION_LABEL[actionType]}</span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-data text-muted-foreground">
+              <span className="flex items-center gap-2">
+                <AdminAvatar name={request.organizer_name || "Organizer"} src={request.organizer_avatar} size="sm" />
+                {request.organizer_name || "Unknown organizer"}
+                {request.organizer_username && <span>@{request.organizer_username}</span>}
+              </span>
+              <span className="tabular-nums">Submitted {format(new Date(request.created_at), "EEE d MMM, h:mm a")}</span>
             </div>
           </div>
-
-          {/* Content Section */}
-          <div className="flex-1 p-4">
-            <div className="flex flex-col h-full">
-              {/* Header */}
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
-                    {request.action_type === "create"
-                      ? proposedData?.name || "New Event"
-                      : request.current_event_name || "Unknown Event"}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
-                    <span>
-                      Submitted{" "}
-                      {format(new Date(request.created_at), "MMM d, h:mm a")}
-                    </span>
-                  </div>
-                </div>
-                <RequestStatusBadge
-                  status={request.status as EventChangeRequestStatus}
-                />
-              </div>
-
-              {/* Organizer Info */}
-              <div className="flex items-center gap-2 mb-3 p-2 bg-muted/30 rounded-lg">
-                <Avatar className="h-7 w-7">
-                  <AvatarImage src={request.organizer_avatar || undefined} />
-                  <AvatarFallback className="text-xs">
-                    {request.organizer_name?.charAt(0) || "O"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">
-                    {request.organizer_name || "Unknown"}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    @{request.organizer_username || "unknown"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Event Details Preview */}
-              {request.action_type !== "delete" && proposedData && (
-                <div className="mb-3">
-                  <CompactDiffViewer
-                    original={
-                      request.original_data as Record<string, unknown> | null
-                    }
-                    proposed={
-                      proposedData as unknown as Record<string, unknown>
-                    }
-                    actionType={request.action_type as EventChangeAction}
-                  />
-                </div>
-              )}
-
-              {/* Delete Warning */}
-              {request.action_type === "delete" && (
-                <div className="mb-3 p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-lg">
-                  <p className="text-xs text-rose-600 dark:text-rose-400 flex items-center gap-2">
-                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                    This will permanently delete the event and all associated
-                    data
-                  </p>
-                </div>
-              )}
-
-              {/* Review Notes (if reviewed) */}
-              {request.review_notes && (
-                <div className="mb-3 p-2.5 bg-muted/50 rounded-lg">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">
-                    Review Notes
-                  </p>
-                  <p className="text-xs">{request.review_notes}</p>
-                  {request.reviewer_name && (
-                    <p className="text-[10px] text-muted-foreground mt-1.5">
-                      — {request.reviewer_name},{" "}
-                      {format(new Date(request.reviewed_at!), "MMM d, h:mm a")}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="mt-auto flex items-center gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onViewDetails}
-                  className="flex-1 h-8 text-xs"
-                >
-                  <Eye className="h-3.5 w-3.5 mr-1.5" />
-                  View Details
-                </Button>
-                {request.status === "pending" && (
-                  <>
-                    <Button
-                      size="sm"
-                      onClick={onApprove}
-                      className="flex-1 h-8 text-xs bg-emerald-600 hover:bg-emerald-700"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                      Approve
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={onReject}
-                      className="flex-1 h-8 text-xs"
-                    >
-                      <XCircle className="h-3.5 w-3.5 mr-1.5" />
-                      Reject
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
+          <Button variant="outline" size="sm" onClick={onViewDetails}>
+            <Eye />
+            Full details
+          </Button>
         </div>
-      </Card>
-    </motion.div>
+        {poster && (
+          <div className="relative mt-6 aspect-video w-full max-w-md overflow-hidden rounded-lg border bg-muted">
+            <OptimizedImage src={poster} alt={`Proposed poster for ${requestTitle(request)}`} fill className="object-cover" sizes="448px" />
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 px-6 pb-6">
+        {actionType === "delete" ? (
+          <p className="mt-6 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-data">
+            <AlertCircle aria-hidden="true" className="mt-1 size-4 shrink-0 text-destructive" />
+            Approving permanently deletes this event and everything attached to it.
+          </p>
+        ) : (
+          <DiffGroup title={actionType === "create" ? "Submitted details" : "Changes"} icon={Clock}>
+            {rows.length === 0 ? (
+              <p className="border-t py-3 text-data text-muted-foreground">No changes detected.</p>
+            ) : (
+              rows.map((d) => (
+                <DiffField
+                  key={d.field}
+                  label={d.label}
+                  before={actionType === "create" ? null : formatValue(d.old_value)}
+                  after={formatValue(d.new_value)}
+                  changed={d.changed}
+                />
+              ))
+            )}
+          </DiffGroup>
+        )}
+
+        {request.review_notes && (
+          <div className="mt-6 rounded-lg bg-muted/50 p-4">
+            <p className="text-xs font-medium text-muted-foreground">Review notes</p>
+            <p className="mt-1 text-data">{request.review_notes}</p>
+            {request.reviewer_name && request.reviewed_at && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {request.reviewer_name}, {format(new Date(request.reviewed_at), "d MMM, h:mm a")}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {status === "pending" && (
+        <div className="sticky bottom-0 flex flex-wrap items-center gap-2 border-t bg-background px-6 py-3">
+          <p className="mr-auto text-data text-muted-foreground">
+            {actionType === "delete"
+              ? "The organizer is asking to delete this event."
+              : "Approving applies these changes and notifies the organizer."}
+          </p>
+          <Button variant="outline" onClick={onReject}>
+            <XCircle />
+            Reject…
+          </Button>
+          <Button variant="solid" onClick={onApprove}>
+            <CheckCircle2 />
+            Approve
+          </Button>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -786,14 +551,6 @@ function EventDetailsDialog({
       >
         <DialogHeader className="flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div
-              className={`p-2 rounded-lg ${
-                actionTypeConfig[request.action_type as EventChangeAction]
-                  .bgColor
-              }`}
-            >
-              {actionTypeConfig[request.action_type as EventChangeAction].icon}
-            </div>
             <div>
               <DialogTitle className="text-xl">
                 {request.action_type === "create"
@@ -832,7 +589,7 @@ function EventDetailsDialog({
                       sizes="(max-width: 640px) 50vw, 33vw"
                     />
                     {idx === 0 && (
-                      <Badge className="absolute top-2 left-2 text-[10px]">
+                      <Badge className="absolute top-2 left-2 text-xs">
                         Primary
                       </Badge>
                     )}
@@ -879,7 +636,7 @@ function EventDetailsDialog({
                     key={field.key}
                     className={`p-3 rounded-lg border ${
                       hasChanged
-                        ? "border-amber-300/50 bg-amber-50/50 dark:border-amber-700/50 dark:bg-amber-950/20"
+                        ? "border-warning/30 bg-warning/5"
                         : "border-border/50 bg-muted/30"
                     }`}
                   >
@@ -889,7 +646,7 @@ function EventDetailsDialog({
                       {hasChanged && (
                         <Badge
                           variant="outline"
-                          className="ml-auto text-[10px] text-amber-600 border-amber-300"
+                          className="ml-auto text-xs text-warning border-warning/30"
                         >
                           Changed
                         </Badge>
@@ -897,14 +654,14 @@ function EventDetailsDialog({
                     </div>
                     <div className="text-sm">
                       {hasChanged && oldVal !== null && oldVal !== undefined && (
-                        <div className="text-rose-600 dark:text-rose-400 line-through text-xs mb-0.5">
+                        <div className="text-muted-foreground line-through text-xs mb-1">
                           {formatValue(oldVal)}
                         </div>
                       )}
                       <div
                         className={
                           hasChanged
-                            ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                            ? "text-foreground font-medium"
                             : ""
                         }
                       >
@@ -957,9 +714,6 @@ export function EventChangeRequestsPage() {
   const [detailsRequest, setDetailsRequest] =
     React.useState<EventChangeRequestWithDetails | null>(null);
 
-  // Refs for modals
-  const reviewModalRef = React.useRef<HTMLDivElement>(null);
-
   const { toast } = useToast();
 
   // Prevent scroll lock layout shift on review dialog
@@ -996,14 +750,6 @@ export function EventChangeRequestsPage() {
         observer.disconnect();
         removeScrollLock();
       };
-    }
-  }, [isReviewDialogOpen]);
-
-  // Apply CSS containment to review modal
-  React.useEffect(() => {
-    if (isReviewDialogOpen && reviewModalRef.current) {
-      reviewModalRef.current.style.contain = "layout style paint";
-      reviewModalRef.current.style.isolation = "isolate";
     }
   }, [isReviewDialogOpen]);
 
@@ -1135,368 +881,178 @@ export function EventChangeRequestsPage() {
     }
   };
 
-  // Stats cards configuration
-  const statsCards = React.useMemo(
-    () => [
-      {
-        key: "pending",
-        label: "Pending Review",
-        value: pendingCount,
-        icon: Clock,
-        color: "yellow" as StatVariant,
-      },
-      {
-        key: "total",
-        label: "Total Requests",
-        value: totalCount,
-        icon: ClipboardList,
-        color: "blue" as StatVariant,
-      },
-      {
-        key: "approved",
-        label: "Approved",
-        value: approvedCount,
-        icon: CheckCircle2,
-        color: "green" as StatVariant,
-      },
-      {
-        key: "rejected",
-        label: "Rejected",
-        value: rejectedCount,
-        icon: XCircle,
-        color: "red" as StatVariant,
-      },
-    ],
-    [pendingCount, totalCount, approvedCount, rejectedCount],
-  );
+  const [selectedId, setSelectedId] = React.useState<string | number | null>(null);
+  const selected = filteredRequests.find((r) => r.id === selectedId) ?? filteredRequests[0] ?? null;
+
+  const statusOptions = [
+    { value: "pending", label: "Pending", count: pendingCount },
+    { value: "approved", label: "Approved" },
+    { value: "rejected", label: "Rejected" },
+    { value: "all", label: "All" },
+  ];
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-6"
+    <AdminPageShell
+      eyebrow="Events & ticketing"
+      title="Event approvals"
+      description="Organizer changes wait here. Nothing goes live until it's approved."
+      actions={
+        <Button variant="outline" onClick={fetchRequests} loading={isLoading}>
+          <RefreshCw />
+          Refresh
+        </Button>
+      }
+      metrics={[
+        { label: "Pending review", value: pendingCount, emphasis: pendingCount > 0 },
+        { label: "Approved", value: approvedCount.toLocaleString() },
+        { label: "Rejected", value: rejectedCount.toLocaleString() },
+        { label: "In this view", value: totalCount.toLocaleString() },
+      ]}
+      tabs={
+        <SegmentedControl
+          label="Request status"
+          value={statusFilter}
+          onValueChange={(v) => {
+            setStatusFilter(v);
+            setCurrentPage(1);
+          }}
+          options={statusOptions}
+        />
+      }
     >
-      {/* Header */}
-      <motion.div variants={itemVariants} className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-2xl" />
-        <div className="relative p-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-primary/10 rounded-xl">
-              <FileCheck className="h-6 w-6 text-primary" />
-            </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-              Event Approval Queue
-            </h1>
-          </div>
-          <p className="text-muted-foreground text-lg">
-            Review and approve organizer event submissions. Verify event
-            details, images, and ticket configurations before making them live.
-          </p>
-        </div>
-      </motion.div>
-
-      {/* Stats Cards */}
-      <motion.div
-        variants={itemVariants}
-        className="grid grid-cols-2 gap-4 md:grid-cols-4"
-      >
-        {statsCards.map((card) => {
-          const styles = statVariantStyles[card.color];
-          const Icon = card.icon;
-
-          return (
-            <motion.div
-              key={card.key}
-              variants={itemVariants}
-              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-            >
-              <Card className={styles.card}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className={styles.title}>{card.label}</CardTitle>
-                  <div className={styles.iconWrapper}>
-                    <Icon className={styles.icon} />
+      <div className="grid min-w-0 overflow-clip rounded-lg border bg-card lg:grid-cols-[theme(spacing.96)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col border-b lg:border-b-0 lg:border-r">
+          <AdminFilterBar
+            search={{ value: searchQuery, onChange: setSearchQuery, placeholder: "Search requests" }}
+            facets={[
+              {
+                id: "action",
+                label: "Type",
+                single: true,
+                selected: actionFilter === "all" ? [] : [actionFilter],
+                onChange: (values) => {
+                  setActionFilter(values[0] ?? "all");
+                  setCurrentPage(1);
+                },
+                options: [
+                  { value: "create", label: "New event" },
+                  { value: "update", label: "Update" },
+                  { value: "delete", label: "Delete" },
+                ],
+              },
+            ]}
+          />
+          {isLoading ? (
+            <ul aria-busy="true" aria-label="Loading requests">
+              {[0, 1, 2, 3].map((i) => (
+                <li key={i} className="flex gap-3 border-b px-4 py-3">
+                  <div className="size-12 animate-pulse rounded-md bg-muted motion-reduce:animate-none" />
+                  <div className="flex flex-1 flex-col gap-2 pt-1">
+                    <div className="h-3 w-3/4 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+                    <div className="h-3 w-1/2 animate-pulse rounded bg-muted motion-reduce:animate-none" />
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className={styles.value}>
-                    {card.value.toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          );
-        })}
-      </motion.div>
-
-      {/* Filters */}
-      <motion.div
-        variants={itemVariants}
-        className="rounded-xl border border-border/50 bg-gradient-to-r from-background/50 to-background/30 p-6 backdrop-blur-sm"
-      >
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-1 flex-col gap-4 md:flex-row md:items-center">
-            <div className="relative flex-1 max-w-md">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 rounded-md bg-primary/10 p-1">
-                <Search className="h-4 w-4 text-primary" />
-              </div>
-              <Input
-                placeholder="Search by organizer or event name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-11 bg-background/50 pl-11 pr-4 font-medium placeholder:font-normal border-border/50 focus:border-primary/50"
-              />
-            </div>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-11 w-full border-border/50 bg-background/50 md:w-44">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={actionFilter} onValueChange={setActionFilter}>
-              <SelectTrigger className="h-11 w-full border-border/50 bg-background/50 md:w-44">
-                <SelectValue placeholder="Action Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Actions</SelectItem>
-                <SelectItem value="create">Create</SelectItem>
-                <SelectItem value="update">Update</SelectItem>
-                <SelectItem value="delete">Delete</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button
-            variant="outline"
-            onClick={fetchRequests}
-            disabled={isLoading}
-            className="h-11"
-          >
-            <RefreshCw
-              className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+                </li>
+              ))}
+            </ul>
+          ) : filteredRequests.length === 0 ? (
+            <EmptyState
+              icon={statusFilter === "pending" && !searchQuery ? CheckCircle2 : Inbox}
+              title={statusFilter === "pending" && !searchQuery ? "Queue is clear" : "No requests match"}
+              description={
+                statusFilter === "pending" && !searchQuery
+                  ? "Every change request has been handled. New submissions will appear here."
+                  : "Try another status, type or search."
+              }
             />
-            Refresh
-          </Button>
+          ) : (
+            <ul aria-label="Change requests" className="max-h-[70vh] overflow-y-auto">
+              {filteredRequests.map((request) => (
+                <RequestQueueItem
+                  key={request.id}
+                  request={request}
+                  selected={selected?.id === request.id}
+                  onSelect={() => setSelectedId(request.id)}
+                />
+              ))}
+            </ul>
+          )}
+          {totalPages > 1 && (
+            <Pagination
+              page={currentPage}
+              pageSize={12}
+              total={totalCount}
+              onPageChange={setCurrentPage}
+              itemLabel="requests"
+              className="mt-auto"
+            />
+          )}
         </div>
-      </motion.div>
 
-      {/* Requests Grid */}
-      <motion.div variants={itemVariants}>
-        {isLoading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i} className="animate-pulse">
-                <CardContent className="p-0">
-                  <div className="flex flex-col lg:flex-row">
-                    <div className="w-full lg:w-48 h-32 bg-muted" />
-                    <div className="flex-1 p-4 space-y-3">
-                      <div className="h-5 bg-muted rounded w-3/4" />
-                      <div className="h-4 bg-muted rounded w-1/2" />
-                      <div className="h-16 bg-muted rounded" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : filteredRequests.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="p-12 text-center">
-              <div className="mx-auto w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-4">
-                <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Queue is Clear!</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                {statusFilter === "pending"
-                  ? "All event change requests have been processed. New submissions will appear here."
-                  : "No requests match your current filters. Try adjusting your search criteria."}
-              </p>
-            </CardContent>
-          </Card>
+        {selected && !isLoading ? (
+          <RequestDetail
+            request={selected}
+            onApprove={() => openReviewDialog(selected, "approve")}
+            onReject={() => openReviewDialog(selected, "reject")}
+            onViewDetails={() => openDetailsDialog(selected)}
+          />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filteredRequests.map((request) => (
-              <EventRequestCard
-                key={request.id}
-                request={request}
-                onApprove={() => openReviewDialog(request, "approve")}
-                onReject={() => openReviewDialog(request, "reject")}
-                onViewDetails={() => openDetailsDialog(request)}
-              />
-            ))}
+          <div className="hidden lg:block">
+            <EmptyState icon={Inbox} title="Pick a request" description="Its changes show up here." />
           </div>
         )}
-      </motion.div>
+      </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <motion.div
-          variants={itemVariants}
-          className="flex items-center justify-center gap-2"
-        >
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Previous
-          </Button>
-          <div className="flex items-center gap-1 px-4">
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const pageNum = i + 1;
-              return (
-                <Button
-                  key={pageNum}
-                  variant={currentPage === pageNum ? "default" : "ghost"}
-                  size="sm"
-                  className="w-8 h-8 p-0"
-                  onClick={() => setCurrentPage(pageNum)}
-                >
-                  {pageNum}
-                </Button>
-              );
-            })}
-            {totalPages > 5 && (
-              <>
-                <span className="px-2 text-muted-foreground">...</span>
-                <Button
-                  variant={currentPage === totalPages ? "default" : "ghost"}
-                  size="sm"
-                  className="w-8 h-8 p-0"
-                  onClick={() => setCurrentPage(totalPages)}
-                >
-                  {totalPages}
-                </Button>
-              </>
-            )}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-          >
-            Next
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        </motion.div>
-      )}
-
-      {/* Review Dialog */}
-      <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
-        <DialogContent ref={reviewModalRef} className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {reviewAction === "approve" ? (
-                <>
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                  Approve Request
-                </>
-              ) : (
-                <>
-                  <XCircle className="h-5 w-5 text-rose-600" />
-                  Reject Request
-                </>
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              {reviewAction === "approve"
-                ? "The changes will be applied immediately and the organizer will be notified."
-                : "Please provide a reason. The organizer will receive your feedback."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            {selectedRequest && (
-              <div className="p-3 rounded-lg bg-muted/50 border">
-                <div className="flex items-center gap-2 mb-2">
-                  <div
-                    className={`p-1.5 rounded ${
-                      actionTypeConfig[
-                        selectedRequest.action_type as EventChangeAction
-                      ].bgColor
-                    }`}
-                  >
-                    {
-                      actionTypeConfig[
-                        selectedRequest.action_type as EventChangeAction
-                      ].icon
-                    }
-                  </div>
-                  <span className="font-medium capitalize text-sm">
-                    {selectedRequest.action_type} Event
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {(selectedRequest.proposed_data as EventProposedData | null)
-                    ?.name || selectedRequest.current_event_name}
-                </p>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {reviewAction === "approve"
-                  ? "Notes (optional)"
-                  : "Rejection Reason *"}
-              </label>
-              <Textarea
-                value={reviewNotes}
-                onChange={(e) => setReviewNotes(e.target.value)}
-                placeholder={
-                  reviewAction === "approve"
-                    ? "Add any notes for the organizer..."
-                    : "Explain why this request is being rejected..."
-                }
-                rows={4}
-                className="resize-none"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setIsReviewDialogOpen(false)}
-            >
+      <AdminModal
+        open={isReviewDialogOpen}
+        onOpenChange={setIsReviewDialogOpen}
+        title={reviewAction === "approve" ? "Approve this request?" : "Reject this request?"}
+        description={
+          selectedRequest
+            ? `${ACTION_LABEL[selectedRequest.action_type as EventChangeAction]}: ${requestTitle(selectedRequest)}. ` +
+              (reviewAction === "approve"
+                ? "The changes apply right away and the organizer is notified."
+                : "The organizer sees your reason and can resubmit.")
+            : undefined
+        }
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsReviewDialogOpen(false)}>
               Cancel
             </Button>
             <Button
-              variant={reviewAction === "approve" ? "default" : "destructive"}
+              variant={reviewAction === "approve" ? "solid" : "destructive"}
               onClick={processRequest}
-              disabled={isProcessing}
-              className={
-                reviewAction === "approve"
-                  ? "bg-emerald-600 hover:bg-emerald-700"
-                  : ""
-              }
+              loading={isProcessing}
             >
-              {isProcessing && (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              )}
-              {reviewAction === "approve"
-                ? "Confirm Approval"
-                : "Confirm Rejection"}
+              {reviewAction === "approve" ? "Approve" : "Reject request"}
             </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </>
+        }
+      >
+        <FormField
+          label={reviewAction === "approve" ? "Note for the organizer" : "Reason"}
+          optional={reviewAction === "approve"}
+          hint={reviewAction === "reject" ? "Required. The organizer sees this." : undefined}
+        >
+          <Textarea
+            value={reviewNotes}
+            onChange={(e) => setReviewNotes(e.target.value)}
+            placeholder={
+              reviewAction === "approve"
+                ? "Anything the organizer should know"
+                : "e.g. The poster text is unreadable"
+            }
+            rows={4}
+            className="resize-none"
+          />
+        </FormField>
+      </AdminModal>
 
-      {/* Details Dialog */}
       <EventDetailsDialog
         request={detailsRequest}
         isOpen={isDetailsDialogOpen}
         onClose={() => setIsDetailsDialogOpen(false)}
       />
-    </motion.div>
+    </AdminPageShell>
   );
 }
