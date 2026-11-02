@@ -176,6 +176,92 @@ export const dataEntryNavigation: RoleNavItem[] = [
 
 export const dataEntrySecondaryNavigation: RoleNavItem[] = [];
 
+// ---- Admin shell grouping ----
+// Presentation only: how the admin sidebar groups and labels links. Which links a
+// person sees still comes from the role lists above (adminNavigation etc.); an
+// allowed link missing from these groups is shown under "More", never dropped.
+export interface AdminNavGroup {
+  /** Null for the ungrouped top item (Overview). */
+  label: string | null;
+  items: { href: string; label: string }[];
+}
+
+export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
+  { label: null, items: [{ href: "/dashboard", label: "Overview" }] },
+  {
+    label: "Events & ticketing",
+    items: [
+      { href: "/admin/events", label: "Events" },
+      { href: "/admin/events/approvals", label: "Event approvals" },
+      { href: "/admin/bookings", label: "Bookings" },
+      { href: "/admin/ticket-pdf-inventory", label: "Ticket inventory" },
+      { href: "/admin/accounts", label: "Gate & accounts" },
+      { href: "/dashboard/scan", label: "Scan QR" },
+    ],
+  },
+  {
+    label: "Catalog",
+    items: [
+      { href: "/admin/listings", label: "Listings" },
+      { href: "/admin/listings/approvals", label: "Listing approvals" },
+      { href: "/admin/listings-duplicator", label: "Duplicator" },
+      { href: "/admin/brand-groups", label: "Brand groups" },
+      { href: "/admin/listing-capacity", label: "Capacity" },
+      { href: "/admin/categories", label: "Categories" },
+      { href: "/admin/listing-scraper", label: "Scraper" },
+    ],
+  },
+  {
+    label: "Offers",
+    items: [
+      { href: "/admin/cards", label: "Bank cards" },
+      { href: "/admin/redemptions", label: "Redemptions" },
+      { href: "/admin/creator-codes", label: "Creator codes" },
+    ],
+  },
+  {
+    label: "Community",
+    items: [
+      { href: "/admin/users", label: "Users" },
+      { href: "/admin/reviews", label: "Reviews" },
+      { href: "/admin/reports", label: "Reports" },
+      { href: "/admin/forms", label: "Form submissions" },
+    ],
+  },
+  {
+    label: "Editorial",
+    items: [
+      { href: "/admin/blogs/approvals", label: "Blog approvals" },
+      { href: "/admin/writer-applications", label: "Writer applications" },
+      { href: "/admin/blog-categories", label: "Blog categories" },
+    ],
+  },
+  {
+    label: "Growth",
+    items: [
+      { href: "/admin/gamification", label: "Gamification" },
+      { href: "/admin/app-layout", label: "App layout" },
+      { href: "/admin/segments", label: "Segments" },
+    ],
+  },
+  {
+    label: "Insights",
+    items: [
+      { href: "/admin/analytics", label: "Analytics" },
+      { href: "/admin/mobile-events", label: "Mobile events" },
+      { href: "/admin/demand-gap", label: "Demand gap" },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { href: "/admin/logs", label: "Logs" },
+      { href: "/admin/security", label: "Security" },
+      { href: "/admin/settings", label: "Settings" },
+    ],
+  },
+];
+
 // ---- Organizer ----
 export const organizerMainNavigation: RoleNavItem[] = [
   { name: "My Events", href: "/dashboard/events", icon: Calendar, description: "Manage your events" },

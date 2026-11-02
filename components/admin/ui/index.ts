@@ -50,3 +50,4 @@ export {
   type AdminDataTableProps,
   type SortState,
 } from "./AdminDataTable";
+export { AdminShell, type AdminShellProfile, type AdminShellProps } from "./AdminShell";
