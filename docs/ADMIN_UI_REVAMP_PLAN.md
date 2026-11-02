@@ -131,3 +131,4 @@ flowchart LR
 * Theme audit: Dark/light mode contrast across all 45 pages.
 * Mobile and tablet responsive breakpoint verification.
 * Loading state and empty state polish.
+
