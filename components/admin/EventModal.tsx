@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Calendar,
   Users,
   Star,
   MapPin,
@@ -25,16 +24,9 @@ import {
   Layers,
   QrCode,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { AdminDrawer, FormFooter, StatusBadge } from "@/components/admin/ui";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OrganizerSelect } from "./OrganizerSelect";
@@ -99,7 +91,11 @@ export function EventModal({
   const [isLoading, setIsLoading] = React.useState(false);
   const [isLoadingData, setIsLoadingData] = React.useState(false);
   const { toast } = useToast();
-  const modalRef = React.useRef<HTMLDivElement>(null);
+  // Each open starts on Details, as it did when the tabs lived inside the dialog.
+  const [activeTab, setActiveTab] = React.useState("details");
+  React.useEffect(() => {
+    if (isOpen) setActiveTab("details");
+  }, [isOpen, event?.event_id]);
 
   // Capture initial body state on component mount - BEFORE any modal interactions
   const initialBodyState = React.useRef({
@@ -138,18 +134,6 @@ export function EventModal({
 
     // Initial body state captured
   }, []); // Empty dependency array - run only once on mount
-  React.useEffect(() => {
-    if (isOpen && modalRef.current) {
-      // Dialog content mounted
-      // Dialog mounted
-
-      // Apply CSS containment to prevent layout shifts
-      modalRef.current.style.contain = "layout style paint";
-      modalRef.current.style.isolation = "isolate";
-
-      // Applied CSS containment to modal
-    }
-  }, [isOpen]);
 
   // Fetch categories data
   React.useEffect(() => {
@@ -845,86 +829,52 @@ export function EventModal({
     }));
   };
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "published":
-        return "default";
-      case "draft":
-        return "secondary";
-      case "archived":
-        return "outline";
-      default:
-        return "secondary";
-    }
-  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        ref={modalRef}
-        className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+    // Tabs wraps the drawer so the tab row (header) and panels (body) share state.
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <AdminDrawer
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
+        title={event ? event.event_name || "Edit event" : "New event"}
+        description={event ? "Update event details and settings" : "Fill in the details to create an event"}
+        meta={event ? <StatusBadge status={event.event_status} /> : undefined}
+        tabs={
+          <TabsList variant="underline">
+            <TabsTrigger value="details">
+              <Tag className="size-4" />
+              Details
+            </TabsTrigger>
+            <TabsTrigger value="gallery">
+              <ImageIcon className="size-4" />
+              Gallery
+            </TabsTrigger>
+            <TabsTrigger value="tickets">
+              <Ticket className="size-4" />
+              Tickets
+            </TabsTrigger>
+          </TabsList>
+        }
+        footer={
+          <FormFooter>
+            <Button type="button" variant="outline" onClick={handleCancel} disabled={isLoading}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="solid" onClick={handleSubmit} loading={isLoading}>
+              {isLoading ? "Saving…" : event ? "Save changes" : "Create event"}
+            </Button>
+          </FormFooter>
+        }
       >
-        <DialogHeader className="flex-shrink-0 pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Calendar className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <DialogTitle className="text-xl font-semibold">
-                  {event ? "Edit Event" : "Create New Event"}
-                </DialogTitle>
-                <DialogDescription className="text-sm text-muted-foreground mt-1">
-                  {event
-                    ? "Update event details and settings"
-                    : "Fill in the details to create a new event"}
-                </DialogDescription>
-              </div>
-            </div>
-            {event && (
-              <Badge
-                variant={getStatusBadgeVariant(event.event_status)}
-                className="capitalize"
-              >
-                {event.event_status}
-              </Badge>
-            )}
-          </div>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto px-6">
           {event && isLoadingData ? (
-            <div className="flex flex-col items-center justify-center h-full py-24">
-              <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4"></div>
-              <div className="text-lg font-medium text-muted-foreground">
-                Loading event details...
-              </div>
+            <div role="status" className="flex flex-col items-center justify-center py-24 text-data text-muted-foreground">
+              <div className="mb-4 size-8 animate-spin rounded-full border-2 border-muted border-t-foreground motion-reduce:animate-none" />
+              Loading event details…
             </div>
           ) : (
-            <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mb-6">
-                <TabsTrigger
-                  value="details"
-                  className="flex items-center gap-2"
-                >
-                  <Tag className="h-4 w-4" />
-                  Details
-                </TabsTrigger>
-                <TabsTrigger
-                  value="gallery"
-                  className="flex items-center gap-2"
-                >
-                  <ImageIcon className="h-4 w-4" />
-                  Gallery
-                </TabsTrigger>
-                <TabsTrigger
-                  value="tickets"
-                  className="flex items-center gap-2"
-                >
-                  <Ticket className="h-4 w-4" />
-                  Tickets
-                </TabsTrigger>
-              </TabsList>
+            <>
 
               <TabsContent value="details" className="space-y-8">
                 <form onSubmit={handleSubmit} className="space-y-8">
@@ -1253,13 +1203,13 @@ export function EventModal({
                             </SelectItem>
                             <SelectItem value="published">
                               <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                <div className="size-2 rounded-full bg-success"></div>
                                 Published
                               </div>
                             </SelectItem>
                             <SelectItem value="archived">
                               <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-gray-500"></div>
+                                <div className="size-2 rounded-full bg-muted-foreground"></div>
                                 Archived
                               </div>
                             </SelectItem>
@@ -1270,11 +1220,9 @@ export function EventModal({
 
                     {/* Featured Event Toggle */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="flex items-center justify-between p-4 rounded-lg border bg-gradient-to-r from-yellow-50/50 to-orange-50/50 dark:from-yellow-950/20 dark:to-orange-950/20 border-yellow-200/50 dark:border-yellow-800/50">
+                      <div className="flex items-center justify-between rounded-lg border p-4">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-full bg-yellow-100 dark:bg-yellow-900/30">
-                            <Star className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                          </div>
+                          <Star className="h-4 w-4 text-primary" />
                           <div>
                             <Label
                               htmlFor="is_featured"
@@ -1356,7 +1304,7 @@ export function EventModal({
                             <SelectContent>
                               <SelectItem value="single">
                                 <div className="flex items-center gap-2">
-                                  <QrCode className="h-4 w-4 text-emerald-500" />
+                                  <QrCode className="h-4 w-4 text-muted-foreground" />
                                   <span>Single Device Verification (1 Device)</span>
                                 </div>
                               </SelectItem>
@@ -1454,42 +1402,9 @@ export function EventModal({
                   </div>
                 )}
               </TabsContent>
-            </Tabs>
+            </>
           )}
-        </div>
-
-        {/* Footer Actions */}
-        <div className="flex-shrink-0 pt-6 border-t bg-background/50 backdrop-blur-sm">
-          <div className="flex justify-end gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCancel}
-              disabled={isLoading}
-              className="px-6"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              onClick={handleSubmit}
-              disabled={isLoading}
-              className="px-6 min-w-[120px]"
-            >
-              {isLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  Saving...
-                </div>
-              ) : event ? (
-                "Update Event"
-              ) : (
-                "Create Event"
-              )}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+      </AdminDrawer>
+    </Tabs>
   );
 }
