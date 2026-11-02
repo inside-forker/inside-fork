@@ -39,7 +39,7 @@
     --accent: 220 14.3% 95.9%;
     --accent-foreground: var(--ink);
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 72% 45%; /* #C52020: 5.8:1 as text on white, 5.6:1 behind white text (AA) */
     --destructive-foreground: 0 0% 98%;
 
     --border: 220 13% 91%;
