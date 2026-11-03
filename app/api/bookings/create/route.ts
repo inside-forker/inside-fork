@@ -20,10 +20,8 @@ import {
 import crypto from "crypto";
 import {
   ParchiServiceError,
-  getParchiOffer,
   previewParchiDiscount,
 } from "@/lib/parchi/service";
-import { computeParchiDiscount } from "@/lib/parchi/discount";
 import { readParchiChannelCookie } from "@/lib/parchi/channel";
 import { PRISMFEST_SLUG, getPrismfestTicketDiscount } from "@/lib/events/prismfest";
 
@@ -93,7 +91,7 @@ export async function POST(request: NextRequest) {
       (i: { ticketTypeId: number }) => i.ticketTypeId,
     );
     const { rows: ticketTypes } = await query(
-      `SELECT id, price, event_id, name FROM ticket_types WHERE id = ANY($1::int[])`,
+      `SELECT id, price, event_id, name, parchi_price FROM ticket_types WHERE id = ANY($1::int[])`,
       [ticketTypeIds],
     );
 
@@ -113,9 +111,11 @@ export async function POST(request: NextRequest) {
         if (!tt) throw new Error(`Invalid ticket type: ${item.ticketTypeId}`);
         const price = Number(tt.price);
         subtotal += price * item.quantity;
+        const parchiPrice = tt.parchi_price != null ? Number(tt.parchi_price) : null;
         return {
           ...item,
           price,
+          parchiPrice,
           name: tt.name as string | undefined,
           eventId: Number(tt.event_id),
         };

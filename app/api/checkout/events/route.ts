@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     // Group size + checkout questions per ticket type (event-wide fields
     // merged with each tier's own).
     const { rows: ticketRows } = await query(
-      `SELECT tt.id, tt.event_id, tt.people_per_ticket, tt.min_people_per_ticket,
+      `SELECT tt.id, tt.event_id, tt.price, tt.parchi_price, tt.people_per_ticket, tt.min_people_per_ticket,
               tt.attendee_fields,
               e.attendee_fields AS event_attendee_fields
        FROM ticket_types tt JOIN events e ON e.id = tt.event_id
@@ -61,6 +61,8 @@ export async function GET(request: NextRequest) {
         .filter((t) => Number(t.event_id) === Number(row.id))
         .map((t) => ({
           id: Number(t.id),
+          price: t.price != null ? Number(t.price) : 0,
+          parchi_price: t.parchi_price != null ? Number(t.parchi_price) : null,
           people_per_ticket: normalizePeoplePerTicket(t.people_per_ticket),
           min_people_per_ticket: normalizeMinPeople(
             t.min_people_per_ticket,

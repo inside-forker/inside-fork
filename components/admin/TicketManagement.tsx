@@ -65,6 +65,8 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
     group_name: "",
     group_order: "0",
     original_price: "",
+    parchi_price: "",
+    parchi_original_price: "",
     attendee_fields: [],
   });
   const { toast } = useToast();
@@ -484,6 +486,8 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
           group_name: formData.group_name?.trim() || null,
           group_order: parseInt(formData.group_order || "0") || 0,
           original_price: formData.original_price ? parseFloat(formData.original_price) : null,
+          parchi_price: formData.parchi_price ? parseFloat(formData.parchi_price) : null,
+          parchi_original_price: formData.parchi_original_price ? parseFloat(formData.parchi_original_price) : null,
           attendee_fields: formData.attendee_fields ?? [],
         }),
       });
@@ -576,6 +580,8 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       group_name: "",
       group_order: "0",
       original_price: "",
+      parchi_price: "",
+      parchi_original_price: "",
       attendee_fields: [],
     });
   };
@@ -622,6 +628,8 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       group_name: ticket.group_name || "",
       group_order: String(ticket.group_order ?? 0),
       original_price: ticket.original_price?.toString() || "",
+      parchi_price: ticket.parchi_price?.toString() || "",
+      parchi_original_price: ticket.parchi_original_price?.toString() || "",
       attendee_fields: ticket.attendee_fields ?? [],
     });
     setIsDialogOpen(true);
@@ -792,6 +800,16 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                       )}
                     </div>
                   </div>
+                  {ticket.parchi_price && (
+                    <div className="flex items-center gap-1.5 text-xs text-[#0069DB] font-semibold bg-[#0069DB]/10 border border-[#0069DB]/20 px-2 py-0.5 rounded-full w-fit">
+                      <span>Parchi: {formatCurrency(ticket.parchi_price)}</span>
+                      {ticket.parchi_original_price && ticket.parchi_original_price > ticket.parchi_price && (
+                        <span className="line-through text-muted-foreground text-[10px]">
+                          {formatCurrency(ticket.parchi_original_price)}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-blue-600" />
                     <span className="text-sm text-muted-foreground">
@@ -922,7 +940,14 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                 />
               </div>
 
-              {/* Price & Original Price */}
+            </div>
+
+            {/* Native Inside Price & Original Price */}
+            <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-3">
+              <div className="flex items-center gap-2">
+                <Banknote className="h-4 w-4 text-primary" />
+                <h4 className="text-sm font-semibold">Inside Karachi Pricing (Native)</h4>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="ticket-price" className="text-sm font-medium">
@@ -957,7 +982,58 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                     placeholder="e.g. 3500"
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    Shows slashed price & % off discount badge
+                    Shows slashed price & % off discount badge on Inside
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Parchi Student Pricing */}
+            <div className="p-4 rounded-xl border border-[#0069DB]/30 bg-[#0069DB]/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#0069DB]" />
+                  <h4 className="text-sm font-semibold text-[#0069DB]">Parchi Student Pricing</h4>
+                </div>
+                <span className="text-[11px] text-muted-foreground">Unlocked via Parchi 2FA at checkout</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="ticket-parchi-price" className="text-sm font-medium">
+                    Parchi Price (Rs) <span className="text-muted-foreground text-xs">(optional)</span>
+                  </Label>
+                  <Input
+                    id="ticket-parchi-price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.parchi_price || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, parchi_price: e.target.value }))
+                    }
+                    placeholder="e.g. 2499"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Exclusive rate for verified students
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ticket-parchi-original-price" className="text-sm font-medium">
+                    Parchi Comparison Price (Rs) <span className="text-muted-foreground text-xs">(optional)</span>
+                  </Label>
+                  <Input
+                    id="ticket-parchi-original-price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.parchi_original_price || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, parchi_original_price: e.target.value }))
+                    }
+                    placeholder="e.g. 2999"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Slashed comparison for students (defaults to native price)
                   </p>
                 </div>
               </div>

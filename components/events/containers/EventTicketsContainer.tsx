@@ -51,6 +51,8 @@ export async function EventTicketsContainer({
             group_name: row.group_name ? String(row.group_name).trim() : null,
             group_order: row.group_order !== null && row.group_order !== undefined ? Number(row.group_order) : 0,
             original_price: row.original_price != null ? Number(row.original_price) : null,
+            parchi_price: row.parchi_price != null ? Number(row.parchi_price) : null,
+            parchi_original_price: row.parchi_original_price != null ? Number(row.parchi_original_price) : null,
         };
     });
 

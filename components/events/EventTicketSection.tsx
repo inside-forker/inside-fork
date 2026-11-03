@@ -202,6 +202,63 @@ export function EventTicketSection({
     }));
   };
 
+  const getTicketPricing = (ticket: TicketType) => {
+    const originalPrice = isPrismfest
+      ? getPrismfestOriginalPrice(ticket.name)
+      : null;
+
+    const hasParchiPrice =
+      ticket.parchi_price != null &&
+      ticket.parchi_price > 0 &&
+      ticket.parchi_price < ticket.price;
+
+    if (arrivedFromParchi && hasParchiPrice) {
+      const salePrice = ticket.parchi_price!;
+      const comparePrice =
+        ticket.parchi_original_price && ticket.parchi_original_price > salePrice
+          ? ticket.parchi_original_price
+          : ticket.price > salePrice
+          ? ticket.price
+          : ticket.original_price && ticket.original_price > salePrice
+          ? ticket.original_price
+          : null;
+      return {
+        mode: "parchi" as const,
+        salePrice,
+        comparePrice,
+        hasParchiPrice,
+      };
+    }
+
+    if (showIkStudentPrice && ticket.price > 0) {
+      const salePrice = getTicketDiscountedPrice(ticket);
+      const comparePrice =
+        originalPrice && originalPrice > ticket.price
+          ? originalPrice
+          : ticket.original_price && ticket.original_price > ticket.price
+          ? ticket.original_price
+          : ticket.price;
+      return {
+        mode: "student" as const,
+        salePrice,
+        comparePrice: comparePrice > salePrice ? comparePrice : null,
+        hasParchiPrice,
+      };
+    }
+
+    const salePrice = ticket.price;
+    const comparePrice =
+      ticket.original_price && ticket.original_price > salePrice
+        ? ticket.original_price
+        : null;
+    return {
+      mode: "native" as const,
+      salePrice,
+      comparePrice,
+      hasParchiPrice,
+    };
+  };
+
   const renderAccordionStepper = (
     ticket: TicketType,
     selectedQuantity: number,
@@ -248,9 +305,6 @@ export function EventTicketSection({
         ? Number.MAX_SAFE_INTEGER
         : ticket.quantity_available;
     const maxQuantity = Math.min(perPersonLimit, stockLimit);
-    const originalPrice = isPrismfest
-      ? getPrismfestOriginalPrice(ticket.name)
-      : null;
 
     return (
       <div
@@ -278,24 +332,76 @@ export function EventTicketSection({
 
         {/* Middle: Price */}
         <div className="text-right shrink-0 px-2 sm:px-4">
-          {showIkStudentPrice && ticket.price > 0 ? (
-            <div className="flex flex-col items-end">
-              <span className="text-sm sm:text-base font-bold text-primary whitespace-nowrap">
-                {formatPrice(getTicketDiscountedPrice(ticket))}
-              </span>
-              <span className="text-[11px] text-muted-foreground line-through whitespace-nowrap">
-                {formatPrice(
-                  originalPrice && originalPrice > ticket.price
-                    ? originalPrice
-                    : ticket.price,
+          {(() => {
+            const pricing = getTicketPricing(ticket);
+            if (pricing.mode === "parchi") {
+              return (
+                <div className="flex flex-col items-end">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm sm:text-base font-bold text-[#0069DB] whitespace-nowrap">
+                      {formatPrice(pricing.salePrice)}
+                    </span>
+                    <span className="text-[10px] font-bold text-[#0069DB] bg-[#0069DB]/10 border border-[#0069DB]/20 px-1 py-0.5 rounded">
+                      PARCHI RATE
+                    </span>
+                  </div>
+                  {pricing.comparePrice && (
+                    <span className="text-[11px] text-muted-foreground line-through whitespace-nowrap">
+                      {formatPrice(pricing.comparePrice)}
+                    </span>
+                  )}
+                </div>
+              );
+            }
+            if (pricing.mode === "student") {
+              return (
+                <div className="flex flex-col items-end">
+                  <span className="text-sm sm:text-base font-bold text-primary whitespace-nowrap">
+                    {formatPrice(pricing.salePrice)}
+                  </span>
+                  {pricing.comparePrice && (
+                    <span className="text-[11px] text-muted-foreground line-through whitespace-nowrap">
+                      {formatPrice(pricing.comparePrice)}
+                    </span>
+                  )}
+                </div>
+              );
+            }
+            if (pricing.comparePrice) {
+              return (
+                <div className="flex flex-col items-end">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm sm:text-base font-bold text-emerald-400 whitespace-nowrap">
+                      {formatPrice(pricing.salePrice)}
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1 py-0.5 rounded">
+                      {Math.round(((pricing.comparePrice - pricing.salePrice) / pricing.comparePrice) * 100)}% OFF
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground line-through whitespace-nowrap">
+                    {formatPrice(pricing.comparePrice)}
+                  </span>
+                  {pricing.hasParchiPrice && (
+                    <span className="text-[10px] text-[#0069DB] mt-0.5">
+                      Students: {formatPrice(ticket.parchi_price!)} via Parchi
+                    </span>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <div className="flex flex-col items-end">
+                <span className="text-sm sm:text-base font-semibold text-foreground whitespace-nowrap">
+                  {formatPrice(pricing.salePrice)}
+                </span>
+                {pricing.hasParchiPrice && (
+                  <span className="text-[10px] text-[#0069DB] mt-0.5">
+                    Students: {formatPrice(ticket.parchi_price!)} via Parchi
+                  </span>
                 )}
-              </span>
-            </div>
-          ) : (
-            <span className="text-sm sm:text-base font-semibold text-foreground whitespace-nowrap">
-              {formatPrice(ticket.price)}
-            </span>
-          )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Right: Stepper or External URL or Sold out badge */}
@@ -435,9 +541,6 @@ export function EventTicketSection({
           const description = ticket.description?.trim()
             ? ticket.description
             : FALLBACK_TICKET_DESCRIPTION;
-          const originalPrice = isPrismfest
-            ? getPrismfestOriginalPrice(ticket.name)
-            : null;
 
           return (
             <motion.div key={ticket.id} variants={cardVariants}>
@@ -455,38 +558,60 @@ export function EventTicketSection({
                       </p>
                     )}
                     <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2">
-                      {showIkStudentPrice && ticket.price > 0 ? (
-                        <>
-                          <span className="text-lg font-bold whitespace-nowrap text-primary">
-                            {formatPrice(getTicketDiscountedPrice(ticket))}
+                      {(() => {
+                        const pricing = getTicketPricing(ticket);
+                        if (pricing.mode === "parchi") {
+                          return (
+                            <>
+                              <span className="text-lg font-bold whitespace-nowrap text-[#0069DB]">
+                                {formatPrice(pricing.salePrice)}
+                              </span>
+                              {pricing.comparePrice && (
+                                <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
+                                  {formatPrice(pricing.comparePrice)}
+                                </span>
+                              )}
+                              <span className="text-[10px] font-bold text-[#0069DB] bg-[#0069DB]/10 border border-[#0069DB]/20 px-1.5 py-0.5 rounded">
+                                PARCHI RATE
+                              </span>
+                            </>
+                          );
+                        }
+                        if (pricing.mode === "student") {
+                          return (
+                            <>
+                              <span className="text-lg font-bold whitespace-nowrap text-primary">
+                                {formatPrice(pricing.salePrice)}
+                              </span>
+                              {pricing.comparePrice && (
+                                <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
+                                  {formatPrice(pricing.comparePrice)}
+                                </span>
+                              )}
+                            </>
+                          );
+                        }
+                        if (pricing.comparePrice) {
+                          return (
+                            <>
+                              <span className="text-lg font-bold whitespace-nowrap text-emerald-400">
+                                {formatPrice(pricing.salePrice)}
+                              </span>
+                              <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
+                                {formatPrice(pricing.comparePrice)}
+                              </span>
+                              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                                {Math.round(((pricing.comparePrice - pricing.salePrice) / pricing.comparePrice) * 100)}% OFF
+                              </span>
+                            </>
+                          );
+                        }
+                        return (
+                          <span className="text-lg font-bold whitespace-nowrap">
+                            {formatPrice(pricing.salePrice)}
                           </span>
-                          <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
-                            {formatPrice(
-                              originalPrice && originalPrice > ticket.price
-                                ? originalPrice
-                                : ticket.original_price && ticket.original_price > ticket.price
-                                ? ticket.original_price
-                                : ticket.price,
-                            )}
-                          </span>
-                        </>
-                      ) : ticket.original_price && ticket.original_price > ticket.price ? (
-                        <>
-                          <span className="text-lg font-bold whitespace-nowrap text-emerald-400">
-                            {formatPrice(ticket.price)}
-                          </span>
-                          <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
-                            {formatPrice(ticket.original_price)}
-                          </span>
-                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
-                            {Math.round(((ticket.original_price - ticket.price) / ticket.original_price) * 100)}% OFF
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-lg font-bold whitespace-nowrap">
-                          {formatPrice(ticket.price)}
-                        </span>
-                      )}
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -533,55 +658,77 @@ export function EventTicketSection({
                           {status.text}
                         </Badge>
                       )}
-                      {showIkStudentPrice && ticket.price > 0 ? (
-                        <>
-                          <div className="text-sm text-muted-foreground line-through whitespace-nowrap">
-                            {formatPrice(
-                              originalPrice && originalPrice > ticket.price
-                                ? originalPrice
-                                : ticket.original_price && ticket.original_price > ticket.price
-                                ? ticket.original_price
-                                : ticket.price,
+                      {(() => {
+                        const pricing = getTicketPricing(ticket);
+                        if (pricing.mode === "parchi") {
+                          return (
+                            <>
+                              {pricing.comparePrice && (
+                                <div className="text-sm text-muted-foreground line-through whitespace-nowrap">
+                                  {formatPrice(pricing.comparePrice)}
+                                </div>
+                              )}
+                              <div className="text-3xl font-bold whitespace-nowrap text-[#0069DB]">
+                                {formatPrice(pricing.salePrice)}
+                              </div>
+                              <div className="text-xs font-bold text-[#0069DB] bg-[#0069DB]/10 border border-[#0069DB]/20 px-2 py-0.5 rounded-full w-fit ml-auto mt-0.5">
+                                Parchi Student Rate
+                              </div>
+                            </>
+                          );
+                        }
+                        if (pricing.mode === "student") {
+                          return (
+                            <>
+                              <div className="text-sm text-muted-foreground line-through whitespace-nowrap">
+                                {formatPrice(
+                                  pricing.comparePrice || ticket.price
+                                )}
+                              </div>
+                              <div className="text-3xl font-bold whitespace-nowrap text-primary">
+                                {formatPrice(pricing.salePrice)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Inside Karachi price
+                              </div>
+                            </>
+                          );
+                        }
+                        if (pricing.comparePrice) {
+                          return (
+                            <>
+                              <div className="flex items-center justify-end gap-2">
+                                <span className="text-sm text-muted-foreground line-through whitespace-nowrap">
+                                  {formatPrice(pricing.comparePrice)}
+                                </span>
+                                <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                                  {Math.round(((pricing.comparePrice - pricing.salePrice) / pricing.comparePrice) * 100)}% OFF
+                                </span>
+                              </div>
+                              <div className="text-3xl font-bold whitespace-nowrap text-emerald-400">
+                                {formatPrice(pricing.salePrice)}
+                              </div>
+                              {pricing.hasParchiPrice && (
+                                <div className="text-xs text-[#0069DB] mt-0.5">
+                                  Students: {formatPrice(ticket.parchi_price!)} via Parchi
+                                </div>
+                              )}
+                            </>
+                          );
+                        }
+                        return (
+                          <>
+                            <div className="text-3xl font-bold whitespace-nowrap">
+                              {formatPrice(pricing.salePrice)}
+                            </div>
+                            {pricing.hasParchiPrice && (
+                              <div className="text-xs text-[#0069DB] mt-0.5">
+                                Students: {formatPrice(ticket.parchi_price!)} via Parchi
+                              </div>
                             )}
-                          </div>
-                          <div className="text-3xl font-bold whitespace-nowrap text-primary">
-                            {formatPrice(getTicketDiscountedPrice(ticket))}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Inside Karachi price
-                          </div>
-                        </>
-                      ) : ticket.original_price && ticket.original_price > ticket.price ? (
-                        <>
-                          <div className="flex items-center justify-end gap-2">
-                            <span className="text-sm text-muted-foreground line-through whitespace-nowrap">
-                              {formatPrice(ticket.original_price)}
-                            </span>
-                            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                              {Math.round(((ticket.original_price - ticket.price) / ticket.original_price) * 100)}% OFF
-                            </span>
-                          </div>
-                          <div className="text-3xl font-bold whitespace-nowrap text-emerald-400">
-                            {formatPrice(ticket.price)}
-                          </div>
-                          {ticket.price > 0 && (
-                            <div className="text-xs text-muted-foreground">
-                              per ticket
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <div className="text-3xl font-bold whitespace-nowrap">
-                            {formatPrice(ticket.price)}
-                          </div>
-                          {ticket.price > 0 && (
-                            <div className="text-xs text-muted-foreground">
-                              per ticket
-                            </div>
-                          )}
-                        </>
-                      )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
 

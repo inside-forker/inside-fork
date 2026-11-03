@@ -235,11 +235,25 @@ export function CheckoutClient() {
           const disc = getPrismfestTicketDiscount(item.ticketName, item.price);
           return sum + disc * item.quantity;
         }, 0);
-      } else if (parchiOffer) {
-        discount = computeParchiDiscount(
-          parchiOffer,
-          subtotal,
-        );
+      } else {
+        const tierParchiDiscount = items.reduce((sum, item) => {
+          const tt = (eventInfo?.ticket_types as Array<{ id: number; price?: number; parchi_price?: number | null }> | undefined)?.find(
+            (t) => t.id === item.ticketTypeId,
+          );
+          if (tt?.parchi_price != null && tt.parchi_price < item.price) {
+            return sum + (item.price - tt.parchi_price) * item.quantity;
+          }
+          return sum;
+        }, 0);
+
+        if (tierParchiDiscount > 0) {
+          discount = tierParchiDiscount;
+        } else if (parchiOffer) {
+          discount = computeParchiDiscount(
+            parchiOffer,
+            subtotal,
+          );
+        }
       }
     }
     const discounted = subtotal - discount;
@@ -260,6 +274,7 @@ export function CheckoutClient() {
   }, [
     items,
     config,
+    eventInfo,
     parchiOffer,
     parchiVerificationId,
     ikOpenStudentDiscount,
@@ -422,7 +437,7 @@ export function CheckoutClient() {
         cnic: "",
       }),
     ).length === 0;
-  const showContactFields = editingContact || (!!user && !profileComplete);
+  const _showContactFields = editingContact || (!!user && !profileComplete);
 
   const handleBuyerChange = (field: keyof BuyerDetails, value: string) => {
     if (field === "email" && user) return;

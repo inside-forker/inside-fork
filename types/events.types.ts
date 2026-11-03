@@ -116,6 +116,10 @@ export type TicketType = {
   group_order?: number | null;
   /** Original/slashed price before discount (e.g. 3500 when price is 2999). */
   original_price?: number | null;
+  /** Custom student price available only through Parchi verification. */
+  parchi_price?: number | null;
+  /** Optional slashed comparison price for Parchi students. */
+  parchi_original_price?: number | null;
 };
 
 // Event page props
@@ -190,4 +194,6 @@ export interface TicketFormData {
   group_name?: string;
   group_order?: string;
   original_price?: string;
+  parchi_price?: string;
+  parchi_original_price?: string;
 }

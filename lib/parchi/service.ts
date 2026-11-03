@@ -386,7 +386,7 @@ export async function previewParchiDiscount(input: {
   eventId: number;
   requestId: string;
   subtotal: number;
-  items?: Array<{ name?: string; price: number; quantity: number }>;
+  items?: Array<{ name?: string; price: number; parchiPrice?: number | null; quantity: number }>;
 }): Promise<number> {
   const invalid = new ParchiServiceError(
     "parchi_invalid",
@@ -408,15 +408,20 @@ export async function previewParchiDiscount(input: {
   ) {
     throw invalid;
   }
-  const offer = await getParchiOffer(input.eventId);
-  if (!offer) {
-    throw new ParchiServiceError(
-      "parchi_not_offered",
-      "The Parchi student discount isn't available for this event.",
-      400,
-    );
-  }
+  // Check if any items have custom tier-level parchi_price
   if (input.items && input.items.length > 0) {
+    const hasTierParchiPricing = input.items.some(
+      (item) => item.parchiPrice != null && item.parchiPrice < item.price,
+    );
+    if (hasTierParchiPricing) {
+      return input.items.reduce((sum, item) => {
+        if (item.parchiPrice != null && item.parchiPrice < item.price) {
+          return sum + (item.price - item.parchiPrice) * item.quantity;
+        }
+        return sum;
+      }, 0);
+    }
+
     const { rows: eventRows } = await query(
       `SELECT slug FROM events WHERE id = $1 LIMIT 1`,
       [input.eventId],
@@ -428,6 +433,15 @@ export async function previewParchiDiscount(input: {
         return sum + disc * item.quantity;
       }, 0);
     }
+  }
+
+  const offer = await getParchiOffer(input.eventId);
+  if (!offer) {
+    throw new ParchiServiceError(
+      "parchi_not_offered",
+      "The Parchi student discount isn't available for this event.",
+      400,
+    );
   }
   return computeParchiDiscount(offer, input.subtotal);
 }

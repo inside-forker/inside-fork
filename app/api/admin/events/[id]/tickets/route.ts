@@ -23,7 +23,7 @@ const TICKET_TYPE_COLUMNS =
   "id, event_id, name, description, price, quantity_available, " +
   "to_json(sale_starts_at) #>> '{}' AS sale_starts_at, " +
   "to_json(sale_ends_at) #>> '{}' AS sale_ends_at, " +
-  "max_per_person, ticket_url, people_per_ticket, min_people_per_ticket, attendee_fields, group_name, group_order, original_price";
+  "max_per_person, ticket_url, people_per_ticket, min_people_per_ticket, attendee_fields, group_name, group_order, original_price, parchi_price, parchi_original_price";
 
 function toNumericTicketType(row: Record<string, unknown>) {
   return {
@@ -32,6 +32,8 @@ function toNumericTicketType(row: Record<string, unknown>) {
     event_id: Number(row.event_id),
     price: row.price !== null ? Number(row.price) : null,
     original_price: row.original_price !== null && row.original_price !== undefined ? Number(row.original_price) : null,
+    parchi_price: row.parchi_price !== null && row.parchi_price !== undefined ? Number(row.parchi_price) : null,
+    parchi_original_price: row.parchi_original_price !== null && row.parchi_original_price !== undefined ? Number(row.parchi_original_price) : null,
   };
 }
 
@@ -193,6 +195,8 @@ export async function POST(
       group_name,
       group_order,
       original_price,
+      parchi_price,
+      parchi_original_price,
     } = body;
     const size = groupSize(people_per_ticket, min_people_per_ticket);
 
@@ -270,8 +274,8 @@ export async function POST(
     let ticketType;
     try {
       const { rows } = await query(
-        `INSERT INTO ticket_types (event_id, name, description, price, quantity_available, sale_starts_at, sale_ends_at, max_per_person, ticket_url, people_per_ticket, attendee_fields, min_people_per_ticket, group_name, group_order, original_price)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13, $14, $15)
+        `INSERT INTO ticket_types (event_id, name, description, price, quantity_available, sale_starts_at, sale_ends_at, max_per_person, ticket_url, people_per_ticket, attendee_fields, min_people_per_ticket, group_name, group_order, original_price, parchi_price, parchi_original_price)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13, $14, $15, $16, $17)
          RETURNING ${TICKET_TYPE_COLUMNS}`,
         [
           eventId,
@@ -289,6 +293,8 @@ export async function POST(
           group_name ? String(group_name).trim() || null : null,
           group_order !== undefined && group_order !== null && group_order !== "" ? Number(group_order) : 0,
           original_price !== undefined && original_price !== null && original_price !== "" && !isNaN(Number(original_price)) ? Number(original_price) : null,
+          parchi_price !== undefined && parchi_price !== null && parchi_price !== "" && !isNaN(Number(parchi_price)) ? Number(parchi_price) : null,
+          parchi_original_price !== undefined && parchi_original_price !== null && parchi_original_price !== "" && !isNaN(Number(parchi_original_price)) ? Number(parchi_original_price) : null,
         ]
       );
       ticketType = toNumericTicketType(rows[0]);

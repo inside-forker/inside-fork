@@ -10,6 +10,13 @@ export interface CheckoutEventInfo {
   start_time: string | null;
   location_name: string | null;
   image_url: string | null;
+  ticket_types?: Array<{
+    id: number;
+    price?: number;
+    parchi_price?: number | null;
+    people_per_ticket?: number;
+    min_people_per_ticket?: number;
+  }>;
 }
 
 export interface CheckoutTotals {
