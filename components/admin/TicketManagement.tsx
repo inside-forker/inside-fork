@@ -19,6 +19,10 @@ import {
   FileText,
   Upload,
   Sparkles,
+  FolderPlus,
+  Folder,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import {
   Dialog,
@@ -79,6 +83,32 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
   const [isUploadingPdfs, setIsUploadingPdfs] = React.useState(false);
   const [selectedFiles, setSelectedFiles] = React.useState<FileList | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Section Header Management
+  const [isHeaderDialogOpen, setIsHeaderDialogOpen] = React.useState(false);
+  const [headerForm, setHeaderForm] = React.useState({ name: "", order: "0" });
+  const [knownHeaders, setKnownHeaders] = React.useState<Array<{ name: string; order: number }>>([]);
+  const [isCustomHeaderInput, setIsCustomHeaderInput] = React.useState(false);
+
+  // Bundled PDF Splitter
+  const [isSplitImportOpen, setIsSplitImportOpen] = React.useState(false);
+  const [splitPdfFile, setSplitPdfFile] = React.useState<File | null>(null);
+  const [isSplitting, setIsSplitting] = React.useState(false);
+  const [splitResult, setSplitResult] = React.useState<{
+    totalPages: number;
+    totalTiers: number;
+    newTiersCreated: number;
+    passesUploaded: number;
+    breakdown: Array<{
+      show: string;
+      ticket: string;
+      ticketTypeId: number;
+      passesCount: number;
+      isNewTier: boolean;
+      status: string;
+    }>;
+  } | null>(null);
+  const splitInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleUploadPdfs = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,13 +215,54 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
     fetchTicketTypes();
   }, [fetchTicketTypes]);
 
-  const existingGroupNames = React.useMemo(() => {
-    const names = new Set<string>();
+  // Combined headers from existing tickets and manually created headers
+  const allHeaders = React.useMemo(() => {
+    const map = new Map<string, number>();
     ticketTypes.forEach((t) => {
-      if (t.group_name?.trim()) names.add(t.group_name.trim());
+      if (t.group_name?.trim()) {
+        map.set(t.group_name.trim(), t.group_order ?? 0);
+      }
     });
-    return Array.from(names);
-  }, [ticketTypes]);
+    knownHeaders.forEach((h) => {
+      if (!map.has(h.name)) {
+        map.set(h.name, h.order);
+      }
+    });
+    return Array.from(map.entries())
+      .map(([name, order]) => ({ name, order }))
+      .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  }, [ticketTypes, knownHeaders]);
+
+  // Tickets grouped by section header
+  const groupedTickets = React.useMemo(() => {
+    const map = new Map<string, { order: number; tickets: TicketType[] }>();
+    const ungrouped: TicketType[] = [];
+
+    // Pre-seed known headers
+    allHeaders.forEach((h) => {
+      map.set(h.name, { order: h.order, tickets: [] });
+    });
+
+    ticketTypes.forEach((t) => {
+      const gName = t.group_name?.trim();
+      if (gName) {
+        if (!map.has(gName)) {
+          map.set(gName, { order: t.group_order ?? 0, tickets: [] });
+        }
+        map.get(gName)!.tickets.push(t);
+      } else {
+        ungrouped.push(t);
+      }
+    });
+
+    const groups: Array<{ name: string; order: number; tickets: TicketType[] }> = [];
+    for (const [name, data] of map.entries()) {
+      groups.push({ name, order: data.order, tickets: data.tickets });
+    }
+    groups.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+
+    return { groups, ungrouped };
+  }, [ticketTypes, allHeaders]);
 
   // Initialize body state capture
   React.useEffect(() => {
@@ -699,10 +770,100 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
     setIsDialogOpen(true);
   };
 
+  // Header management handlers
+  const handleSaveHeader = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!headerForm.name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a section header name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const name = headerForm.name.trim();
+    const order = parseInt(headerForm.order || "0", 10) || 0;
+
+    setKnownHeaders((prev) => {
+      const filtered = prev.filter((h) => h.name.toLowerCase() !== name.toLowerCase());
+      return [...filtered, { name, order }];
+    });
+
+    toast({
+      title: "Section Header Created",
+      description: `Header "${name}" is now ready. Assign tickets to it via the dropdown.`,
+    });
+
+    setIsHeaderDialogOpen(false);
+    setHeaderForm({ name: "", order: "0" });
+  };
+
+  const handleRunSplitImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!splitPdfFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a bundled PDF file to import",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const formDataUpload = new FormData();
+    formDataUpload.append("file", splitPdfFile);
+
+    try {
+      setIsSplitting(true);
+      const res = await fetch(`/api/admin/events/${eventId}/tickets/split-import`, {
+        method: "POST",
+        body: formDataUpload,
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Failed to split and import bundled PDF");
+      }
+
+      setSplitResult(json.data);
+      toast({
+        title: "Bundled PDF Imported Successfully",
+        description: `Imported ${json.data.passesUploaded} passes across ${json.data.totalTiers} tiers!`,
+      });
+
+      // Refresh ticket types list
+      await fetchTicketTypes();
+    } catch (error) {
+      console.error("Split import error:", error);
+      toast({
+        title: "Import Failed",
+        description: error instanceof Error ? error.message : "Failed to import bundled PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSplitting(false);
+    }
+  };
+
   // Open create dialog
   const handleCreate = () => {
     setEditingTicket(null);
     resetForm();
+    setIsCustomHeaderInput(false);
+    setIsDialogOpen(true);
+  };
+
+  const handleCreateForGroup = (groupName?: string, groupOrder?: number) => {
+    setEditingTicket(null);
+    resetForm();
+    if (groupName) {
+      setFormData((prev) => ({
+        ...prev,
+        group_name: groupName,
+        group_order: String(groupOrder ?? 0),
+      }));
+    }
+    setIsCustomHeaderInput(false);
     setIsDialogOpen(true);
   };
 
@@ -725,79 +886,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
     });
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Ticket className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-medium">Ticket Types</h3>
-        </div>
-        <Button onClick={handleCreate} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Add Ticket Type
-        </Button>
-      </div>
-
-      {/* Questions every ticket of the event asks at checkout */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Additional fields (all tickets)</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Extra details buyers fill in at checkout, e.g. university name.
-            These apply to every ticket of this event; add fields for one
-            ticket only inside that ticket type.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <AttendeeFieldsEditor value={eventFields} onChange={setEventFields} />
-          <div className="flex justify-end">
-            <Button
-              size="sm"
-              onClick={() => void handleSaveEventFields()}
-              disabled={isSavingEventFields}
-            >
-              {isSavingEventFields ? "Saving…" : "Save fields"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Ticket Types List */}
-      {isLoading && ticketTypes.length === 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader>
-                <div className="h-4 bg-muted rounded w-3/4"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="h-3 bg-muted rounded w-1/2"></div>
-                  <div className="h-3 bg-muted rounded w-2/3"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : ticketTypes.length === 0 ? (
-        <Card className="p-8">
-          <div className="text-center">
-            <Ticket className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">No ticket types yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Create your first ticket type to start selling tickets for this
-              event.
-            </p>
-            <Button onClick={handleCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create First Ticket Type
-            </Button>
-          </div>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {ticketTypes.map((ticket) => (
+  const renderTicketCard = (ticket: TicketType) => (
             <Card key={ticket.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -958,7 +1047,179 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                 </div>
               </CardContent>
             </Card>
+
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Ticket className="h-5 w-5 text-primary" />
+          <h3 className="text-lg font-medium">Ticket Types</h3>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsHeaderDialogOpen(true)}
+            className="flex items-center gap-1.5"
+          >
+            <FolderPlus className="h-4 w-4 text-primary" />
+            + Add Section Header
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSplitResult(null);
+              setSplitPdfFile(null);
+              setIsSplitImportOpen(true);
+            }}
+            className="flex items-center gap-1.5 border-dashed border-primary/50 text-primary hover:bg-primary/5"
+          >
+            <Sparkles className="h-4 w-4 text-primary" />
+            Import Bundled PDF
+          </Button>
+          <Button onClick={handleCreate} size="sm" className="flex items-center gap-1.5">
+            <Plus className="h-4 w-4" />
+            Add Ticket Type
+          </Button>
+        </div>
+      </div>
+
+      {/* Questions every ticket of the event asks at checkout */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Additional fields (all tickets)</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Extra details buyers fill in at checkout, e.g. university name.
+            These apply to every ticket of this event; add fields for one
+            ticket only inside that ticket type.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <AttendeeFieldsEditor value={eventFields} onChange={setEventFields} />
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => void handleSaveEventFields()}
+              disabled={isSavingEventFields}
+            >
+              {isSavingEventFields ? "Saving…" : "Save fields"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Ticket Types List */}
+      {isLoading && ticketTypes.length === 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader>
+                <div className="h-4 bg-muted rounded w-3/4"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="h-3 bg-muted rounded w-1/2"></div>
+                  <div className="h-3 bg-muted rounded w-2/3"></div>
+                </div>
+              </CardContent>
+            </Card>
           ))}
+        </div>
+      ) : ticketTypes.length === 0 ? (
+        <Card className="p-8">
+          <div className="text-center">
+            <Ticket className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">No ticket types yet</h3>
+            <p className="text-muted-foreground mb-4">
+              Create your first ticket type to start selling tickets for this
+              event.
+            </p>
+            <Button onClick={handleCreate}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create First Ticket Type
+            </Button>
+          </div>
+        </Card>
+      ) : allHeaders.length > 0 ? (
+        <div className="space-y-6">
+          {groupedTickets.groups.map((group) => {
+            if (group.tickets.length === 0 && !knownHeaders.some((h) => h.name === group.name)) {
+              return null;
+            }
+            return (
+              <div
+                key={group.name}
+                className="rounded-xl border border-primary/20 bg-muted/10 p-4 space-y-4"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                      <Folder className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-sm flex items-center gap-2">
+                        {group.name}
+                        {group.order > 0 && (
+                          <span className="text-xs font-normal text-muted-foreground">
+                            (Sort: #{group.order})
+                          </span>
+                        )}
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        {group.tickets.length} ticket type{group.tickets.length !== 1 ? "s" : ""} under this header
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCreateForGroup(group.name, group.order)}
+                    className="text-xs h-8"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Add to this Section
+                  </Button>
+                </div>
+
+                {group.tickets.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic py-2 text-center">
+                    No tickets assigned to this section yet.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {group.tickets.map(renderTicketCard)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {groupedTickets.ungrouped.length > 0 && (
+            <div className="rounded-xl border border-border p-4 space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                <div>
+                  <h4 className="font-semibold text-sm">General / Ungrouped Tickets</h4>
+                  <p className="text-xs text-muted-foreground">
+                    {groupedTickets.ungrouped.length} ticket{groupedTickets.ungrouped.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {groupedTickets.ungrouped.map(renderTicketCard)}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {ticketTypes.map(renderTicketCard)}
         </div>
       )}
 
@@ -985,47 +1246,83 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Section Header / Grouping */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl border border-border/60 bg-muted/30">
-              <div className="md:col-span-2 space-y-2">
-                <Label htmlFor="ticket-group-name" className="text-sm font-medium">
-                  Section Header / Group <span className="text-muted-foreground text-xs">(optional)</span>
-                </Label>
-                <Input
-                  id="ticket-group-name"
-                  list="ticket-group-suggestions"
-                  value={formData.group_name || ""}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, group_name: e.target.value }))
-                  }
-                  placeholder="e.g. Day 1 - 28th November, VIP Passes, Workshop"
-                />
-                <datalist id="ticket-group-suggestions">
-                  {existingGroupNames.map((name) => (
-                    <option key={name} value={name} />
-                  ))}
-                </datalist>
-                <p className="text-xs text-muted-foreground">
-                  Tickets sharing this header are grouped under collapsible accordions on the event page.
-                </p>
+            <div className="p-4 rounded-xl border border-border/60 bg-muted/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="ticket-group-select" className="text-sm font-semibold flex items-center gap-1.5">
+                    <Folder className="h-4 w-4 text-primary" />
+                    Section Header / Group <span className="text-muted-foreground text-xs font-normal">(optional)</span>
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Assign this ticket to an accordion section (e.g. Day 1, VIP Passes). Multiple tickets share one header.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="ticket-group-order" className="text-sm font-medium">
-                  Group Sort Order <span className="text-muted-foreground text-xs">(optional)</span>
-                </Label>
-                <Input
-                  id="ticket-group-order"
-                  type="number"
-                  min="0"
-                  value={formData.group_order || "0"}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, group_order: e.target.value }))
-                  }
-                  placeholder="0"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Lower numbers appear first.
-                </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-2 space-y-1.5">
+                  <select
+                    id="ticket-group-select"
+                    value={isCustomHeaderInput ? "__new__" : formData.group_name || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "__new__") {
+                        setIsCustomHeaderInput(true);
+                        setFormData((prev) => ({ ...prev, group_name: "", group_order: "0" }));
+                      } else {
+                        setIsCustomHeaderInput(false);
+                        const matched = allHeaders.find((h) => h.name === val);
+                        setFormData((prev) => ({
+                          ...prev,
+                          group_name: val,
+                          group_order: matched ? String(matched.order) : "0",
+                        }));
+                      }
+                    }}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">None (Ungrouped / Standalone Ticket)</option>
+                    {allHeaders.map((h) => (
+                      <option key={h.name} value={h.name}>
+                        📁 {h.name} {h.order ? `(#${h.order})` : ""}
+                      </option>
+                    ))}
+                    <option value="__new__">+ Create New Section Header...</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Input
+                    id="ticket-group-order"
+                    type="number"
+                    min="0"
+                    value={formData.group_order || "0"}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, group_order: e.target.value }))
+                    }
+                    placeholder="Sort Order"
+                    title="Section Sort Order (Lower numbers appear first)"
+                  />
+                </div>
               </div>
+
+              {isCustomHeaderInput && (
+                <div className="pt-2 border-t border-border/40">
+                  <Label htmlFor="custom-group-name" className="text-xs font-medium text-primary">
+                    New Section Header Title:
+                  </Label>
+                  <Input
+                    id="custom-group-name"
+                    value={formData.group_name || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, group_name: e.target.value }))
+                    }
+                    placeholder="e.g. Day 1 - 28th November, Workshop Passes"
+                    className="mt-1"
+                    autoFocus
+                  />
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1494,6 +1791,201 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
               </div>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Section Header Dialog */}
+      <Dialog open={isHeaderDialogOpen} onOpenChange={setIsHeaderDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderPlus className="h-5 w-5 text-primary" />
+              Create Section Header
+            </DialogTitle>
+            <DialogDescription>
+              Group tickets under a collapsible accordion header on the event page (e.g. Day 1 - 28th November).
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveHeader} className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="new-header-name" className="text-sm font-medium">
+                Section Header Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="new-header-name"
+                value={headerForm.name}
+                onChange={(e) => setHeaderForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g. Day 1 - 28th November, VIP Passes, Workshop"
+                required
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="new-header-order" className="text-sm font-medium">
+                Group Sort Order <span className="text-muted-foreground text-xs">(optional)</span>
+              </Label>
+              <Input
+                id="new-header-order"
+                type="number"
+                min="0"
+                value={headerForm.order}
+                onChange={(e) => setHeaderForm((prev) => ({ ...prev, order: e.target.value }))}
+                placeholder="0"
+              />
+              <p className="text-xs text-muted-foreground">
+                Lower numbers appear first on the event page.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsHeaderDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" size="sm">
+                Save Section Header
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Auto-Import & Split Bundled PDF Dialog */}
+      <Dialog open={isSplitImportOpen} onOpenChange={(open) => !open && !isSplitting && setIsSplitImportOpen(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Auto-Import & Split Bundled Ticket PDF
+            </DialogTitle>
+            <DialogDescription>
+              Upload a multi-pass bundled PDF (e.g. Ticketwala). Pages will be sliced, grouped into shows/tiers, ticket types created with Pre-Uploaded PDF flow enabled, and passes saved into inventory.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!splitResult ? (
+            <form onSubmit={handleRunSplitImport} className="space-y-4 pt-2">
+              <div className="border-2 border-dashed border-border/80 hover:border-primary/50 rounded-xl p-6 text-center space-y-3 transition-colors bg-muted/20">
+                <FileText className="h-10 w-10 text-primary mx-auto opacity-80" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    {splitPdfFile ? splitPdfFile.name : "Select or Drop Bundled PDF"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {splitPdfFile
+                      ? `${(splitPdfFile.size / (1024 * 1024)).toFixed(2)} MB • Ready to slice & import`
+                      : "Multi-page pass PDF (e.g. 80-page Ticketwala bundle)"}
+                  </p>
+                </div>
+                <Input
+                  ref={splitInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={(e) => setSplitPdfFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                  id="bundled-pdf-file-input"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => splitInputRef.current?.click()}
+                  disabled={isSplitting}
+                >
+                  <Upload className="h-3.5 w-3.5 mr-1.5" />
+                  {splitPdfFile ? "Change PDF" : "Choose PDF File"}
+                </Button>
+              </div>
+
+              <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs space-y-1.5">
+                <p className="font-semibold text-primary flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  What happens automatically:
+                </p>
+                <ul className="list-disc pl-5 text-muted-foreground space-y-0.5 text-[11px]">
+                  <li>Slices multi-page PDF into standalone 1-page passes</li>
+                  <li>Reads Show line (e.g. <em>Day 1 - 28th November</em>) and groups tiers under that header</li>
+                  <li>Reads Ticket name and auto-creates clean ticket types</li>
+                  <li>Pre-Uploaded PDF Flow is enabled automatically</li>
+                  <li>Passes are uploaded to DO Spaces and added to inventory</li>
+                </ul>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsSplitImportOpen(false)}
+                  disabled={isSplitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isSplitting || !splitPdfFile}
+                  className="min-w-[140px]"
+                >
+                  {isSplitting ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Slicing & Uploading…</span>
+                    </div>
+                  ) : (
+                    "Split & Import Passes"
+                  )}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-4 pt-2">
+              <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3.5 text-xs space-y-1">
+                <p className="font-semibold text-emerald-800 text-sm flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  Import Complete!
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  Processed {splitResult.totalPages} pages across {splitResult.totalTiers} tiers ({splitResult.passesUploaded} passes ready in inventory).
+                </p>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                {splitResult.breakdown.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2.5 rounded-lg border border-border/70 bg-background flex items-center justify-between text-xs"
+                  >
+                    <div>
+                      <p className="font-medium text-foreground">{item.ticket}</p>
+                      <p className="text-[11px] text-muted-foreground">📁 {item.show}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-emerald-600">
+                        {item.passesCount} passes
+                      </span>
+                      <p className="text-[10px] text-muted-foreground">{item.status}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <Button
+                  size="sm"
+                  onClick={() => setIsSplitImportOpen(false)}
+                >
+                  Done & View Tickets
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
