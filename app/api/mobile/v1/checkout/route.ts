@@ -19,7 +19,6 @@ import {
   effectiveQuantitySql,
   syncPdfStockForTicketTypes,
 } from "@/lib/ticketing/sellable-quantity";
-import { studentPriceSql, tiersStudentDiscount } from "@/lib/parchi/discount";
 import {
   buildAttendeeDetails,
   loadTicketAttendeeConfig,
@@ -47,45 +46,6 @@ function normalizeTicketTypeRows(
     sale_starts_at: String(row.sale_starts_at),
     sale_ends_at: String(row.sale_ends_at),
   }));
-}
-
-/**
- * Parchi-enabled events: Inside's open discount (the web's logged-in,
- * non-Parchi price), off the ticket subtotal before fees. The web passes it
- * through create_booking_atomic; create_booking_with_reservation has no
- * open-discount path, so it is applied here on the freshly created booking,
- * before fees. Same per-tier math as the web (tiersStudentDiscount).
- */
-async function applyEventStudentDiscount(bookingId: number, eventId: number) {
-  const { rows: eventRows } = await query(
-    `SELECT parchi_enabled FROM events WHERE id = $1 LIMIT 1`,
-    [eventId],
-  );
-  if (eventRows[0]?.parchi_enabled !== true) return;
-
-  const { rows: itemRows } = await query(
-    `SELECT bi.quantity, bi.price_per_ticket, ${studentPriceSql()} AS parchi_price
-     FROM booking_items bi
-     JOIN ticket_types tt ON tt.id = bi.ticket_type_id
-     JOIN events e ON e.id = tt.event_id
-     WHERE bi.booking_id = $1`,
-    [bookingId],
-  );
-  const discount = tiersStudentDiscount(
-    itemRows.map((item) => ({
-      price: Number(item.price_per_ticket),
-      parchi_price: item.parchi_price != null ? Number(item.parchi_price) : null,
-      quantity: Number(item.quantity),
-    })),
-  );
-  if (discount <= 0) return;
-
-  await query(
-    `UPDATE bookings
-     SET total_amount = total_amount - $2, discount_amount = $2
-     WHERE id = $1 AND coupon_id IS NULL AND COALESCE(discount_amount, 0) = 0`,
-    [bookingId, discount],
-  );
 }
 
 const bodySchema = z.object({
@@ -415,11 +375,6 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     }
     bookingId = newId;
 
-    // One discount per booking: the event's open student discount only when
-    // no coupon or Parchi verification was used.
-    if (!couponCode && !parchiVerificationId) {
-      await applyEventStudentDiscount(bookingId, eventId);
-    }
   }
 
   // Saved for when the passes are issued (after payment). A reused booking

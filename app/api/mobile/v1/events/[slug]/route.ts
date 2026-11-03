@@ -249,9 +249,9 @@ export const GET = mobileRoute(async (request: NextRequest, { params }) => {
       };
     }),
     parchi_offer: parchiOffer,
-    // Parchi-enabled events: the discount checkout applies to every app
-    // booking (see applyEventStudentDiscount). Drives the slashed prices.
-    event_discount: parchiOffer,
+    // Student prices are for Parchi-app shoppers only (on the web), so the
+    // Inside app gets no event-wide discount or slashed prices.
+    event_discount: null,
     // The detail tabs' extras. Only the venue map is stored so far; the rest
     // stay empty and the app hides their sections.
     event_info: {

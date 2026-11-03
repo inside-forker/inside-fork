@@ -202,8 +202,8 @@ export function CheckoutClient() {
     };
   }, [parchiEventId]);
 
-  // Event's Parchi toggle: the per-tier Parchi price for everyone - Inside
-  // Karachi shoppers automatically, Parchi-app shoppers once verified.
+  // Event's Parchi toggle: the per-tier Parchi price, for Parchi-app shoppers
+  // only and only once verified. Inside shoppers pay list price.
   const parchiEnabled = eventInfo?.parchi_enabled === true;
   const tierDiscount = useMemo(
     () =>
@@ -221,17 +221,11 @@ export function CheckoutClient() {
     [items, eventInfo, parchiEnabled],
   );
 
-  // Open IK discount only when NOT on the Parchi channel. Parchi visitors
-  // must complete 2FA (parchiVerificationId) before any student discount.
-  const ikOpenStudentDiscount =
-    tierDiscount > 0 && !arrivedFromParchi && !parchiVerificationId;
-
   // Same arithmetic as app/api/bookings/create/route.ts: student discount
   // comes off the subtotal, then fees on what's left.
   const totals: CheckoutTotals = useMemo(() => {
     const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    const discount =
-      parchiVerificationId || ikOpenStudentDiscount ? tierDiscount : 0;
+    const discount = parchiVerificationId ? tierDiscount : 0;
     const discounted = subtotal - discount;
     const platformFee =
       Number(config?.["fees.platform_fee_fixed"] || 0) +
@@ -247,13 +241,7 @@ export function CheckoutClient() {
       paymentFee,
       total: discounted + platformFee + paymentFee,
     };
-  }, [
-    items,
-    config,
-    parchiVerificationId,
-    ikOpenStudentDiscount,
-    tierDiscount,
-  ]);
+  }, [items, config, parchiVerificationId, tierDiscount]);
 
   // Fetch Config
   useEffect(() => {
@@ -670,9 +658,6 @@ export function CheckoutClient() {
         items={items}
         event={eventInfo}
         totals={totals}
-        discountLabel={
-          ikOpenStudentDiscount ? "Inside Karachi Discount" : undefined
-        }
         onChangeQuantity={updateQuantity}
       />
 
@@ -684,15 +669,6 @@ export function CheckoutClient() {
           onLogin={() => setAuthOpen(true)}
           onApprovedChange={setParchiVerificationId}
         />
-      ) : null}
-
-      {ikOpenStudentDiscount ? (
-        <div className="rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm">
-          <p className="font-semibold text-foreground">Inside Karachi Discount Applied</p>
-          <p className="text-muted-foreground">
-            You save {formatPkr(tierDiscount)} on these tickets.
-          </p>
-        </div>
       ) : null}
 
       {/* Who pays and where the tickets go - not a ticket holder by itself. */}

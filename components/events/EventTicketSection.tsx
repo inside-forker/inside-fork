@@ -52,16 +52,6 @@ export function EventTicketSection({
     }, 0);
   };
 
-  const getTicketDiscountedPrice = (ticket: TicketType) =>
-    getTicketPricing(ticket).salePrice;
-
-  const getTotalDiscountedPrice = () => {
-    return Object.entries(selectedTickets).reduce((total, [id, quantity]) => {
-      const ticket = ticketTypes.find((t) => t.id === parseInt(id));
-      if (!ticket || quantity <= 0) return total;
-      return total + getTicketDiscountedPrice(ticket) * quantity;
-    }, 0);
-  };
 
   const getTotalTickets = () => {
     return Object.values(selectedTickets).reduce(
@@ -179,7 +169,9 @@ export function EventTicketSection({
   };
 
   function getTicketPricing(ticket: TicketType) {
-    const studentPrice = parchiEnabled ? tierStudentPrice(ticket) : null;
+    // Student prices are a Parchi-app thing: Inside visitors see list prices.
+    const studentPrice =
+      parchiEnabled && arrivedFromParchi ? tierStudentPrice(ticket) : null;
     const hasParchiPrice = studentPrice != null;
 
     if (studentPrice != null) {
@@ -189,7 +181,7 @@ export function EventTicketSection({
           ? ticket.parchi_original_price
           : ticket.price;
       return {
-        mode: arrivedFromParchi ? ("parchi" as const) : ("student" as const),
+        mode: "parchi" as const,
         salePrice,
         comparePrice,
         hasParchiPrice,
@@ -254,20 +246,6 @@ export function EventTicketSection({
                         <span className="text-[10px] font-bold text-[#0069DB] bg-[#0069DB]/10 border border-[#0069DB]/20 px-1.5 py-0.5 rounded">
                           PARCHI RATE
                         </span>
-                      </>
-                    );
-                  }
-                  if (pricing.mode === "student") {
-                    return (
-                      <>
-                        <span className="text-lg font-bold whitespace-nowrap text-primary">
-                          {formatPrice(pricing.salePrice)}
-                        </span>
-                        {pricing.comparePrice && (
-                          <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
-                            {formatPrice(pricing.comparePrice)}
-                          </span>
-                        )}
                       </>
                     );
                   }
@@ -360,23 +338,6 @@ export function EventTicketSection({
                         </div>
                         <div className="text-xs font-bold text-[#0069DB] bg-[#0069DB]/10 border border-[#0069DB]/20 px-2 py-0.5 rounded-full w-fit ml-auto mt-0.5">
                           Parchi Student Rate
-                        </div>
-                      </>
-                    );
-                  }
-                  if (pricing.mode === "student") {
-                    return (
-                      <>
-                        <div className="text-sm text-muted-foreground line-through whitespace-nowrap">
-                          {formatPrice(
-                            pricing.comparePrice || ticket.price
-                          )}
-                        </div>
-                        <div className="text-3xl font-bold whitespace-nowrap text-primary">
-                          {formatPrice(pricing.salePrice)}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Inside Karachi price
                         </div>
                       </>
                     );
@@ -563,22 +524,9 @@ export function EventTicketSection({
                 </h4>
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   Total:{" "}
-                  {!arrivedFromParchi &&
-                  getTotalDiscountedPrice() < getTotalPrice() ? (
-                    <>
-                      <span className="line-through mr-1.5 sm:mr-2">
-                        {formatPrice(getTotalPrice())}
-                      </span>
-                      <span className="font-semibold text-primary">
-                        {formatPrice(getTotalDiscountedPrice())}
-                      </span>{" "}
-                      <span className="text-xs">with Inside Karachi</span>
-                    </>
-                  ) : (
-                    <span className="font-semibold text-foreground">
-                      {formatPrice(getTotalPrice())}
-                    </span>
-                  )}
+                  <span className="font-semibold text-foreground">
+                    {formatPrice(getTotalPrice())}
+                  </span>
                   {arrivedFromParchi && parchiEnabled && (
                     <span className="block text-xs mt-0.5" style={{ color: PARCHI_BLUE }}>
                       Parchi discount applies after you verify at checkout
