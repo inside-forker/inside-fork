@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { PDFDocument } from "pdf-lib";
-import pdfParse from "pdf-parse";
+// @ts-expect-error - pdf-parse/lib/pdf-parse avoids root index.js debug block looking for test/data
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import {
   uploadPdfToInventory,
   syncTicketTypeQuantityAvailable,
