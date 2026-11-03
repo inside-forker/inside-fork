@@ -1637,7 +1637,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                   <div className="text-[11px] text-[#0069DB] bg-[#0069DB]/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
                     <span>💡</span>
                     <span>
-                      Overrides the event&apos;s Parchi % for this ticket. Applies only when the event&apos;s Parchi Student Discount is on.
+                      Used only when the event&apos;s Parchi Student Discount is on and has no % set (the event % applies to every ticket).
                     </span>
                   </div>
                 </>

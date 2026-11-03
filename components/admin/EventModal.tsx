@@ -1332,7 +1332,7 @@ export function EventModal({
                             className="h-11 max-w-[160px]"
                           />
                           <p className="text-xs text-muted-foreground">
-                            A ticket&apos;s own Parchi price, if set, overrides this.
+                            Applies to every ticket. Leave empty to use each ticket&apos;s own Parchi price instead.
                           </p>
                         </div>
                       )}

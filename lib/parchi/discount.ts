@@ -12,15 +12,17 @@ export interface ParchiOffer {
 }
 
 /**
- * SQL for a tier's student price: the ticket's own Parchi price if set,
- * otherwise the event's Parchi % off (rounded to whole rupees). NULL unless
- * the event's Parchi toggle is on. The one definition shared by every query
- * and by create_booking_atomic (keep the migration in step).
+ * SQL for a tier's student price: the event's Parchi % off (rounded to whole
+ * rupees) applies to every ticket; a ticket's own Parchi price is used only
+ * when the event has no %. NULL unless the event's Parchi toggle is on. The
+ * one definition shared by every query and by create_booking_atomic (keep
+ * the migration in step).
  */
 export function studentPriceSql(tt = "tt", e = "e"): string {
-  return `(CASE WHEN ${e}.parchi_enabled THEN COALESCE(${tt}.parchi_price,
+  return `(CASE WHEN ${e}.parchi_enabled THEN
     CASE WHEN ${e}.parchi_discount_percent > 0
-      THEN round(${tt}.price * (100 - ${e}.parchi_discount_percent) / 100) END) END)`;
+      THEN round(${tt}.price * (100 - ${e}.parchi_discount_percent) / 100)
+      ELSE ${tt}.parchi_price END END)`;
 }
 
 /**
