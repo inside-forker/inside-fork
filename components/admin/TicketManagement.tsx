@@ -1069,7 +1069,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                       className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground"
                       title="Manage in Ticket PDF Inventory"
                     >
-                      <a href="/admin/ticket-pdf-inventory" target="_blank" rel="noopener noreferrer">
+                      <a href={`/admin/ticket-pdf-inventory?event_id=${eventId}`} target="_blank" rel="noopener noreferrer">
                         Manage
                         <ExternalLink className="h-2.5 w-2.5 ml-1" />
                       </a>
@@ -1666,7 +1666,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                           size="sm"
                           className="h-7 text-xs text-primary"
                         >
-                          <a href="/admin/ticket-pdf-inventory" target="_blank" rel="noopener noreferrer">
+                          <a href={`/admin/ticket-pdf-inventory?event_id=${eventId}`} target="_blank" rel="noopener noreferrer">
                             Manage in Inventory
                             <ExternalLink className="h-2.5 w-2.5 ml-1" />
                           </a>
@@ -1810,7 +1810,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                 size="sm"
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
-                <a href="/admin/ticket-pdf-inventory" target="_blank" rel="noopener noreferrer">
+                <a href={`/admin/ticket-pdf-inventory?event_id=${eventId}`} target="_blank" rel="noopener noreferrer">
                   Full Inventory Page
                   <ExternalLink className="h-3 w-3 ml-1" />
                 </a>

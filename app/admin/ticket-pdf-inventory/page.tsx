@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { requireSessionUser } from "@/lib/auth/require-session";
 import { TicketPdfInventoryPage } from "@/components/admin/TicketPdfInventoryPage";
@@ -36,5 +37,15 @@ export default async function AdminTicketPdfInventoryRoute() {
     return <TicketPdfInventoryPasscodeGate configured={configured} />;
   }
 
-  return <TicketPdfInventoryPage />;
+  return (
+    <Suspense
+      fallback={
+        <div className="p-8 text-center text-sm text-muted-foreground">
+          Loading ticket PDF inventory…
+        </div>
+      }
+    >
+      <TicketPdfInventoryPage />
+    </Suspense>
+  );
 }

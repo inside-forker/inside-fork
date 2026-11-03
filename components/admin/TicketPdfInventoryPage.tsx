@@ -7,9 +7,8 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowUpRight,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -163,6 +162,8 @@ type TicketTypeOption = {
 
 export function TicketPdfInventoryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialEventId = searchParams.get("event_id");
   const { toast } = useToast();
   const [data, setData] = useState<InventoryPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -187,13 +188,30 @@ export function TicketPdfInventoryPage() {
 
   // Creation & Upload
   const [events, setEvents] = useState<EventOption[]>([]);
-  const [selectedEventId, setSelectedEventId] = useState<number | "">("");
+  const [selectedEventId, setSelectedEventId] = useState<number | "">(
+    initialEventId && !isNaN(Number(initialEventId)) ? Number(initialEventId) : ""
+  );
   const [ticketTypes, setTicketTypes] = useState<TicketTypeOption[]>([]);
   const [selectedTicketTypeId, setSelectedTicketTypeId] = useState<number | "">("");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadTargetTier, setUploadTargetTier] = useState<{ id: number; name: string } | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  const handleEventChange = (eventId: number | "") => {
+    setSelectedEventId(eventId);
+    setSelectedTicketTypeId("");
+    setTierFilter("all");
+    setCurrentPage(1);
+    const newParams = new URLSearchParams(searchParams.toString());
+    if (eventId !== "") {
+      newParams.set("event_id", String(eventId));
+    } else {
+      newParams.delete("event_id");
+    }
+    const query = newParams.toString();
+    router.replace(query ? `/admin/ticket-pdf-inventory?${query}` : `/admin/ticket-pdf-inventory`, { scroll: false });
+  };
   const [createForm, setCreateForm] = useState({
     name: "",
     description: "",
@@ -407,12 +425,24 @@ export function TicketPdfInventoryPage() {
     }
   }
 
+  // Visible Tiers for the selected event (or all if none selected)
+  const visibleTiers = useMemo(() => {
+    if (!data) return [];
+    if (selectedEventId === "") return data.tiers;
+    return data.tiers.filter((tier) => tier.event_id === Number(selectedEventId));
+  }, [data, selectedEventId]);
+
   // Filtered & Searched Tickets
   const filteredTickets = useMemo(() => {
     if (!data) return [];
     const query = searchQuery.trim().toLowerCase();
 
     return data.tickets.filter((ticket) => {
+      // Event filter: if an event is selected, only show tickets for that event
+      if (selectedEventId !== "" && ticket.event_id !== Number(selectedEventId)) {
+        return false;
+      }
+
       // Status filter
       if (statusFilter === "parchi") {
         if (!ticket.is_parchi) return false;
@@ -451,12 +481,12 @@ export function TicketPdfInventoryPage() {
 
       return true;
     });
-  }, [data, statusFilter, tierFilter, searchQuery]);
+  }, [data, selectedEventId, statusFilter, tierFilter, searchQuery]);
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, tierFilter, searchQuery, pageSize]);
+  }, [selectedEventId, statusFilter, tierFilter, searchQuery, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(filteredTickets.length / pageSize));
   const paginatedTickets = useMemo(() => {
@@ -465,8 +495,13 @@ export function TicketPdfInventoryPage() {
   }, [filteredTickets, currentPage, pageSize]);
 
   const parchiSoldCount = useMemo(
-    () => data?.tickets.filter((t) => t.is_parchi).length ?? 0,
-    [data],
+    () =>
+      data?.tickets.filter(
+        (t) =>
+          t.is_parchi &&
+          (selectedEventId === "" || t.event_id === Number(selectedEventId)),
+      ).length ?? 0,
+    [data, selectedEventId],
   );
 
   const handleOpenUploadForTier = (tier: TierSummary) => {
@@ -538,6 +573,19 @@ export function TicketPdfInventoryPage() {
     });
   };
 
+  const summary = useMemo(() => {
+    if (!data) return { total: 0, sold: 0, available: 0 };
+    if (selectedEventId === "") return data.summary;
+    const evTickets = data.tickets.filter((t) => t.event_id === Number(selectedEventId));
+    const sold = evTickets.filter((t) => t.status === "sold").length;
+    const available = evTickets.filter((t) => t.status === "available").length;
+    return { total: evTickets.length, sold, available };
+  }, [data, selectedEventId]);
+
+  const soldPct =
+    summary.total > 0 ? Math.round((summary.sold / summary.total) * 100) : 0;
+  const availPct = 100 - soldPct;
+
   if (loading && !data) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -546,11 +594,6 @@ export function TicketPdfInventoryPage() {
       </div>
     );
   }
-
-  const summary = data?.summary ?? { total: 0, sold: 0, available: 0 };
-  const soldPct =
-    summary.total > 0 ? Math.round((summary.sold / summary.total) * 100) : 0;
-  const availPct = 100 - soldPct;
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
@@ -824,10 +867,10 @@ export function TicketPdfInventoryPage() {
                   value={selectedEventId === "" ? "" : String(selectedEventId)}
                   onChange={(e) => {
                     const v = e.target.value;
-                    setSelectedEventId(v ? Number(v) : "");
+                    handleEventChange(v ? Number(v) : "");
                   }}
                 >
-                  <option value="">Select event…</option>
+                  <option value="">All Events (Overall View)</option>
                   {events.map((ev) => (
                     <option key={ev.event_id} value={ev.event_id}>
                       {ev.event_name}
@@ -928,11 +971,11 @@ export function TicketPdfInventoryPage() {
       </Card>
 
       {/* Tier Summaries Grid */}
-      {(data?.tiers.length ?? 0) > 0 && (
+      {visibleTiers.length > 0 && (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Tier Breakdown ({data!.tiers.length})
+              Tier Breakdown ({visibleTiers.length})
             </h2>
             {tierFilter !== "all" && (
               <Button
@@ -947,7 +990,7 @@ export function TicketPdfInventoryPage() {
           </div>
 
           <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-            {data!.tiers.map((tier) => {
+            {visibleTiers.map((tier) => {
               const pct =
                 tier.total > 0 ? Math.round((tier.sold / tier.total) * 100) : 0;
               const isSelected = tierFilter === tier.ticket_type_id;

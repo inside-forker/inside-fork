@@ -44,7 +44,11 @@ export async function GET(request: NextRequest) {
       throw error;
     }
 
-    const eventSlug = new URL(request.url).searchParams.get("event_slug");
+    const searchParams = new URL(request.url).searchParams;
+    const eventSlug = searchParams.get("event_slug");
+    const eventIdRaw = searchParams.get("event_id");
+    const eventId =
+      eventIdRaw && !isNaN(Number(eventIdRaw)) ? parseInt(eventIdRaw, 10) : null;
 
     const { rows: tickets } = await query(
       `SELECT
@@ -76,11 +80,12 @@ export async function GET(request: NextRequest) {
        LEFT JOIN parchi_verifications v
          ON v.booking_id = i.booking_id AND v.status = 'approved'
        WHERE ($1::text IS NULL OR lower(e.slug) = lower($1))
+         AND ($2::int IS NULL OR e.id = $2)
        ORDER BY
          CASE WHEN i.booking_id IS NULL THEN 0 ELSE 1 END,
          i.assigned_at DESC NULLS LAST,
          i.id ASC`,
-      [eventSlug],
+      [eventSlug, eventId],
     );
 
     const byTypeMap = new Map<
