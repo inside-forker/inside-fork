@@ -34,6 +34,8 @@ function toNumericTicketType(row: Record<string, unknown>) {
     original_price: row.original_price !== null && row.original_price !== undefined ? Number(row.original_price) : null,
     parchi_price: row.parchi_price !== null && row.parchi_price !== undefined ? Number(row.parchi_price) : null,
     parchi_original_price: row.parchi_original_price !== null && row.parchi_original_price !== undefined ? Number(row.parchi_original_price) : null,
+    pdf_total: row.pdf_total != null ? Number(row.pdf_total) : 0,
+    pdf_available: row.pdf_available != null ? Number(row.pdf_available) : 0,
   };
 }
 
@@ -104,7 +106,12 @@ export async function GET(
         // alias over the input column for simple ORDER BY names, which
         // would otherwise sort by the to_json-rendered text instead of the
         // real timestamptz value.
-        `SELECT ${TICKET_TYPE_COLUMNS} FROM ticket_types t WHERE t.event_id = $1 ORDER BY t.sale_starts_at ASC`,
+        `SELECT ${TICKET_TYPE_COLUMNS},
+            (SELECT COUNT(*)::int FROM ticket_pdf_inventory i WHERE i.ticket_type_id = t.id) AS pdf_total,
+            (SELECT COUNT(*)::int FROM ticket_pdf_inventory i WHERE i.ticket_type_id = t.id AND i.booking_id IS NULL) AS pdf_available
+         FROM ticket_types t
+         WHERE t.event_id = $1
+         ORDER BY t.group_order ASC NULLS LAST, t.group_name ASC NULLS LAST, t.sale_starts_at ASC`,
         [eventId]
       );
       ticketTypes = rows.map(toNumericTicketType);

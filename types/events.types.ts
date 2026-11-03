@@ -20,7 +20,7 @@ export type AdminEvent = {
   category_id: number | null;
   max_capacity: number | null;
   is_featured: boolean;
-  scanning_mode?: "single" | "multi_gate";
+  scanning_mode?: "single" | "multi_gate" | "disabled";
   total_gates?: number;
   gate_assignment_mode?: "manual" | "auto";
   /** Venue / zone map image (events.layout_image_url). */
@@ -52,7 +52,7 @@ export type Event = {
   address: string | null;
   latitude: number | null;
   longitude: number | null;
-  scanning_mode?: "single" | "multi_gate";
+  scanning_mode?: "single" | "multi_gate" | "disabled";
   total_gates?: number;
   gate_assignment_mode?: "manual" | "auto";
   // Editorial feature flags exposed from events_with_details
@@ -120,6 +120,10 @@ export type TicketType = {
   parchi_price?: number | null;
   /** Optional slashed comparison price for Parchi students. */
   parchi_original_price?: number | null;
+  /** Total uploaded ticket PDFs in inventory for this tier. */
+  pdf_total?: number;
+  /** Available (unassigned) ticket PDFs in inventory for this tier. */
+  pdf_available?: number;
 };
 
 // Event page props
@@ -196,4 +200,5 @@ export interface TicketFormData {
   original_price?: string;
   parchi_price?: string;
   parchi_original_price?: string;
+  is_pdf_flow?: boolean;
 }

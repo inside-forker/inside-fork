@@ -4,6 +4,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import {
   Plus,
@@ -15,6 +16,9 @@ import {
   Banknote,
   Clock,
   ExternalLink,
+  FileText,
+  Upload,
+  Sparkles,
 } from "lucide-react";
 import {
   Dialog,
@@ -67,8 +71,66 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
     original_price: "",
     parchi_price: "",
     parchi_original_price: "",
+    is_pdf_flow: false,
     attendee_fields: [],
   });
+
+  const [uploadingTicket, setUploadingTicket] = React.useState<TicketType | null>(null);
+  const [isUploadingPdfs, setIsUploadingPdfs] = React.useState(false);
+  const [selectedFiles, setSelectedFiles] = React.useState<FileList | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleUploadPdfs = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadingTicket || !selectedFiles || selectedFiles.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please select at least one PDF file to upload",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const formDataUpload = new FormData();
+    formDataUpload.append("ticket_type_id", String(uploadingTicket.id));
+    for (let i = 0; i < selectedFiles.length; i++) {
+      formDataUpload.append("files", selectedFiles[i]);
+    }
+
+    try {
+      setIsUploadingPdfs(true);
+      const res = await fetch(
+        `/api/organizer/events/${eventId}/ticket-pdf-inventory/upload`,
+        {
+          method: "POST",
+          body: formDataUpload,
+        },
+      );
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Failed to upload PDFs");
+      }
+
+      toast({
+        title: "Upload Successful",
+        description: `Successfully uploaded ${json.data?.inserted ?? selectedFiles.length} ticket PDFs!`,
+      });
+
+      setSelectedFiles(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setUploadingTicket(null);
+      fetchTicketTypes();
+    } catch (err) {
+      toast({
+        title: "Upload Failed",
+        description: err instanceof Error ? err.message : "Failed to upload ticket PDFs",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingPdfs(false);
+    }
+  };
   const { toast } = useToast();
   // Checkout questions every ticket of this event asks.
   const [eventFields, setEventFields] = React.useState<AttendeeField[]>([]);
@@ -582,6 +644,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       original_price: "",
       parchi_price: "",
       parchi_original_price: "",
+      is_pdf_flow: false,
       attendee_fields: [],
     });
   };
@@ -630,6 +693,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       original_price: ticket.original_price?.toString() || "",
       parchi_price: ticket.parchi_price?.toString() || "",
       parchi_original_price: ticket.parchi_original_price?.toString() || "",
+      is_pdf_flow: (ticket.pdf_total ?? 0) > 0,
       attendee_fields: ticket.attendee_fields ?? [],
     });
     setIsDialogOpen(true);
@@ -851,6 +915,47 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                     </span>
                   </div>
                 )}
+
+                {/* PDF Inventory Status & Fast Upload */}
+                <div className="pt-3 border-t border-border/40 flex items-center justify-between flex-wrap gap-2">
+                  {(ticket.pdf_total ?? 0) > 0 ? (
+                    <div className="flex items-center gap-1.5 text-xs text-primary font-medium">
+                      <FileText className="h-3.5 w-3.5" />
+                      <span>{ticket.pdf_available ?? 0} / {ticket.pdf_total} PDFs ready</span>
+                    </div>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" />
+                      Dynamic Inside Pass
+                    </span>
+                  )}
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs px-2.5 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                      onClick={() => {
+                        setUploadingTicket(ticket);
+                        setSelectedFiles(null);
+                      }}
+                    >
+                      <Upload className="h-3 w-3" />
+                      Upload PDFs
+                    </Button>
+                    <Button
+                      asChild
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground"
+                      title="Manage in Ticket PDF Inventory"
+                    >
+                      <a href="/admin/ticket-pdf-inventory" target="_blank" rel="noopener noreferrer">
+                        Manage
+                        <ExternalLink className="h-2.5 w-2.5 ml-1" />
+                      </a>
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -1161,6 +1266,81 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
 
             <Separator />
 
+            {/* Pre-Uploaded Ticket PDF Flow Toggle */}
+            <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" />
+                  <div>
+                    <h4 className="text-sm font-semibold">Pre-Uploaded Ticket PDF Flow</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Sell pre-issued PDF passes (e.g. Ticketwala / external barcodes) instead of dynamic generation.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="ticket-pdf-flow-toggle" className="text-xs font-medium cursor-pointer">
+                    {formData.is_pdf_flow ? "Enabled" : "Disabled"}
+                  </Label>
+                  <Switch
+                    id="ticket-pdf-flow-toggle"
+                    checked={Boolean(formData.is_pdf_flow)}
+                    onCheckedChange={(checked) =>
+                      setFormData((prev) => ({ ...prev, is_pdf_flow: checked }))
+                    }
+                  />
+                </div>
+              </div>
+
+              {formData.is_pdf_flow && (
+                <div className="pt-2 border-t border-border/40 space-y-2">
+                  {editingTicket ? (
+                    <div className="flex items-center justify-between bg-background p-2.5 rounded-lg border border-border/50 text-xs">
+                      <div>
+                        <span className="font-semibold text-foreground">
+                          {editingTicket.pdf_available ?? 0} available
+                        </span>{" "}
+                        <span className="text-muted-foreground">
+                          ({editingTicket.pdf_total ?? 0} total PDFs uploaded)
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => {
+                            setUploadingTicket(editingTicket);
+                            setSelectedFiles(null);
+                          }}
+                        >
+                          <Upload className="h-3 w-3" />
+                          Upload More PDFs
+                        </Button>
+                        <Button
+                          asChild
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs text-primary"
+                        >
+                          <a href="/admin/ticket-pdf-inventory" target="_blank" rel="noopener noreferrer">
+                            Manage in Inventory
+                            <ExternalLink className="h-2.5 w-2.5 ml-1" />
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Save this ticket type first. Once saved, you can immediately upload your PDF batch directly to this tier.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Sale Dates */}
             <div className="space-y-4">
               <h4 className="text-sm font-medium flex items-center gap-2">
@@ -1229,6 +1409,89 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                   "Create Ticket Type"
                 )}
               </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick PDF Upload Dialog */}
+      <Dialog open={!!uploadingTicket} onOpenChange={(open) => !open && setUploadingTicket(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5 text-primary" />
+              Upload Ticket PDFs
+            </DialogTitle>
+            <DialogDescription>
+              Upload pre-issued PDF passes for &ldquo;{uploadingTicket?.name}&rdquo;.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleUploadPdfs} className="space-y-4 pt-2">
+            <div className="bg-muted/40 p-3 rounded-lg border border-border/60 text-xs space-y-1">
+              <div className="flex justify-between font-medium">
+                <span>Current Inventory:</span>
+                <span className="text-primary font-semibold">
+                  {uploadingTicket?.pdf_available ?? 0} available / {uploadingTicket?.pdf_total ?? 0} total
+                </span>
+              </div>
+              <p className="text-muted-foreground text-[11px]">
+                Each uploaded PDF file counts as 1 available ticket in stock.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pdf-files-input" className="text-sm font-medium">
+                Select PDF Files (.pdf)
+              </Label>
+              <Input
+                id="pdf-files-input"
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                multiple
+                onChange={(e) => setSelectedFiles(e.target.files)}
+                className="cursor-pointer"
+                required
+              />
+              {selectedFiles && selectedFiles.length > 0 && (
+                <p className="text-xs text-primary font-medium">
+                  {selectedFiles.length} file{selectedFiles.length !== 1 ? "s" : ""} selected for upload
+                </p>
+              )}
+            </div>
+
+            <div className="pt-2 flex items-center justify-between">
+              <Button
+                asChild
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                <a href="/admin/ticket-pdf-inventory" target="_blank" rel="noopener noreferrer">
+                  Full Inventory Page
+                  <ExternalLink className="h-3 w-3 ml-1" />
+                </a>
+              </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setUploadingTicket(null)}
+                  disabled={isUploadingPdfs}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isUploadingPdfs || !selectedFiles || selectedFiles.length === 0}
+                >
+                  {isUploadingPdfs ? "Uploading..." : "Upload PDFs"}
+                </Button>
+              </div>
             </div>
           </form>
         </DialogContent>
