@@ -607,9 +607,16 @@ export function EventTicketSection({
                           );
                         }
                         return (
-                          <span className="text-lg font-bold whitespace-nowrap">
-                            {formatPrice(pricing.salePrice)}
-                          </span>
+                          <>
+                            <span className="text-lg font-bold whitespace-nowrap">
+                              {formatPrice(pricing.salePrice)}
+                            </span>
+                            {pricing.hasParchiPrice && (
+                              <span className="text-[10px] font-bold text-[#0069DB] bg-[#0069DB]/10 border border-[#0069DB]/20 px-1.5 py-0.5 rounded">
+                                Students: {formatPrice(ticket.parchi_price!)} via Parchi
+                              </span>
+                            )}
+                          </>
                         );
                       })()}
                     </div>

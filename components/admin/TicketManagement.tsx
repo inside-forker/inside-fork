@@ -90,6 +90,10 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
   const [knownHeaders, setKnownHeaders] = React.useState<Array<{ name: string; order: number }>>([]);
   const [isCustomHeaderInput, setIsCustomHeaderInput] = React.useState(false);
 
+  // Discount toggles (Native Inside Karachi vs Independent Parchi Student)
+  const [hasNativeDiscount, setHasNativeDiscount] = React.useState(false);
+  const [hasParchiDiscount, setHasParchiDiscount] = React.useState(false);
+
   // Bundled PDF Splitter
   const [isSplitImportOpen, setIsSplitImportOpen] = React.useState(false);
   const [splitPdfFile, setSplitPdfFile] = React.useState<File | null>(null);
@@ -592,6 +596,36 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       return;
     }
 
+    if (hasNativeDiscount) {
+      if (!formData.original_price || parseFloat(formData.original_price) <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter an original price higher than the selling price, or toggle off discount",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (parseFloat(formData.original_price) <= parseFloat(formData.price)) {
+        toast({
+          title: "Validation Error",
+          description: "Original price must be greater than selling price to offer a discount on Inside Karachi",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    if (hasParchiDiscount) {
+      if (!formData.parchi_price || parseFloat(formData.parchi_price) <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter a valid Parchi student price, or toggle off student discount",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     try {
       setIsLoading(true);
       const url = editingTicket
@@ -599,6 +633,19 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
         : `/api/admin/events/${eventId}/tickets`;
 
       const method = editingTicket ? "PUT" : "POST";
+
+      const originalPriceToSend =
+        hasNativeDiscount && formData.original_price
+          ? parseFloat(formData.original_price)
+          : null;
+      const parchiPriceToSend =
+        hasParchiDiscount && formData.parchi_price
+          ? parseFloat(formData.parchi_price)
+          : null;
+      const parchiOrigPriceToSend =
+        hasParchiDiscount && formData.parchi_original_price
+          ? parseFloat(formData.parchi_original_price)
+          : null;
 
       const response = await fetch(url, {
         method,
@@ -622,9 +669,9 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
             parseInt(formData.min_people_per_ticket || "") || null,
           group_name: formData.group_name?.trim() || null,
           group_order: parseInt(formData.group_order || "0") || 0,
-          original_price: formData.original_price ? parseFloat(formData.original_price) : null,
-          parchi_price: formData.parchi_price ? parseFloat(formData.parchi_price) : null,
-          parchi_original_price: formData.parchi_original_price ? parseFloat(formData.parchi_original_price) : null,
+          original_price: originalPriceToSend,
+          parchi_price: parchiPriceToSend,
+          parchi_original_price: parchiOrigPriceToSend,
           attendee_fields: formData.attendee_fields ?? [],
         }),
       });
@@ -722,6 +769,8 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       is_pdf_flow: false,
       attendee_fields: [],
     });
+    setHasNativeDiscount(false);
+    setHasParchiDiscount(false);
   };
 
   const handleSaveEventFields = async () => {
@@ -750,6 +799,16 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
   // Open edit dialog
   const handleEdit = (ticket: TicketType) => {
     setEditingTicket(ticket);
+    const hasNatDisc = Boolean(
+      ticket.original_price != null &&
+      Number(ticket.original_price) > Number(ticket.price)
+    );
+    const hasParcDisc = Boolean(
+      ticket.parchi_price != null &&
+      Number(ticket.parchi_price) > 0
+    );
+    setHasNativeDiscount(hasNatDisc);
+    setHasParchiDiscount(hasParcDisc);
     setFormData({
       name: ticket.name,
       description: ticket.description || "",
@@ -1388,16 +1447,42 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
 
             </div>
 
-            {/* Native Inside Price & Original Price */}
+            {/* Native Inside Price & Discount Toggle */}
             <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-3">
-              <div className="flex items-center gap-2">
-                <Banknote className="h-4 w-4 text-primary" />
-                <h4 className="text-sm font-semibold">Inside Karachi Pricing (Native)</h4>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Banknote className="h-4 w-4 text-primary" />
+                  <h4 className="text-sm font-semibold">Inside Karachi Pricing (Native)</h4>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label
+                    htmlFor="native-discount-toggle"
+                    className="text-xs font-medium cursor-pointer"
+                  >
+                    {hasNativeDiscount ? (
+                      <span className="text-emerald-500 font-semibold">Discount Enabled</span>
+                    ) : (
+                      <span className="text-muted-foreground">No Discount (Regular)</span>
+                    )}
+                  </Label>
+                  <Switch
+                    id="native-discount-toggle"
+                    checked={hasNativeDiscount}
+                    onCheckedChange={(checked) => {
+                      setHasNativeDiscount(checked);
+                      if (!checked) {
+                        setFormData((prev) => ({ ...prev, original_price: "" }));
+                      }
+                    }}
+                  />
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              <div className={hasNativeDiscount ? "grid grid-cols-2 gap-3" : "space-y-2"}>
                 <div className="space-y-2">
                   <Label htmlFor="ticket-price" className="text-sm font-medium">
-                    Price (Rs) <span className="text-destructive">*</span>
+                    {hasNativeDiscount ? "Discounted Sale Price (Rs)" : "Price (Rs)"}{" "}
+                    <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="ticket-price"
@@ -1411,26 +1496,58 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                     placeholder="0.00"
                     required
                   />
+                  {!hasNativeDiscount && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Regular price charged on Inside Karachi. No slashed pricing or % discount badge will be shown.
+                    </p>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ticket-original-price" className="text-sm font-medium">
-                    Original Price (Rs) <span className="text-muted-foreground text-xs">(optional)</span>
-                  </Label>
-                  <Input
-                    id="ticket-original-price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.original_price || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, original_price: e.target.value }))
-                    }
-                    placeholder="e.g. 3500"
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    Shows slashed price & % off discount badge on Inside
-                  </p>
-                </div>
+
+                {hasNativeDiscount && (
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-original-price" className="text-sm font-medium">
+                      Original Price (Rs) <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="ticket-original-price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.original_price || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, original_price: e.target.value }))
+                      }
+                      placeholder="e.g. 3500"
+                    />
+                    {(() => {
+                      const orig = parseFloat(formData.original_price || "0");
+                      const curr = parseFloat(formData.price || "0");
+                      if (orig > 0 && curr > 0 && orig > curr) {
+                        const pct = Math.round(((orig - curr) / orig) * 100);
+                        return (
+                          <div className="flex items-center gap-1.5 text-[11px] text-emerald-500 font-medium">
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 font-bold">
+                              {pct}% OFF
+                            </span>
+                            <span>Shows slashed Rs {orig.toLocaleString()}</span>
+                          </div>
+                        );
+                      }
+                      if (orig > 0 && curr > 0 && orig <= curr) {
+                        return (
+                          <p className="text-[11px] text-amber-500">
+                            Must be higher than selling price (Rs {formData.price})
+                          </p>
+                        );
+                      }
+                      return (
+                        <p className="text-[11px] text-muted-foreground">
+                          Shows slashed price & % off discount badge on Inside
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1441,48 +1558,92 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                   <div className="w-2.5 h-2.5 rounded-full bg-[#0069DB]" />
                   <h4 className="text-sm font-semibold text-[#0069DB]">Parchi Student Pricing</h4>
                 </div>
-                <span className="text-[11px] text-muted-foreground">Unlocked via Parchi 2FA at checkout</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="ticket-parchi-price" className="text-sm font-medium">
-                    Parchi Price (Rs) <span className="text-muted-foreground text-xs">(optional)</span>
+                <div className="flex items-center gap-2">
+                  <Label
+                    htmlFor="parchi-discount-toggle"
+                    className="text-xs font-medium cursor-pointer"
+                  >
+                    {hasParchiDiscount ? (
+                      <span className="text-[#0069DB] font-semibold">Student Discount Active</span>
+                    ) : (
+                      <span className="text-muted-foreground">No Student Discount</span>
+                    )}
                   </Label>
-                  <Input
-                    id="ticket-parchi-price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.parchi_price || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, parchi_price: e.target.value }))
-                    }
-                    placeholder="e.g. 2499"
+                  <Switch
+                    id="parchi-discount-toggle"
+                    checked={hasParchiDiscount}
+                    onCheckedChange={(checked) => {
+                      setHasParchiDiscount(checked);
+                      if (!checked) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          parchi_price: "",
+                          parchi_original_price: "",
+                        }));
+                      }
+                    }}
                   />
-                  <p className="text-[11px] text-muted-foreground">
-                    Exclusive rate for verified students
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ticket-parchi-original-price" className="text-sm font-medium">
-                    Parchi Comparison Price (Rs) <span className="text-muted-foreground text-xs">(optional)</span>
-                  </Label>
-                  <Input
-                    id="ticket-parchi-original-price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.parchi_original_price || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, parchi_original_price: e.target.value }))
-                    }
-                    placeholder="e.g. 2999"
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    Slashed comparison for students (defaults to native price)
-                  </p>
                 </div>
               </div>
+
+              {hasParchiDiscount ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="ticket-parchi-price" className="text-sm font-medium">
+                        Parchi Price (Rs) <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="ticket-parchi-price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.parchi_price || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, parchi_price: e.target.value }))
+                        }
+                        placeholder="e.g. 2499"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Exclusive discounted rate unlocked only for verified students via Parchi 2FA
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ticket-parchi-original-price" className="text-sm font-medium">
+                        Parchi Comparison Price (Rs){" "}
+                        <span className="text-muted-foreground text-xs">(optional)</span>
+                      </Label>
+                      <Input
+                        id="ticket-parchi-original-price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.parchi_original_price || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            parchi_original_price: e.target.value,
+                          }))
+                        }
+                        placeholder={formData.price ? `e.g. ${formData.price}` : "e.g. 2999"}
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Slashed comparison for students (defaults to native price of Rs {formData.price || "0"})
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-[#0069DB] bg-[#0069DB]/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                    <span>💡</span>
+                    <span>
+                      Independent Pricing: Parchi students will get this discount even if Inside Karachi has no discount enabled.
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Verified students will pay the standard Inside Karachi rate (Rs {formData.price || "0.00"}). Toggle on to offer a special student price via Parchi app.
+                </p>
+              )}
             </div>
 
             {/* Description */}
