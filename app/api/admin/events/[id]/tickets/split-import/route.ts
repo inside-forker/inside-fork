@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { PDFDocument } from "pdf-lib";
-import { PDFParse } from "pdf-parse";
+import pdfParse from "pdf-parse";
 import {
   uploadPdfToInventory,
   syncTicketTypeQuantityAvailable,
@@ -136,14 +136,31 @@ export async function POST(
       );
     }
 
-    // Extract text from all pages with pdf-parse
-    let parsedPages: Array<{ text: string }> = [];
+    // Extract text from all pages with pdf-parse pagerender
+    const parsedPageTexts: string[] = [];
     try {
-      const parser = new PDFParse({ data: fileBuffer });
-      const result = await parser.getText();
-      parsedPages = result.pages || [];
+      const render_page = (pageData: {
+        getTextContent: () => Promise<{ items: Array<{ str: string; transform: number[] }> }>;
+      }) => {
+        return pageData.getTextContent().then((textContent) => {
+          let lastY: number | undefined;
+          let text = "";
+          for (const item of textContent.items) {
+            if (lastY === item.transform[5] || !lastY) {
+              text += item.str;
+            } else {
+              text += "\n" + item.str;
+            }
+            lastY = item.transform[5];
+          }
+          parsedPageTexts.push(text);
+          return text;
+        });
+      };
+
+      await pdfParse(fileBuffer, { pagerender: render_page });
     } catch (err) {
-      console.warn("pdf-parse extraction warning, falling back to page index naming:", err);
+      console.warn("pdf-parse extraction warning:", err);
     }
 
     // Group pages by (Show, Ticket)
@@ -158,7 +175,7 @@ export async function POST(
     const categoryMap = new Map<string, { show: string; ticket: string; pages: PageItem[] }>();
 
     for (let i = 0; i < pageCount; i++) {
-      const text = parsedPages[i]?.text || "";
+      const text = parsedPageTexts[i] || "";
       const showMatch = text.match(/Show:\s*([^\r\n]+)/i);
       const ticketMatch = text.match(/Ticket:\s*([^\r\n]+)/i);
       const invoiceMatch = text.match(/Invoice:\s*(\d{6,})/i);

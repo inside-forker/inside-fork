@@ -110,6 +110,10 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
   } | null>(null);
   const splitInputRef = React.useRef<HTMLInputElement>(null);
 
+  // Revert / Delete All Tickets state
+  const [isRevertAllDialogOpen, setIsRevertAllDialogOpen] = React.useState(false);
+  const [isRevertingAll, setIsRevertingAll] = React.useState(false);
+
   const handleUploadPdfs = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadingTicket || !selectedFiles || selectedFiles.length === 0) {
@@ -845,6 +849,33 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
     }
   };
 
+  const handleRevertAll = async () => {
+    try {
+      setIsRevertingAll(true);
+      const res = await fetch(`/api/admin/events/${eventId}/tickets/revert-all`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Failed to delete tickets");
+      }
+      toast({
+        title: "All Tickets Reverted",
+        description: json.message || "All ticket tiers and PDF passes have been deleted.",
+      });
+      setIsRevertAllDialogOpen(false);
+      await fetchTicketTypes();
+    } catch (error) {
+      toast({
+        title: "Revert Failed",
+        description: error instanceof Error ? error.message : "Failed to revert all tickets",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRevertingAll(false);
+    }
+  };
+
   // Open create dialog
   const handleCreate = () => {
     setEditingTicket(null);
@@ -1087,6 +1118,19 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
             <Plus className="h-4 w-4" />
             Add Ticket Type
           </Button>
+          {ticketTypes.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsRevertAllDialogOpen(true)}
+              className="flex items-center gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5 hover:text-destructive"
+              title="Delete all ticket types and inventory PDFs for this event"
+            >
+              <Trash2 className="h-4 w-4" />
+              Revert / Delete All
+            </Button>
+          )}
         </div>
       </div>
 
@@ -2000,6 +2044,19 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
         cancelText="Cancel"
         variant="destructive"
         isLoading={isLoading}
+      />
+
+      {/* Revert / Delete All Tickets Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={isRevertAllDialogOpen}
+        onClose={() => setIsRevertAllDialogOpen(false)}
+        onConfirm={handleRevertAll}
+        title="Delete All Ticket Types & Passes?"
+        description="This will permanently delete all ticket types and all uploaded inventory PDF passes for this event, giving you a fresh clean slate. This action cannot be undone."
+        confirmText="Yes, Delete All"
+        cancelText="Cancel"
+        variant="destructive"
+        isLoading={isRevertingAll}
       />
     </div>
   );
