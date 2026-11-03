@@ -21,7 +21,7 @@ export async function EventTicketsContainer({
             ${effectiveQuantitySql("tt")} AS effective_quantity_available
          FROM ticket_types tt
          WHERE tt.event_id = $1
-         ORDER BY tt.price ASC`,
+         ORDER BY tt.group_order ASC NULLS LAST, tt.group_name ASC NULLS LAST, tt.price ASC`,
         [event.id],
     );
 
@@ -48,6 +48,9 @@ export async function EventTicketsContainer({
             max_per_person:
                 row.max_per_person !== null ? Number(row.max_per_person) : null,
             ticket_url: row.ticket_url ? String(row.ticket_url).trim() : null,
+            group_name: row.group_name ? String(row.group_name).trim() : null,
+            group_order: row.group_order !== null && row.group_order !== undefined ? Number(row.group_order) : 0,
+            original_price: row.original_price != null ? Number(row.original_price) : null,
         };
     });
 

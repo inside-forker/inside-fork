@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Minus, CreditCard, ExternalLink } from "lucide-react";
+import { Plus, Minus, CreditCard, ExternalLink, ChevronDown } from "lucide-react";
 import { EventTicketSectionProps, TicketType } from "@/types/events.types";
 import { PremiumHeading } from "@/components/brand/Typography";
 import { useRouter } from "next/navigation";
@@ -158,6 +158,177 @@ export function EventTicketSection({
     </div>
   );
 
+  interface TicketGroup {
+    name: string | null;
+    tickets: TicketType[];
+  }
+
+  const ticketGroups = useMemo(() => {
+    const groupMap = new Map<string, TicketType[]>();
+    const ungrouped: TicketType[] = [];
+
+    ticketTypes.forEach((ticket) => {
+      const gName = ticket.group_name?.trim();
+      if (gName) {
+        if (!groupMap.has(gName)) {
+          groupMap.set(gName, []);
+        }
+        groupMap.get(gName)!.push(ticket);
+      } else {
+        ungrouped.push(ticket);
+      }
+    });
+
+    const list: TicketGroup[] = [];
+    groupMap.forEach((tickets, name) => {
+      list.push({ name, tickets });
+    });
+    if (ungrouped.length > 0) {
+      list.push({ name: null, tickets: ungrouped });
+    }
+    return list;
+  }, [ticketTypes]);
+
+  const hasGroups = useMemo(() => {
+    return ticketTypes.some((t) => !!t.group_name?.trim());
+  }, [ticketTypes]);
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (groupName: string) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [groupName]: !prev[groupName],
+    }));
+  };
+
+  const renderAccordionStepper = (
+    ticket: TicketType,
+    selectedQuantity: number,
+    maxQuantity: number,
+  ) => (
+    <div className="flex items-center space-x-1 sm:space-x-2 bg-zinc-900 border border-zinc-800 rounded-full px-1.5 py-0.5 sm:px-2 sm:py-1 shrink-0">
+      <button
+        type="button"
+        onClick={() => updateTicketQuantity(ticket.id, selectedQuantity - 1)}
+        disabled={selectedQuantity === 0}
+        className="h-6 w-6 sm:h-7 sm:w-7 rounded-full flex items-center justify-center text-red-500 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
+        aria-label={`Decrease quantity for ${ticket.name}`}
+      >
+        <div className="w-5 h-5 rounded-full border border-red-500/60 flex items-center justify-center">
+          <Minus className="w-3 h-3 text-red-400" />
+        </div>
+      </button>
+
+      <span className="w-5 sm:w-7 text-center font-medium text-xs sm:text-sm text-foreground">
+        {selectedQuantity}
+      </span>
+
+      <button
+        type="button"
+        onClick={() => updateTicketQuantity(ticket.id, selectedQuantity + 1)}
+        disabled={selectedQuantity >= maxQuantity}
+        className="h-6 w-6 sm:h-7 sm:w-7 rounded-full flex items-center justify-center text-zinc-300 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
+        aria-label={`Increase quantity for ${ticket.name}`}
+      >
+        <div className="w-5 h-5 rounded-full border border-zinc-600 flex items-center justify-center">
+          <Plus className="w-3 h-3 text-zinc-300" />
+        </div>
+      </button>
+    </div>
+  );
+
+  const renderAccordionTicketRow = (ticket: TicketType) => {
+    const status = getTicketStatus(ticket);
+    const isAvailable = isTicketAvailable(ticket);
+    const selectedQuantity = selectedTickets[ticket.id] || 0;
+    const perPersonLimit = ticket.max_per_person ?? 10;
+    const stockLimit =
+      ticket.quantity_available === null
+        ? Number.MAX_SAFE_INTEGER
+        : ticket.quantity_available;
+    const maxQuantity = Math.min(perPersonLimit, stockLimit);
+    const originalPrice = isPrismfest
+      ? getPrismfestOriginalPrice(ticket.name)
+      : null;
+
+    return (
+      <div
+        key={ticket.id}
+        className="flex items-center justify-between gap-3 py-3 px-3 sm:px-5 hover:bg-white/[0.02] transition-colors"
+      >
+        {/* Left: Name & optional description/group badge */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm sm:text-base text-foreground leading-snug">
+              {ticket.name}
+            </span>
+            {(ticket.people_per_ticket ?? 1) > 1 && (
+              <span className="inline-block rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                Group of {ticket.people_per_ticket}
+              </span>
+            )}
+          </div>
+          {ticket.description?.trim() && (
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+              {ticket.description}
+            </p>
+          )}
+        </div>
+
+        {/* Middle: Price */}
+        <div className="text-right shrink-0 px-2 sm:px-4">
+          {showIkStudentPrice && ticket.price > 0 ? (
+            <div className="flex flex-col items-end">
+              <span className="text-sm sm:text-base font-bold text-primary whitespace-nowrap">
+                {formatPrice(getTicketDiscountedPrice(ticket))}
+              </span>
+              <span className="text-[11px] text-muted-foreground line-through whitespace-nowrap">
+                {formatPrice(
+                  originalPrice && originalPrice > ticket.price
+                    ? originalPrice
+                    : ticket.price,
+                )}
+              </span>
+            </div>
+          ) : (
+            <span className="text-sm sm:text-base font-semibold text-foreground whitespace-nowrap">
+              {formatPrice(ticket.price)}
+            </span>
+          )}
+        </div>
+
+        {/* Right: Stepper or External URL or Sold out badge */}
+        <div className="shrink-0">
+          {ticket.ticket_url ? (
+            <Button
+              size="sm"
+              className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-3 py-1.5 text-xs inline-flex items-center gap-1 shadow-sm"
+              asChild
+            >
+              <a
+                href={ticket.ticket_url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Buy Pass
+                <ExternalLink className="w-3 h-3 ml-0.5" />
+              </a>
+            </Button>
+          ) : isAvailable ? (
+            renderAccordionStepper(ticket, selectedQuantity, maxQuantity)
+          ) : (
+            status && (
+              <Badge variant={status.variant} className="shrink-0 text-xs">
+                {status.text}
+              </Badge>
+            )
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const goToCheckout = () => {
     clearCart();
     Object.entries(selectedTickets).forEach(([id, quantity]) => {
@@ -192,6 +363,64 @@ export function EventTicketSection({
         Select <span className="text-primary">Tickets</span>
       </PremiumHeading>
 
+      {hasGroups ? (
+        <div className="space-y-4">
+          {ticketGroups.map((group, groupIdx) => {
+            const groupKey = group.name || `ungrouped-${groupIdx}`;
+            const isCollapsed = group.name ? !!collapsedGroups[group.name] : false;
+
+            return (
+              <Card
+                key={groupKey}
+                className="overflow-hidden border border-zinc-800/80 bg-zinc-950/70 rounded-2xl shadow-lg"
+              >
+                {group.name ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.name!)}
+                    className="w-full flex items-center justify-between px-4 sm:px-6 py-3.5 bg-zinc-900/90 hover:bg-zinc-800/90 border border-zinc-800/80 rounded-xl my-2 mx-auto max-w-[calc(100%-1rem)] transition-all cursor-pointer select-none"
+                  >
+                    <span className="w-5 sm:w-6" />
+                    <span className="text-emerald-400 font-bold text-sm sm:text-base tracking-wide text-center">
+                      {group.name}
+                    </span>
+                    <ChevronDown
+                      className={`w-5 h-5 text-emerald-400 transition-transform duration-200 ${
+                        isCollapsed ? "-rotate-90" : "rotate-0"
+                      }`}
+                    />
+                  </button>
+                ) : (
+                  <div className="px-4 sm:px-6 py-3 border-b border-zinc-800/80">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      General Passes
+                    </h4>
+                  </div>
+                )}
+
+                <AnimatePresence initial={false}>
+                  {!isCollapsed && (
+                    <motion.div
+                      key={`group-body-${groupKey}`}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: "easeInOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="divide-y divide-zinc-800/60 pb-1">
+                        {group.tickets.map((ticket) =>
+                          renderAccordionTicketRow(ticket),
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
       <motion.div className="grid gap-3 md:gap-6" variants={cardGridVariants}>
         {ticketTypes.map((ticket) => {
           const status = getTicketStatus(ticket);
@@ -235,8 +464,22 @@ export function EventTicketSection({
                             {formatPrice(
                               originalPrice && originalPrice > ticket.price
                                 ? originalPrice
+                                : ticket.original_price && ticket.original_price > ticket.price
+                                ? ticket.original_price
                                 : ticket.price,
                             )}
+                          </span>
+                        </>
+                      ) : ticket.original_price && ticket.original_price > ticket.price ? (
+                        <>
+                          <span className="text-lg font-bold whitespace-nowrap text-emerald-400">
+                            {formatPrice(ticket.price)}
+                          </span>
+                          <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
+                            {formatPrice(ticket.original_price)}
+                          </span>
+                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                            {Math.round(((ticket.original_price - ticket.price) / ticket.original_price) * 100)}% OFF
                           </span>
                         </>
                       ) : (
@@ -296,6 +539,8 @@ export function EventTicketSection({
                             {formatPrice(
                               originalPrice && originalPrice > ticket.price
                                 ? originalPrice
+                                : ticket.original_price && ticket.original_price > ticket.price
+                                ? ticket.original_price
                                 : ticket.price,
                             )}
                           </div>
@@ -305,6 +550,25 @@ export function EventTicketSection({
                           <div className="text-xs text-muted-foreground">
                             Inside Karachi price
                           </div>
+                        </>
+                      ) : ticket.original_price && ticket.original_price > ticket.price ? (
+                        <>
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="text-sm text-muted-foreground line-through whitespace-nowrap">
+                              {formatPrice(ticket.original_price)}
+                            </span>
+                            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                              {Math.round(((ticket.original_price - ticket.price) / ticket.original_price) * 100)}% OFF
+                            </span>
+                          </div>
+                          <div className="text-3xl font-bold whitespace-nowrap text-emerald-400">
+                            {formatPrice(ticket.price)}
+                          </div>
+                          {ticket.price > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              per ticket
+                            </div>
+                          )}
                         </>
                       ) : (
                         <>
@@ -349,6 +613,7 @@ export function EventTicketSection({
           );
         })}
       </motion.div>
+      )}
 
       {getTotalTickets() > 0 && (
         <motion.div

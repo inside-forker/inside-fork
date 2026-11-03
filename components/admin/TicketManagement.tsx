@@ -62,6 +62,9 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
     ticket_url: "",
     people_per_ticket: "1",
     min_people_per_ticket: "1",
+    group_name: "",
+    group_order: "0",
+    original_price: "",
     attendee_fields: [],
   });
   const { toast } = useToast();
@@ -117,6 +120,14 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
   React.useEffect(() => {
     fetchTicketTypes();
   }, [fetchTicketTypes]);
+
+  const existingGroupNames = React.useMemo(() => {
+    const names = new Set<string>();
+    ticketTypes.forEach((t) => {
+      if (t.group_name?.trim()) names.add(t.group_name.trim());
+    });
+    return Array.from(names);
+  }, [ticketTypes]);
 
   // Initialize body state capture
   React.useEffect(() => {
@@ -470,6 +481,9 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
           people_per_ticket: parseInt(formData.people_per_ticket || "1") || 1,
           min_people_per_ticket:
             parseInt(formData.min_people_per_ticket || "") || null,
+          group_name: formData.group_name?.trim() || null,
+          group_order: parseInt(formData.group_order || "0") || 0,
+          original_price: formData.original_price ? parseFloat(formData.original_price) : null,
           attendee_fields: formData.attendee_fields ?? [],
         }),
       });
@@ -559,6 +573,9 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       ticket_url: "",
       people_per_ticket: "1",
       min_people_per_ticket: "1",
+      group_name: "",
+      group_order: "0",
+      original_price: "",
       attendee_fields: [],
     });
   };
@@ -602,6 +619,9 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       min_people_per_ticket: String(
         ticket.min_people_per_ticket ?? ticket.people_per_ticket ?? 1,
       ),
+      group_name: ticket.group_name || "",
+      group_order: String(ticket.group_order ?? 0),
+      original_price: ticket.original_price?.toString() || "",
       attendee_fields: ticket.attendee_fields ?? [],
     });
     setIsDialogOpen(true);
@@ -731,15 +751,23 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {(ticket.people_per_ticket ?? 1) > 1 && (
-                  <span className="inline-block rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold">
-                    Group of{" "}
-                    {ticket.min_people_per_ticket &&
-                    ticket.min_people_per_ticket < (ticket.people_per_ticket ?? 1)
-                      ? `${ticket.min_people_per_ticket}–${ticket.people_per_ticket}`
-                      : ticket.people_per_ticket}
-                  </span>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {ticket.group_name && (
+                    <span className="inline-block rounded-full bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 text-xs font-semibold">
+                      Section: {ticket.group_name}
+                      {ticket.group_order ? ` (#${ticket.group_order})` : ""}
+                    </span>
+                  )}
+                  {(ticket.people_per_ticket ?? 1) > 1 && (
+                    <span className="inline-block rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold">
+                      Group of{" "}
+                      {ticket.min_people_per_ticket &&
+                      ticket.min_people_per_ticket < (ticket.people_per_ticket ?? 1)
+                        ? `${ticket.min_people_per_ticket}–${ticket.people_per_ticket}`
+                        : ticket.people_per_ticket}
+                    </span>
+                  )}
+                </div>
                 {ticket.description && (
                   <p className="text-sm text-muted-foreground line-clamp-2">
                     {ticket.description}
@@ -748,9 +776,21 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Banknote className="h-4 w-4 text-green-600" />
-                    <span className="font-semibold text-green-600">
-                      {formatCurrency(ticket.price)}
-                    </span>
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                      <span className="font-semibold text-green-600">
+                        {formatCurrency(ticket.price)}
+                      </span>
+                      {ticket.original_price && ticket.original_price > ticket.price && (
+                        <>
+                          <span className="text-xs text-muted-foreground line-through">
+                            {formatCurrency(ticket.original_price)}
+                          </span>
+                          <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                            {Math.round(((ticket.original_price - ticket.price) / ticket.original_price) * 100)}% OFF
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-blue-600" />
@@ -821,6 +861,50 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Section Header / Grouping */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl border border-border/60 bg-muted/30">
+              <div className="md:col-span-2 space-y-2">
+                <Label htmlFor="ticket-group-name" className="text-sm font-medium">
+                  Section Header / Group <span className="text-muted-foreground text-xs">(optional)</span>
+                </Label>
+                <Input
+                  id="ticket-group-name"
+                  list="ticket-group-suggestions"
+                  value={formData.group_name || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, group_name: e.target.value }))
+                  }
+                  placeholder="e.g. Day 1 - 28th November, VIP Passes, Workshop"
+                />
+                <datalist id="ticket-group-suggestions">
+                  {existingGroupNames.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+                <p className="text-xs text-muted-foreground">
+                  Tickets sharing this header are grouped under collapsible accordions on the event page.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ticket-group-order" className="text-sm font-medium">
+                  Group Sort Order <span className="text-muted-foreground text-xs">(optional)</span>
+                </Label>
+                <Input
+                  id="ticket-group-order"
+                  type="number"
+                  min="0"
+                  value={formData.group_order || "0"}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, group_order: e.target.value }))
+                  }
+                  placeholder="0"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Lower numbers appear first.
+                </p>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Ticket Name */}
               <div className="space-y-2">
@@ -838,23 +922,44 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                 />
               </div>
 
-              {/* Price */}
-              <div className="space-y-2">
-                <Label htmlFor="ticket-price" className="text-sm font-medium">
-                  Price (Rs) <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="ticket-price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.price}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, price: e.target.value }))
-                  }
-                  placeholder="0.00"
-                  required
-                />
+              {/* Price & Original Price */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="ticket-price" className="text-sm font-medium">
+                    Price (Rs) <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="ticket-price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.price}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, price: e.target.value }))
+                    }
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ticket-original-price" className="text-sm font-medium">
+                    Original Price (Rs) <span className="text-muted-foreground text-xs">(optional)</span>
+                  </Label>
+                  <Input
+                    id="ticket-original-price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.original_price || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, original_price: e.target.value }))
+                    }
+                    placeholder="e.g. 3500"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Shows slashed price & % off discount badge
+                  </p>
+                </div>
               </div>
             </div>
 

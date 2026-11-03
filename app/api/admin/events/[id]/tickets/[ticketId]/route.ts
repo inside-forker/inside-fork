@@ -20,7 +20,7 @@ const TICKET_TYPE_COLUMNS =
   "id, event_id, name, description, price, quantity_available, " +
   "to_json(sale_starts_at) #>> '{}' AS sale_starts_at, " +
   "to_json(sale_ends_at) #>> '{}' AS sale_ends_at, " +
-  "max_per_person, ticket_url, people_per_ticket, min_people_per_ticket, attendee_fields";
+  "max_per_person, ticket_url, people_per_ticket, min_people_per_ticket, attendee_fields, group_name, group_order, original_price";
 
 function toNumericTicketType(row: Record<string, unknown>) {
   return {
@@ -28,6 +28,7 @@ function toNumericTicketType(row: Record<string, unknown>) {
     id: Number(row.id),
     event_id: Number(row.event_id),
     price: row.price !== null ? Number(row.price) : null,
+    original_price: row.original_price !== null && row.original_price !== undefined ? Number(row.original_price) : null,
   };
 }
 
@@ -116,6 +117,9 @@ export async function PUT(
       people_per_ticket,
       min_people_per_ticket,
       attendee_fields,
+      group_name,
+      group_order,
+      original_price,
     } = body;
 
     // Get current ticket data for comparison
@@ -239,6 +243,25 @@ export async function PUT(
       pushField(
         "ticket_url",
         ticket_url ? String(ticket_url).trim() || null : null
+      );
+    if (group_name !== undefined)
+      pushField(
+        "group_name",
+        group_name ? String(group_name).trim() || null : null
+      );
+    if (group_order !== undefined)
+      pushField(
+        "group_order",
+        group_order !== null && group_order !== "" && !isNaN(Number(group_order))
+          ? Number(group_order)
+          : 0
+      );
+    if (original_price !== undefined)
+      pushField(
+        "original_price",
+        original_price !== null && original_price !== "" && !isNaN(Number(original_price))
+          ? Number(original_price)
+          : null
       );
 
     if (setClauses.length === 0) {

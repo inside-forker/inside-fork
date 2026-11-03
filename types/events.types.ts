@@ -110,6 +110,12 @@ export type TicketType = {
   min_people_per_ticket?: number | null;
   /** This tier's own checkout questions (event-wide ones live on the event). */
   attendee_fields?: AttendeeField[];
+  /** Section header or group label (e.g. "Day 1 - 28th November"). */
+  group_name?: string | null;
+  /** Sort order for the group section. */
+  group_order?: number | null;
+  /** Original/slashed price before discount (e.g. 3500 when price is 2999). */
+  original_price?: number | null;
 };
 
 // Event page props
@@ -181,4 +187,7 @@ export interface TicketFormData {
   people_per_ticket?: string;
   min_people_per_ticket?: string;
   attendee_fields?: AttendeeField[];
+  group_name?: string;
+  group_order?: string;
+  original_price?: string;
 }
