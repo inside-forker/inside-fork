@@ -242,9 +242,8 @@ export async function POST(
              sale_ends_at,
              max_per_person,
              people_per_ticket,
-             created_at,
-             updated_at
-           ) VALUES ($1, $2, $3, $4, 0, 0, $5, $6, 10, 1, NOW(), NOW())
+             attendee_fields
+           ) VALUES ($1, $2, $3, $4, 0, 0, $5, $6, 10, 1, '[]'::jsonb)
            RETURNING id`,
           [eventId, ticket, show, order, eventStart, eventEnd]
         );
