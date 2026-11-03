@@ -1637,13 +1637,13 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                   <div className="text-[11px] text-[#0069DB] bg-[#0069DB]/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
                     <span>💡</span>
                     <span>
-                      Independent Pricing: Parchi students will get this discount even if Inside Karachi has no discount enabled.
+                      Overrides the event&apos;s Parchi % for this ticket. Applies only when the event&apos;s Parchi Student Discount is on.
                     </span>
                   </div>
                 </>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Verified students will pay the standard Inside Karachi rate (Rs {formData.price || "0.00"}). Toggle on to offer a special student price via Parchi app.
+                  Uses the event&apos;s Parchi % (set in the event&apos;s settings). Toggle on to give this ticket its own student price instead.
                 </p>
               )}
             </div>

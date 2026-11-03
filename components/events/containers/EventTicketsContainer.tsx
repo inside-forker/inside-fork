@@ -2,7 +2,7 @@
 import { query } from "@/lib/db";
 import { EventTicketSection } from "@/components/events/EventTicketSection";
 import { Event } from "@/types/events.types";
-import type { ParchiOffer } from "@/lib/parchi/discount";
+import { studentPriceSql, type ParchiOffer } from "@/lib/parchi/discount";
 import { effectiveQuantitySql } from "@/lib/ticketing/sellable-quantity";
 
 interface EventTicketsContainerProps {
@@ -18,8 +18,10 @@ export async function EventTicketsContainer({
     // the tier has PDF inventory; otherwise ticket_types.quantity_available.
     const { rows } = await query(
         `SELECT tt.*,
-            ${effectiveQuantitySql("tt")} AS effective_quantity_available
+            ${effectiveQuantitySql("tt")} AS effective_quantity_available,
+            ${studentPriceSql()} AS student_price
          FROM ticket_types tt
+         JOIN events e ON e.id = tt.event_id
          WHERE tt.event_id = $1
          ORDER BY tt.group_order ASC NULLS LAST, tt.group_name ASC NULLS LAST, tt.price ASC`,
         [event.id],
@@ -51,7 +53,9 @@ export async function EventTicketsContainer({
             group_name: row.group_name ? String(row.group_name).trim() : null,
             group_order: row.group_order !== null && row.group_order !== undefined ? Number(row.group_order) : 0,
             original_price: row.original_price != null ? Number(row.original_price) : null,
-            parchi_price: row.parchi_price != null ? Number(row.parchi_price) : null,
+            // Effective student price (event % or the tier's own); null when
+            // the event's Parchi toggle is off.
+            parchi_price: row.student_price != null ? Number(row.student_price) : null,
             parchi_original_price: row.parchi_original_price != null ? Number(row.parchi_original_price) : null,
         };
     });

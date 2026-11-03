@@ -19,11 +19,12 @@ import {
 } from "@/lib/mobile/skip-payment";
 import crypto from "crypto";
 import {
+  isParchiEnabled,
   ParchiServiceError,
   previewParchiDiscount,
 } from "@/lib/parchi/service";
 import { readParchiChannelCookie } from "@/lib/parchi/channel";
-import { PRISMFEST_SLUG, getPrismfestTicketDiscount } from "@/lib/events/prismfest";
+import { studentPriceSql, tiersStudentDiscount } from "@/lib/parchi/discount";
 
 export async function POST(request: NextRequest) {
   try {
@@ -91,7 +92,10 @@ export async function POST(request: NextRequest) {
       (i: { ticketTypeId: number }) => i.ticketTypeId,
     );
     const { rows: ticketTypes } = await query(
-      `SELECT id, price, event_id, name, parchi_price FROM ticket_types WHERE id = ANY($1::int[])`,
+      `SELECT tt.id, tt.price, tt.event_id, tt.name,
+              ${studentPriceSql()} AS parchi_price
+       FROM ticket_types tt JOIN events e ON e.id = tt.event_id
+       WHERE tt.id = ANY($1::int[])`,
       [ticketTypeIds],
     );
 
@@ -199,7 +203,7 @@ export async function POST(request: NextRequest) {
 
     // Student discount comes off the ticket subtotal before fees.
     // - Parchi channel / verification: claim via approved request id.
-    // - Logged-in IK on Prismfest, NOT from Parchi: open student discount.
+    // - Logged-in IK on a Parchi-enabled event, NOT from Parchi: open discount.
     // Non-authoritative preview: create_booking_atomic re-derives under locks.
     let discountAmount = 0;
     let allowOpenStudentDiscount = false;
@@ -227,23 +231,18 @@ export async function POST(request: NextRequest) {
         throw err;
       }
     } else if (!fromParchiChannel) {
-      // Open IK student discount: Prismfest shoppers who did NOT arrive from
-      // the Parchi app. Parchi-channel bookings must verify via 2FA above.
-      const { rows: eventRows } = await query(
-        `SELECT slug FROM events WHERE id = $1 LIMIT 1`,
-        [eventId],
-      );
-      const slug = (eventRows[0]?.slug as string | undefined) ?? "";
-      if (slug === PRISMFEST_SLUG) {
-        discountAmount = verifiedItems.reduce(
-          (
-            sum: number,
-            item: { name?: string; price: number; quantity: number },
-          ) => {
-            const disc = getPrismfestTicketDiscount(item.name ?? "", item.price);
-            return sum + disc * item.quantity;
-          },
-          0,
+      // Open IK student discount: shoppers on a Parchi-enabled event who did
+      // NOT arrive from the Parchi app. Parchi-channel bookings must verify
+      // via 2FA above.
+      if (await isParchiEnabled(eventId)) {
+        discountAmount = tiersStudentDiscount(
+          verifiedItems.map(
+            (item: { price: number; parchiPrice: number | null; quantity: number }) => ({
+              price: item.price,
+              parchi_price: item.parchiPrice,
+              quantity: item.quantity,
+            }),
+          ),
         );
         allowOpenStudentDiscount = discountAmount > 0;
       }

@@ -161,6 +161,14 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/admin/events - Create new event (if needed for admin creation)
+/** 0 < % <= 100, else null (no event-wide Parchi %). */
+function toParchiPercent(value: unknown): number | null {
+  const n = Number(value);
+  return value !== null && value !== "" && Number.isFinite(n) && n > 0 && n <= 100
+    ? n
+    : null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession(request);
@@ -211,6 +219,8 @@ export async function POST(request: NextRequest) {
       scanning_mode,
       total_gates,
       layout_image_url,
+      parchi_enabled,
+      parchi_discount_percent,
     } = body;
 
     if (!name || !name.trim()) {
@@ -254,8 +264,9 @@ export async function POST(request: NextRequest) {
            name, slug, description, start_time, end_time,
            location_name, address, latitude, longitude, category_id, organizer_id, max_capacity,
            is_featured, featured_rank, commission_rate, is_commission_based, status, require_guest_details,
-           scanning_mode, total_gates, layout_image_url
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+           scanning_mode, total_gates, layout_image_url, parchi_enabled,
+           parchi_discount_percent
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
          RETURNING id, organizer_id, name, slug, description,
            to_json(start_time) #>> '{}' AS start_time,
            to_json(end_time) #>> '{}' AS end_time,
@@ -264,7 +275,7 @@ export async function POST(request: NextRequest) {
            to_json(updated_at) #>> '{}' AS updated_at,
            category_id, max_capacity, is_featured, featured_rank, require_guest_details,
            location_name, address, latitude, longitude, scanning_mode, total_gates,
-           layout_image_url`,
+           layout_image_url, parchi_enabled, parchi_discount_percent`,
         [
           name.trim(),
           slug,
@@ -295,6 +306,8 @@ export async function POST(request: NextRequest) {
           scanning_mode || "single",
           total_gates ? Math.max(1, parseInt(String(total_gates), 10) || 1) : 1,
           layout_image_url || null,
+          parchi_enabled === true || parchi_enabled === "true",
+          toParchiPercent(parchi_discount_percent),
         ]
       );
       const row = rows[0];

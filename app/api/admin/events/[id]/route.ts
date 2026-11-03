@@ -41,7 +41,7 @@ const EVENTS_ROW_COLUMNS =
   "to_json(created_at) #>> '{}' AS created_at, to_json(updated_at) #>> '{}' AS updated_at, " +
   "category_id, max_capacity, is_featured, featured_rank, require_guest_details, " +
   "location_name, address, latitude, longitude, scanning_mode, total_gates, " +
-  "layout_image_url";
+  "layout_image_url, parchi_enabled, parchi_discount_percent";
 
 function toNumericEventsRow(row: Record<string, unknown>) {
   return {
@@ -135,7 +135,7 @@ export async function GET(
 
     // Not on the (untracked) events_with_details view, so read it directly.
     const { rows: layoutRows } = await query(
-      `SELECT layout_image_url FROM events WHERE id = $1`,
+      `SELECT layout_image_url, parchi_enabled, parchi_discount_percent FROM events WHERE id = $1`,
       [eventId]
     );
 
@@ -144,6 +144,11 @@ export async function GET(
       data: {
         ...toNumericEvent(event),
         layout_image_url: layoutRows[0]?.layout_image_url ?? null,
+        parchi_enabled: layoutRows[0]?.parchi_enabled === true,
+        parchi_discount_percent:
+          layoutRows[0]?.parchi_discount_percent != null
+            ? Number(layoutRows[0].parchi_discount_percent)
+            : null,
         images,
       },
     });
@@ -223,6 +228,8 @@ export async function PATCH(
       scanning_mode,
       total_gates,
       layout_image_url,
+      parchi_enabled,
+      parchi_discount_percent,
     } = body;
 
     // Build update
@@ -282,6 +289,17 @@ export async function PATCH(
       pushField("total_gates", Math.max(1, parseInt(total_gates, 10) || 1));
     if (layout_image_url !== undefined)
       pushField("layout_image_url", layout_image_url || null);
+    if (parchi_enabled !== undefined)
+      pushField("parchi_enabled", parchi_enabled === true);
+    if (parchi_discount_percent !== undefined) {
+      const pct = Number(parchi_discount_percent);
+      pushField(
+        "parchi_discount_percent",
+        parchi_discount_percent !== null && Number.isFinite(pct) && pct > 0 && pct <= 100
+          ? pct
+          : null,
+      );
+    }
 
     updateParams.push(eventId);
     const idIdx = updateParams.length;

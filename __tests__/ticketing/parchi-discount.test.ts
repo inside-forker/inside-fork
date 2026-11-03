@@ -1,8 +1,9 @@
 import {
   computeParchiDiscount,
   describeParchiOffer,
-  resolveStudentOffer,
-  PRISMFEST_FALLBACK_OFFER,
+  tierStudentPrice,
+  tiersStudentDiscount,
+  tiersHeadlineOffer,
   type ParchiOffer,
 } from "@/lib/parchi/discount";
 
@@ -70,21 +71,39 @@ describe("Parchi Discount Calculation", () => {
     });
   });
 
-  describe("resolveStudentOffer", () => {
-    it("returns active offer when provided", () => {
-      const customOffer: ParchiOffer = {
-        discount_type: "percentage",
-        discount_value: 30,
-        max_discount_amount: 1000,
-      };
-      expect(resolveStudentOffer(customOffer)).toEqual(customOffer);
+  describe("per-tier student pricing (event Parchi toggle)", () => {
+    // Prismfest '26 tiers: price -> parchi_price.
+    const tiers = [
+      { price: 6000, parchi_price: 2999 }, // Prism Fam
+      { price: 6000, parchi_price: 4800 }, // Prism Her
+      { price: 12000, parchi_price: 5999 }, // Prism Front
+      { price: 16000, parchi_price: 9999 }, // Prism Exclusive
+    ];
+
+    it("uses parchi_price only when it is below the price", () => {
+      expect(tierStudentPrice({ price: 6000, parchi_price: 2999 })).toBe(2999);
+      expect(tierStudentPrice({ price: 6000, parchi_price: 6000 })).toBeNull();
+      expect(tierStudentPrice({ price: 6000, parchi_price: null })).toBeNull();
+      expect(tierStudentPrice({ price: 6000 })).toBeNull();
     });
 
-    it("falls back to PRISMFEST_FALLBACK_OFFER when offer is null or undefined", () => {
-      expect(resolveStudentOffer(null)).toEqual(PRISMFEST_FALLBACK_OFFER);
-      expect(resolveStudentOffer(undefined)).toEqual(PRISMFEST_FALLBACK_OFFER);
-      expect(PRISMFEST_FALLBACK_OFFER.discount_value).toBe(50);
-      expect(PRISMFEST_FALLBACK_OFFER.discount_type).toBe("percentage");
+    it("sums rupees off per tier times quantity", () => {
+      expect(
+        tiersStudentDiscount([
+          { ...tiers[0], quantity: 2 },
+          { ...tiers[1], quantity: 1 },
+          { price: 1000, parchi_price: null, quantity: 3 },
+        ]),
+      ).toBe(3001 * 2 + 1200);
+    });
+
+    it("headlines the biggest % off across tiers", () => {
+      expect(tiersHeadlineOffer(tiers)).toEqual({
+        discount_type: "percentage",
+        discount_value: 50,
+        max_discount_amount: null,
+      });
+      expect(tiersHeadlineOffer([{ price: 1000, parchi_price: null }])).toBeNull();
     });
   });
 

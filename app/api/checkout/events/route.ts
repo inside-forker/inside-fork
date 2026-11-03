@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { studentPriceSql } from "@/lib/parchi/discount";
 import {
   mergeAttendeeFields,
   normalizeMinPeople,
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { rows } = await query(
-      `SELECT e.id, e.require_guest_details, e.name, e.slug, e.start_time, e.location_name,
+      `SELECT e.id, e.require_guest_details, e.parchi_enabled, e.name, e.slug, e.start_time, e.location_name,
               (SELECT i.url FROM event_images i
                WHERE i.event_id = e.id
                ORDER BY i.is_primary DESC NULLS LAST, i.display_order ASC NULLS LAST
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
     // Group size + checkout questions per ticket type (event-wide fields
     // merged with each tier's own).
     const { rows: ticketRows } = await query(
-      `SELECT tt.id, tt.event_id, tt.price, tt.parchi_price, tt.people_per_ticket, tt.min_people_per_ticket,
+      `SELECT tt.id, tt.event_id, tt.price, ${studentPriceSql()} AS parchi_price, tt.people_per_ticket, tt.min_people_per_ticket,
               tt.attendee_fields,
               e.attendee_fields AS event_attendee_fields
        FROM ticket_types tt JOIN events e ON e.id = tt.event_id
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
     const events = rows.map((row) => ({
       id: Number(row.id),
       require_guest_details: row.require_guest_details,
+      parchi_enabled: row.parchi_enabled === true,
       name: row.name as string,
       slug: (row.slug as string | null) ?? null,
       start_time: row.start_time ? new Date(row.start_time).toISOString() : null,

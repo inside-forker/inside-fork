@@ -25,6 +25,10 @@ export type AdminEvent = {
   gate_assignment_mode?: "manual" | "auto";
   /** Venue / zone map image (events.layout_image_url). */
   layout_image_url?: string | null;
+  /** Parchi student discount toggle (events.parchi_enabled). */
+  parchi_enabled?: boolean;
+  /** Event-wide Parchi % off (a ticket's parchi_price overrides it). */
+  parchi_discount_percent?: number | null;
   created_at: string;
   updated_at: string;
   images?: EventImage[];

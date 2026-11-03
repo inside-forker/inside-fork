@@ -10,17 +10,8 @@ import { EventTicketSectionProps, TicketType } from "@/types/events.types";
 import { PremiumHeading } from "@/components/brand/Typography";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/context/cartStore";
-import {
-  computeParchiDiscount,
-  PARCHI_BLUE,
-  resolveStudentOffer,
-} from "@/lib/parchi/discount";
+import { PARCHI_BLUE, tierStudentPrice } from "@/lib/parchi/discount";
 import { useArrivedFromParchi } from "@/lib/parchi/prefill";
-import {
-  isPrismfestSlug,
-  getPrismfestOriginalPrice,
-  getPrismfestDiscountedPrice,
-} from "@/lib/events/prismfest";
 import {
   sectionVariants,
   cardGridVariants,
@@ -34,21 +25,11 @@ export function EventTicketSection({
   parchiOffer,
 }: EventTicketSectionProps) {
   const router = useRouter();
-  // Parchi-app visitors: full prices + Parchi 2FA later. Anyone else on
-  // Prismfest: Inside Karachi slashed prices (coupon or 50% fallback).
+  // Parchi toggle on (the offer is only set then): Parchi-app visitors see
+  // the Parchi rate (unlocked by Parchi 2FA at checkout); everyone else sees
+  // the same price as Inside Karachi's own discount.
   const arrivedFromParchi = useArrivedFromParchi();
-  const isPrismfest = isPrismfestSlug(event.slug);
-  const studentOffer =
-    !arrivedFromParchi
-      ? isPrismfest
-        ? resolveStudentOffer(parchiOffer)
-        : (parchiOffer ?? null)
-      : null;
-  const showIkStudentPrice = !!studentOffer;
-  const studentPrice = (amount: number) =>
-    studentOffer
-      ? Math.round(amount - computeParchiDiscount(studentOffer, amount))
-      : amount;
+  const parchiEnabled = !!parchiOffer;
   const { addItem, clearCart } = useCartStore();
   const [selectedTickets, setSelectedTickets] = useState<
     Record<number, number>
@@ -71,13 +52,8 @@ export function EventTicketSection({
     }, 0);
   };
 
-  const getTicketDiscountedPrice = (ticket: TicketType) => {
-    if (isPrismfest) {
-      const prismPrice = getPrismfestDiscountedPrice(ticket.name);
-      if (prismPrice != null) return prismPrice;
-    }
-    return studentPrice(ticket.price);
-  };
+  const getTicketDiscountedPrice = (ticket: TicketType) =>
+    getTicketPricing(ticket).salePrice;
 
   const getTotalDiscountedPrice = () => {
     return Object.entries(selectedTickets).reduce((total, [id, quantity]) => {
@@ -202,46 +178,20 @@ export function EventTicketSection({
     }));
   };
 
-  const getTicketPricing = (ticket: TicketType) => {
-    const originalPrice = isPrismfest
-      ? getPrismfestOriginalPrice(ticket.name)
-      : null;
+  function getTicketPricing(ticket: TicketType) {
+    const studentPrice = parchiEnabled ? tierStudentPrice(ticket) : null;
+    const hasParchiPrice = studentPrice != null;
 
-    const hasParchiPrice =
-      ticket.parchi_price != null &&
-      ticket.parchi_price > 0 &&
-      ticket.parchi_price < ticket.price;
-
-    if (arrivedFromParchi && hasParchiPrice) {
-      const salePrice = ticket.parchi_price!;
+    if (studentPrice != null) {
+      const salePrice = studentPrice;
       const comparePrice =
         ticket.parchi_original_price && ticket.parchi_original_price > salePrice
           ? ticket.parchi_original_price
-          : ticket.price > salePrice
-          ? ticket.price
-          : ticket.original_price && ticket.original_price > salePrice
-          ? ticket.original_price
-          : null;
-      return {
-        mode: "parchi" as const,
-        salePrice,
-        comparePrice,
-        hasParchiPrice,
-      };
-    }
-
-    if (showIkStudentPrice && ticket.price > 0) {
-      const salePrice = getTicketDiscountedPrice(ticket);
-      const comparePrice =
-        originalPrice && originalPrice > ticket.price
-          ? originalPrice
-          : ticket.original_price && ticket.original_price > ticket.price
-          ? ticket.original_price
           : ticket.price;
       return {
-        mode: "student" as const,
+        mode: arrivedFromParchi ? ("parchi" as const) : ("student" as const),
         salePrice,
-        comparePrice: comparePrice > salePrice ? comparePrice : null,
+        comparePrice,
         hasParchiPrice,
       };
     }
@@ -257,7 +207,7 @@ export function EventTicketSection({
       comparePrice,
       hasParchiPrice,
     };
-  };
+  }
 
   const renderTicketCard = (ticket: TicketType) => {
     const status = getTicketStatus(ticket);
@@ -613,7 +563,8 @@ export function EventTicketSection({
                 </h4>
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   Total:{" "}
-                  {showIkStudentPrice && getTotalPrice() > 0 ? (
+                  {!arrivedFromParchi &&
+                  getTotalDiscountedPrice() < getTotalPrice() ? (
                     <>
                       <span className="line-through mr-1.5 sm:mr-2">
                         {formatPrice(getTotalPrice())}
@@ -628,7 +579,7 @@ export function EventTicketSection({
                       {formatPrice(getTotalPrice())}
                     </span>
                   )}
-                  {arrivedFromParchi && (
+                  {arrivedFromParchi && parchiEnabled && (
                     <span className="block text-xs mt-0.5" style={{ color: PARCHI_BLUE }}>
                       Parchi discount applies after you verify at checkout
                     </span>

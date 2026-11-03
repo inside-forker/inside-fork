@@ -13,8 +13,13 @@ import {
   type ParchiRequestData,
   type ParchiStatus,
 } from "./client";
-import { computeParchiDiscount, type ParchiOffer } from "./discount";
-import { PRISMFEST_SLUG, getPrismfestTicketDiscount } from "@/lib/events/prismfest";
+import {
+  computeParchiDiscount,
+  studentPriceSql,
+  tiersHeadlineOffer,
+  tiersStudentDiscount,
+  type ParchiOffer,
+} from "./discount";
 
 export type { ParchiOffer };
 
@@ -130,8 +135,45 @@ async function enforceStartLimit(userId: string): Promise<void> {
 // Offer
 // ---------------------------------------------------------------------------
 
-/** The Parchi discount that applies to this event right now, if any. */
+/** Whether the event has the Parchi student discount switched on. */
+export async function isParchiEnabled(eventId: number): Promise<boolean> {
+  const { rows } = await query(
+    `SELECT parchi_enabled FROM events WHERE id = $1`,
+    [eventId],
+  );
+  return rows[0]?.parchi_enabled === true;
+}
+
+/**
+ * The student discount on this event right now, if any: the biggest % off
+ * across its tiers (the event's Parchi %, or a tier's own Parchi price), for
+ * banners and copy. Null unless the event's Parchi toggle is on.
+ * The actual discount is per tier (see tiersStudentDiscount).
+ */
 export async function getParchiOffer(
+  eventId: number,
+): Promise<ParchiOffer | null> {
+  const { rows } = await query(
+    `SELECT tt.price, ${studentPriceSql()} AS student_price
+     FROM ticket_types tt
+     JOIN events e ON e.id = tt.event_id
+     WHERE tt.event_id = $1 AND e.parchi_enabled = true`,
+    [eventId],
+  );
+  // numeric columns come back from pg as strings.
+  return tiersHeadlineOffer(
+    rows.map((r) => ({
+      price: Number(r.price),
+      parchi_price: r.student_price != null ? Number(r.student_price) : null,
+    })),
+  );
+}
+
+/**
+ * Legacy: a `requires_parchi` coupon row. Only the booking RPC's fallback for
+ * events without the toggle still reads one.
+ */
+async function getParchiCouponOffer(
   eventId: number,
 ): Promise<ParchiOffer | null> {
   const { rows } = await query(
@@ -149,7 +191,6 @@ export async function getParchiOffer(
   );
   const row = rows[0];
   if (!row) return null;
-  // numeric columns come back from pg as strings.
   return {
     discount_type: row.discount_type,
     discount_value: Number(row.discount_value),
@@ -408,34 +449,18 @@ export async function previewParchiDiscount(input: {
   ) {
     throw invalid;
   }
-  // Check if any items have custom tier-level parchi_price
-  if (input.items && input.items.length > 0) {
-    const hasTierParchiPricing = input.items.some(
-      (item) => item.parchiPrice != null && item.parchiPrice < item.price,
+  // Toggle on: the per-tier Parchi prices, same as create_booking_atomic.
+  if (await isParchiEnabled(input.eventId)) {
+    return tiersStudentDiscount(
+      (input.items ?? []).map((item) => ({
+        price: item.price,
+        parchi_price: item.parchiPrice,
+        quantity: item.quantity,
+      })),
     );
-    if (hasTierParchiPricing) {
-      return input.items.reduce((sum, item) => {
-        if (item.parchiPrice != null && item.parchiPrice < item.price) {
-          return sum + (item.price - item.parchiPrice) * item.quantity;
-        }
-        return sum;
-      }, 0);
-    }
-
-    const { rows: eventRows } = await query(
-      `SELECT slug FROM events WHERE id = $1 LIMIT 1`,
-      [input.eventId],
-    );
-    const slug = (eventRows[0]?.slug as string | undefined) ?? "";
-    if (slug === PRISMFEST_SLUG) {
-      return input.items.reduce((sum, item) => {
-        const disc = getPrismfestTicketDiscount(item.name ?? "", item.price);
-        return sum + disc * item.quantity;
-      }, 0);
-    }
   }
 
-  const offer = await getParchiOffer(input.eventId);
+  const offer = await getParchiCouponOffer(input.eventId);
   if (!offer) {
     throw new ParchiServiceError(
       "parchi_not_offered",

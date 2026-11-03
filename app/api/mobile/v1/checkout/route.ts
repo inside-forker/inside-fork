@@ -19,8 +19,7 @@ import {
   effectiveQuantitySql,
   syncPdfStockForTicketTypes,
 } from "@/lib/ticketing/sellable-quantity";
-import { isPrismfestSlug, getPrismfestTicketDiscount } from "@/lib/events/prismfest";
-import { computeParchiDiscount } from "@/lib/parchi/discount";
+import { studentPriceSql, tiersStudentDiscount } from "@/lib/parchi/discount";
 import {
   buildAttendeeDetails,
   loadTicketAttendeeConfig,
@@ -51,66 +50,42 @@ function normalizeTicketTypeRows(
 }
 
 /**
- * Prismfest: Inside's open discount (the web's logged-in, non-Parchi price),
- * off the ticket subtotal before fees. The web passes it through
- * create_booking_atomic; create_booking_with_reservation has no open-discount
- * path, so it is applied here on the freshly created booking, before fees.
- * Same coupon row and math as the web (getParchiOffer + computeParchiDiscount).
+ * Parchi-enabled events: Inside's open discount (the web's logged-in,
+ * non-Parchi price), off the ticket subtotal before fees. The web passes it
+ * through create_booking_atomic; create_booking_with_reservation has no
+ * open-discount path, so it is applied here on the freshly created booking,
+ * before fees. Same per-tier math as the web (tiersStudentDiscount).
  */
-async function applyPrismfestDiscount(bookingId: number, eventId: number) {
+async function applyEventStudentDiscount(bookingId: number, eventId: number) {
   const { rows: eventRows } = await query(
-    `SELECT slug FROM events WHERE id = $1 LIMIT 1`,
+    `SELECT parchi_enabled FROM events WHERE id = $1 LIMIT 1`,
     [eventId],
   );
-  if (!isPrismfestSlug(eventRows[0]?.slug as string | undefined)) return;
-
-  const { rows: couponRows } = await query(
-    `SELECT id, discount_type, discount_value, max_discount_amount
-     FROM coupons
-     WHERE requires_parchi = true
-       AND is_active = true
-       AND (event_id IS NULL OR event_id = $1)
-       AND (starts_at IS NULL OR starts_at <= NOW())
-       AND (ends_at IS NULL OR ends_at >= NOW())
-       AND (usage_limit IS NULL OR usage_count < usage_limit)
-     ORDER BY event_id NULLS LAST, id
-     LIMIT 1`,
-    [eventId],
-  );
-  const coupon = couponRows[0];
-  if (!coupon) return;
+  if (eventRows[0]?.parchi_enabled !== true) return;
 
   const { rows: itemRows } = await query(
-    `SELECT bi.quantity, bi.price_per_ticket, tt.name
+    `SELECT bi.quantity, bi.price_per_ticket, ${studentPriceSql()} AS parchi_price
      FROM booking_items bi
      JOIN ticket_types tt ON tt.id = bi.ticket_type_id
+     JOIN events e ON e.id = tt.event_id
      WHERE bi.booking_id = $1`,
     [bookingId],
   );
-  const discount = itemRows.reduce(
-    (sum: number, item: { name?: string; price_per_ticket: string | number; quantity: string | number }) =>
-      sum +
-      getPrismfestTicketDiscount(
-        (item.name as string) ?? "",
-        Number(item.price_per_ticket),
-      ) *
-        Number(item.quantity),
-    0,
+  const discount = tiersStudentDiscount(
+    itemRows.map((item) => ({
+      price: Number(item.price_per_ticket),
+      parchi_price: item.parchi_price != null ? Number(item.parchi_price) : null,
+      quantity: Number(item.quantity),
+    })),
   );
   if (discount <= 0) return;
 
-  const { rowCount } = await query(
+  await query(
     `UPDATE bookings
-     SET total_amount = total_amount - $2, discount_amount = $2, coupon_id = $3
-     WHERE id = $1 AND coupon_id IS NULL`,
-    [bookingId, discount, coupon.id],
+     SET total_amount = total_amount - $2, discount_amount = $2
+     WHERE id = $1 AND coupon_id IS NULL AND COALESCE(discount_amount, 0) = 0`,
+    [bookingId, discount],
   );
-  if (rowCount) {
-    await query(
-      `UPDATE coupons SET usage_count = usage_count + 1 WHERE id = $1`,
-      [coupon.id],
-    );
-  }
 }
 
 const bodySchema = z.object({
@@ -440,10 +415,10 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     }
     bookingId = newId;
 
-    // One discount per booking: Prismfest's open discount only when no coupon
-    // or Parchi verification was used.
+    // One discount per booking: the event's open student discount only when
+    // no coupon or Parchi verification was used.
     if (!couponCode && !parchiVerificationId) {
-      await applyPrismfestDiscount(bookingId, eventId);
+      await applyEventStudentDiscount(bookingId, eventId);
     }
   }
 

@@ -2,22 +2,17 @@
 
 import { ParchiEventBanner } from "@/components/events/ParchiEventBanner";
 import { InsideStudentBanner } from "@/components/events/InsideStudentBanner";
-import {
-  resolveStudentOffer,
-  type ParchiOffer,
-} from "@/lib/parchi/discount";
+import type { ParchiOffer } from "@/lib/parchi/discount";
 import { useArrivedFromParchi } from "@/lib/parchi/prefill";
-import { isPrismfestSlug } from "@/lib/events/prismfest";
 import { useSupabaseUser } from "@/hooks/useSupabaseUser";
 
 /**
  * Chooses Parchi vs Inside student branding on the event page.
  * - Parchi channel → Parchi banner only
- * - Non-Parchi on Prismfest → Inside banner
- * - Otherwise → nothing
+ * - Everyone else → Inside banner
  *
- * Prismfest always has a resolvable offer (live coupon or 20% fallback) so the
- * banner never disappears when the coupon row is briefly unreadable.
+ * `offer` is only set when the event's Parchi toggle is on and a tier has a
+ * Parchi price (see getParchiOffer); otherwise nothing renders.
  */
 export function EventStudentBanners({
   offer,
@@ -28,20 +23,17 @@ export function EventStudentBanners({
 }) {
   const { user, isLoading } = useSupabaseUser();
   const fromParchi = useArrivedFromParchi();
-  const isPrismfest = isPrismfestSlug(eventSlug);
-  const resolved =
-    offer ?? (isPrismfest ? resolveStudentOffer(null) : null);
 
-  if (!resolved) return null;
+  if (!offer) return null;
 
   if (fromParchi) {
-    return <ParchiEventBanner offer={resolved} />;
+    return <ParchiEventBanner offer={offer} />;
   }
 
-  if (!isLoading && isPrismfest) {
+  if (!isLoading) {
     return (
       <InsideStudentBanner
-        offer={resolved}
+        offer={offer}
         signedIn={!!user}
         eventSlug={eventSlug}
       />

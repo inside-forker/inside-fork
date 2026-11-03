@@ -28,13 +28,8 @@ import {
 } from "@/lib/ticketing/attendee-fields";
 import { CheckoutContactCard, type BuyerDetails } from "./CheckoutContactCard";
 import { digitsOnly, formatPhone, formatPkr } from "./checkoutFormat";
-import {
-  computeParchiDiscount,
-  resolveStudentOffer,
-  type ParchiOffer,
-} from "@/lib/parchi/discount";
+import { tiersStudentDiscount, type ParchiOffer } from "@/lib/parchi/discount";
 import { useArrivedFromParchi } from "@/lib/parchi/prefill";
-import { isPrismfestSlug, getPrismfestTicketDiscount } from "@/lib/events/prismfest";
 import { AuthModal } from "@/components/auth/AuthModal";
 import type {
   ResumableBookingDTO,
@@ -207,55 +202,36 @@ export function CheckoutClient() {
     };
   }, [parchiEventId]);
 
-  // Synchronously detect Prismfest carts right from the cart items
-  const isPrismfestCart =
-    isPrismfestSlug(eventInfo?.slug) ||
-    items.some(
-      (i) =>
-        i.eventId === 101 ||
-        (i.eventName && i.eventName.toLowerCase().includes("prism")),
-    );
+  // Event's Parchi toggle: the per-tier Parchi price for everyone - Inside
+  // Karachi shoppers automatically, Parchi-app shoppers once verified.
+  const parchiEnabled = eventInfo?.parchi_enabled === true;
+  const tierDiscount = useMemo(
+    () =>
+      parchiEnabled
+        ? tiersStudentDiscount(
+            items.map((item) => ({
+              price: item.price,
+              parchi_price: eventInfo?.ticket_types?.find(
+                (t) => t.id === item.ticketTypeId,
+              )?.parchi_price,
+              quantity: item.quantity,
+            })),
+          )
+        : 0,
+    [items, eventInfo, parchiEnabled],
+  );
 
   // Open IK discount only when NOT on the Parchi channel. Parchi visitors
   // must complete 2FA (parchiVerificationId) before any student discount.
   const ikOpenStudentDiscount =
-    isPrismfestCart &&
-    !arrivedFromParchi &&
-    !parchiVerificationId;
+    tierDiscount > 0 && !arrivedFromParchi && !parchiVerificationId;
 
   // Same arithmetic as app/api/bookings/create/route.ts: student discount
   // comes off the subtotal, then fees on what's left.
   const totals: CheckoutTotals = useMemo(() => {
     const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    let discount = 0;
-    const shouldApplyDiscount = !!parchiVerificationId || ikOpenStudentDiscount;
-    if (shouldApplyDiscount) {
-      if (isPrismfestCart) {
-        discount = items.reduce((sum, item) => {
-          const disc = getPrismfestTicketDiscount(item.ticketName, item.price);
-          return sum + disc * item.quantity;
-        }, 0);
-      } else {
-        const tierParchiDiscount = items.reduce((sum, item) => {
-          const tt = (eventInfo?.ticket_types as Array<{ id: number; price?: number; parchi_price?: number | null }> | undefined)?.find(
-            (t) => t.id === item.ticketTypeId,
-          );
-          if (tt?.parchi_price != null && tt.parchi_price < item.price) {
-            return sum + (item.price - tt.parchi_price) * item.quantity;
-          }
-          return sum;
-        }, 0);
-
-        if (tierParchiDiscount > 0) {
-          discount = tierParchiDiscount;
-        } else if (parchiOffer) {
-          discount = computeParchiDiscount(
-            parchiOffer,
-            subtotal,
-          );
-        }
-      }
-    }
+    const discount =
+      parchiVerificationId || ikOpenStudentDiscount ? tierDiscount : 0;
     const discounted = subtotal - discount;
     const platformFee =
       Number(config?.["fees.platform_fee_fixed"] || 0) +
@@ -274,11 +250,9 @@ export function CheckoutClient() {
   }, [
     items,
     config,
-    eventInfo,
-    parchiOffer,
     parchiVerificationId,
     ikOpenStudentDiscount,
-    isPrismfestCart,
+    tierDiscount,
   ]);
 
   // Fetch Config
@@ -702,10 +676,10 @@ export function CheckoutClient() {
         onChangeQuantity={updateQuantity}
       />
 
-      {parchiEventId && arrivedFromParchi && isPrismfestCart ? (
+      {parchiEventId && arrivedFromParchi && parchiEnabled && parchiOffer ? (
         <ParchiDiscountCard
           eventId={parchiEventId}
-          offer={resolveStudentOffer(parchiOffer)}
+          offer={parchiOffer}
           isLoggedIn={!!user}
           onLogin={() => setAuthOpen(true)}
           onApprovedChange={setParchiVerificationId}
@@ -716,9 +690,7 @@ export function CheckoutClient() {
         <div className="rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm">
           <p className="font-semibold text-foreground">Inside Karachi Discount Applied</p>
           <p className="text-muted-foreground">
-            {parchiOffer?.discount_type === "percentage"
-              ? `${Math.round(parchiOffer.discount_value)}% discount applied.`
-              : "50% discount applied."}
+            You save {formatPkr(tierDiscount)} on these tickets.
           </p>
         </div>
       ) : null}
@@ -903,7 +875,7 @@ export function CheckoutClient() {
           // Stay on the checkout page with account connected
         }}
         description={
-          parchiOffer && isPrismfestSlug(eventInfo?.slug)
+          parchiEnabled && parchiOffer
             ? `Sign in or create an Inside Karachi account to unlock your discount.`
             : "Sign in or create an account to complete your booking."
         }

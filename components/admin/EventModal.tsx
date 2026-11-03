@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Layers,
   QrCode,
+  GraduationCap,
 } from "lucide-react";
 import { AdminDrawer, FormFooter, StatusBadge } from "@/components/admin/ui";
 import { Textarea } from "@/components/ui/textarea";
@@ -75,6 +76,8 @@ export function EventModal({
     is_featured: false,
     status: "draft",
     require_guest_details: false,
+    parchi_enabled: false,
+    parchi_discount_percent: "",
     scanning_mode: "single",
     total_gates: "1",
     layout_image_url: "",
@@ -182,6 +185,8 @@ export function EventModal({
         is_featured: false,
         status: "draft",
         require_guest_details: false,
+        parchi_enabled: false,
+        parchi_discount_percent: "",
         scanning_mode: "single",
         total_gates: "1",
         layout_image_url: "",
@@ -213,6 +218,8 @@ export function EventModal({
         is_featured: false,
         status: "draft",
         require_guest_details: false,
+        parchi_enabled: false,
+        parchi_discount_percent: "",
         scanning_mode: "single",
         total_gates: "1",
         layout_image_url: "",
@@ -247,6 +254,11 @@ export function EventModal({
               is_featured: eventData.is_featured || false,
               status: eventData.event_status || "draft",
               require_guest_details: eventData.require_guest_details || false,
+              parchi_enabled: eventData.parchi_enabled === true,
+              parchi_discount_percent:
+                eventData.parchi_discount_percent != null
+                  ? String(eventData.parchi_discount_percent)
+                  : "",
               scanning_mode: eventData.scanning_mode || "single",
               total_gates: (eventData.total_gates || 1).toString(),
               layout_image_url: eventData.layout_image_url || "",
@@ -677,6 +689,10 @@ export function EventModal({
         is_featured: formData.is_featured,
         status: formData.status,
         require_guest_details: formData.require_guest_details,
+        parchi_enabled: formData.parchi_enabled,
+        parchi_discount_percent: formData.parchi_discount_percent
+          ? Number(formData.parchi_discount_percent)
+          : null,
         scanning_mode: formData.scanning_mode as "single" | "multi_gate",
         total_gates: Math.max(1, parseInt(formData.total_gates || "1", 10) || 1),
         layout_image_url: formData.layout_image_url || null,
@@ -1269,6 +1285,57 @@ export function EventModal({
                           }
                         />
                       </div>
+
+                      <div className="flex items-center justify-between p-4 rounded-lg border border-[#0069DB]/25 bg-[#0069DB]/5">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-[#0069DB]/10">
+                            <GraduationCap className="h-4 w-4 text-[#0069DB]" />
+                          </div>
+                          <div>
+                            <Label
+                              htmlFor="parchi_enabled"
+                              className="text-sm font-medium cursor-pointer"
+                            >
+                              Parchi Student Discount
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              Inside Karachi and Parchi banners, slashed prices and
+                              Parchi ID verification at checkout.
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          id="parchi_enabled"
+                          checked={formData.parchi_enabled}
+                          onCheckedChange={(checked) =>
+                            handleInputChange("parchi_enabled", checked)
+                          }
+                        />
+                      </div>
+
+                      {formData.parchi_enabled && (
+                        <div className="space-y-2 rounded-lg border border-[#0069DB]/25 p-4">
+                          <Label htmlFor="parchi_discount_percent" className="text-sm font-medium">
+                            Parchi discount (% off every ticket)
+                          </Label>
+                          <Input
+                            id="parchi_discount_percent"
+                            type="number"
+                            min="1"
+                            max="100"
+                            step="1"
+                            placeholder="e.g. 20"
+                            value={formData.parchi_discount_percent}
+                            onChange={(e) =>
+                              handleInputChange("parchi_discount_percent", e.target.value)
+                            }
+                            className="h-11 max-w-[160px]"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            A ticket&apos;s own Parchi price, if set, overrides this.
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     <Separator />
