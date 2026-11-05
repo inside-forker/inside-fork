@@ -338,17 +338,19 @@ export function ShareButton({
     setIsUploading(false);
   };
 
-  // Compact variant (just icon button)
-  if (variant === "compact") {
+  // Compact (icon only) and pill (icon + "Share") variants
+  if (variant === "compact" || variant === "pill") {
     return (
       <>
         <Button
           onClick={handleShareClick}
           variant="outline"
-          size="icon"
+          size={variant === "pill" ? "default" : "icon"}
+          aria-label={variant === "compact" ? "Share" : undefined}
           className={cn("rounded-full", className)}
         >
           <Share2 className="w-4 h-4" />
+          {variant === "pill" && <span>Share</span>}
         </Button>
         <ShareModal
           isOpen={state !== "idle"}

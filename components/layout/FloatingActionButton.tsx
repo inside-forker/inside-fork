@@ -14,6 +14,7 @@ export function FloatingActionButton({ onClick }: FloatingActionButtonProps) {
       animate={{ scale: 1, y: 0, opacity: 1 }}
       exit={{ scale: 0, y: 50, opacity: 0 }}
       transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      data-mobile-fab=""
       className="md:hidden fixed bottom-4 right-4 z-50"
     >
       <motion.button

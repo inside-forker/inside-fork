@@ -1110,3 +1110,21 @@ div[style*="border: "] {
     max-height: 100% !important;
   }
 }
+
+/* ============================================
+   Event page booking bar (phones and tablets)
+   The bar owns the bottom edge, so the floating BottomNav / menu button
+   step aside while it is on screen, and the footer clears it.
+   ============================================ */
+@media (max-width: 767px) {
+  :root:has([data-event-buy-bar]) nav[data-chrome="footer"],
+  :root:has([data-event-buy-bar]) [data-mobile-fab] {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  :root:has([data-event-buy-bar]) footer[data-chrome="footer"] {
+    padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  }
+}

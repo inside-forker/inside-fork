@@ -109,7 +109,7 @@ export interface ShareButtonProps {
   contentId: number;
   contentTitle: string;
   contentUrl: string;
-  variant?: "default" | "compact" | "floating";
+  variant?: "default" | "compact" | "pill" | "floating";
   className?: string;
 }
 
