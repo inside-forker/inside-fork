@@ -34,6 +34,7 @@ import { OrganizerSelect } from "./OrganizerSelect";
 import { EventGalleryUpload } from "./EventGalleryUpload";
 import { EventVenueMapUpload } from "./EventVenueMapUpload";
 import { TicketManagement } from "./TicketManagement";
+import { EventInvitesPanel } from "./EventInvitesPanel";
 import { v4 as uuidv4 } from "uuid";
 
 import type { AdminEvent } from "@/types/events.types";
@@ -1223,6 +1224,12 @@ export function EventModal({
                                 Published
                               </div>
                             </SelectItem>
+                            <SelectItem value="invite_only">
+                              <div className="flex items-center gap-2">
+                                <div className="size-2 rounded-full bg-warning"></div>
+                                Invite only (hidden)
+                              </div>
+                            </SelectItem>
                             <SelectItem value="archived">
                               <div className="flex items-center gap-2">
                                 <div className="size-2 rounded-full bg-muted-foreground"></div>
@@ -1483,7 +1490,12 @@ export function EventModal({
 
               <TabsContent value="tickets" className="space-y-8">
                 {event ? (
-                  <TicketManagement eventId={event.event_id} />
+                  <>
+                    {formData.status === "invite_only" && (
+                      <EventInvitesPanel eventId={event.event_id} />
+                    )}
+                    <TicketManagement eventId={event.event_id} />
+                  </>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <Ticket className="h-12 w-12 text-muted-foreground mb-4" />

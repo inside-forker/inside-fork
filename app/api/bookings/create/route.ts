@@ -343,6 +343,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Invite-only guard triggers (sql/migrations/20261106_invite_only_events.sql).
+      if (/^invite:/i.test(message)) {
+        return NextResponse.json(
+          { error: message.replace(/^invite:\s*/i, ""), error_code: "invite_required" },
+          { status: 403 },
+        );
+      }
+
       if (isValidationFailure) {
         return NextResponse.json({ error: message }, { status: 400 });
       }

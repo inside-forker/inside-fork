@@ -54,11 +54,14 @@ export function EventBookingProvider({
   event,
   ticketTypes,
   parchiOffer,
+  maxTotal,
   children,
 }: {
   event: Event;
   ticketTypes: TicketType[];
   parchiOffer: ParchiOffer | null;
+  /** Most tickets across all tiers (invite-only events: 1). Picking past it swaps tiers. */
+  maxTotal?: number;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -68,8 +71,17 @@ export function EventBookingProvider({
   const [selected, setSelected] = useState<Record<number, number>>({});
 
   const setQuantity = useCallback((ticketId: number, quantity: number) => {
-    setSelected((prev) => ({ ...prev, [ticketId]: Math.max(0, quantity) }));
-  }, []);
+    setSelected((prev) => {
+      const qty = Math.max(0, quantity);
+      if (!maxTotal) return { ...prev, [ticketId]: qty };
+      const others = Object.entries(prev).reduce(
+        (sum, [id, n]) => (Number(id) === ticketId ? sum : sum + n),
+        0,
+      );
+      if (qty + others <= maxTotal) return { ...prev, [ticketId]: qty };
+      return { [ticketId]: Math.min(qty, maxTotal) };
+    });
+  }, [maxTotal]);
 
   const { totalTickets, totalPrice } = useMemo(() => {
     let count = 0;
@@ -114,11 +126,11 @@ export function EventBookingProvider({
         ticketName: ticket.name,
         price: ticket.price,
         quantity,
-        maxQuantity: ticket.quantity_available || undefined,
+        maxQuantity: maxTotal ?? (ticket.quantity_available || undefined),
       });
     }
     router.push("/checkout");
-  }, [addItem, clearCart, event.id, event.name, router, selected, ticketTypes]);
+  }, [addItem, clearCart, event.id, event.name, maxTotal, router, selected, ticketTypes]);
 
   const showTickets = useCallback(() => {
     document.getElementById("tickets")?.scrollIntoView({ behavior: "smooth", block: "start" });
