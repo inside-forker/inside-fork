@@ -1,10 +1,11 @@
-import { MapPin } from "lucide-react";
+import { MapPin, Navigation } from "lucide-react";
 import { OptimizedImage } from "@/components/ui/optimized-image";
 import { ShareButton } from "@/components/shared/ShareButton";
 import { EventOrganizer } from "@/components/events/EventOrganizer";
 import type { Event } from "@/types/events.types";
 import { cn } from "@/lib/utils";
 import { formatEventFacts } from "@/lib/events/datetime";
+import { eventDirectionsUrl } from "@/lib/events/directions";
 
 /**
  * The event header, in three pieces the page places on its grid: phones
@@ -50,8 +51,9 @@ export function EventTitle({ event, className }: { event: Event; className?: str
         <h1 className="text-[32px] font-bold leading-[1.1] tracking-[-0.025em] lg:text-5xl lg:leading-[1.05] lg:tracking-[-0.03em]">
           {event.name}
         </h1>
-        <div className="mt-3 flex items-center gap-3 lg:mt-3.5">
-          <EventOrganizer event={event} className="min-w-0 flex-1" />
+        <div className="mt-3 flex items-center gap-2 lg:mt-3.5">
+          <EventOrganizer event={event} className="mr-1 min-w-0 flex-1" />
+          <DirectionsButton event={event} className="lg:hidden" />
           <ShareButton
             {...share}
             variant="compact"
@@ -59,12 +61,34 @@ export function EventTitle({ event, className }: { event: Event; className?: str
           />
         </div>
       </div>
-      <ShareButton
-        {...share}
-        variant="pill"
-        className="hidden h-11 shrink-0 gap-2 border-0 bg-muted pl-4 pr-[18px] text-[15px] font-semibold shadow-none hover:bg-border lg:inline-flex"
-      />
+      <div className="hidden shrink-0 items-center gap-2 lg:flex">
+        <DirectionsButton event={event} />
+        <ShareButton
+          {...share}
+          variant="pill"
+          className="h-11 gap-2 border-0 bg-muted pl-4 pr-[18px] text-[15px] font-semibold shadow-none hover:bg-border"
+        />
+      </div>
     </div>
+  );
+}
+
+/** Grey capsule that opens the venue in Google Maps. */
+function DirectionsButton({ event, className }: { event: Event; className?: string }) {
+  if (!event.location_name && !event.address && !(event.latitude && event.longitude)) return null;
+  return (
+    <a
+      href={eventDirectionsUrl(event)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        "inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-muted pl-4 pr-[18px] text-[15px] font-semibold text-foreground transition-colors hover:bg-border",
+        className,
+      )}
+    >
+      <Navigation className="h-4 w-4" aria-hidden="true" />
+      Directions
+    </a>
   );
 }
 
@@ -91,7 +115,9 @@ export function EventFacts({ event, className }: { event: Event; className?: str
       </div>
       {venue && (
         <a
-          href="#location"
+          href={eventDirectionsUrl(event)}
+          target="_blank"
+          rel="noopener noreferrer"
           className="block border-l border-border px-1.5 text-center text-foreground lg:px-3"
         >
           <div className={LABEL}>Venue</div>

@@ -10,7 +10,7 @@ import { EventTicketsPanel } from "@/components/events/detail/EventTicketsPanel"
 import { EventBookingBar } from "@/components/events/detail/EventBookingBar";
 import { EventLineup, type EventLineupArtist } from "@/components/events/detail/EventLineup";
 import { EventGoodToKnow, type EventInfoLists } from "@/components/events/detail/EventGoodToKnow";
-import { EventLocation } from "@/components/events/detail/EventLocation";
+import { EventVenueMap } from "@/components/events/EventVenueMap";
 import { SECTION_TITLE } from "@/components/events/detail/styles";
 import { SimilarEventsContainer } from "@/components/events/containers/SimilarEventsContainer";
 import { MoreEventsSkeleton } from "@/components/events/detail/MoreEvents";
@@ -115,7 +115,6 @@ export default async function EventPage({
   const info: EventInfoLists = { setting_tags: [], amenities: [], restrictions: [] };
 
   const hasTickets = ticketTypes.length > 0;
-  const hasVenue = Boolean(event.location_name || event.address);
 
   return (
     <div className="bg-background">
@@ -151,8 +150,13 @@ export default async function EventPage({
 
               <EventGoodToKnow info={info} className="mt-9 lg:mt-14" />
 
-              {hasVenue && (
-                <EventLocation event={event} layoutImageUrl={venueMapUrl} className="mt-10 lg:mt-[72px]" />
+              {venueMapUrl && (
+                <section aria-labelledby="venue-map-title" className="mt-10 lg:mt-[72px]">
+                  <h2 id="venue-map-title" className={cn(SECTION_TITLE, "mb-4 lg:mb-5")}>
+                    Venue map
+                  </h2>
+                  <EventVenueMap src={venueMapUrl} alt={`${event.name} venue map`} />
+                </section>
               )}
             </div>
           </div>
