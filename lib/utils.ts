@@ -1,10 +1,34 @@
 import { clsx, type ClassValue } from "clsx";
 import { extendTailwindMerge } from "tailwind-merge";
 
-// Teach tailwind-merge the custom `text-data` size (tailwind.config.ts), or it
-// treats it as a colour and drops the real text colour beside it.
+// Teach tailwind-merge the custom tokens in tailwind.config.ts. Without this it
+// treats sizes like `text-data` or `text-body` as colours and drops the real
+// text colour beside them, and never dedupes the other custom names.
 const twMerge = extendTailwindMerge({
-  extend: { classGroups: { "font-size": [{ text: ["data"] }] } },
+  extend: {
+    classGroups: {
+      "font-size": [
+        {
+          text: [
+            "data",
+            "display-xl",
+            "display-lg",
+            "display-md",
+            "title",
+            "body-lg",
+            "body",
+            "small",
+            "label",
+          ],
+        },
+      ],
+      "font-family": [{ font: ["display", "ui", "mono-label"] }],
+      rounded: [{ rounded: ["control", "media", "container"] }],
+      shadow: [{ shadow: ["overlay"] }],
+      duration: [{ duration: ["fast", "base", "slow"] }],
+      ease: [{ ease: ["standard"] }],
+    },
+  },
 });
 
 export function cn(...inputs: ClassValue[]) {

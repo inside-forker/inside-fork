@@ -88,6 +88,34 @@
   }
 }
 
+/* Design-system tokens (additive). Motion, radius hierarchy and the single
+   overlay shadow. Mapped in tailwind.config.ts; lib/motion.ts mirrors the
+   motion values for framer-motion, so keep the two in sync. */
+@layer base {
+  :root {
+    --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+    --duration-fast: 150ms;
+    --duration-base: 300ms;
+    --duration-slow: 600ms;
+
+    /* Smaller on controls, larger on media and containers */
+    --radius-control: 0.5rem;
+    --radius-media: 1rem;
+    --radius-container: 1.5rem;
+
+    /* Floating layers only (menus, popovers, dialogs) */
+    --shadow-overlay:
+      0 16px 40px -12px hsl(var(--ink) / 0.22),
+      0 2px 8px hsl(var(--ink) / 0.08);
+  }
+
+  .dark {
+    --shadow-overlay:
+      0 16px 40px -12px rgb(0 0 0 / 0.6),
+      0 0 0 1px hsl(0 0% 100% / 0.06);
+  }
+}
+
 /* Admin scope. Applies only inside the admin shell root ([data-admin]).
    Consumer pages are untouched. See docs/ui-revamp/02-design-system.md. */
 @layer components {

@@ -70,12 +70,38 @@ const config = {
   		},
   		fontSize: {
   			// 13/20 data step for dense admin tables, chips and meta
-  			data: ['0.8125rem', { lineHeight: '1.25rem' }]
+  			data: ['0.8125rem', { lineHeight: '1.25rem' }],
+  			// Design-system type scale. Display sizes are fluid (390px -> 1440px).
+  			'display-xl': ['clamp(3rem, 1.9rem + 4.5vw, 6rem)', { lineHeight: '1.02', letterSpacing: '-0.035em' }],
+  			'display-lg': ['clamp(2.5rem, 1.7rem + 3.3vw, 4.5rem)', { lineHeight: '1.05', letterSpacing: '-0.03em' }],
+  			'display-md': ['clamp(2rem, 1.5rem + 2vw, 3.25rem)', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
+  			title: ['1.5rem', { lineHeight: '1.25', letterSpacing: '-0.01em' }],
+  			'body-lg': ['1.125rem', { lineHeight: '1.6' }],
+  			body: ['1rem', { lineHeight: '1.6' }],
+  			small: ['0.875rem', { lineHeight: '1.5' }],
+  			label: ['0.75rem', { lineHeight: '1rem', letterSpacing: '0.02em' }]
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			sm: 'calc(var(--radius) - 4px)',
+  			// Design-system hierarchy: controls < media < containers
+  			control: 'var(--radius-control)',
+  			media: 'var(--radius-media)',
+  			container: 'var(--radius-container)'
+  		},
+  		// One shadow token, for floating layers only
+  		boxShadow: {
+  			overlay: 'var(--shadow-overlay)'
+  		},
+  		// Motion tokens (mirrored in lib/motion.ts)
+  		transitionDuration: {
+  			fast: 'var(--duration-fast)',
+  			base: 'var(--duration-base)',
+  			slow: 'var(--duration-slow)'
+  		},
+  		transitionTimingFunction: {
+  			standard: 'var(--ease-standard)'
   		},
   		keyframes: {
   			'accordion-down': {
