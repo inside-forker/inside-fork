@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "design-lint": "node scripts/design-lint.mjs",
     "test": "jest",
     "test:watch": "jest --watch",
     "scrape:listings": "npx tsx scrapers/peekaboo_listings/index.ts",
