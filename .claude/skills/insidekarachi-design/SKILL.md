@@ -12,10 +12,35 @@ The brand is fixed. Do not reinterpret it per page. When this skill and the gene
 ## Before you write any UI
 
 1. Read `app/globals.css` for the real tokens. Never rely on the hex values in this file if the CSS says otherwise.
-2. Check what already exists in `components/ui`, `components/layout` and `components/motion` (and `lib/motion.ts`). Reuse before creating.
+2. Check what already exists in `components/ds` (the design-system kit, below), `components/ui` (shadcn primitives) and `lib/motion.ts`. Reuse before creating. `components/layout` holds the shared header and footer, not layout primitives.
 3. If a needed pattern does not exist, say so and propose it before inventing it. A one-off style on one page is how the site drifts.
-4. Do not copy patterns from pages that have not been migrated yet. Old pages still contain the banned styles, and legacy classes such as `.glass-card`, `.gradient-text*`, `.premium-gradient-*`, `.shadow-premium*` and the old keyframes still exist in `globals.css` only so those pages keep working. Never use them in new code, and never delete them unless every page using them has been migrated. The reference for "correct" is this file plus the already-redesigned pages.
+4. Do not copy patterns from pages that have not been migrated yet. Old pages still contain the banned styles. Legacy classes such as `.glass-card`, `.gradient-text*`, `.shadow-premium*`, `.premium-card`, `.glass*` and the old keyframes live in the `LEGACY` block at the end of `globals.css` only so those pages keep working. Never use them in new code, and never delete them unless every page using them has been migrated. The reference for "correct" is this file, `components/ds` and the already-redesigned pages (listed in `design-lint.paths.json`).
 5. Read `references/patterns.md` when composing a page layout. It has the card-free alternatives.
+
+## The kit
+
+Import from `@/components/ds`. All are server components except `Reveal`. Run `npm run dev` and open `/design-preview` to see every piece in light and dark (the page 404s in production).
+
+| Component | Use |
+|---|---|
+| `Section` | Full-width band. `tone`: `white` \| `cream` \| `ink` \| `muted`. `size`: `sm` \| `md` \| `lg` \| `xl` (vertical padding). The only place band padding is defined. |
+| `Container` | Content column with the site gutters. `width`: `prose` (reading width) \| `default` \| `wide`. |
+| `Heading` | Fraunces headline. `as`: `h1`–`h4`. `variant`: `display-xl` \| `display-lg` \| `display-md` \| `title`. Inherits the band's colour. |
+| `Label` | Small mono metadata (`as`: `span`, `p`, `time`, `dt`, `dd`). Not an automatic eyebrow. |
+| `Reveal` | One scroll reveal (fade + 16px rise), plays once, reduced motion keeps only the fade. `delay` in seconds for a small stagger. |
+| `RuledList`, `RuledListItem` | Hairline-divided rows (`title`, `meta`, `description`, optional `href` makes the whole row the link). Replaces most card grids. |
+
+Section tones re-map the theme tokens inside their band (`.ds-tone-*` in `globals.css`). Inside a cream or ink band, keep using `text-foreground`, `text-muted-foreground`, `border-border` and `bg-background`; they already resolve to the right colours. Never hard-code `text-cream` or `text-ink` inside a band.
+
+| Token | Classes |
+|---|---|
+| Type scale | `text-display-xl`, `text-display-lg`, `text-display-md` (fluid), `text-title`, `text-body-lg`, `text-body`, `text-small`, `text-label`. `text-data` is the admin table size. |
+| Fonts | `font-display`, `font-ui`, `font-mono-label` |
+| Radius | `rounded-control` (8px, buttons and inputs) < `rounded-media` (16px, images and cards) < `rounded-container` (24px, large panels) |
+| Shadow | `shadow-overlay` only, for menus, popovers and dialogs |
+| Motion | `duration-fast` (150ms), `duration-base` (300ms), `duration-slow` (600ms), `ease-standard`. For framer-motion: `ease`, `duration`, `transition`, `revealVariants`, `revealViewport` from `@/lib/motion`. |
+
+`cn()` in `lib/utils.ts` knows these names. If you add a token, register it there too, or tailwind-merge will drop classes beside it.
 
 ## The feel
 
@@ -30,7 +55,7 @@ These are the tells of a generated site. Do not use them in new code, and remove
 - Gradients of any kind (`bg-gradient-*`, `linear-gradient`, `radial-gradient`, `from-`/`via-`/`to-`, gradient text)
 - `backdrop-blur`, `backdrop-filter`, translucent "glass" panels
 - Glows and blurred color blobs (`blur-*` on decorative elements, colored `box-shadow`, `drop-shadow` glows)
-- Decorative shadows. Use none, or a hairline border. If a floating layer (menu, dialog) truly needs separation, use the one shadow token from `globals.css`, not an arbitrary value.
+- Decorative shadows. Use none, or a hairline border. If a floating layer (menu, dialog) truly needs separation, use the one shadow token, `shadow-overlay`, not an arbitrary value.
 - Arbitrary values for color, shadow, radius or timing (`shadow-[...]`, `bg-[#...]`, `duration-[...]`). Use tokens.
 - Emojis as icons. Use Lucide.
 
@@ -48,7 +73,7 @@ These are the tells of a generated site. Do not use them in new code, and remove
 
 Success (dark green) and warning (dark amber) are for admin status badges only.
 
-Always use the Tailwind/CSS token classes (`bg-primary`, `text-foreground`, and so on), never raw hex, so dark mode works. Dark mode uses a slightly brighter pink on a near-black background and must be checked on every page.
+Always use the Tailwind/CSS token classes (`bg-primary`, `text-foreground`, and so on), never raw hex, so dark mode works. Dark mode uses a slightly brighter pink on a near-black background and must be checked on every page. The root layout currently forces light mode (`forcedTheme="light"`), so check dark by wrapping the content in a `dark` class, as `/design-preview` does.
 
 Pink is scarce on purpose. It should cover well under 5% of any screen. If a screen has three pink things competing, two of them should be ink or grey. Scarcity is what makes the primary action obvious and the page feel expensive.
 
@@ -66,13 +91,13 @@ Headlines: large, tight tracking, generous line spacing below them. Let size con
 
 Body: keep lines under about 75 characters. Give Fraunces body text a little more line-height than Instrument Sans.
 
-Use only the type scale defined in the repo. Do not invent sizes.
+Use only the type scale defined in the repo (see The kit). Do not invent sizes. The body font of old pages is still Inter (`font-sans`); migrated pages set `font-ui` on their own content.
 
 Use the mono label for real metadata (a date, a neighborhood, a category, a count). Do not put an uppercase tracked eyebrow above every heading, and do not number sections (01, 02, 03) unless the content really is a sequence. A label earns its place by telling the reader something the heading does not. Do not accent a single word in a headline with italic or color.
 
 ## Layout and composition
 
-Build pages from the layout primitives (`Section`, `Container`, `Heading`, and so on) once they exist. Do not hand-roll section padding or max-widths.
+Build pages from the primitives in `components/ds` (`Section`, `Container`, `Heading`, `Label`, `RuledList`). Do not hand-roll section padding or max-widths.
 
 Structure comes from full-width bands that alternate white, cream and ink, with large vertical padding. Vary the rhythm: not every band needs the same height or the same internal layout. Three identical stacked bands is still a template.
 
@@ -80,7 +105,7 @@ Cards are for discrete objects people open or compare, such as a listing or an e
 
 Never put a card inside a card. Never use one identical rounded card repeated in a grid as the whole page.
 
-Radius comes from the radius tokens, and the scale should have hierarchy: larger on media and containers, smaller on controls. Do not apply one radius to everything.
+Radius comes from the radius tokens (`rounded-control`, `rounded-media`, `rounded-container`), and the scale has hierarchy: larger on media and containers, smaller on controls. Do not apply one radius to everything.
 
 Photography should be real and large, full-bleed where possible. Use `next/image` with correct `sizes` and meaningful `alt`.
 
@@ -94,8 +119,8 @@ The goal is smooth and responsive, not decorative. Two kinds of motion exist:
 
 Rules:
 
-- Use `components/motion` and `lib/motion.ts`, built on the `framer-motion` package already installed in this repo (check `package.json` for the exact import path). Do not add another animation library, and do not add new keyframes to `globals.css`. Legacy keyframes there are being phased out; never use them in new code.
-- One easing curve and three durations (fast 150ms, base 300ms, slow 600ms), defined once as tokens. Never type a raw duration or cubic-bezier in a component.
+- Use `Reveal` from `components/ds` and the tokens in `lib/motion.ts`, built on the installed `framer-motion` package (import from `"framer-motion"`). Do not add another animation library, and do not add new keyframes to `globals.css`. Legacy keyframes there are being phased out; never use them in new code.
+- One easing curve and three durations, defined once as tokens: CSS `--ease-standard` and `--duration-fast/base/slow` (150/300/600ms), Tailwind `ease-standard` and `duration-fast/base/slow`, and the same values in `lib/motion.ts`. Never type a raw duration or cubic-bezier in a component. `lib/utils/listing-animations.ts` is legacy; do not use it in new code.
 - Move things with `transform` and `opacity` only, so animation stays on the GPU. Color changes on interactive states are fine. Never animate width, height, top or left.
 - Scroll reveals play once, never replay on scroll back.
 - Respect `prefers-reduced-motion` by removing movement and keeping any essential state change.
@@ -123,7 +148,7 @@ Every page meets this before it is considered done:
 1. State briefly which layout primitives and patterns you will use and where the one memorable element goes.
 2. Build with existing components and tokens only.
 3. If Playwright is available, screenshot at 1440px and 390px, in light and dark mode, then critique honestly against this file and fix what is off. Remove one decorative thing before finishing.
-4. Run `npm run build`. If `npm run design-lint` exists, run it too. Fix failures before saying the work is done, because changes may go straight to production.
+4. Add the migrated page's files (or folders) to `design-lint.paths.json`, then run `npm run design-lint` and `npm run build`. On a low-memory machine the build may need `NODE_OPTIONS=--max-old-space-size=6144`. Fix failures before saying the work is done, because changes may go straight to production. `npm run design-lint -- --report` shows what is left across the unmigrated code.
 5. Finish with a short summary: what changed, any new pattern proposed, anything left inconsistent that you noticed but did not touch.
 
 ## Definition of done
@@ -134,4 +159,5 @@ Every page meets this before it is considered done:
 - [ ] No cards except real objects
 - [ ] Motion uses the shared tokens and respects reduced motion
 - [ ] Checked at mobile and desktop widths, light and dark
+- [ ] Page files listed in `design-lint.paths.json` and `npm run design-lint` passes
 - [ ] Build passes
