@@ -52,7 +52,9 @@ const inter = Inter({
   ],
 });
 
-// Auth-surface type system (scoped: only elements referencing these vars use them).
+// Design-system faces, exposed as CSS variables and mapped to the Tailwind
+// classes font-display, font-ui and font-mono-label (tailwind.config.ts).
+// Only elements using those classes change; the body stays Inter.
 const fraunces = Fraunces({
   subsets: ["latin"],
   variable: "--font-display",
@@ -71,7 +73,7 @@ const instrumentSans = Instrument_Sans({
 
 const ibmPlexMono = IBM_Plex_Mono({
   subsets: ["latin"],
-  variable: "--font-mono-ui",
+  variable: "--font-mono-label",
   display: "swap",
   weight: ["400", "500"],
   fallback: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],

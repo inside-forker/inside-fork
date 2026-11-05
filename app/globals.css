@@ -88,22 +88,6 @@
   }
 }
 
-@layer components {
-  /* Auth-surface type roles. Only applied where explicitly referenced;
-     the rest of the app keeps Inter via --font-sans. */
-  .font-display {
-    font-family: var(--font-display), Georgia, "Times New Roman", serif;
-    font-optical-sizing: auto;
-  }
-  .font-ui {
-    font-family: var(--font-ui), var(--font-sans);
-  }
-  .font-mono-label {
-    font-family: var(--font-mono-ui), ui-monospace, SFMono-Regular, Menlo,
-      monospace;
-  }
-}
-
 /* Admin scope. Applies only inside the admin shell root ([data-admin]).
    Consumer pages are untouched. See docs/ui-revamp/02-design-system.md. */
 @layer components {

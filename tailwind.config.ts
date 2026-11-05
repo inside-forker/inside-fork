@@ -21,7 +21,11 @@ const config = {
   	extend: {
   		fontFamily: {
   			// Inter, loaded by next/font in app/layout.tsx, same face as the mobile app
-  			sans: ['var(--font-sans)', 'system-ui', 'sans-serif']
+  			sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+  			// Design-system faces (next/font variables set in app/layout.tsx)
+  			display: ['var(--font-display)', 'Georgia', '"Times New Roman"', 'serif'],
+  			ui: ['var(--font-ui)', 'var(--font-sans)'],
+  			'mono-label': ['var(--font-mono-label)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace']
   		},
   		colors: {
   			// Brand palette (logo): cream surfaces and ink text alongside the pink primary
