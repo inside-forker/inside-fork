@@ -116,6 +116,33 @@
   }
 }
 
+/* Section tones (components/ds/Section). Each tone re-maps the semantic
+   tokens inside its band, so text, muted text, hairlines and controls adapt
+   without per-component overrides. */
+@layer components {
+  .ds-tone-cream {
+    --background: var(--cream);
+    --foreground: var(--ink);
+    --muted-foreground: 40 8% 36%;
+    --border: 45 22% 80%;
+  }
+  .dark .ds-tone-cream {
+    --background: var(--card);
+    --foreground: 0 0% 98%;
+    --muted-foreground: 0 0% 63.9%;
+    --border: 0 0% 18%;
+  }
+  .ds-tone-ink {
+    --background: var(--ink);
+    --foreground: var(--cream);
+    --muted-foreground: 51 12% 72%;
+    --border: 207 12% 22%;
+  }
+  .ds-tone-muted {
+    --background: var(--muted);
+  }
+}
+
 /* Admin scope. Applies only inside the admin shell root ([data-admin]).
    Consumer pages are untouched. See docs/ui-revamp/02-design-system.md. */
 @layer components {

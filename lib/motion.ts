@@ -23,16 +23,19 @@ export const transition = {
 /** Distance a revealed element travels, in px. */
 export const revealDistance = 16;
 
-/** Scroll reveal: opacity + transform only. */
+/**
+ * Scroll reveal: opacity + transform only. Pair with
+ * <MotionConfig reducedMotion="user"> (components/ds/Reveal does), which drops
+ * the movement and keeps the fade for people who prefer reduced motion.
+ * Pass a delay in seconds through framer-motion's `custom` prop.
+ */
 export const revealVariants: Variants = {
   hidden: { opacity: 0, y: revealDistance },
-  visible: { opacity: 1, y: 0, transition: transition.slow },
-};
-
-/** Reduced-motion reveal: keep the fade, drop the movement. */
-export const revealVariantsReduced: Variants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: transition.base },
+  visible: (delay: number = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { ...transition.slow, delay },
+  }),
 };
 
 /** Scroll reveals play once and never replay on scroll back. */
