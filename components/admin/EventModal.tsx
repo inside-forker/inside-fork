@@ -1294,7 +1294,7 @@ export function EventModal({
                       </div>
                     </div>
 
-                    {/* Featured Event Toggle */}
+                    {/* Toggles Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="flex items-center justify-between rounded-lg border p-4">
                         <div className="flex items-center gap-3">
@@ -1345,10 +1345,13 @@ export function EventModal({
                           }
                         />
                       </div>
+                    </div>
 
-                      <div className="flex items-center justify-between p-4 rounded-lg border border-[#0069DB]/25 bg-[#0069DB]/5">
+                    {/* Parchi Student Discount */}
+                    <div className="rounded-xl border border-[#0069DB]/25 bg-[#0069DB]/5 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-full bg-[#0069DB]/10">
+                          <div className="p-2 rounded-full bg-[#0069DB]/10 shrink-0">
                             <GraduationCap className="h-4 w-4 text-[#0069DB]" />
                           </div>
                           <div>
@@ -1359,8 +1362,7 @@ export function EventModal({
                               Parchi Student Discount
                             </Label>
                             <p className="text-xs text-muted-foreground">
-                              Inside Karachi and Parchi banners, slashed prices and
-                              Parchi ID verification at checkout.
+                              Inside Karachi and Parchi banners, slashed prices and Parchi ID verification at checkout.
                             </p>
                           </div>
                         </div>
@@ -1374,8 +1376,8 @@ export function EventModal({
                       </div>
 
                       {formData.parchi_enabled && (
-                        <div className="space-y-2 rounded-lg border border-[#0069DB]/25 p-4">
-                          <Label htmlFor="parchi_discount_percent" className="text-sm font-medium">
+                        <div className="pt-2 border-t border-[#0069DB]/20 space-y-1.5">
+                          <Label htmlFor="parchi_discount_percent" className="text-xs font-medium">
                             Parchi discount (% off every ticket)
                           </Label>
                           <Input
@@ -1389,118 +1391,177 @@ export function EventModal({
                             onChange={(e) =>
                               handleInputChange("parchi_discount_percent", e.target.value)
                             }
-                            className="h-11 max-w-[160px]"
+                            className="h-10 max-w-[180px]"
                           />
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-[11px] text-muted-foreground">
                             Applies to every ticket. Leave empty to use each ticket&apos;s own Parchi price instead.
                           </p>
                         </div>
                       )}
+                    </div>
 
-                      {/* Custom Checkout Fees Section */}
-                      <div className="flex items-center justify-between p-4 rounded-lg border border-emerald-500/25 bg-emerald-500/5">
+                    {/* Custom Checkout Fees Section */}
+                    <div className="space-y-4 rounded-xl border border-border/70 bg-card p-4 transition-colors">
+                      <div className="flex items-start justify-between gap-4">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-full bg-emerald-500/10">
-                            <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                          <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+                            <CreditCard className="h-5 w-5" />
                           </div>
-                          <div>
-                            <Label
-                              htmlFor="custom_fees_enabled"
-                              className="text-sm font-medium cursor-pointer"
-                            >
-                              Custom Processing & Platform Fees
-                            </Label>
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-semibold">
+                                Custom Processing & Platform Fees
+                              </h4>
+                              {formData.custom_fees_enabled ? (
+                                <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                                  Custom active
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                  Global default
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground">
-                              Override universal system checkout fees (currently 5% payment processing) for this event.
+                              Override universal system checkout fees (standard 5% payment processing) for this event.
                             </p>
                           </div>
                         </div>
-                        <Switch
-                          id="custom_fees_enabled"
-                          checked={formData.custom_fees_enabled}
-                          onCheckedChange={(checked) =>
-                            handleInputChange("custom_fees_enabled", checked)
-                          }
-                        />
+                        <div className="flex items-center gap-2 shrink-0 pt-0.5">
+                          <Label
+                            htmlFor="custom_fees_enabled"
+                            className="text-xs text-muted-foreground cursor-pointer select-none"
+                          >
+                            {formData.custom_fees_enabled ? "On" : "Off"}
+                          </Label>
+                          <Switch
+                            id="custom_fees_enabled"
+                            checked={formData.custom_fees_enabled}
+                            onCheckedChange={(checked) =>
+                              handleInputChange("custom_fees_enabled", checked)
+                            }
+                          />
+                        </div>
                       </div>
 
-                      {formData.custom_fees_enabled && (
-                        <div className="space-y-4 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.02] p-4">
-                          <p className="text-xs text-muted-foreground">
-                            Set custom fee overrides for this event. Enter <span className="font-semibold text-foreground">0</span> to waive the fee completely. Leave blank to inherit global system default.
-                          </p>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {formData.custom_fees_enabled ? (
+                        <div className="pt-3 border-t border-border/50 space-y-4">
+                          <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
+                            💡 Enter <span className="font-semibold text-foreground">0</span> to waive a fee completely for this event, or enter a custom rate. Leave blank to inherit global system default.
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div className="space-y-1.5">
                               <Label htmlFor="payment_processing_fee_percentage" className="text-xs font-medium">
-                                Payment Processing Fee (%)
+                                Processing Fee (%)
                               </Label>
-                              <Input
-                                id="payment_processing_fee_percentage"
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.01"
-                                placeholder="Global default (5%)"
-                                value={formData.payment_processing_fee_percentage}
-                                onChange={(e) =>
-                                  handleInputChange("payment_processing_fee_percentage", e.target.value)
-                                }
-                                className="h-10"
-                              />
+                              <div className="relative">
+                                <Input
+                                  id="payment_processing_fee_percentage"
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.01"
+                                  placeholder="5.0"
+                                  value={formData.payment_processing_fee_percentage}
+                                  onChange={(e) =>
+                                    handleInputChange("payment_processing_fee_percentage", e.target.value)
+                                  }
+                                  className="h-10 pr-8"
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                                  %
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                Default: 5% of ticket total
+                              </p>
                             </div>
+
                             <div className="space-y-1.5">
                               <Label htmlFor="payment_processing_fee_fixed" className="text-xs font-medium">
-                                Fixed Processing Fee (Rs)
+                                Fixed Processing (PKR)
                               </Label>
-                              <Input
-                                id="payment_processing_fee_fixed"
-                                type="number"
-                                min="0"
-                                step="1"
-                                placeholder="Global default (Rs 0)"
-                                value={formData.payment_processing_fee_fixed}
-                                onChange={(e) =>
-                                  handleInputChange("payment_processing_fee_fixed", e.target.value)
-                                }
-                                className="h-10"
-                              />
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                                  Rs
+                                </span>
+                                <Input
+                                  id="payment_processing_fee_fixed"
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  placeholder="0"
+                                  value={formData.payment_processing_fee_fixed}
+                                  onChange={(e) =>
+                                    handleInputChange("payment_processing_fee_fixed", e.target.value)
+                                  }
+                                  className="h-10 pl-9"
+                                />
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                Default: Rs 0 per order
+                              </p>
                             </div>
+
                             <div className="space-y-1.5">
                               <Label htmlFor="platform_fee_percentage" className="text-xs font-medium">
                                 Platform Fee (%)
                               </Label>
-                              <Input
-                                id="platform_fee_percentage"
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.01"
-                                placeholder="Global default (0%)"
-                                value={formData.platform_fee_percentage}
-                                onChange={(e) =>
-                                  handleInputChange("platform_fee_percentage", e.target.value)
-                                }
-                                className="h-10"
-                              />
+                              <div className="relative">
+                                <Input
+                                  id="platform_fee_percentage"
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.01"
+                                  placeholder="0.0"
+                                  value={formData.platform_fee_percentage}
+                                  onChange={(e) =>
+                                    handleInputChange("platform_fee_percentage", e.target.value)
+                                  }
+                                  className="h-10 pr-8"
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                                  %
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                Default: 0%
+                              </p>
                             </div>
+
                             <div className="space-y-1.5">
                               <Label htmlFor="platform_fee_fixed" className="text-xs font-medium">
-                                Fixed Platform Fee (Rs)
+                                Fixed Platform (PKR)
                               </Label>
-                              <Input
-                                id="platform_fee_fixed"
-                                type="number"
-                                min="0"
-                                step="1"
-                                placeholder="Global default (Rs 0)"
-                                value={formData.platform_fee_fixed}
-                                onChange={(e) =>
-                                  handleInputChange("platform_fee_fixed", e.target.value)
-                                }
-                                className="h-10"
-                              />
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                                  Rs
+                                </span>
+                                <Input
+                                  id="platform_fee_fixed"
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  placeholder="0"
+                                  value={formData.platform_fee_fixed}
+                                  onChange={(e) =>
+                                    handleInputChange("platform_fee_fixed", e.target.value)
+                                  }
+                                  className="h-10 pl-9"
+                                />
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                Default: Rs 0
+                              </p>
                             </div>
                           </div>
+                        </div>
+                      ) : (
+                        <div className="pt-2 border-t border-border/40 text-xs text-muted-foreground flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                          <span>Using global defaults: 5% payment processing fee, Rs 0 fixed, 0% platform fee.</span>
                         </div>
                       )}
                     </div>

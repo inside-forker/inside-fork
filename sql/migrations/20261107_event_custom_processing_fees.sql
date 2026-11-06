@@ -13,3 +13,4 @@ COMMENT ON COLUMN events.payment_processing_fee_percentage IS 'Custom payment pr
 COMMENT ON COLUMN events.payment_processing_fee_fixed IS 'Custom fixed payment processing fee in PKR override. NULL = use system_config default.';
 COMMENT ON COLUMN events.platform_fee_percentage IS 'Custom platform fee percentage override. NULL = use system_config default.';
 COMMENT ON COLUMN events.platform_fee_fixed IS 'Custom fixed platform fee in PKR override. NULL = use system_config default.';
+
