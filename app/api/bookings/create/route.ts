@@ -193,18 +193,40 @@ export async function POST(request: NextRequest) {
             ? parseFloat(v) || 0
             : 0;
     }
-    const platformFeeFixed = feeMap["fees.platform_fee_fixed"] ?? 0;
-    const platformFeePercentage = feeMap["fees.platform_fee_percentage"] ?? 0;
-    const paymentFeeFixed = feeMap["fees.payment_processing_fee_fixed"] ?? 0;
+
+    const eventId = verifiedItems[0].eventId as number;
+
+    // Fetch event-specific fee overrides (if configured), falling back to system_config defaults
+    const { rows: eventFeeRows } = await query(
+      `SELECT payment_processing_fee_percentage, payment_processing_fee_fixed,
+              platform_fee_percentage, platform_fee_fixed
+       FROM events WHERE id = $1`,
+      [eventId],
+    );
+    const eventFees = eventFeeRows[0];
+
+    const platformFeeFixed =
+      eventFees?.platform_fee_fixed != null
+        ? Number(eventFees.platform_fee_fixed)
+        : (feeMap["fees.platform_fee_fixed"] ?? 0);
+    const platformFeePercentage =
+      eventFees?.platform_fee_percentage != null
+        ? Number(eventFees.platform_fee_percentage)
+        : (feeMap["fees.platform_fee_percentage"] ?? 0);
+    const paymentFeeFixed =
+      eventFees?.payment_processing_fee_fixed != null
+        ? Number(eventFees.payment_processing_fee_fixed)
+        : (feeMap["fees.payment_processing_fee_fixed"] ?? 0);
     const paymentFeePercentage =
-      feeMap["fees.payment_processing_fee_percentage"] ?? 0;
+      eventFees?.payment_processing_fee_percentage != null
+        ? Number(eventFees.payment_processing_fee_percentage)
+        : (feeMap["fees.payment_processing_fee_percentage"] ?? 0);
 
     // Student discount comes off the ticket subtotal before fees.
     // Only via an approved Parchi verification (Parchi-app shoppers); Inside
     // shoppers pay list price.
     // Non-authoritative preview: create_booking_atomic re-derives under locks.
     let discountAmount = 0;
-    const eventId = verifiedItems[0].eventId as number;
 
     if (parchiVerificationId) {
       try {

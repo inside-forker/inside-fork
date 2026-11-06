@@ -29,6 +29,14 @@ export type AdminEvent = {
   parchi_enabled?: boolean;
   /** Event-wide Parchi % off (a ticket's parchi_price overrides it). */
   parchi_discount_percent?: number | null;
+  /** Custom payment processing fee percentage override (null = system default). */
+  payment_processing_fee_percentage?: number | null;
+  /** Custom fixed payment processing fee in PKR override (null = system default). */
+  payment_processing_fee_fixed?: number | null;
+  /** Custom platform fee percentage override (null = system default). */
+  platform_fee_percentage?: number | null;
+  /** Custom fixed platform fee in PKR override (null = system default). */
+  platform_fee_fixed?: number | null;
   created_at: string;
   updated_at: string;
   images?: EventImage[];

@@ -387,7 +387,7 @@ export const POST = mobileRoute(async (request: NextRequest) => {
   }
 
   const { rows: bookingRows } = await query(
-    `SELECT id, booking_reference, total_amount, payment_status, coupon_id, discount_amount
+    `SELECT id, booking_reference, total_amount, payment_status, coupon_id, discount_amount, event_id
      FROM bookings WHERE id = $1`,
     [bookingId],
   );
@@ -415,11 +415,32 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     feeMap[row.config_key] =
       typeof v === "number" ? v : parseFloat(String(v)) || 0;
   }
-  const platformFeeFixed = feeMap["fees.platform_fee_fixed"] ?? 0;
-  const platformFeePercentage = feeMap["fees.platform_fee_percentage"] ?? 0;
-  const paymentFeeFixed = feeMap["fees.payment_processing_fee_fixed"] ?? 0;
+
+  // Fetch event-specific fee overrides (if configured), falling back to system_config defaults
+  const { rows: eventFeeRows } = await query(
+    `SELECT payment_processing_fee_percentage, payment_processing_fee_fixed,
+            platform_fee_percentage, platform_fee_fixed
+     FROM events WHERE id = $1`,
+    [booking.event_id],
+  );
+  const eventFees = eventFeeRows[0];
+
+  const platformFeeFixed =
+    eventFees?.platform_fee_fixed != null
+      ? Number(eventFees.platform_fee_fixed)
+      : (feeMap["fees.platform_fee_fixed"] ?? 0);
+  const platformFeePercentage =
+    eventFees?.platform_fee_percentage != null
+      ? Number(eventFees.platform_fee_percentage)
+      : (feeMap["fees.platform_fee_percentage"] ?? 0);
+  const paymentFeeFixed =
+    eventFees?.payment_processing_fee_fixed != null
+      ? Number(eventFees.payment_processing_fee_fixed)
+      : (feeMap["fees.payment_processing_fee_fixed"] ?? 0);
   const paymentFeePercentage =
-    feeMap["fees.payment_processing_fee_percentage"] ?? 0;
+    eventFees?.payment_processing_fee_percentage != null
+      ? Number(eventFees.payment_processing_fee_percentage)
+      : (feeMap["fees.payment_processing_fee_percentage"] ?? 0);
 
   const subtotal = Number(booking.total_amount);
   const platformFee =

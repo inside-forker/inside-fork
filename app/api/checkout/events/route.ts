@@ -31,6 +31,8 @@ export async function GET(request: NextRequest) {
 
     const { rows } = await query(
       `SELECT e.id, e.require_guest_details, e.parchi_enabled, e.name, e.slug, e.start_time, e.location_name,
+              e.payment_processing_fee_percentage, e.payment_processing_fee_fixed,
+              e.platform_fee_percentage, e.platform_fee_fixed,
               (SELECT i.url FROM event_images i
                WHERE i.event_id = e.id
                ORDER BY i.is_primary DESC NULLS LAST, i.display_order ASC NULLS LAST
@@ -59,6 +61,22 @@ export async function GET(request: NextRequest) {
       start_time: row.start_time ? new Date(row.start_time).toISOString() : null,
       location_name: (row.location_name as string | null) ?? null,
       image_url: (row.image_url as string | null) ?? null,
+      payment_processing_fee_percentage:
+        row.payment_processing_fee_percentage != null
+          ? Number(row.payment_processing_fee_percentage)
+          : null,
+      payment_processing_fee_fixed:
+        row.payment_processing_fee_fixed != null
+          ? Number(row.payment_processing_fee_fixed)
+          : null,
+      platform_fee_percentage:
+        row.platform_fee_percentage != null
+          ? Number(row.platform_fee_percentage)
+          : null,
+      platform_fee_fixed:
+        row.platform_fee_fixed != null
+          ? Number(row.platform_fee_fixed)
+          : null,
       ticket_types: ticketRows
         .filter((t) => Number(t.event_id) === Number(row.id))
         .map((t) => ({

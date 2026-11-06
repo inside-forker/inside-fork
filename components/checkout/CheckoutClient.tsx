@@ -222,18 +222,38 @@ export function CheckoutClient() {
   );
 
   // Same arithmetic as app/api/bookings/create/route.ts: student discount
-  // comes off the subtotal, then fees on what's left.
+  // comes off the subtotal, then fees on what's left. Event overrides take precedence over system_config.
   const totals: CheckoutTotals = useMemo(() => {
     const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const discount = parchiVerificationId ? tierDiscount : 0;
     const discounted = subtotal - discount;
+
+    const platformFeeFixed =
+      eventInfo?.platform_fee_fixed != null
+        ? Number(eventInfo.platform_fee_fixed)
+        : Number(config?.["fees.platform_fee_fixed"] || 0);
+
+    const platformFeePercentage =
+      eventInfo?.platform_fee_percentage != null
+        ? Number(eventInfo.platform_fee_percentage)
+        : Number(config?.["fees.platform_fee_percentage"] || 0);
+
+    const paymentFeeFixed =
+      eventInfo?.payment_processing_fee_fixed != null
+        ? Number(eventInfo.payment_processing_fee_fixed)
+        : Number(config?.["fees.payment_processing_fee_fixed"] || 0);
+
+    const paymentFeePercentage =
+      eventInfo?.payment_processing_fee_percentage != null
+        ? Number(eventInfo.payment_processing_fee_percentage)
+        : Number(config?.["fees.payment_processing_fee_percentage"] || 0);
+
     const platformFee =
-      Number(config?.["fees.platform_fee_fixed"] || 0) +
-      discounted * (Number(config?.["fees.platform_fee_percentage"] || 0) / 100);
+      platformFeeFixed + discounted * (platformFeePercentage / 100);
     const paymentFee =
-      Number(config?.["fees.payment_processing_fee_fixed"] || 0) +
-      (discounted + platformFee) *
-        (Number(config?.["fees.payment_processing_fee_percentage"] || 0) / 100);
+      paymentFeeFixed +
+      (discounted + platformFee) * (paymentFeePercentage / 100);
+
     return {
       subtotal,
       discount,
@@ -241,7 +261,7 @@ export function CheckoutClient() {
       paymentFee,
       total: discounted + platformFee + paymentFee,
     };
-  }, [items, config, parchiVerificationId, tierDiscount]);
+  }, [items, config, parchiVerificationId, tierDiscount, eventInfo]);
 
   // Fetch Config
   useEffect(() => {

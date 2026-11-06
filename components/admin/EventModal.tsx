@@ -24,6 +24,7 @@ import {
   Layers,
   QrCode,
   GraduationCap,
+  CreditCard,
 } from "lucide-react";
 import { AdminDrawer, FormFooter, StatusBadge } from "@/components/admin/ui";
 import { Textarea } from "@/components/ui/textarea";
@@ -79,6 +80,11 @@ export function EventModal({
     require_guest_details: false,
     parchi_enabled: false,
     parchi_discount_percent: "",
+    custom_fees_enabled: false,
+    payment_processing_fee_percentage: "",
+    payment_processing_fee_fixed: "",
+    platform_fee_percentage: "",
+    platform_fee_fixed: "",
     scanning_mode: "single",
     total_gates: "1",
     layout_image_url: "",
@@ -188,6 +194,11 @@ export function EventModal({
         require_guest_details: false,
         parchi_enabled: false,
         parchi_discount_percent: "",
+        custom_fees_enabled: false,
+        payment_processing_fee_percentage: "",
+        payment_processing_fee_fixed: "",
+        platform_fee_percentage: "",
+        platform_fee_fixed: "",
         scanning_mode: "single",
         total_gates: "1",
         layout_image_url: "",
@@ -221,6 +232,11 @@ export function EventModal({
         require_guest_details: false,
         parchi_enabled: false,
         parchi_discount_percent: "",
+        custom_fees_enabled: false,
+        payment_processing_fee_percentage: "",
+        payment_processing_fee_fixed: "",
+        platform_fee_percentage: "",
+        platform_fee_fixed: "",
         scanning_mode: "single",
         total_gates: "1",
         layout_image_url: "",
@@ -259,6 +275,27 @@ export function EventModal({
               parchi_discount_percent:
                 eventData.parchi_discount_percent != null
                   ? String(eventData.parchi_discount_percent)
+                  : "",
+              custom_fees_enabled:
+                eventData.payment_processing_fee_percentage != null ||
+                eventData.payment_processing_fee_fixed != null ||
+                eventData.platform_fee_percentage != null ||
+                eventData.platform_fee_fixed != null,
+              payment_processing_fee_percentage:
+                eventData.payment_processing_fee_percentage != null
+                  ? String(eventData.payment_processing_fee_percentage)
+                  : "",
+              payment_processing_fee_fixed:
+                eventData.payment_processing_fee_fixed != null
+                  ? String(eventData.payment_processing_fee_fixed)
+                  : "",
+              platform_fee_percentage:
+                eventData.platform_fee_percentage != null
+                  ? String(eventData.platform_fee_percentage)
+                  : "",
+              platform_fee_fixed:
+                eventData.platform_fee_fixed != null
+                  ? String(eventData.platform_fee_fixed)
                   : "",
               scanning_mode: eventData.scanning_mode || "single",
               total_gates: (eventData.total_gates || 1).toString(),
@@ -694,6 +731,22 @@ export function EventModal({
         parchi_discount_percent: formData.parchi_discount_percent
           ? Number(formData.parchi_discount_percent)
           : null,
+        payment_processing_fee_percentage:
+          formData.custom_fees_enabled && formData.payment_processing_fee_percentage.trim() !== ""
+            ? Number(formData.payment_processing_fee_percentage)
+            : null,
+        payment_processing_fee_fixed:
+          formData.custom_fees_enabled && formData.payment_processing_fee_fixed.trim() !== ""
+            ? Number(formData.payment_processing_fee_fixed)
+            : null,
+        platform_fee_percentage:
+          formData.custom_fees_enabled && formData.platform_fee_percentage.trim() !== ""
+            ? Number(formData.platform_fee_percentage)
+            : null,
+        platform_fee_fixed:
+          formData.custom_fees_enabled && formData.platform_fee_fixed.trim() !== ""
+            ? Number(formData.platform_fee_fixed)
+            : null,
         scanning_mode: formData.scanning_mode as "single" | "multi_gate",
         total_gates: Math.max(1, parseInt(formData.total_gates || "1", 10) || 1),
         layout_image_url: formData.layout_image_url || null,
@@ -1341,6 +1394,113 @@ export function EventModal({
                           <p className="text-xs text-muted-foreground">
                             Applies to every ticket. Leave empty to use each ticket&apos;s own Parchi price instead.
                           </p>
+                        </div>
+                      )}
+
+                      {/* Custom Checkout Fees Section */}
+                      <div className="flex items-center justify-between p-4 rounded-lg border border-emerald-500/25 bg-emerald-500/5">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-emerald-500/10">
+                            <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                          </div>
+                          <div>
+                            <Label
+                              htmlFor="custom_fees_enabled"
+                              className="text-sm font-medium cursor-pointer"
+                            >
+                              Custom Processing & Platform Fees
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              Override universal system checkout fees (currently 5% payment processing) for this event.
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          id="custom_fees_enabled"
+                          checked={formData.custom_fees_enabled}
+                          onCheckedChange={(checked) =>
+                            handleInputChange("custom_fees_enabled", checked)
+                          }
+                        />
+                      </div>
+
+                      {formData.custom_fees_enabled && (
+                        <div className="space-y-4 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.02] p-4">
+                          <p className="text-xs text-muted-foreground">
+                            Set custom fee overrides for this event. Enter <span className="font-semibold text-foreground">0</span> to waive the fee completely. Leave blank to inherit global system default.
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <Label htmlFor="payment_processing_fee_percentage" className="text-xs font-medium">
+                                Payment Processing Fee (%)
+                              </Label>
+                              <Input
+                                id="payment_processing_fee_percentage"
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                placeholder="Global default (5%)"
+                                value={formData.payment_processing_fee_percentage}
+                                onChange={(e) =>
+                                  handleInputChange("payment_processing_fee_percentage", e.target.value)
+                                }
+                                className="h-10"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="payment_processing_fee_fixed" className="text-xs font-medium">
+                                Fixed Processing Fee (Rs)
+                              </Label>
+                              <Input
+                                id="payment_processing_fee_fixed"
+                                type="number"
+                                min="0"
+                                step="1"
+                                placeholder="Global default (Rs 0)"
+                                value={formData.payment_processing_fee_fixed}
+                                onChange={(e) =>
+                                  handleInputChange("payment_processing_fee_fixed", e.target.value)
+                                }
+                                className="h-10"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="platform_fee_percentage" className="text-xs font-medium">
+                                Platform Fee (%)
+                              </Label>
+                              <Input
+                                id="platform_fee_percentage"
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                placeholder="Global default (0%)"
+                                value={formData.platform_fee_percentage}
+                                onChange={(e) =>
+                                  handleInputChange("platform_fee_percentage", e.target.value)
+                                }
+                                className="h-10"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="platform_fee_fixed" className="text-xs font-medium">
+                                Fixed Platform Fee (Rs)
+                              </Label>
+                              <Input
+                                id="platform_fee_fixed"
+                                type="number"
+                                min="0"
+                                step="1"
+                                placeholder="Global default (Rs 0)"
+                                value={formData.platform_fee_fixed}
+                                onChange={(e) =>
+                                  handleInputChange("platform_fee_fixed", e.target.value)
+                                }
+                                className="h-10"
+                              />
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>

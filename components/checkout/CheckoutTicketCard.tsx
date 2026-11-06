@@ -12,6 +12,10 @@ export interface CheckoutEventInfo {
   start_time: string | null;
   location_name: string | null;
   image_url: string | null;
+  payment_processing_fee_percentage?: number | null;
+  payment_processing_fee_fixed?: number | null;
+  platform_fee_percentage?: number | null;
+  platform_fee_fixed?: number | null;
   ticket_types?: Array<{
     id: number;
     price?: number;

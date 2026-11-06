@@ -221,6 +221,10 @@ export async function POST(request: NextRequest) {
       layout_image_url,
       parchi_enabled,
       parchi_discount_percent,
+      payment_processing_fee_percentage,
+      payment_processing_fee_fixed,
+      platform_fee_percentage,
+      platform_fee_fixed,
     } = body;
 
     if (!name || !name.trim()) {
@@ -257,6 +261,12 @@ export async function POST(request: NextRequest) {
       slug = `${baseSlug}-${counter}`;
     }
 
+    const parseFee = (v: unknown): number | null => {
+      if (v === null || v === undefined || v === "") return null;
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    };
+
     let event;
     try {
       const { rows } = await query(
@@ -265,8 +275,10 @@ export async function POST(request: NextRequest) {
            location_name, address, latitude, longitude, category_id, organizer_id, max_capacity,
            is_featured, featured_rank, commission_rate, is_commission_based, status, require_guest_details,
            scanning_mode, total_gates, layout_image_url, parchi_enabled,
-           parchi_discount_percent
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+           parchi_discount_percent,
+           payment_processing_fee_percentage, payment_processing_fee_fixed,
+           platform_fee_percentage, platform_fee_fixed
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
          RETURNING id, organizer_id, name, slug, description,
            to_json(start_time) #>> '{}' AS start_time,
            to_json(end_time) #>> '{}' AS end_time,
@@ -275,7 +287,9 @@ export async function POST(request: NextRequest) {
            to_json(updated_at) #>> '{}' AS updated_at,
            category_id, max_capacity, is_featured, featured_rank, require_guest_details,
            location_name, address, latitude, longitude, scanning_mode, total_gates,
-           layout_image_url, parchi_enabled, parchi_discount_percent`,
+           layout_image_url, parchi_enabled, parchi_discount_percent,
+           payment_processing_fee_percentage, payment_processing_fee_fixed,
+           platform_fee_percentage, platform_fee_fixed`,
         [
           name.trim(),
           slug,
@@ -308,6 +322,10 @@ export async function POST(request: NextRequest) {
           layout_image_url || null,
           parchi_enabled === true || parchi_enabled === "true",
           toParchiPercent(parchi_discount_percent),
+          parseFee(payment_processing_fee_percentage),
+          parseFee(payment_processing_fee_fixed),
+          parseFee(platform_fee_percentage),
+          parseFee(platform_fee_fixed),
         ]
       );
       const row = rows[0];

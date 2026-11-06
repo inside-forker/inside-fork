@@ -41,7 +41,8 @@ const EVENTS_ROW_COLUMNS =
   "to_json(created_at) #>> '{}' AS created_at, to_json(updated_at) #>> '{}' AS updated_at, " +
   "category_id, max_capacity, is_featured, featured_rank, require_guest_details, " +
   "location_name, address, latitude, longitude, scanning_mode, total_gates, " +
-  "layout_image_url, parchi_enabled, parchi_discount_percent";
+  "layout_image_url, parchi_enabled, parchi_discount_percent, " +
+  "payment_processing_fee_percentage, payment_processing_fee_fixed, platform_fee_percentage, platform_fee_fixed";
 
 function toNumericEventsRow(row: Record<string, unknown>) {
   return {
@@ -53,6 +54,22 @@ function toNumericEventsRow(row: Record<string, unknown>) {
     longitude: row.longitude !== null ? Number(row.longitude) : null,
     commission_rate:
       row.commission_rate !== null ? Number(row.commission_rate) : null,
+    payment_processing_fee_percentage:
+      row.payment_processing_fee_percentage !== null && row.payment_processing_fee_percentage !== undefined
+        ? Number(row.payment_processing_fee_percentage)
+        : null,
+    payment_processing_fee_fixed:
+      row.payment_processing_fee_fixed !== null && row.payment_processing_fee_fixed !== undefined
+        ? Number(row.payment_processing_fee_fixed)
+        : null,
+    platform_fee_percentage:
+      row.platform_fee_percentage !== null && row.platform_fee_percentage !== undefined
+        ? Number(row.platform_fee_percentage)
+        : null,
+    platform_fee_fixed:
+      row.platform_fee_fixed !== null && row.platform_fee_fixed !== undefined
+        ? Number(row.platform_fee_fixed)
+        : null,
   };
 }
 
@@ -135,7 +152,10 @@ export async function GET(
 
     // Not on the (untracked) events_with_details view, so read it directly.
     const { rows: layoutRows } = await query(
-      `SELECT layout_image_url, parchi_enabled, parchi_discount_percent FROM events WHERE id = $1`,
+      `SELECT layout_image_url, parchi_enabled, parchi_discount_percent,
+              payment_processing_fee_percentage, payment_processing_fee_fixed,
+              platform_fee_percentage, platform_fee_fixed
+       FROM events WHERE id = $1`,
       [eventId]
     );
 
@@ -148,6 +168,22 @@ export async function GET(
         parchi_discount_percent:
           layoutRows[0]?.parchi_discount_percent != null
             ? Number(layoutRows[0].parchi_discount_percent)
+            : null,
+        payment_processing_fee_percentage:
+          layoutRows[0]?.payment_processing_fee_percentage != null
+            ? Number(layoutRows[0].payment_processing_fee_percentage)
+            : null,
+        payment_processing_fee_fixed:
+          layoutRows[0]?.payment_processing_fee_fixed != null
+            ? Number(layoutRows[0].payment_processing_fee_fixed)
+            : null,
+        platform_fee_percentage:
+          layoutRows[0]?.platform_fee_percentage != null
+            ? Number(layoutRows[0].platform_fee_percentage)
+            : null,
+        platform_fee_fixed:
+          layoutRows[0]?.platform_fee_fixed != null
+            ? Number(layoutRows[0].platform_fee_fixed)
             : null,
         images,
       },
@@ -230,6 +266,10 @@ export async function PATCH(
       layout_image_url,
       parchi_enabled,
       parchi_discount_percent,
+      payment_processing_fee_percentage,
+      payment_processing_fee_fixed,
+      platform_fee_percentage,
+      platform_fee_fixed,
     } = body;
 
     // Build update
@@ -299,6 +339,23 @@ export async function PATCH(
           ? pct
           : null,
       );
+    }
+    const parseFee = (v: unknown): number | null => {
+      if (v === null || v === undefined || v === "") return null;
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    };
+    if (payment_processing_fee_percentage !== undefined) {
+      pushField("payment_processing_fee_percentage", parseFee(payment_processing_fee_percentage));
+    }
+    if (payment_processing_fee_fixed !== undefined) {
+      pushField("payment_processing_fee_fixed", parseFee(payment_processing_fee_fixed));
+    }
+    if (platform_fee_percentage !== undefined) {
+      pushField("platform_fee_percentage", parseFee(platform_fee_percentage));
+    }
+    if (platform_fee_fixed !== undefined) {
+      pushField("platform_fee_fixed", parseFee(platform_fee_fixed));
     }
 
     updateParams.push(eventId);
