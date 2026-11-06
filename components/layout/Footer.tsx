@@ -1,13 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { ThemeAwareLogo } from "./ThemeAwareLogo";
 import { Facebook, Instagram, Twitter, Youtube } from "lucide-react";
 import { useRef, useEffect } from "react";
 import { CurrentYear } from "@/components/ui/CurrentYear";
 import { useScroll } from "@/lib/context/scroll-context";
 import { useInView } from "@/lib/hooks/use-in-view";
 import { NewsletterForm } from "@/components/shared/NewsletterForm";
+import { Container, Heading, Section } from "@/components/ds";
 
 // Define the type for the categories prop
 type Category = { name: string; slug: string };
@@ -67,6 +68,10 @@ const socialLinks = [
   },
 ];
 
+// Shared focus ring for links on the ink band
+const focusRing =
+  "rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 export function Footer({ serverCategories: _serverCategories }: FooterProps) {
   const footerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(footerRef, { threshold: 0.2 });
@@ -78,76 +83,87 @@ export function Footer({ serverCategories: _serverCategories }: FooterProps) {
   }, [isInView, setIsFooterInView]);
 
   return (
-    <footer
-      data-chrome="footer"
-      ref={footerRef}
-      className="border-t border-border bg-cream"
-    >
-      <div className="container mx-auto px-5 py-10 sm:px-6 lg:px-8">
-        <div className="grid gap-8 md:grid-cols-12 md:gap-10">
-          {/* Brand, newsletter and socials */}
-          <div className="space-y-4 md:col-span-5">
-            <div className="w-fit">
-              <ThemeAwareLogo />
+    <Section as="footer" tone="ink" size="sm" data-chrome="footer">
+      <div ref={footerRef}>
+        <Container>
+          <div className="grid gap-12 md:grid-cols-12 md:gap-10">
+            {/* Brand, newsletter and socials */}
+            <div className="md:col-span-5">
+              <Link href="/" className={`inline-flex min-h-11 items-center ${focusRing}`}>
+                <Image
+                  src="/assets/logo-white.png"
+                  alt="Inside Karachi"
+                  width={120}
+                  height={40}
+                  className="h-10 w-auto object-contain"
+                />
+              </Link>
+              <p className="mt-4 max-w-sm font-ui text-body text-muted-foreground">
+                The definitive guide to unlocking the best experiences in Karachi.
+              </p>
+
+              <div className="mt-10 max-w-md">
+                <Heading as="h2" variant="title">
+                  Become an Insider
+                </Heading>
+                <NewsletterForm
+                  variant="band"
+                  className="mt-4"
+                  buttonLabel="Sign me up"
+                  successTitle="Subscribed"
+                />
+              </div>
+
+              <ul className="-ml-3 mt-8 flex gap-1">
+                {socialLinks.map((social) => (
+                  <li key={social.name}>
+                    <Link
+                      href={social.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={social.name}
+                      className={`flex size-11 items-center justify-center text-muted-foreground transition-colors duration-fast ease-standard hover:text-foreground ${focusRing}`}
+                    >
+                      <social.icon aria-hidden="true" className="size-5" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-              The definitive guide to unlocking the best experiences in{" "}
-              <span className="font-semibold text-primary">Karachi</span>.
-            </p>
-            <div className="max-w-sm space-y-2">
-              <h2 className="text-sm font-semibold text-foreground">
-                Become an <span className="text-primary">Insider</span>
-              </h2>
-              <NewsletterForm buttonLabel="Sign me up" successTitle="Subscribed" />
-            </div>
-            <div className="flex gap-2">
-              {socialLinks.map((social) => (
-                <Link
-                  key={social.name}
-                  href={social.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary active:opacity-80"
-                >
-                  <social.icon className="h-4 w-4" />
-                  <span className="sr-only">{social.name}</span>
-                </Link>
+
+            {/* Link columns */}
+            <div className="grid gap-10 sm:grid-cols-3 md:col-span-7">
+              {footerLinks.map((group) => (
+                <div key={group.title}>
+                  <Heading as="h2" variant="title" className="text-body-lg">
+                    {group.title}
+                  </Heading>
+                  <ul className="mt-3 md:mt-4 md:space-y-1">
+                    {group.links.map((link) => (
+                      <li key={link.name}>
+                        <Link
+                          href={link.href}
+                          className={`flex min-h-11 items-center font-ui text-small text-muted-foreground transition-colors duration-fast ease-standard hover:text-foreground md:min-h-0 md:py-1 ${focusRing}`}
+                        >
+                          {link.name}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
             </div>
           </div>
 
-          {/* Link columns */}
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:col-span-7">
-            {footerLinks.map((group) => (
-              <div key={group.title}>
-                <h2 className="text-sm font-semibold text-foreground">{group.title}</h2>
-                <ul className="mt-3 space-y-2">
-                  {group.links.map((link) => (
-                    <li key={link.name}>
-                      <Link
-                        href={link.href}
-                        className="text-sm text-muted-foreground transition-colors hover:text-primary"
-                      >
-                        {link.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+          {/* Bottom bar: the only divider */}
+          <div className="mt-12 flex flex-col gap-1 border-t border-border pt-6 font-ui text-small text-muted-foreground sm:flex-row sm:justify-between">
+            <p>
+              © <CurrentYear /> Inside Karachi. All Rights Reserved.
+            </p>
+            <p>Managed by CITY GUIDE NETWORK (PRIVATE) LIMITED.</p>
           </div>
-        </div>
-
-        {/* Copyright */}
-        <div className="mt-8 flex flex-col gap-1 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:justify-between">
-          <p>
-            © <CurrentYear /> Inside Karachi. All Rights Reserved.
-          </p>
-          <p>
-            Managed by CITY GUIDE NETWORK (PRIVATE) LIMITED.
-          </p>
-        </div>
+        </Container>
       </div>
-    </footer>
+    </Section>
   );
 }

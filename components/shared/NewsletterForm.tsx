@@ -14,6 +14,11 @@ type NewsletterFormProps = {
   /** Defaults to the server's message ("already subscribed", etc.). */
   successDescription?: string;
   className?: string;
+  /**
+   * `card` (default): the joined rounded field used on the homepage.
+   * `band`: solid input and separate pink button for dark ds bands (footer).
+   */
+  variant?: "card" | "band";
 };
 
 /** Email sign-up for the newsletter list (`/api/newsletter`). */
@@ -22,6 +27,7 @@ export function NewsletterForm({
   successTitle,
   successDescription,
   className,
+  variant = "card",
 }: NewsletterFormProps) {
   const { toast } = useToast();
   const { executeRecaptcha, loadRecaptcha } = useRecaptcha(
@@ -81,6 +87,50 @@ export function NewsletterForm({
     }
   };
 
+  const preloadRecaptcha = () => {
+    if (!recaptchaPreloaded.current) {
+      recaptchaPreloaded.current = true;
+      loadRecaptcha();
+    }
+  };
+
+  if (variant === "band") {
+    return (
+      <form className={className} onSubmit={handleSubmit}>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Mail
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              type="email"
+              placeholder="Your email address"
+              aria-label="Email address"
+              className="h-11 rounded-control border-border bg-background pl-9 font-ui text-body text-foreground placeholder:text-muted-foreground md:text-small"
+              onFocus={preloadRecaptcha}
+            />
+            {/* Honeypot field - hidden from users */}
+            <input
+              ref={honeyRef}
+              type="text"
+              name="website_confirm"
+              className="sr-only"
+              aria-hidden="true"
+              tabIndex={-1}
+            />
+          </div>
+          <Button
+            type="submit"
+            className="h-11 rounded-control bg-primary px-5 font-ui text-small font-medium text-primary-foreground transition-colors duration-fast ease-standard hover:bg-primary/90"
+          >
+            {buttonLabel}
+          </Button>
+        </div>
+      </form>
+    );
+  }
+
   return (
     <form className={className} onSubmit={handleSubmit}>
       <div className="flex overflow-hidden rounded-xl border border-border bg-card">
@@ -91,12 +141,7 @@ export function NewsletterForm({
             placeholder="Your email address"
             aria-label="Email address"
             className="h-11 border-0 bg-transparent pl-9 pr-3 text-sm placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0"
-            onFocus={() => {
-              if (!recaptchaPreloaded.current) {
-                recaptchaPreloaded.current = true;
-                loadRecaptcha();
-              }
-            }}
+            onFocus={preloadRecaptcha}
           />
           {/* Honeypot field - hidden from users */}
           <input
