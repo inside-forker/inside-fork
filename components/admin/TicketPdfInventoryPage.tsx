@@ -29,9 +29,12 @@ import {
   ShoppingBag,
   Sparkles,
   Ticket,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -197,6 +200,12 @@ export function TicketPdfInventoryPage() {
   const [uploadTargetTier, setUploadTargetTier] = useState<{ id: number; name: string } | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  // Deletion States
+  const [selectedTicketIds, setSelectedTicketIds] = useState<number[]>([]);
+  const [deletingTicket, setDeletingTicket] = useState<InventoryTicket | null>(null);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleEventChange = (eventId: number | "") => {
     setSelectedEventId(eventId);
@@ -483,9 +492,10 @@ export function TicketPdfInventoryPage() {
     });
   }, [data, selectedEventId, statusFilter, tierFilter, searchQuery]);
 
-  // Reset page when filters change
+  // Reset page & selection when filters change
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedTicketIds([]);
   }, [selectedEventId, statusFilter, tierFilter, searchQuery, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(filteredTickets.length / pageSize));
@@ -493,6 +503,73 @@ export function TicketPdfInventoryPage() {
     const start = (currentPage - 1) * pageSize;
     return filteredTickets.slice(start, start + pageSize);
   }, [filteredTickets, currentPage, pageSize]);
+
+  // Selection helpers for available tickets
+  const availablePaginatedTickets = useMemo(() => {
+    return paginatedTickets.filter((t) => t.status === "available");
+  }, [paginatedTickets]);
+
+  const isAllPaginatedAvailableSelected =
+    availablePaginatedTickets.length > 0 &&
+    availablePaginatedTickets.every((t) => selectedTicketIds.includes(t.id));
+
+  const isSomePaginatedAvailableSelected =
+    availablePaginatedTickets.some((t) => selectedTicketIds.includes(t.id)) &&
+    !isAllPaginatedAvailableSelected;
+
+  const toggleSelectAll = () => {
+    if (isAllPaginatedAvailableSelected) {
+      const pageAvailableIds = new Set(availablePaginatedTickets.map((t) => t.id));
+      setSelectedTicketIds((prev) => prev.filter((id) => !pageAvailableIds.has(id)));
+    } else {
+      const newIds = new Set([
+        ...selectedTicketIds,
+        ...availablePaginatedTickets.map((t) => t.id),
+      ]);
+      setSelectedTicketIds(Array.from(newIds));
+    }
+  };
+
+  const toggleSelectTicket = (id: number) => {
+    setSelectedTicketIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const executeDelete = async (ids: number[]) => {
+    if (ids.length === 0) return;
+    try {
+      setIsDeleting(true);
+      const res = await fetch("/api/admin/ticket-pdf-inventory", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to remove tickets from inventory");
+      }
+      toast({
+        title: "Tickets Removed",
+        description:
+          json.message ||
+          `Removed ${json.data?.deleted_count ?? ids.length} ticket(s) from inventory.`,
+      });
+      setSelectedTicketIds((prev) => prev.filter((id) => !ids.includes(id)));
+      setDeletingTicket(null);
+      setIsBulkDeleteModalOpen(false);
+      await load(true);
+    } catch (err) {
+      toast({
+        title: "Removal Failed",
+        description:
+          err instanceof Error ? err.message : "Failed to remove tickets",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const parchiSoldCount = useMemo(
     () =>
@@ -1251,22 +1328,93 @@ export function TicketPdfInventoryPage() {
             </div>
           ) : (
             <>
+              {selectedTicketIds.length > 0 && (
+                <div className="flex items-center justify-between p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl mb-3 animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                    <span className="font-semibold text-xs sm:text-sm text-rose-600 dark:text-rose-400">
+                      {selectedTicketIds.length} ticket(s) selected
+                    </span>
+                    <span className="text-xs text-muted-foreground hidden sm:inline">
+                      (Ready to remove from available pool)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedTicketIds([])}
+                      className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                      disabled={isDeleting}
+                    >
+                      Clear selection
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setIsBulkDeleteModalOpen(true)}
+                      className="h-8 text-xs gap-1.5 shadow-sm"
+                      disabled={isDeleting}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Remove Selected ({selectedTicketIds.length})</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
               <div className="rounded-xl border border-border/60 overflow-x-auto shadow-2xs">
                 <Table>
                   <TableHeader className="bg-muted/40">
                     <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={
+                            isAllPaginatedAvailableSelected
+                              ? true
+                              : isSomePaginatedAvailableSelected
+                              ? "indeterminate"
+                              : false
+                          }
+                          onCheckedChange={toggleSelectAll}
+                          aria-label="Select all available tickets on page"
+                          disabled={availablePaginatedTickets.length === 0}
+                        />
+                      </TableHead>
                       <TableHead className="w-32">Ticket ID</TableHead>
                       <TableHead>Tier &amp; Event</TableHead>
                       <TableHead className="w-24">Status</TableHead>
                       <TableHead>Buyer Details</TableHead>
                       <TableHead>Booking Reference</TableHead>
                       <TableHead className="w-32">Assigned At</TableHead>
-                      <TableHead className="text-right w-32">Actions</TableHead>
+                      <TableHead className="text-right w-36">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedTickets.map((ticket) => (
-                      <TableRow key={ticket.id} className="hover:bg-muted/30">
+                      <TableRow
+                        key={ticket.id}
+                        className={cn(
+                          "hover:bg-muted/30",
+                          selectedTicketIds.includes(ticket.id) && "bg-rose-500/5",
+                        )}
+                      >
+                        {/* Selection Checkbox */}
+                        <TableCell className="w-10">
+                          {ticket.status === "available" ? (
+                            <Checkbox
+                              checked={selectedTicketIds.includes(ticket.id)}
+                              onCheckedChange={() => toggleSelectTicket(ticket.id)}
+                              aria-label={`Select ticket ${ticket.external_ticket_id}`}
+                            />
+                          ) : (
+                            <span
+                              title="Sold tickets cannot be removed"
+                              className="cursor-not-allowed opacity-30 inline-block p-0.5"
+                            >
+                              <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                            </span>
+                          )}
+                        </TableCell>
                         {/* Ticket ID */}
                         <TableCell>
                           <div className="flex items-center gap-1.5">
@@ -1437,6 +1585,28 @@ export function TicketPdfInventoryPage() {
                                 <ExternalLink className="h-3.5 w-3.5" />
                               </a>
                             </Button>
+
+                            {ticket.status === "available" ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDeletingTicket(ticket)}
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                title="Remove ticket from inventory"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled
+                                className="h-8 w-8 p-0 opacity-20 cursor-not-allowed"
+                                title="Sold tickets cannot be removed"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1753,6 +1923,38 @@ export function TicketPdfInventoryPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Single Ticket Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={Boolean(deletingTicket)}
+        onClose={() => setDeletingTicket(null)}
+        onConfirm={() => {
+          if (deletingTicket) {
+            void executeDelete([deletingTicket.id]);
+          }
+        }}
+        title="Remove Ticket from Inventory"
+        description={`Are you sure you want to remove ticket #${deletingTicket?.external_ticket_id} (${deletingTicket?.ticket_type_name})? This will permanently delete the stored PDF from DO Spaces and decrease the available stock count.`}
+        confirmText="Remove Ticket"
+        cancelText="Cancel"
+        variant="destructive"
+        isLoading={isDeleting}
+      />
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={isBulkDeleteModalOpen}
+        onClose={() => setIsBulkDeleteModalOpen(false)}
+        onConfirm={() => {
+          void executeDelete(selectedTicketIds);
+        }}
+        title={`Remove ${selectedTicketIds.length} Tickets from Inventory`}
+        description={`Are you sure you want to remove these ${selectedTicketIds.length} available tickets from the inventory pool? Their stored PDFs will be permanently deleted and available ticket counts will be updated automatically.`}
+        confirmText={`Remove ${selectedTicketIds.length} Tickets`}
+        cancelText="Cancel"
+        variant="destructive"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

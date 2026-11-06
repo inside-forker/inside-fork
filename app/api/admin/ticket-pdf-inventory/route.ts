@@ -7,6 +7,8 @@ import {
   requirePdfInventoryUnlock,
 } from "@/lib/ticketing/pdf-inventory-gate";
 import { captureRouteError } from "@/lib/sentry/captureRouteError";
+import { syncTicketTypeQuantityAvailable } from "@/lib/ticketing/pdf-inventory-upload";
+import { deleteFile } from "@/lib/storage/spaces";
 
 export const dynamic = "force-dynamic";
 
@@ -172,6 +174,147 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json(
       { success: false, error: "Failed to load PDF inventory" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * DELETE /api/admin/ticket-pdf-inventory
+ * Body: { ids: number[] } or { id: number }
+ * Removes unsold PDF tickets from the inventory, deletes their files from Spaces,
+ * and updates ticket_types.quantity_available.
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    let admin;
+    try {
+      admin = await requireAdmin(request);
+    } catch (error) {
+      const status = getAdminAuthErrorStatus(error);
+      return NextResponse.json(
+        {
+          success: false,
+          error: error instanceof Error ? error.message : "Unauthorized",
+        },
+        { status: status ?? 500 },
+      );
+    }
+
+    try {
+      requirePdfInventoryEmailAllowed(admin.user.email);
+      requirePdfInventoryUnlock(request, String(admin.profile.id));
+    } catch (error) {
+      if (error instanceof PdfInventoryGateError) {
+        return NextResponse.json(
+          { success: false, code: error.code, error: error.message },
+          { status: error.status },
+        );
+      }
+      throw error;
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const rawIds = Array.isArray(body.ids)
+      ? body.ids
+      : body.id != null
+      ? [body.id]
+      : [];
+
+    const ids = rawIds
+      .map((id: unknown) => Number(id))
+      .filter((id: number) => !isNaN(id) && id > 0);
+
+    if (ids.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "Please provide valid ticket ID(s) to remove" },
+        { status: 400 },
+      );
+    }
+
+    // Fetch tickets to verify ownership, booking status, and storage keys
+    const { rows: targets } = await query<{
+      id: number;
+      ticket_type_id: number;
+      storage_key: string | null;
+      booking_id: number | null;
+      external_ticket_id: string;
+    }>(
+      `SELECT id, ticket_type_id, storage_key, booking_id, external_ticket_id
+       FROM ticket_pdf_inventory
+       WHERE id = ANY($1::int[])`,
+      [ids],
+    );
+
+    if (targets.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "No matching tickets found in inventory" },
+        { status: 404 },
+      );
+    }
+
+    // Check for sold tickets
+    const soldTargets = targets.filter((t) => t.booking_id != null);
+    const availableTargets = targets.filter((t) => t.booking_id == null);
+
+    if (availableTargets.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Selected ticket(s) have already been sold or assigned to a booking and cannot be removed.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const deleteIds = availableTargets.map((t) => t.id);
+
+    // Delete files from Spaces (swallow errors so DB delete proceeds even if remote file is missing)
+    await Promise.allSettled(
+      availableTargets
+        .map((t) => t.storage_key)
+        .filter((k): k is string => Boolean(k))
+        .map((k) => deleteFile(k)),
+    );
+
+    // Delete records from database
+    await query(
+      `DELETE FROM ticket_pdf_inventory WHERE id = ANY($1::int[])`,
+      [deleteIds],
+    );
+
+    // Sync quantity_available for all affected ticket types
+    const affectedTicketTypeIds = Array.from(
+      new Set(availableTargets.map((t) => t.ticket_type_id)),
+    );
+
+    await Promise.all(
+      affectedTicketTypeIds.map((typeId) =>
+        syncTicketTypeQuantityAvailable(typeId),
+      ),
+    );
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        deleted_count: deleteIds.length,
+        skipped_sold_count: soldTargets.length,
+        deleted_ids: deleteIds,
+        affected_ticket_types: affectedTicketTypeIds,
+      },
+      message:
+        soldTargets.length > 0
+          ? `Removed ${deleteIds.length} available ticket(s). ${soldTargets.length} sold ticket(s) were skipped.`
+          : `Successfully removed ${deleteIds.length} ticket(s) from inventory.`,
+    });
+  } catch (error) {
+    captureRouteError(error, {
+      route: "/api/admin/ticket-pdf-inventory",
+      method: "DELETE",
+    });
+    return NextResponse.json(
+      { success: false, error: "Failed to remove tickets from inventory" },
       { status: 500 },
     );
   }
