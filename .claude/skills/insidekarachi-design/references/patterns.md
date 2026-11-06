@@ -46,7 +46,7 @@ A full-width photo with generous height and no text on it, or with a short capti
 
 ## 5. Statement band
 
-A band (cream or ink) holding one large Fraunces sentence and nothing else, or a sentence with one button. Use for a mission line, a pull quote or a call to action. Not for statistics dressed up as a "big number with a small label", which is a default treatment.
+An ink band (never cream) holding one large Fraunces sentence and nothing else, or a sentence with one button. Use for a mission line, a pull quote or a call to action. Not for statistics dressed up as a "big number with a small label", which is a default treatment.
 
 ## 6. Listing or event grid (where cards are allowed)
 

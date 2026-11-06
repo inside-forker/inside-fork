@@ -64,14 +64,20 @@ These are the tells of a generated site. Do not use them in new code, and remove
 | Role | Value | Use |
 |---|---|---|
 | Primary pink | `#FF184E` | Primary buttons, links, focus rings |
-| Ink | `#13181C` | Text, and the dark section background |
-| Cream | `#F3F0DF` | Warm section background |
-| White | `#FFFFFF` | Page background |
+| Ink | `#13181C` | Text; the footer and dark statement or hero bands (with cream text) |
+| Cream | `#F3F0DF` | Occasional accent band: at most one per page, never the footer |
+| White | `#FFFFFF` | Page background and the default section background |
 | Grey | `#F3F4F6` | Muted surfaces, secondary/accent |
 | Border | `#E5E7EB` | Hairlines and dividers |
 | Destructive | `#C52020` | Errors and destructive actions |
 
 Success (dark green) and warning (dark amber) are for admin status badges only.
+
+Section backgrounds:
+
+- **White** is the default for every section.
+- **Ink with cream text** is for the footer and for dark statement or hero bands (`Section tone="ink"`).
+- **Cream** is an occasional accent: at most one cream band per page, and never the footer.
 
 Always use the Tailwind/CSS token classes (`bg-primary`, `text-foreground`, and so on), never raw hex, so dark mode works. Dark mode uses a slightly brighter pink on a near-black background and must be checked on every page. The root layout currently forces light mode (`forcedTheme="light"`), so check dark by wrapping the content in a `dark` class, as `/design-preview` does.
 
@@ -99,7 +105,7 @@ Use the mono label for real metadata (a date, a neighborhood, a category, a coun
 
 Build pages from the primitives in `components/ds` (`Section`, `Container`, `Heading`, `Label`, `RuledList`). Do not hand-roll section padding or max-widths.
 
-Structure comes from full-width bands that alternate white, cream and ink, with large vertical padding. Vary the rhythm: not every band needs the same height or the same internal layout. Three identical stacked bands is still a template.
+Structure comes from full-width bands with large vertical padding, using the section backgrounds from Color (white by default). Vary the rhythm: not every band needs the same height or the same internal layout. Three identical stacked bands is still a template.
 
 Cards are for discrete objects people open or compare, such as a listing or an event. They are not a default container for text, features, stats or steps. For everything else use ruled lists with hairline dividers, large type with whitespace, split layouts (image beside text), full-bleed photography, or a plain table. See `references/patterns.md`.
 
