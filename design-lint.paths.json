@@ -1,3 +1,3 @@
 {
-  "paths": ["components/ds", "app/design-preview", "app/i", "app/invite", "components/events/invite", "components/layout/Footer.tsx", "components/shared/NewsletterForm.tsx"]
+  "paths": ["components/ds", "app/design-preview", "app/i", "app/invite", "components/events/invite", "components/layout/Footer.tsx", "components/shared/NewsletterForm.tsx", "components/layout/PublicHeader.tsx"]
 }

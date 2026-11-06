@@ -4,6 +4,7 @@ import * as React from "react";
 import ReactDOM from "react-dom";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { transition } from "@/lib/motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -235,10 +236,10 @@ export function PremiumDiscoveryPanel({
         id="premium-discovery-panel"
         onMouseDown={setPointerDownFlag}
         onTouchStart={setPointerDownFlag}
-        initial={{ opacity: 0, y: -20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -20, scale: 0.95 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }}
+        transition={transition.base}
         className={cn(
           "fixed top-[88px] left-0 right-0 z-[9999]",
           "pointer-events-none flex justify-center",
@@ -248,9 +249,9 @@ export function PremiumDiscoveryPanel({
         <div
           className={cn(
             "w-[90vw] max-w-5xl pointer-events-auto",
-            "bg-background/95 backdrop-blur-xl border border-border/50",
-            "rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/30",
-            "p-6 max-h-[80vh] overflow-y-auto custom-scrollbar",
+            "bg-popover text-popover-foreground border border-border",
+            "rounded-container shadow-overlay",
+            "p-6 max-h-[80vh] overflow-y-auto scrollbar-thin",
           )}
         >
           {/* Header - Only show in desktop mode */}
@@ -324,7 +325,7 @@ export function PremiumDiscoveryPanel({
                         }
                         onSearchSelect?.(result);
                       }}
-                      className="w-full p-4 text-left bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/30 transition-all duration-200 group"
+                      className="w-full p-4 text-left bg-card border border-border/50 rounded-xl hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/30 transition-all duration-200 group"
                     >
                       <div className="flex items-start space-x-3">
                         <div className="flex-shrink-0 mt-1">
@@ -431,8 +432,8 @@ export function PremiumDiscoveryPanel({
                       className={cn(
                         "group overflow-hidden rounded-xl p-4 transition-all duration-300 relative",
                         mobileMode
-                          ? "bg-card/30 border border-border/30 hover:border-border hover:bg-card/50 hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 hover:-translate-y-1 active:scale-95"
-                          : "p-5 rounded-xl border border-border/50 hover:border-border bg-card/50 hover:bg-card cursor-pointer hover:shadow-lg",
+                          ? "bg-card/30 border border-border/30 hover:border-border hover:bg-card/50 active:scale-95"
+                          : "p-5 rounded-xl border border-border/50 hover:border-border bg-card/50 hover:bg-card cursor-pointer",
                       )}
                     >
                       <div className="flex items-center gap-4">
@@ -465,11 +466,6 @@ export function PremiumDiscoveryPanel({
                       <p className="text-sm text-muted-foreground mt-3">
                         Restaurants, cafes, shops & more
                       </p>
-
-                      {/* Subtle gradient overlay for mobile */}
-                      {mobileMode && (
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none group-hover:pointer-events-auto" />
-                      )}
                     </motion.div>
                   </Link>
 
@@ -535,8 +531,8 @@ export function PremiumDiscoveryPanel({
                       className={cn(
                         "group overflow-hidden rounded-xl p-4 transition-all duration-300 relative",
                         mobileMode
-                          ? "bg-card/30 border border-border/30 hover:border-border hover:bg-card/50 hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 hover:-translate-y-1 active:scale-95"
-                          : "p-5 rounded-xl border border-border/50 hover:border-border bg-card/50 hover:bg-card cursor-pointer hover:shadow-lg",
+                          ? "bg-card/30 border border-border/30 hover:border-border hover:bg-card/50 active:scale-95"
+                          : "p-5 rounded-xl border border-border/50 hover:border-border bg-card/50 hover:bg-card cursor-pointer",
                       )}
                     >
                       <div className="flex items-center gap-4">
@@ -569,11 +565,6 @@ export function PremiumDiscoveryPanel({
                       <p className="text-sm text-muted-foreground mt-3">
                         Concerts, workshops & meetups
                       </p>
-
-                      {/* Subtle gradient overlay for mobile */}
-                      {mobileMode && (
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none group-hover:pointer-events-auto" />
-                      )}
                     </motion.div>
                   </Link>
                 </div>
@@ -611,7 +602,7 @@ export function PremiumDiscoveryPanel({
                             className={cn(
                               "p-5 rounded-xl border border-border/50 hover:border-border relative",
                               "bg-card/50 hover:bg-card transition-all duration-200",
-                              "cursor-pointer group hover:shadow-lg",
+                              "cursor-pointer group",
                             )}
                           >
                             <div className="text-center space-y-3">
@@ -712,7 +703,7 @@ export function PremiumDiscoveryPanel({
                           className={cn(
                             "p-5 rounded-lg border border-border/50 hover:border-border relative",
                             "bg-card/50 hover:bg-card transition-all duration-200",
-                            "cursor-pointer group hover:shadow-md",
+                            "cursor-pointer group",
                           )}
                         >
                           <div className="space-y-3">

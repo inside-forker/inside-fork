@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { PremiumHeader } from "@/components/dashboard/PremiumHeader";
+import { PublicHeader } from "@/components/layout/PublicHeader";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { getOptionalSessionUser } from "@/lib/auth/require-session";
 import type { User } from "@supabase/supabase-js";
@@ -176,14 +177,24 @@ export async function UnifiedPremiumHeader({
 
   return (
     <>
-      <PremiumHeader
-        user={user}
-        profile={profile}
-        context={context}
-        showDiscoveryPanel={showDiscoveryPanel}
-        onMenuClick={onMenuClick}
-        sidebarOpen={sidebarOpen}
-      />
+      {/* Public pages get the redesigned header; /admin and /dashboard keep
+          PremiumHeader through their own layout. */}
+      {context === "public" ? (
+        <PublicHeader
+          user={user}
+          profile={profile}
+          showDiscoveryPanel={showDiscoveryPanel}
+        />
+      ) : (
+        <PremiumHeader
+          user={user}
+          profile={profile}
+          context={context}
+          showDiscoveryPanel={showDiscoveryPanel}
+          onMenuClick={onMenuClick}
+          sidebarOpen={sidebarOpen}
+        />
+      )}
 
       {/* Mobile Navigation - Only show on public pages */}
       {context === "public" && (
