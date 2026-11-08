@@ -94,21 +94,6 @@ export function ticketPricing(ticket: TicketType, showStudentPrice = false): Tic
 
   // Regular Inside Karachi visitor (did NOT arrive from Parchi link):
   // Never show Parchi student discount or Parchi comparison prices.
-  // If original_price matches parchi_original_price and price matches parchi_price,
-  // this is a Parchi discount and must NOT be shown as a slashed price to normal Inside users.
-  if (
-    ticket.parchi_original_price != null &&
-    ticket.parchi_price != null &&
-    ticket.original_price === ticket.parchi_original_price &&
-    ticket.price === ticket.parchi_price
-  ) {
-    return {
-      mode: "native",
-      salePrice: ticket.parchi_original_price,
-      comparePrice: null,
-    };
-  }
-
   // ONLY show a discount if native Inside discount was explicitly configured (original_price > price).
   const hasNativeDiscount =
     ticket.original_price != null && ticket.original_price > ticket.price;
