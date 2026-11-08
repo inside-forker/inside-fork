@@ -16,6 +16,7 @@ The brand is fixed. Do not reinterpret it per page. When this skill and the gene
 3. If a needed pattern does not exist, say so and propose it before inventing it. A one-off style on one page is how the site drifts.
 4. Do not copy patterns from pages that have not been migrated yet. Old pages still contain the banned styles. Legacy classes such as `.glass-card`, `.gradient-text*`, `.shadow-premium*`, `.premium-card`, `.glass*` and the old keyframes live in the `LEGACY` block at the end of `globals.css` only so those pages keep working. Never use them in new code, and never delete them unless every page using them has been migrated. The reference for "correct" is this file, `components/ds` and the already-redesigned pages (listed in `design-lint.paths.json`).
 5. Read `references/patterns.md` when composing a page layout. It has the card-free alternatives.
+6. Every public page must follow docs/public-site-brief.md: its section order, its one primary action and its memorable element. Before building, propose mockups (see workflow) and wait for approval.
 
 ## The kit
 
