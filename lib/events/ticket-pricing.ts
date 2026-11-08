@@ -52,18 +52,30 @@ export function maxSelectable(ticket: TicketType): number {
   return Math.min(perPerson, stock);
 }
 
-export type TicketPricing = {
-  mode: "native";
-  salePrice: number;
-  comparePrice: number | null;
-};
+export type TicketPricing =
+  | { mode: "student"; salePrice: number; comparePrice: number | null }
+  | { mode: "native"; salePrice: number; comparePrice: number | null };
 
 /**
  * Price to show for a tier on the public event page.
- * Returns the native purchasable ticket price (with native original_price comparison, if any).
- * Parchi student discounts are applied at checkout after 2FA verification, not baked into the public event page sale price.
+ * Inside users (normal page, not arrived from Parchi) see the discounted student/slashed prices directly.
+ * Parchi arrivals see the standard list price on the tiles and verify their Parchi ID at checkout.
  */
-export function ticketPricing(ticket: TicketType): TicketPricing {
+export function ticketPricing(ticket: TicketType, showStudentPrice = false): TicketPricing {
+  const studentPrice = showStudentPrice ? tierStudentPrice(ticket) : null;
+  if (studentPrice != null) {
+    const compare =
+      ticket.parchi_original_price && ticket.parchi_original_price > studentPrice
+        ? ticket.parchi_original_price
+        : ticket.original_price && ticket.original_price > studentPrice
+          ? ticket.original_price
+          : ticket.price;
+    return {
+      mode: "student",
+      salePrice: studentPrice,
+      comparePrice: compare > studentPrice ? compare : null,
+    };
+  }
   return {
     mode: "native",
     salePrice: ticket.price,

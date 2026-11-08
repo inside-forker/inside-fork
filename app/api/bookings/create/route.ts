@@ -19,10 +19,12 @@ import {
 } from "@/lib/mobile/skip-payment";
 import crypto from "crypto";
 import {
+  isParchiEnabled,
   ParchiServiceError,
   previewParchiDiscount,
 } from "@/lib/parchi/service";
-import { studentPriceSql } from "@/lib/parchi/discount";
+import { readParchiChannelCookie } from "@/lib/parchi/channel";
+import { studentPriceSql, tiersStudentDiscount } from "@/lib/parchi/discount";
 
 export async function POST(request: NextRequest) {
   try {
@@ -223,10 +225,14 @@ export async function POST(request: NextRequest) {
         : (feeMap["fees.payment_processing_fee_percentage"] ?? 0);
 
     // Student discount comes off the ticket subtotal before fees.
-    // Only via an approved Parchi verification (Parchi-app shoppers); Inside
-    // shoppers pay list price.
+    // - Parchi channel / verification: claim via approved request id.
+    // - Logged-in IK on a Parchi-enabled event, NOT from Parchi: open discount.
     // Non-authoritative preview: create_booking_atomic re-derives under locks.
     let discountAmount = 0;
+    let allowOpenStudentDiscount = false;
+    const fromParchiChannel = readParchiChannelCookie(
+      request.headers.get("cookie"),
+    );
 
     if (parchiVerificationId) {
       try {
@@ -245,6 +251,22 @@ export async function POST(request: NextRequest) {
           );
         }
         throw err;
+      }
+    } else if (!fromParchiChannel) {
+      // Open IK student discount: shoppers on a Parchi-enabled event who did
+      // NOT arrive from the Parchi app. Parchi-channel bookings must verify
+      // via 2FA above.
+      if (await isParchiEnabled(eventId)) {
+        discountAmount = tiersStudentDiscount(
+          verifiedItems.map(
+            (item: { price: number; parchiPrice: number | null; quantity: number }) => ({
+              price: item.price,
+              parchi_price: item.parchiPrice,
+              quantity: item.quantity,
+            }),
+          ),
+        );
+        allowOpenStudentDiscount = discountAmount > 0;
       }
     }
     const discountedSubtotal = subtotal - discountAmount;
@@ -314,7 +336,7 @@ export async function POST(request: NextRequest) {
           JSON.stringify(rpcItems),
           parchiVerificationId,
           discountAmount,
-          false, // p_allow_open_student_discount: Parchi-app shoppers only
+          allowOpenStudentDiscount,
         ],
       );
       const rpcResult = rpcRows[0]?.result as BookingAtomicResult | null;

@@ -17,12 +17,14 @@ interface BookingContext {
   ticketTypes: TicketType[];
   /** The event's Parchi offer, only for Parchi-app arrivals; else null. */
   parchiOffer: ParchiOffer | null;
+  /** Whether student discount pricing is shown on the tiles (for Inside users on Parchi-enabled events). */
+  showStudentPrice: boolean;
   /** Whether the visitor arrived from the Parchi app. */
   arrivedFromParchi: boolean;
   selected: Record<number, number>;
   setQuantity: (ticketId: number, quantity: number) => void;
   totalTickets: number;
-  /** Total at the native ticket prices shown on the tiles. */
+  /** Total at the ticket prices shown on the tiles (discounted for Inside users). */
   totalPrice: number;
   /** Cheapest tier that can be bought, for "From Rs …"; null when none can. */
   fromPrice: number | null;
@@ -67,6 +69,7 @@ export function EventBookingProvider({
   const router = useRouter();
   const { addItem, clearCart } = useCartStore();
   const arrivedFromParchi = useArrivedFromParchi();
+  const showStudentPrice = Boolean(parchiOffer) && !arrivedFromParchi;
   const [selected, setSelected] = useState<Record<number, number>>({});
 
   const setQuantity = useCallback((ticketId: number, quantity: number) => {
@@ -89,17 +92,17 @@ export function EventBookingProvider({
       const ticket = ticketTypes.find((t) => t.id === Number(id));
       if (!ticket || qty <= 0) continue;
       count += qty;
-      price += ticketPricing(ticket).salePrice * qty;
+      price += ticketPricing(ticket, showStudentPrice).salePrice * qty;
     }
     return { totalTickets: count, totalPrice: price };
-  }, [selected, ticketTypes]);
+  }, [selected, ticketTypes, showStudentPrice]);
 
   const fromPrice = useMemo(() => {
     const prices = ticketTypes
       .filter(isBuyable)
-      .map((t) => ticketPricing(t).salePrice);
+      .map((t) => ticketPricing(t, showStudentPrice).salePrice);
     return prices.length > 0 ? Math.min(...prices) : null;
-  }, [ticketTypes]);
+  }, [ticketTypes, showStudentPrice]);
 
   const unavailableLabel = useMemo(() => {
     if (ticketTypes.length === 0 || ticketTypes.some(isBuyable)) return null;
@@ -140,6 +143,7 @@ export function EventBookingProvider({
       event,
       ticketTypes,
       parchiOffer: arrivedFromParchi ? parchiOffer : null,
+      showStudentPrice,
       arrivedFromParchi,
       selected,
       setQuantity,
@@ -154,6 +158,7 @@ export function EventBookingProvider({
       event,
       ticketTypes,
       parchiOffer,
+      showStudentPrice,
       arrivedFromParchi,
       selected,
       setQuantity,

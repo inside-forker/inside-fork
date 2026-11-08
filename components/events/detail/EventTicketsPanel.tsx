@@ -132,7 +132,7 @@ export function EventTicketsPanel({ className }: { className?: string }) {
 }
 
 function TicketTile({ ticket, wide }: { ticket: TicketType; wide: boolean }) {
-  const { selected, setQuantity } = useEventBooking();
+  const { selected, setQuantity, showStudentPrice } = useEventBooking();
   const external = Boolean(ticket.ticket_url);
   const unavailable = external ? null : ticketUnavailable(ticket);
   const onSale = !external && isTicketOnSale(ticket);
@@ -140,7 +140,7 @@ function TicketTile({ ticket, wide }: { ticket: TicketType; wide: boolean }) {
   const picked = onSale && qty > 0;
   const max = maxSelectable(ticket);
   const atLimit = picked && qty >= max;
-  const pricing = ticketPricing(ticket);
+  const pricing = ticketPricing(ticket, showStudentPrice);
   const discount = percentOff(pricing.salePrice, pricing.comparePrice);
 
   const people = ticket.people_per_ticket ?? 1;

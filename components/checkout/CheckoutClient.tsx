@@ -221,11 +221,17 @@ export function CheckoutClient() {
     [items, eventInfo, parchiEnabled],
   );
 
+  // Open IK discount only when NOT on the Parchi channel. Parchi visitors
+  // must complete 2FA (parchiVerificationId) before any student discount.
+  const ikOpenStudentDiscount =
+    tierDiscount > 0 && !arrivedFromParchi && !parchiVerificationId;
+
   // Same arithmetic as app/api/bookings/create/route.ts: student discount
   // comes off the subtotal, then fees on what's left. Event overrides take precedence over system_config.
   const totals: CheckoutTotals = useMemo(() => {
     const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    const discount = parchiVerificationId ? tierDiscount : 0;
+    const discount =
+      parchiVerificationId || ikOpenStudentDiscount ? tierDiscount : 0;
     const discounted = subtotal - discount;
 
     const platformFeeFixed =
@@ -261,7 +267,14 @@ export function CheckoutClient() {
       paymentFee,
       total: discounted + platformFee + paymentFee,
     };
-  }, [items, config, parchiVerificationId, tierDiscount, eventInfo]);
+  }, [
+    items,
+    config,
+    parchiVerificationId,
+    ikOpenStudentDiscount,
+    tierDiscount,
+    eventInfo,
+  ]);
 
   // Fetch Config
   useEffect(() => {
@@ -689,6 +702,15 @@ export function CheckoutClient() {
           onLogin={() => setAuthOpen(true)}
           onApprovedChange={setParchiVerificationId}
         />
+      ) : null}
+
+      {ikOpenStudentDiscount ? (
+        <div className="rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm">
+          <p className="font-semibold text-foreground">Inside Karachi Discount Applied</p>
+          <p className="text-muted-foreground">
+            You save {formatPkr(tierDiscount)} on these tickets.
+          </p>
+        </div>
       ) : null}
 
       {/* Who pays and where the tickets go - not a ticket holder by itself. */}
