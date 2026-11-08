@@ -21,6 +21,7 @@ import {
   Sparkles,
   FolderPlus,
   Folder,
+  Pencil,
   CheckCircle2,
   Loader2,
 } from "lucide-react";
@@ -87,6 +88,13 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
   // Section Header Management
   const [isHeaderDialogOpen, setIsHeaderDialogOpen] = React.useState(false);
   const [headerForm, setHeaderForm] = React.useState({ name: "", order: "0" });
+  const [isEditHeaderOpen, setIsEditHeaderOpen] = React.useState(false);
+  const [editingHeader, setEditingHeader] = React.useState<{
+    oldName: string;
+    name: string;
+    order: string;
+  } | null>(null);
+  const [isSavingHeaderEdit, setIsSavingHeaderEdit] = React.useState(false);
   const [knownHeaders, setKnownHeaders] = React.useState<Array<{ name: string; order: number }>>([]);
   const [isCustomHeaderInput, setIsCustomHeaderInput] = React.useState(false);
 
@@ -862,6 +870,78 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
     setHeaderForm({ name: "", order: "0" });
   };
 
+  const handleOpenEditHeader = (name: string, order: number) => {
+    setEditingHeader({
+      oldName: name,
+      name,
+      order: String(order ?? 0),
+    });
+    setIsEditHeaderOpen(true);
+  };
+
+  const handleUpdateHeader = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingHeader) return;
+    const newName = editingHeader.name.trim();
+    if (!newName) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a section header name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const oldName = editingHeader.oldName.trim();
+    const newOrder = parseInt(editingHeader.order || "0", 10) || 0;
+
+    setIsSavingHeaderEdit(true);
+    try {
+      const res = await fetch(`/api/admin/events/${eventId}/tickets/headers`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oldName,
+          newName,
+          order: newOrder,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to update section header");
+      }
+
+      setKnownHeaders((prev) => {
+        const filtered = prev.filter(
+          (h) =>
+            h.name.toLowerCase() !== oldName.toLowerCase() &&
+            h.name.toLowerCase() !== newName.toLowerCase()
+        );
+        return [...filtered, { name: newName, order: newOrder }];
+      });
+
+      await fetchTicketTypes();
+
+      toast({
+        title: "Section Header Updated",
+        description: `Header "${oldName}" renamed to "${newName}".`,
+      });
+
+      setIsEditHeaderOpen(false);
+      setEditingHeader(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to update section header";
+      toast({
+        title: "Error Updating Header",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingHeaderEdit(false);
+    }
+  };
+
   const handleRunSplitImport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!splitPdfFile) {
@@ -1268,29 +1348,54 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                       <Folder className="h-4 w-4" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-sm flex items-center gap-2">
-                        {group.name}
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="font-semibold text-sm">
+                          {group.name}
+                        </h4>
                         {group.order > 0 && (
                           <span className="text-xs font-normal text-muted-foreground">
                             (Sort: #{group.order})
                           </span>
                         )}
-                      </h4>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenEditHeader(group.name, group.order)}
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-primary/10 rounded"
+                          title={`Edit ${group.name}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          <span className="sr-only">Edit section header {group.name}</span>
+                        </Button>
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {group.tickets.length} ticket type{group.tickets.length !== 1 ? "s" : ""} under this header
                       </p>
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleCreateForGroup(group.name, group.order)}
-                    className="text-xs h-8"
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    Add to this Section
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenEditHeader(group.name, group.order)}
+                      className="text-xs h-8 flex items-center gap-1.5"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit Header
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCreateForGroup(group.name, group.order)}
+                      className="text-xs h-8"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Add to this Section
+                    </Button>
+                  </div>
                 </div>
 
                 {group.tickets.length === 0 ? (
@@ -2060,6 +2165,78 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Section Header Dialog */}
+      <Dialog
+        open={isEditHeaderOpen}
+        onOpenChange={(open) => !isSavingHeaderEdit && setIsEditHeaderOpen(open)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" />
+              Edit Section Header
+            </DialogTitle>
+            <DialogDescription>
+              Rename this section header or adjust its sort order. All tickets currently under this header will be updated automatically.
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingHeader && (
+            <form onSubmit={handleUpdateHeader} className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-header-name" className="text-sm font-medium">
+                  Section Header Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="edit-header-name"
+                  value={editingHeader.name}
+                  onChange={(e) =>
+                    setEditingHeader((prev) => (prev ? { ...prev, name: e.target.value } : null))
+                  }
+                  placeholder="e.g. Day 1 - 28th November, VIP Passes, Workshop"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-header-order" className="text-sm font-medium">
+                  Group Sort Order <span className="text-muted-foreground text-xs">(optional)</span>
+                </Label>
+                <Input
+                  id="edit-header-order"
+                  type="number"
+                  min="0"
+                  value={editingHeader.order}
+                  onChange={(e) =>
+                    setEditingHeader((prev) => (prev ? { ...prev, order: e.target.value } : null))
+                  }
+                  placeholder="0"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Lower numbers appear first on the event page.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditHeaderOpen(false)}
+                  disabled={isSavingHeaderEdit}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" disabled={isSavingHeaderEdit}>
+                  {isSavingHeaderEdit ? "Updating..." : "Save Changes"}
+                </Button>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
 
