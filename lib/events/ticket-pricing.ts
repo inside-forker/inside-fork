@@ -76,6 +76,16 @@ export function ticketPricing(ticket: TicketType, showStudentPrice = false): Tic
       comparePrice: compare > studentPrice ? compare : null,
     };
   }
+  // When not showing student price (Parchi app arrivals who verify at checkout):
+  // Never show premature discounted price or slash for Parchi arrivals.
+  if (ticket.parchi_original_price && ticket.parchi_original_price > ticket.price) {
+    return {
+      mode: "native",
+      salePrice: ticket.parchi_original_price,
+      comparePrice: null,
+    };
+  }
+
   return {
     mode: "native",
     salePrice: ticket.price,
