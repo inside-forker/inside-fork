@@ -65,6 +65,17 @@ export async function hasClaimedInvite(userId: string, eventId: number): Promise
   return rows.length > 0;
 }
 
+/** True once this guest has a paid ticket for the event: their invite is used up. */
+export async function hasPaidInviteBooking(userId: string, eventId: number): Promise<boolean> {
+  const { rows } = await query(
+    `SELECT 1 FROM bookings
+     WHERE event_id = $1 AND user_id = $2 AND payment_status = 'paid'
+     LIMIT 1`,
+    [eventId, userId],
+  );
+  return rows.length > 0;
+}
+
 export type ClaimResult =
   | { ok: true; eventSlug: string }
   | { ok: false; reason: "not_found" | "used" };

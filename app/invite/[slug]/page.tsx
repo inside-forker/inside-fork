@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { loadEventDetail } from "@/lib/events/event-detail";
-import { hasClaimedInvite } from "@/lib/events/invites";
+import { hasClaimedInvite, hasPaidInviteBooking } from "@/lib/events/invites";
 import { EventDetailView } from "@/components/events/detail/EventDetailView";
 import { InviteNotice } from "@/components/events/invite/InviteNotice";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,27 @@ export default async function InviteEventPage({
               <Link href={`/login?next=${encodeURIComponent(`/invite/${slug}`)}`}>Log in</Link>
             </Button>
           ) : undefined
+        }
+      />
+    );
+  }
+
+  // One ticket per invite: once it's bought, the link only points to the ticket.
+  if (await hasPaidInviteBooking(session!.userId, data.event.id)) {
+    return (
+      <InviteNotice
+        event={{
+          name: data.event.name,
+          start_time: data.event.start_time,
+          location_name: data.event.location_name ?? null,
+          poster: data.poster,
+        }}
+        title="You already have your ticket"
+        body="Your invite has been used to book your ticket. Each invite works for one ticket only."
+        action={
+          <Button asChild size="lg" variant="solid" className="h-12 w-full rounded-control text-body">
+            <Link href="/dashboard/bookings">View my ticket</Link>
+          </Button>
         }
       />
     );
