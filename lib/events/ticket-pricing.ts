@@ -53,45 +53,54 @@ export function maxSelectable(ticket: TicketType): number {
 }
 
 export type TicketPricing =
-  | { mode: "student"; salePrice: number; comparePrice: number | null }
+  | { mode: "parchi"; salePrice: number; comparePrice: number | null }
   | { mode: "native"; salePrice: number; comparePrice: number | null };
 
 /**
  * Price to show for a tier on the public event page.
- * Inside users (normal page, not arrived from Parchi) see the discounted student/slashed prices directly.
- * Parchi arrivals see the standard list price on the tiles and verify their Parchi ID at checkout.
+ * - Parchi arrivals (showStudentPrice = true) see the Parchi student rate (e.g. 15% off)
+ *   with the standard list price crossed out. Native Inside discounts do not show to Parchi visitors.
+ * - Normal Inside visitors (showStudentPrice = false) see native Inside pricing: regular price,
+ *   or slashed price ONLY if a native discount was explicitly configured (original_price > price).
  */
 export function ticketPricing(ticket: TicketType, showStudentPrice = false): TicketPricing {
-  const studentPrice = showStudentPrice ? tierStudentPrice(ticket) : null;
-  if (studentPrice != null) {
-    const compare =
-      ticket.parchi_original_price && ticket.parchi_original_price > studentPrice
+  if (showStudentPrice) {
+    // Visitor arrived via Parchi link:
+    // Parchi student pricing applies. Native Inside discounts must NOT show to Parchi visitors.
+    const parchiComparePrice =
+      ticket.parchi_original_price && ticket.parchi_original_price > 0
         ? ticket.parchi_original_price
-        : ticket.original_price && ticket.original_price > studentPrice
+        : ticket.original_price && ticket.original_price > ticket.price
           ? ticket.original_price
           : ticket.price;
-    return {
-      mode: "student",
-      salePrice: studentPrice,
-      comparePrice: compare > studentPrice ? compare : null,
-    };
-  }
-  // When not showing student price (Parchi app arrivals who verify at checkout):
-  // Never show premature discounted price or slash for Parchi arrivals.
-  if (ticket.parchi_original_price && ticket.parchi_original_price > ticket.price) {
+
+    const studentPrice = tierStudentPrice(ticket);
+
+    if (studentPrice != null && studentPrice < parchiComparePrice) {
+      return {
+        mode: "parchi",
+        salePrice: studentPrice,
+        comparePrice: parchiComparePrice,
+      };
+    }
+
+    // Fallback if no student price configured: show standard compare price without native inside discount
     return {
       mode: "native",
-      salePrice: ticket.parchi_original_price,
+      salePrice: parchiComparePrice,
       comparePrice: null,
     };
   }
 
+  // Regular Inside Karachi visitor (did NOT arrive from Parchi link):
+  // Never show Parchi student discount or Parchi comparison prices.
+  // ONLY show a discount if native Inside discount was explicitly configured (original_price > price).
+  const hasNativeDiscount =
+    ticket.original_price != null && ticket.original_price > ticket.price;
+
   return {
     mode: "native",
     salePrice: ticket.price,
-    comparePrice:
-      ticket.original_price && ticket.original_price > ticket.price
-        ? ticket.original_price
-        : null,
+    comparePrice: hasNativeDiscount ? (ticket.original_price ?? null) : null,
   };
 }

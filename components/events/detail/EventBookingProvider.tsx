@@ -69,7 +69,7 @@ export function EventBookingProvider({
   const router = useRouter();
   const { addItem, clearCart } = useCartStore();
   const arrivedFromParchi = useArrivedFromParchi();
-  const showStudentPrice = Boolean(parchiOffer) && !arrivedFromParchi;
+  const showStudentPrice = Boolean(parchiOffer) && arrivedFromParchi;
   const [selected, setSelected] = useState<Record<number, number>>({});
 
   const setQuantity = useCallback((ticketId: number, quantity: number) => {
@@ -185,11 +185,11 @@ export interface BookingSummary {
 }
 
 export function useBookingSummary(): BookingSummary {
-  const { totalTickets, totalPrice, fromPrice, unavailableLabel } = useEventBooking();
+  const { totalTickets, totalPrice, fromPrice, unavailableLabel, showStudentPrice } = useEventBooking();
   if (totalTickets > 0) {
     const count = `${totalTickets} ticket${totalTickets === 1 ? "" : "s"}`;
     return {
-      label: count,
+      label: showStudentPrice ? `${count} · Parchi rate` : count,
       value: rupees(totalPrice),
       hasSelection: true,
       canBuy: true,

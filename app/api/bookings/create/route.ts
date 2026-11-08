@@ -19,12 +19,10 @@ import {
 } from "@/lib/mobile/skip-payment";
 import crypto from "crypto";
 import {
-  isParchiEnabled,
   ParchiServiceError,
   previewParchiDiscount,
 } from "@/lib/parchi/service";
-import { readParchiChannelCookie } from "@/lib/parchi/channel";
-import { studentPriceSql, tiersStudentDiscount } from "@/lib/parchi/discount";
+import { studentPriceSql } from "@/lib/parchi/discount";
 
 export async function POST(request: NextRequest) {
   try {
@@ -226,13 +224,9 @@ export async function POST(request: NextRequest) {
 
     // Student discount comes off the ticket subtotal before fees.
     // - Parchi channel / verification: claim via approved request id.
-    // - Logged-in IK on a Parchi-enabled event, NOT from Parchi: open discount.
-    // Non-authoritative preview: create_booking_atomic re-derives under locks.
+    // - Non-authoritative preview: create_booking_atomic re-derives under locks.
     let discountAmount = 0;
-    let allowOpenStudentDiscount = false;
-    const fromParchiChannel = readParchiChannelCookie(
-      request.headers.get("cookie"),
-    );
+    const allowOpenStudentDiscount = false;
 
     if (parchiVerificationId) {
       try {
@@ -251,22 +245,6 @@ export async function POST(request: NextRequest) {
           );
         }
         throw err;
-      }
-    } else if (!fromParchiChannel) {
-      // Open IK student discount: shoppers on a Parchi-enabled event who did
-      // NOT arrive from the Parchi app. Parchi-channel bookings must verify
-      // via 2FA above.
-      if (await isParchiEnabled(eventId)) {
-        discountAmount = tiersStudentDiscount(
-          verifiedItems.map(
-            (item: { price: number; parchiPrice: number | null; quantity: number }) => ({
-              price: item.price,
-              parchi_price: item.parchiPrice,
-              quantity: item.quantity,
-            }),
-          ),
-        );
-        allowOpenStudentDiscount = discountAmount > 0;
       }
     }
     const discountedSubtotal = subtotal - discountAmount;

@@ -88,8 +88,15 @@ export function markParchiChannel(): void {
 }
 
 export function recallParchiChannel(): boolean {
-  // Live URL wins over sticky storage (first paint + deep links).
-  if (typeof window !== "undefined" && urlSaysParchiChannel()) return true;
+  if (typeof window !== "undefined") {
+    // On event detail pages, arriving from Parchi is strictly dictated by the live URL parameters
+    // (?ref=parchi_app or ?parchiId=...). Navigating directly to an event on Inside is always standard.
+    if (window.location.pathname.startsWith("/events/")) {
+      return urlSaysParchiChannel();
+    }
+    // Deep links / first paint elsewhere
+    if (urlSaysParchiChannel()) return true;
+  }
   try {
     if (sessionStorage.getItem(CHANNEL_KEY) === "1") return true;
   } catch {
@@ -150,8 +157,15 @@ export function captureParchiArrivalFromUrl(
     (parchiId && /^[A-Za-z0-9]{1,10}$/.test(parchiId.trim()))
   ) {
     markParchiChannel();
+    if (parchiId) rememberParchiId(parchiId);
+  } else if (
+    typeof window !== "undefined" &&
+    window.location.pathname.startsWith("/events/") &&
+    !ref &&
+    !parchiId
+  ) {
+    clearParchiChannel();
   }
-  if (parchiId) rememberParchiId(parchiId);
 }
 
 export function rememberParchiId(raw: string | null): void {

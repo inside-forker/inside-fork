@@ -12,46 +12,58 @@ export interface ParchiOffer {
 }
 
 /**
- * SQL for a tier's student price: the event's Parchi % off (rounded to whole
- * rupees) applies to every ticket; a ticket's own Parchi price is used only
- * when the event has no %. NULL unless the event's Parchi toggle is on. The
- * one definition shared by every query and by create_booking_atomic (keep
- * the migration in step).
+ * SQL for a tier's student price:
+ * - If the ticket has an explicit parchi_price, use it.
+ * - Otherwise, apply the event's Parchi % off to the standard list price
+ *   (COALESCE(parchi_original_price, original_price, price)).
+ * NULL unless the event's Parchi toggle is on.
  */
 export function studentPriceSql(tt = "tt", e = "e"): string {
   return `(CASE WHEN ${e}.parchi_enabled THEN
-    CASE WHEN ${e}.parchi_discount_percent > 0
-      THEN round(${tt}.price * (100 - ${e}.parchi_discount_percent) / 100)
-      ELSE ${tt}.parchi_price END END)`;
+    COALESCE(${tt}.parchi_price,
+      CASE WHEN ${e}.parchi_discount_percent > 0
+        THEN round(COALESCE(${tt}.parchi_original_price, ${tt}.original_price, ${tt}.price) * (100 - ${e}.parchi_discount_percent) / 100)
+        ELSE NULL END) END)`;
 }
 
 /**
  * Per-ticket student price on an event with the Parchi toggle on
- * (`events.parchi_enabled`). Everyone gets it: Inside Karachi visitors
- * automatically, Parchi-app visitors after verifying. Null when the tier has
- * no discount. Same rule as create_booking_atomic. `parchi_price` here is the
- * effective student price (studentPriceSql), not the raw column.
+ * (`events.parchi_enabled`). Parchi-app visitors receive this rate after verifying.
+ * Compares against the standard list price (parchi_original_price ?? original_price ?? price)
+ * so that any native Inside discount does not interfere with the Parchi rate.
  */
 export function tierStudentPrice(ticket: {
   price: number;
+  original_price?: number | null;
   parchi_price?: number | null;
+  parchi_original_price?: number | null;
 }): number | null {
   const p = ticket.parchi_price;
-  return p != null && p >= 0 && p < ticket.price ? p : null;
+  const base = ticket.parchi_original_price ?? ticket.original_price ?? ticket.price;
+  return p != null && p >= 0 && p < base ? p : null;
 }
 
 /** Rupees off one ticket of this tier (0 when it has no student price). */
 export function tierStudentDiscount(ticket: {
   price: number;
+  original_price?: number | null;
   parchi_price?: number | null;
+  parchi_original_price?: number | null;
 }): number {
   const p = tierStudentPrice(ticket);
-  return p == null ? 0 : ticket.price - p;
+  const base = ticket.parchi_original_price ?? ticket.original_price ?? ticket.price;
+  return p == null ? 0 : base - p;
 }
 
 /** Discount on a cart: per-tier rupees off times quantity. */
 export function tiersStudentDiscount(
-  items: Array<{ price: number; parchi_price?: number | null; quantity: number }>,
+  items: Array<{
+    price: number;
+    original_price?: number | null;
+    parchi_price?: number | null;
+    parchi_original_price?: number | null;
+    quantity: number;
+  }>,
 ): number {
   return items.reduce((sum, i) => sum + tierStudentDiscount(i) * i.quantity, 0);
 }
