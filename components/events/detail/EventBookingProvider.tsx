@@ -17,12 +17,12 @@ interface BookingContext {
   ticketTypes: TicketType[];
   /** The event's Parchi offer, only for Parchi-app arrivals; else null. */
   parchiOffer: ParchiOffer | null;
-  /** Parchi toggle on and the visitor came from the Parchi app. */
-  showStudentPrice: boolean;
+  /** Whether the visitor arrived from the Parchi app. */
+  arrivedFromParchi: boolean;
   selected: Record<number, number>;
   setQuantity: (ticketId: number, quantity: number) => void;
   totalTickets: number;
-  /** Total at the prices shown on the tiles (student prices for Parchi arrivals). */
+  /** Total at the native ticket prices shown on the tiles. */
   totalPrice: number;
   /** Cheapest tier that can be bought, for "From Rs …"; null when none can. */
   fromPrice: number | null;
@@ -67,7 +67,6 @@ export function EventBookingProvider({
   const router = useRouter();
   const { addItem, clearCart } = useCartStore();
   const arrivedFromParchi = useArrivedFromParchi();
-  const showStudentPrice = Boolean(parchiOffer) && arrivedFromParchi;
   const [selected, setSelected] = useState<Record<number, number>>({});
 
   const setQuantity = useCallback((ticketId: number, quantity: number) => {
@@ -90,17 +89,17 @@ export function EventBookingProvider({
       const ticket = ticketTypes.find((t) => t.id === Number(id));
       if (!ticket || qty <= 0) continue;
       count += qty;
-      price += ticketPricing(ticket, showStudentPrice).salePrice * qty;
+      price += ticketPricing(ticket).salePrice * qty;
     }
     return { totalTickets: count, totalPrice: price };
-  }, [selected, ticketTypes, showStudentPrice]);
+  }, [selected, ticketTypes]);
 
   const fromPrice = useMemo(() => {
     const prices = ticketTypes
       .filter(isBuyable)
-      .map((t) => ticketPricing(t, showStudentPrice).salePrice);
+      .map((t) => ticketPricing(t).salePrice);
     return prices.length > 0 ? Math.min(...prices) : null;
-  }, [ticketTypes, showStudentPrice]);
+  }, [ticketTypes]);
 
   const unavailableLabel = useMemo(() => {
     if (ticketTypes.length === 0 || ticketTypes.some(isBuyable)) return null;
@@ -140,8 +139,8 @@ export function EventBookingProvider({
     () => ({
       event,
       ticketTypes,
-      parchiOffer: showStudentPrice ? parchiOffer : null,
-      showStudentPrice,
+      parchiOffer: arrivedFromParchi ? parchiOffer : null,
+      arrivedFromParchi,
       selected,
       setQuantity,
       totalTickets,
@@ -155,7 +154,7 @@ export function EventBookingProvider({
       event,
       ticketTypes,
       parchiOffer,
-      showStudentPrice,
+      arrivedFromParchi,
       selected,
       setQuantity,
       totalTickets,
@@ -171,7 +170,7 @@ export function EventBookingProvider({
 }
 
 export interface BookingSummary {
-  /** "3 tickets", "1 ticket · Parchi rate", "From" or "Tickets". */
+  /** "3 tickets", "1 ticket", "From" or "Tickets". */
   label: string;
   /** "Rs 10,497", or why nothing can be bought ("Sold out"). */
   value: string;
@@ -181,11 +180,11 @@ export interface BookingSummary {
 }
 
 export function useBookingSummary(): BookingSummary {
-  const { totalTickets, totalPrice, fromPrice, unavailableLabel, showStudentPrice } = useEventBooking();
+  const { totalTickets, totalPrice, fromPrice, unavailableLabel } = useEventBooking();
   if (totalTickets > 0) {
     const count = `${totalTickets} ticket${totalTickets === 1 ? "" : "s"}`;
     return {
-      label: showStudentPrice ? `${count} · Parchi rate` : count,
+      label: count,
       value: rupees(totalPrice),
       hasSelection: true,
       canBuy: true,
