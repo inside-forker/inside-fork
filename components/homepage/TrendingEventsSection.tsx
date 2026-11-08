@@ -61,7 +61,7 @@ function FeaturedEvent({ event, price }: { event: Event; price: string | null })
       href={`/events/${event.slug}`}
       className="group grid overflow-hidden rounded-2xl border border-border bg-card active:opacity-80 md:grid-cols-2"
     >
-      <div className="relative aspect-[16/10] bg-muted md:aspect-auto md:min-h-[300px]">
+      <div className="relative aspect-video bg-muted md:self-center">
         {image ? (
           <OptimizedImage
             src={image}
@@ -145,7 +145,7 @@ export function TrendingEventsSection({ events, prices = {} }: TrendingEventsSec
                   href={`/events/${event.slug}`}
                   className="group block overflow-hidden rounded-2xl border border-border bg-card active:opacity-80"
                 >
-                  <div className="relative aspect-[16/10] bg-muted">
+                  <div className="relative aspect-video bg-muted">
                     {image ? (
                       <OptimizedImage
                         src={image}
