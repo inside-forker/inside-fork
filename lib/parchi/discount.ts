@@ -70,15 +70,25 @@ export function tiersStudentDiscount(
 
 /**
  * The headline offer for banners: the biggest % off across the event's tiers
- * ("Up to 50% off"). Null when no tier has a student price.
+ * ("Up to 50% off"). Null when no tier has a student price and no event % is configured.
  */
 export function tiersHeadlineOffer(
-  tickets: Array<{ price: number; parchi_price?: number | null }>,
+  tickets: Array<{
+    price: number;
+    original_price?: number | null;
+    parchi_price?: number | null;
+    parchi_original_price?: number | null;
+  }>,
+  eventPercent?: number | null,
 ): ParchiOffer | null {
   let best = 0;
   for (const t of tickets) {
     const off = tierStudentDiscount(t);
-    if (off > 0 && t.price > 0) best = Math.max(best, (off / t.price) * 100);
+    const base = t.parchi_original_price ?? t.original_price ?? t.price;
+    if (off > 0 && base > 0) best = Math.max(best, (off / base) * 100);
+  }
+  if (best <= 0 && eventPercent != null && eventPercent > 0) {
+    best = eventPercent;
   }
   if (best <= 0) return null;
   return {

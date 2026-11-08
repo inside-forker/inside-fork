@@ -121,18 +121,24 @@ export function EventBookingProvider({
       if (quantity <= 0) continue;
       const ticket = ticketTypes.find((t) => t.id === Number(id));
       if (!ticket) continue;
+      const pricing = ticketPricing(ticket, arrivedFromParchi);
+      // For Parchi shoppers, checkout initializes with the comparison (original) price
+      // so that 2FA verification unlocks the student discount at checkout.
+      const price = arrivedFromParchi
+        ? (pricing.comparePrice ?? ticket.price)
+        : ticket.price;
       addItem({
         ticketTypeId: ticket.id,
         eventId: event.id,
         eventName: event.name,
         ticketName: ticket.name,
-        price: ticket.price,
+        price,
         quantity,
         maxQuantity: maxTotal ?? (ticket.quantity_available || undefined),
       });
     }
     router.push("/checkout");
-  }, [addItem, clearCart, event.id, event.name, maxTotal, router, selected, ticketTypes]);
+  }, [addItem, arrivedFromParchi, clearCart, event.id, event.name, maxTotal, router, selected, ticketTypes]);
 
   const showTickets = useCallback(() => {
     document.getElementById("tickets")?.scrollIntoView({ behavior: "smooth", block: "start" });

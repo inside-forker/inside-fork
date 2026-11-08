@@ -104,6 +104,17 @@ describe("Parchi Discount Calculation", () => {
         max_discount_amount: null,
       });
       expect(tiersHeadlineOffer([{ price: 1000, parchi_price: null }])).toBeNull();
+      // Supports comparison price and event-wide percentage fallback
+      expect(
+        tiersHeadlineOffer(
+          [{ price: 2550, original_price: 3000, parchi_price: 2550, parchi_original_price: 3000 }],
+          15,
+        ),
+      ).toEqual({
+        discount_type: "percentage",
+        discount_value: 15,
+        max_discount_amount: null,
+      });
     });
   });
 

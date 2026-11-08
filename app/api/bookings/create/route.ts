@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       (i: { ticketTypeId: number }) => i.ticketTypeId,
     );
     const { rows: ticketTypes } = await query(
-      `SELECT tt.id, tt.price, tt.event_id, tt.name,
+      `SELECT tt.id, tt.price, tt.original_price, tt.parchi_price, tt.parchi_original_price, tt.event_id, tt.name,
               ${studentPriceSql()} AS parchi_price
        FROM ticket_types tt JOIN events e ON e.id = tt.event_id
        WHERE tt.id = ANY($1::int[])`,
@@ -111,13 +111,24 @@ export async function POST(request: NextRequest) {
           (t) => Number(t.id) === Number(item.ticketTypeId),
         );
         if (!tt) throw new Error(`Invalid ticket type: ${item.ticketTypeId}`);
-        const price = Number(tt.price);
+        const originalPrice =
+          tt.original_price != null ? Number(tt.original_price) : null;
+        const parchiOriginalPrice =
+          tt.parchi_original_price != null ? Number(tt.parchi_original_price) : null;
+        const price = parchiVerificationId
+          ? (parchiOriginalPrice ??
+            (originalPrice && originalPrice > Number(tt.price)
+              ? originalPrice
+              : Number(tt.price)))
+          : Number(tt.price);
         subtotal += price * item.quantity;
         const parchiPrice = tt.parchi_price != null ? Number(tt.parchi_price) : null;
         return {
           ...item,
           price,
+          originalPrice,
           parchiPrice,
+          parchiOriginalPrice,
           name: tt.name as string | undefined,
           eventId: Number(tt.event_id),
         };

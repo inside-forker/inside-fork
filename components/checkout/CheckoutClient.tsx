@@ -205,17 +205,37 @@ export function CheckoutClient() {
   // Event's Parchi toggle: the per-tier Parchi price, for Parchi-app shoppers
   // only and only once verified. Inside shoppers pay list price.
   const parchiEnabled = eventInfo?.parchi_enabled === true;
+  const effectiveParchiOffer = useMemo(() => {
+    if (parchiOffer) return parchiOffer;
+    if (
+      eventInfo?.parchi_discount_percent != null &&
+      eventInfo.parchi_discount_percent > 0
+    ) {
+      return {
+        discount_type: "percentage" as const,
+        discount_value: Math.round(eventInfo.parchi_discount_percent),
+        max_discount_amount: null,
+      };
+    }
+    return null;
+  }, [parchiOffer, eventInfo]);
+
   const tierDiscount = useMemo(
     () =>
       parchiEnabled
         ? tiersStudentDiscount(
-            items.map((item) => ({
-              price: item.price,
-              parchi_price: eventInfo?.ticket_types?.find(
+            items.map((item) => {
+              const tt = eventInfo?.ticket_types?.find(
                 (t) => t.id === item.ticketTypeId,
-              )?.parchi_price,
-              quantity: item.quantity,
-            })),
+              );
+              return {
+                price: item.price,
+                original_price: tt?.original_price,
+                parchi_price: tt?.parchi_price,
+                parchi_original_price: tt?.parchi_original_price,
+                quantity: item.quantity,
+              };
+            }),
           )
         : 0,
     [items, eventInfo, parchiEnabled],
@@ -687,10 +707,10 @@ export function CheckoutClient() {
         onChangeQuantity={updateQuantity}
       />
 
-      {parchiEventId && arrivedFromParchi && parchiEnabled && parchiOffer ? (
+      {parchiEventId && arrivedFromParchi && parchiEnabled && effectiveParchiOffer ? (
         <ParchiDiscountCard
           eventId={parchiEventId}
-          offer={parchiOffer}
+          offer={effectiveParchiOffer}
           isLoggedIn={!!user}
           onLogin={() => setAuthOpen(true)}
           onApprovedChange={setParchiVerificationId}

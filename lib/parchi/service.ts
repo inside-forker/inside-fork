@@ -154,18 +154,46 @@ export async function getParchiOffer(
   eventId: number,
 ): Promise<ParchiOffer | null> {
   const { rows } = await query(
-    `SELECT tt.price, ${studentPriceSql()} AS student_price
+    `SELECT tt.price, tt.original_price, tt.parchi_price, tt.parchi_original_price,
+            e.parchi_discount_percent,
+            ${studentPriceSql()} AS student_price
      FROM ticket_types tt
      JOIN events e ON e.id = tt.event_id
      WHERE tt.event_id = $1 AND e.parchi_enabled = true`,
     [eventId],
   );
+
+  if (rows.length === 0) {
+    const { rows: eventRows } = await query(
+      `SELECT parchi_enabled, parchi_discount_percent FROM events WHERE id = $1`,
+      [eventId],
+    );
+    const ev = eventRows[0];
+    if (ev?.parchi_enabled && Number(ev.parchi_discount_percent) > 0) {
+      return {
+        discount_type: "percentage",
+        discount_value: Math.round(Number(ev.parchi_discount_percent)),
+        max_discount_amount: null,
+      };
+    }
+    return null;
+  }
+
+  const eventPercent =
+    rows[0]?.parchi_discount_percent != null
+      ? Number(rows[0].parchi_discount_percent)
+      : null;
+
   // numeric columns come back from pg as strings.
   return tiersHeadlineOffer(
     rows.map((r) => ({
       price: Number(r.price),
+      original_price: r.original_price != null ? Number(r.original_price) : null,
       parchi_price: r.student_price != null ? Number(r.student_price) : null,
+      parchi_original_price:
+        r.parchi_original_price != null ? Number(r.parchi_original_price) : null,
     })),
+    eventPercent,
   );
 }
 
@@ -427,7 +455,14 @@ export async function previewParchiDiscount(input: {
   eventId: number;
   requestId: string;
   subtotal: number;
-  items?: Array<{ name?: string; price: number; parchiPrice?: number | null; quantity: number }>;
+  items?: Array<{
+    name?: string;
+    price: number;
+    originalPrice?: number | null;
+    parchiPrice?: number | null;
+    parchiOriginalPrice?: number | null;
+    quantity: number;
+  }>;
 }): Promise<number> {
   const invalid = new ParchiServiceError(
     "parchi_invalid",
@@ -454,7 +489,9 @@ export async function previewParchiDiscount(input: {
     return tiersStudentDiscount(
       (input.items ?? []).map((item) => ({
         price: item.price,
+        original_price: item.originalPrice,
         parchi_price: item.parchiPrice,
+        parchi_original_price: item.parchiOriginalPrice,
         quantity: item.quantity,
       })),
     );

@@ -9,6 +9,7 @@ export interface CheckoutEventInfo {
   slug?: string | null;
   /** Parchi student discount toggle (per-tier parchi_price). */
   parchi_enabled?: boolean;
+  parchi_discount_percent?: number | null;
   start_time: string | null;
   location_name: string | null;
   image_url: string | null;
@@ -19,7 +20,9 @@ export interface CheckoutEventInfo {
   ticket_types?: Array<{
     id: number;
     price?: number;
+    original_price?: number | null;
     parchi_price?: number | null;
+    parchi_original_price?: number | null;
     people_per_ticket?: number;
     min_people_per_ticket?: number;
   }>;

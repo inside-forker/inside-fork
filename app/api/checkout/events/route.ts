@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { rows } = await query(
-      `SELECT e.id, e.require_guest_details, e.parchi_enabled, e.name, e.slug, e.start_time, e.location_name,
+      `SELECT e.id, e.require_guest_details, e.parchi_enabled, e.parchi_discount_percent, e.name, e.slug, e.start_time, e.location_name,
               e.payment_processing_fee_percentage, e.payment_processing_fee_fixed,
               e.platform_fee_percentage, e.platform_fee_fixed,
               (SELECT i.url FROM event_images i
@@ -44,7 +44,9 @@ export async function GET(request: NextRequest) {
     // Group size + checkout questions per ticket type (event-wide fields
     // merged with each tier's own).
     const { rows: ticketRows } = await query(
-      `SELECT tt.id, tt.event_id, tt.price, ${studentPriceSql()} AS parchi_price, tt.people_per_ticket, tt.min_people_per_ticket,
+      `SELECT tt.id, tt.event_id, tt.price, tt.original_price, tt.parchi_price, tt.parchi_original_price,
+              ${studentPriceSql()} AS parchi_price_calculated,
+              tt.people_per_ticket, tt.min_people_per_ticket,
               tt.attendee_fields,
               e.attendee_fields AS event_attendee_fields
        FROM ticket_types tt JOIN events e ON e.id = tt.event_id
@@ -56,6 +58,10 @@ export async function GET(request: NextRequest) {
       id: Number(row.id),
       require_guest_details: row.require_guest_details,
       parchi_enabled: row.parchi_enabled === true,
+      parchi_discount_percent:
+        row.parchi_discount_percent != null
+          ? Number(row.parchi_discount_percent)
+          : null,
       name: row.name as string,
       slug: (row.slug as string | null) ?? null,
       start_time: row.start_time ? new Date(row.start_time).toISOString() : null,
@@ -82,7 +88,18 @@ export async function GET(request: NextRequest) {
         .map((t) => ({
           id: Number(t.id),
           price: t.price != null ? Number(t.price) : 0,
-          parchi_price: t.parchi_price != null ? Number(t.parchi_price) : null,
+          original_price:
+            t.original_price != null ? Number(t.original_price) : null,
+          parchi_price:
+            t.parchi_price_calculated != null
+              ? Number(t.parchi_price_calculated)
+              : t.parchi_price != null
+                ? Number(t.parchi_price)
+                : null,
+          parchi_original_price:
+            t.parchi_original_price != null
+              ? Number(t.parchi_original_price)
+              : null,
           people_per_ticket: normalizePeoplePerTicket(t.people_per_ticket),
           min_people_per_ticket: normalizeMinPeople(
             t.min_people_per_ticket,
