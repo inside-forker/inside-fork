@@ -11,6 +11,7 @@ import { MobileApiError } from "@/lib/mobile/errors";
 import { query } from "@/lib/db";
 import { computeBasketHash, type CheckoutItem } from "@/lib/mobile/commerce";
 import { hashCnic, cnicLast4 } from "@/lib/utils/cnic-server";
+import { releaseLapsedHolds } from "@/lib/checkout/release-lapsed-holds";
 import {
   confirmBookingWithoutPayment,
   isPaymentSkipEnabled,
@@ -291,6 +292,9 @@ export const POST = mobileRoute(async (request: NextRequest) => {
     bookingId = existing.id;
     reused = true;
   } else {
+    // An abandoned earlier checkout must not count against this CNIC.
+    await releaseLapsedHolds(eventId, hashCnic(customer.cnic), user.id);
+
     let newId: number | null = null;
     let rpcErrMsg: string | undefined;
     try {

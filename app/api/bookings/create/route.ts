@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { createNotification } from "@/lib/notifications/service";
 import { captureRouteError } from "@/lib/sentry/captureRouteError";
 import { hashCnic, cnicLast4 } from "@/lib/utils/cnic-server";
+import { releaseLapsedHolds } from "@/lib/checkout/release-lapsed-holds";
 import { resolveAssignedGateIndex } from "@/lib/ticketing/resolve-gate-assignment";
 import { getPdfInventoryTicketTypeIds } from "@/lib/ticketing/pdf-inventory";
 import { syncPdfStockForTicketTypes } from "@/lib/ticketing/sellable-quantity";
@@ -287,6 +288,9 @@ export async function POST(request: NextRequest) {
       booking_id: number;
       booking_reference: string;
     }
+
+    // An abandoned earlier checkout must not count against this CNIC.
+    await releaseLapsedHolds(eventId, cnicHash, user.id);
 
     let bookingId: number | undefined;
     try {
