@@ -2,6 +2,8 @@
 
 Read this when composing a page. Pick patterns from here instead of wrapping content in rounded boxes. Mix patterns across a page so the rhythm varies.
 
+All type here is Inter (`font-sans`), and the Client decisions in SKILL.md win over anything in this file.
+
 ## Contents
 1. Hero
 2. Ruled list
@@ -16,7 +18,7 @@ Read this when composing a page. Pick patterns from here instead of wrapping con
 
 ## 1. Hero
 
-One idea. A large Fraunces headline, one short supporting sentence in Instrument Sans, one primary button. Use real photography (full-bleed or a large split) rather than a decorative background. Play the single entrance animation here and not on every later section. No gradient overlays to make text readable: choose a photo with calm areas, or place text on a solid band beside the image.
+One idea. A large bold headline, one short supporting sentence, one pink primary button. Use real photography (full-bleed or a large split) rather than a decorative background. Play the single entrance animation here and not on every later section. No gradient overlays to make text readable: choose a photo with calm areas, or place text on a solid band beside the image.
 
 ## 2. Ruled list
 
@@ -24,8 +26,8 @@ Replaces most "grid of cards" layouts. Each row is full-width, separated by a 1p
 
 ```
 -------------------------------------------------------
-Title in font-display                     Meta (mono)    ->
-Short description in font-ui, max ~65ch
+Title (bold)                              Meta (label)   ->
+Short description, max ~65ch
 -------------------------------------------------------
 Title                                     Meta           ->
 Description
@@ -34,7 +36,7 @@ Description
 
 The whole row is the link. On hover, shift the title a few pixels with `transform` or change its color to pink. Do not lift or shadow the row.
 
-Good for: categories, neighborhoods, articles, FAQs, steps, team, press.
+Good for: neighborhoods, articles, FAQs, steps, team, press. Categories use the app's icon pack instead (see SKILL.md, Client decisions). Don't let a page become a stack of ruled lists: the client wants it visual, not texty.
 
 ## 3. Split
 
@@ -46,14 +48,16 @@ A full-width photo with generous height and no text on it, or with a short capti
 
 ## 5. Statement band
 
-An ink band (never cream) holding one large Fraunces sentence and nothing else, or a sentence with one button. Use for a mission line, a pull quote or a call to action. Not for statistics dressed up as a "big number with a small label", which is a default treatment.
+An ink band (never cream) holding one large bold sentence and nothing else, or a sentence with one button. Use for a mission line, a pull quote or a call to action. Not for statistics dressed up as a "big number with a small label", which is a default treatment.
 
 ## 6. Listing or event grid (where cards are allowed)
 
 A listing, event or place is a real object, so a card-like unit is fine here. Rules:
 
 - Image first, large, with the radius token for media
-- Title in `font-display`, a line or two of metadata in `font-mono-label` or `font-ui`
+- Title in bold, then one line of metadata
+- Events show their whole banner in its own shape (16:9 or 2.4:1), with a small white label (name, date, price) on the banner. On desktop they sit in justified rows. Never use thumbnails, tiles or calendars.
+- Use grids, bentos or short stacks, never horizontal scroll rows.
 - No border plus shadow plus rounded corners stacked together. Pick image-led with no container, or a hairline border, never both heavy and soft.
 - Hover: slight image scale via `transform` inside an overflow-hidden frame, or title color change. No lift, no glow.
 - Do not wrap these in an outer card, and do not repeat the same grid for unrelated content.
