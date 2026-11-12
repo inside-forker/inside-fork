@@ -171,6 +171,7 @@ function buildEmailHtml(
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: "Asia/Karachi",
   })}</div></div>
                 ${metadataHtml}
               </div>
@@ -204,7 +205,7 @@ function buildEmailText(
   lines.push("");
   lines.push(`Priority: ${notification.priority}`);
   lines.push(
-    `Triggered at: ${new Date(notification.triggered_at).toLocaleString()}`
+    `Triggered at: ${new Date(notification.triggered_at).toLocaleString("en-US", { timeZone: "Asia/Karachi" })}`
   );
   const absoluteCtaUrl = resolveEmailCtaUrl(notification.cta_url);
   if (absoluteCtaUrl) {
