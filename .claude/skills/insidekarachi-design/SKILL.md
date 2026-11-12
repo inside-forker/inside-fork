@@ -37,9 +37,9 @@ The client set these during the November 2026 revamp rounds (homepage INSID-259,
   - Never crop a banner to a thumbnail or shrink it to a listing-style tile.
   - Never use calendars, date rails or date blocks.
   - On desktop, place banners in justified rows: each item's flex-grow is its aspect ratio, so a row shares one height and nothing is cropped.
-  - The details sit on the banner as a small white label with the name, date and price.
+  - The details are white text straight on the banner: the name, with the date under it, at the bottom left, and the price at the bottom right. No label box, no caption under the banner and no venue.
 - **Category icons** are the app's illustrated PNG pack (`insidekhi-reactnative/assets/icons`, copied into `public/`), never Lucide. Lucide is only for generic UI icons such as search, arrows and menu.
-- **Text over an image** sits on a solid white or ink label, never on a gradient scrim.
+- **Text over an image** is white and sits straight on the image, with a soft dark text shadow so it stays readable. No label boxes and no gradient scrims.
 
 These decisions replace several parts of the brief:
 - the one pink action per screen

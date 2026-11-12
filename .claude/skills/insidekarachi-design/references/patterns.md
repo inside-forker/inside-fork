@@ -56,7 +56,7 @@ A listing, event or place is a real object, so a card-like unit is fine here. Ru
 
 - Image first, large, with the radius token for media
 - Title in bold, then one line of metadata
-- Events show their whole banner in its own shape (16:9 or 2.4:1), with a small white label (name, date, price) on the banner. On desktop they sit in justified rows. Never use thumbnails, tiles or calendars.
+- Events show their whole banner in its own shape (16:9 or 2.4:1), with the details as white text straight on the banner: name and date bottom left, price bottom right. On desktop they sit in justified rows. Never use thumbnails, tiles or calendars.
 - Use grids, bentos or short stacks, never horizontal scroll rows.
 - No border plus shadow plus rounded corners stacked together. Pick image-led with no container, or a hairline border, never both heavy and soft.
 - Hover: slight image scale via `transform` inside an overflow-hidden frame, or title color change. No lift, no glow.
