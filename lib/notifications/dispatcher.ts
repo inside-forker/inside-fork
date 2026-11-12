@@ -13,6 +13,7 @@ import { NotificationEmailError, sendNotificationEmail } from "./email";
 import { NotificationPushError, sendNotificationPush } from "./push";
 import { generateBookingConfirmationEmail } from "@/lib/emails/booking-confirmation-template";
 import { getPublicSiteOrigin } from "@/lib/auth/url";
+import { formatEventDateLong, formatEventTime } from "@/lib/events/datetime";
 
 const MAX_BATCH_SIZE = 25;
 const LOCK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -460,18 +461,9 @@ async function buildCustomEmailHtml(
         [bookingId],
       );
 
-      // Format event date and time
-      const eventDate = new Date(booking.event_start_time);
-      const formattedDate = eventDate.toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-      const formattedTime = eventDate.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      // Format event date and time in Karachi time (server runs in UTC)
+      const formattedDate = formatEventDateLong(booking.event_start_time);
+      const formattedTime = formatEventTime(booking.event_start_time);
 
       // Extract event location
       const venueName = booking.event_location_name || "To be announced";
