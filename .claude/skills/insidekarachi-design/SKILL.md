@@ -31,7 +31,10 @@ The client set these during the November 2026 revamp rounds (homepage INSID-259,
 - **Visual, not texty.** Lead with real photos, banners, colour and shape. Keep details to one or two lines, and keep descriptions short and clamped. Stacked text blocks, grey label/value boxes and a heading over every block read as "dumped".
 - **Compact.** People should see many items and their prices without much scrolling. Nothing oversized, no long descriptions. On phones, the page title and search share one row.
 - **Hairlines, not outlines.** Borders are 1px `border-border` (#E5E7EB) or none. Never 2px ink outlines.
-- **No app-style carousels.** No hero sliders, and no horizontal scroll rows of listings or events. Use grids, photo bentos and short stacks. Filter chips wrap instead of scrolling.
+- **No carousels on the landing page.**
+  - The homepage (`/`) has no carousels, hero sliders or horizontal scroll rows. It uses grids, photo bentos and short stacks.
+  - Other pages may use a carousel where it helps.
+  - Filter chips wrap instead of scrolling.
 - **Events are their banner.**
   - Show every event's whole banner in its own shape (16:9 or 2.4:1).
   - Never crop a banner to a thumbnail or shrink it to a listing-style tile.
