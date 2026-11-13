@@ -92,11 +92,15 @@ const clockFmt = new Intl.DateTimeFormat("en-US", {
 interface KarachiDay {
   /** Days since the epoch, for comparing calendar days. */
   index: number;
+  year: number;
+  monthIndex: number;
   day: string;
   month: string;
   weekday: string;
   hour: number;
 }
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function karachiDay(d: Date): KarachiDay {
   const parts = dayParts.formatToParts(d);
@@ -107,10 +111,79 @@ function karachiDay(d: Date): KarachiDay {
   const day = get("day");
   return {
     index: Math.round(Date.UTC(year, monthIndex, Number(day)) / 86_400_000),
+    year,
+    monthIndex,
     day,
     month: get("month"),
     weekday: get("weekday"),
     hour: Number(get("hour")),
+  };
+}
+
+const indexDayFmt = new Intl.DateTimeFormat("en-US", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  timeZone: "UTC",
+});
+
+function dayFromIndex(index: number): { weekday: string; day: string; month: string } {
+  const parts = indexDayFmt.formatToParts(new Date(index * 86_400_000));
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return { weekday: get("weekday"), day: get("day"), month: get("month") };
+}
+
+/** "Sat 28 Nov" for a Karachi day index (days since the epoch). */
+export function formatKarachiDay(index: number): string {
+  const d = dayFromIndex(index);
+  return `${d.weekday} ${d.day} ${d.month}`;
+}
+
+/**
+ * The first and last Karachi calendar day an event covers. An end before
+ * 6 AM counts as the night before, so a gig ending at 2 AM is one day.
+ */
+export function eventDaySpan(startIso: string, endIso: string): { first: number; last: number } | null {
+  const start = parse(startIso);
+  if (!start) return null;
+  const s = karachiDay(start);
+  const end = parse(endIso);
+  if (!end) return { first: s.index, last: s.index };
+  const e = karachiDay(end);
+  const last = e.hour < 6 ? e.index - 1 : e.index;
+  return { first: s.index, last: Math.max(s.index, last) };
+}
+
+/** "Sat 14 Nov", "Sat 28 – Sun 29 Nov" or "Mon 30 Nov – Wed 2 Dec", in Karachi time. */
+export function formatEventDateLine(startIso: string, endIso: string): string {
+  const span = eventDaySpan(startIso, endIso);
+  if (!span) return "";
+  const s = dayFromIndex(span.first);
+  if (span.last === span.first) return `${s.weekday} ${s.day} ${s.month}`;
+  const e = dayFromIndex(span.last);
+  return s.month === e.month
+    ? `${s.weekday} ${s.day} – ${e.weekday} ${e.day} ${e.month}`
+    : `${s.weekday} ${s.day} ${s.month} – ${e.weekday} ${e.day} ${e.month}`;
+}
+
+export interface KarachiToday {
+  /** Days since the epoch. */
+  index: number;
+  /** 0 = Sunday … 6 = Saturday. */
+  weekday: number;
+  /** Days after today until the month ends (0 on the last day). */
+  daysLeftInMonth: number;
+}
+
+/** Today's calendar day in Karachi, for the events date filters. */
+export function karachiToday(now = new Date()): KarachiToday {
+  const k = karachiDay(now);
+  const daysInMonth = new Date(Date.UTC(k.year, k.monthIndex + 1, 0)).getUTCDate();
+  return {
+    index: k.index,
+    weekday: Math.max(0, WEEKDAYS.indexOf(k.weekday)),
+    daysLeftInMonth: daysInMonth - Number(k.day),
   };
 }
 

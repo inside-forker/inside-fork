@@ -14,7 +14,7 @@ export function EventVenueMap({ src, alt }: { src: string; alt: string }) {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="relative block w-full overflow-hidden rounded-[20px] bg-muted text-left"
+          className="relative block w-full overflow-hidden rounded-media bg-muted text-left"
         >
           <Image
             src={src}
@@ -24,7 +24,7 @@ export function EventVenueMap({ src, alt }: { src: string; alt: string }) {
             sizes="(min-width: 1024px) 720px, 100vw"
             className="h-auto w-full"
           />
-          <span className="absolute bottom-3 right-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-background px-3 text-xs font-semibold text-foreground shadow-sm">
+          <span className="absolute bottom-3 right-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-background px-3 text-xs font-semibold text-foreground">
             <Maximize2 className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">View full size</span>
             <span className="sr-only sm:hidden">View full size</span>

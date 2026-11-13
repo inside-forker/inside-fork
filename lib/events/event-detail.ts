@@ -3,6 +3,7 @@ import type { Event, EventImage, TicketType } from "@/types/events.types";
 import { isPrismfestSlug, PRISMFEST_VENUE_MAP } from "@/lib/events/prismfest";
 import { getEventTicketTypes } from "@/lib/events/ticket-types";
 import { getParchiOffer, type ParchiOffer } from "@/lib/parchi/service";
+import { getImageSize, type ImageSize } from "@/lib/images/dimensions";
 
 const FALLBACK_POSTER =
   "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&h=800&fit=crop&crop=center&auto=format&q=80";
@@ -10,6 +11,8 @@ const FALLBACK_POSTER =
 export interface EventDetailData {
   event: Event;
   poster: string;
+  /** The poster's pixel size, so it renders uncropped without a layout jump. */
+  posterSize: ImageSize | null;
   venueMapUrl: string | null;
   parchiOffer: ParchiOffer | null;
   ticketTypes: TicketType[];
@@ -63,6 +66,7 @@ export async function loadEventDetail(slug: string): Promise<EventDetailData | n
   }
 
   const poster = eventImages[0]?.url || FALLBACK_POSTER;
+  const posterSize = await getImageSize(poster);
 
   // Venue map isn't on the (untracked) events_with_details view. Prismfest's
   // bundled image covers it until the layout_image_url migration has run.
@@ -94,5 +98,5 @@ export async function loadEventDetail(slug: string): Promise<EventDetailData | n
     console.error("[event page] Ticket lookup failed:", err);
   }
 
-  return { event, poster, venueMapUrl, parchiOffer, ticketTypes };
+  return { event, poster, posterSize, venueMapUrl, parchiOffer, ticketTypes };
 }

@@ -20,11 +20,16 @@ interface OrganizerItem {
  * Organizer byline under the event title: avatar and name(s), each name
  * linking to the organizer's page when they have one. Renders from the event
  * row straight away, then fills in links once the organizers load.
+ *
+ * `names` renders just the linked names inline (after an optional prefix
+ * such as "By "), for the event page's details line.
  */
 export function EventOrganizer({
   event,
   className,
-}: EventOrganizerProps & { className?: string }) {
+  variant = "byline",
+  prefix = "",
+}: EventOrganizerProps & { className?: string; variant?: "byline" | "names"; prefix?: string }) {
   const [organizers, setOrganizers] = React.useState<OrganizerItem[]>([]);
 
   React.useEffect(() => {
@@ -67,6 +72,39 @@ export function EventOrganizer({
           ]
         : [];
 
+  const names = people.map((organizer, i) => {
+    const name = organizer.full_name || organizer.username || "Organizer";
+    const href =
+      organizer.username && organizer.role === "organizer"
+        ? `/organizer/${organizer.username}`
+        : null;
+    return (
+      <React.Fragment key={organizer.id}>
+        {i > 0 && (i === people.length - 1 ? " & " : ", ")}
+        {href ? (
+          <Link
+            href={href}
+            className={variant === "names" ? "hover:underline" : "hover:text-foreground hover:underline"}
+          >
+            {name}
+          </Link>
+        ) : (
+          name
+        )}
+      </React.Fragment>
+    );
+  });
+
+  if (variant === "names") {
+    if (people.length === 0) return null;
+    return (
+      <span className={className}>
+        {prefix}
+        {names}
+      </span>
+    );
+  }
+
   if (people.length === 0) return <div className={className} />;
 
   const lead = people[0];
@@ -85,27 +123,7 @@ export function EventOrganizer({
           {leadName.charAt(0).toUpperCase()}
         </AvatarFallback>
       </Avatar>
-      <span className="truncate">
-        {people.map((organizer, i) => {
-          const name = organizer.full_name || organizer.username || "Organizer";
-          const href =
-            organizer.username && organizer.role === "organizer"
-              ? `/organizer/${organizer.username}`
-              : null;
-          return (
-            <React.Fragment key={organizer.id}>
-              {i > 0 && (i === people.length - 1 ? " & " : ", ")}
-              {href ? (
-                <Link href={href} className="hover:text-foreground hover:underline">
-                  {name}
-                </Link>
-              ) : (
-                name
-              )}
-            </React.Fragment>
-          );
-        })}
-      </span>
+      <span className="truncate">{names}</span>
       {people.length === 1 && lead.isVerified && (
         <BadgeCheck className="h-4 w-4 shrink-0 text-foreground" aria-label="Verified organizer" />
       )}

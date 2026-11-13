@@ -70,7 +70,7 @@ export function EventGoodToKnow({ info, className }: { info: EventInfoLists; cla
     <section
       aria-labelledby="good-to-know-title"
       className={cn(
-        "-mx-5 bg-muted px-5 pb-10 pt-9 md:mx-0 md:rounded-[28px] md:p-8",
+        "-mx-5 bg-muted px-5 pb-10 pt-9 md:mx-0 md:rounded-container md:p-8",
         className,
       )}
     >
@@ -79,7 +79,7 @@ export function EventGoodToKnow({ info, className }: { info: EventInfoLists; cla
       </h2>
       <ul className="grid grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-3">
         {setting.length > 0 && (
-          <li className="col-span-2 flex items-center gap-3.5 rounded-[20px] bg-background px-[18px] py-4 lg:gap-4 lg:px-[22px] lg:py-5">
+          <li className="col-span-2 flex items-center gap-3.5 rounded-media bg-background px-[18px] py-4 lg:gap-4 lg:px-[22px] lg:py-5">
             {settingIcons.length > 0 && (
               <div className="flex shrink-0 gap-1.5 lg:gap-2">
                 {settingIcons.map((Icon, i) => (
@@ -100,14 +100,14 @@ export function EventGoodToKnow({ info, className }: { info: EventInfoLists; cla
         {amenities.map((label) => {
           const Icon = iconFor(label, AMENITY_ICONS) ?? Check;
           return (
-            <li key={label} className="flex flex-col gap-3 rounded-[20px] bg-background p-4 lg:gap-3.5 lg:p-5">
+            <li key={label} className="flex flex-col gap-3 rounded-media bg-background p-4 lg:gap-3.5 lg:p-5">
               <Icon className="h-[22px] w-[22px]" strokeWidth={1.8} aria-hidden="true" />
               <div className="text-[15px] font-semibold leading-[1.3] lg:text-[17px]">{label}</div>
             </li>
           );
         })}
         {restrictions.length > 0 && (
-          <li className="col-span-2 rounded-[20px] bg-background px-[18px] pb-[18px] pt-4 lg:col-span-3 lg:flex lg:flex-wrap lg:items-center lg:gap-x-4 lg:gap-y-3 lg:px-[22px] lg:py-5">
+          <li className="col-span-2 rounded-media bg-background px-[18px] pb-[18px] pt-4 lg:col-span-3 lg:flex lg:flex-wrap lg:items-center lg:gap-x-4 lg:gap-y-3 lg:px-[22px] lg:py-5">
             <div className="text-[15px] font-semibold lg:text-[17px]">Not allowed</div>
             <div className="mt-2.5 flex flex-wrap gap-1.5 lg:mt-0 lg:gap-2">
               {restrictions.map((label) => (

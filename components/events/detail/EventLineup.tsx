@@ -16,7 +16,7 @@ export function EventLineup({ artists, className }: { artists: EventLineupArtist
     <section
       aria-labelledby="lineup-title"
       className={cn(
-        "rounded-3xl bg-foreground px-[22px] pb-7 pt-6 text-background lg:rounded-[28px] lg:px-10 lg:pb-10 lg:pt-9",
+        "rounded-container bg-foreground px-[22px] pb-7 pt-6 text-background lg:rounded-container lg:px-10 lg:pb-10 lg:pt-9",
         className,
       )}
     >
