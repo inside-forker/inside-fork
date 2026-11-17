@@ -834,6 +834,7 @@ export function AdminBookingsManagement() {
           toolbar={toolbar}
           sort={sort}
           onSortChange={setSort}
+          scrollable={true}
           onRowOpen={(b) => setSelectedBooking(b)}
           rowActions={(b) => (
             <Button

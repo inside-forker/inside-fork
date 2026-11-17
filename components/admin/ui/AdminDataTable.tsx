@@ -65,6 +65,8 @@ export interface AdminDataTableProps<T> {
   /** Rows to sketch while loading. Default 6. */
   skeletonRows?: number;
   className?: string;
+  /** Allow horizontal scrolling on desktop for wide tables. Defaults to false. */
+  scrollable?: boolean;
 }
 
 const SKELETON_WIDTHS = ["w-3/5", "w-2/5", "w-3/4", "w-1/2", "w-2/3"];
@@ -152,6 +154,7 @@ export function AdminDataTable<T>({
   density = "default",
   skeletonRows = 6,
   className,
+  scrollable = false,
 }: AdminDataTableProps<T>) {
   const visible = columns.filter((c) => !hiddenColumns.includes(c.id));
   const rowRefs = React.useRef<(HTMLTableRowElement | null)[]>([]);
@@ -243,13 +246,21 @@ export function AdminDataTable<T>({
         <EmptyState icon={empty.icon} title={empty.title} description={empty.description} action={empty.action} />
       ) : (
         <>
-          {/* Desktop and tablet: a real table with horizontal scroll support when columns exceed container width. */}
-          <div className="hidden overflow-x-auto md:block">
+          {/* Desktop and tablet: a real table. Sticky header needs no scroll container, so wide tables scroll only below lg unless scrollable is true. */}
+          <div className={scrollable ? "hidden overflow-x-auto md:block" : "hidden max-lg:overflow-x-auto md:block"}>
             <table aria-label={label} aria-busy={state !== "ready"} className="w-full min-w-full border-collapse text-data">
               <thead>
                 <tr>
                   {selection && (
-                    <th scope="col" className="sticky top-[var(--admin-sticky-top,0px)] z-10 w-12 border-b bg-muted px-4">
+                    <th
+                      scope="col"
+                      className={cn(
+                        scrollable
+                          ? "sticky top-0 z-10"
+                          : "sticky top-[var(--admin-sticky-top,0px)] z-10",
+                        "w-12 border-b bg-muted px-4",
+                      )}
+                    >
                       <AdminCheckbox
                         aria-label="Select all on this page"
                         checked={headerChecked}
@@ -267,7 +278,10 @@ export function AdminDataTable<T>({
                         scope="col"
                         aria-sort={sorted ? (sorted === "asc" ? "ascending" : "descending") : undefined}
                         className={cn(
-                          "sticky top-[var(--admin-sticky-top,0px)] z-10 h-10 whitespace-nowrap border-b bg-muted px-4 text-xs font-medium text-muted-foreground",
+                          scrollable
+                            ? "sticky top-0 z-10"
+                            : "sticky top-[var(--admin-sticky-top,0px)] z-10",
+                          "h-10 whitespace-nowrap border-b bg-muted px-4 text-xs font-medium text-muted-foreground",
                           col.align === "end" ? "text-right" : "text-left",
                           col.className,
                         )}
@@ -295,7 +309,15 @@ export function AdminDataTable<T>({
                     );
                   })}
                   {rowActions && (
-                    <th scope="col" className="sticky top-[var(--admin-sticky-top,0px)] z-10 border-b bg-muted px-4">
+                    <th
+                      scope="col"
+                      className={cn(
+                        scrollable
+                          ? "sticky top-0 z-10"
+                          : "sticky top-[var(--admin-sticky-top,0px)] z-10",
+                        "border-b bg-muted px-4",
+                      )}
+                    >
                       <span className="sr-only">Actions</span>
                     </th>
                   )}
