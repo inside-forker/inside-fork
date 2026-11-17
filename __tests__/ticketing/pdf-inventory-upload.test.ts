@@ -12,3 +12,4 @@ describe("extractExternalId", () => {
     expect(extractExternalId("general_pass.pdf")).toBeNull();
   });
 });
+

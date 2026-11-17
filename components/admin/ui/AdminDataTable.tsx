@@ -243,9 +243,9 @@ export function AdminDataTable<T>({
         <EmptyState icon={empty.icon} title={empty.title} description={empty.description} action={empty.action} />
       ) : (
         <>
-          {/* Desktop and tablet: a real table. Sticky header needs no scroll container, so wide tables scroll only below lg. */}
-          <div className="hidden max-lg:overflow-x-auto md:block">
-            <table aria-label={label} aria-busy={state !== "ready"} className="w-full border-collapse text-data">
+          {/* Desktop and tablet: a real table with horizontal scroll support when columns exceed container width. */}
+          <div className="hidden overflow-x-auto md:block">
+            <table aria-label={label} aria-busy={state !== "ready"} className="w-full min-w-full border-collapse text-data">
               <thead>
                 <tr>
                   {selection && (

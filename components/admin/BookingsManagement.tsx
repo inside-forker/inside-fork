@@ -46,6 +46,7 @@ import {
   SegmentedControl,
   StatusBadge,
   type AdminColumn,
+  type DateRangeValue,
   type SortState,
 } from "@/components/admin/ui";
 
@@ -131,6 +132,7 @@ export function AdminBookingsManagement() {
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [eventFilter, setEventFilter] = React.useState<string>("all");
   const [channelFilter, setChannelFilter] = React.useState<string>("all");
+  const [dateRange, setDateRange] = React.useState<DateRangeValue>({});
 
   // View mode: detailed bookings table vs aggregate event breakdown matrix
   const [viewMode, setViewMode] = React.useState<"table" | "breakdown">("table");
@@ -364,6 +366,16 @@ export function AdminBookingsManagement() {
       list = list.filter((b) => b.payment_status === statusFilter);
     }
 
+    // Filter by Date Range
+    if (dateRange.from) {
+      const fromTime = new Date(`${dateRange.from}T00:00:00`).getTime();
+      list = list.filter((b) => new Date(b.created_at).getTime() >= fromTime);
+    }
+    if (dateRange.to) {
+      const toTime = new Date(`${dateRange.to}T23:59:59.999`).getTime();
+      list = list.filter((b) => new Date(b.created_at).getTime() <= toTime);
+    }
+
     // Search query
     if (searchQuery) {
       const q = searchQuery.toLowerCase().trim();
@@ -401,7 +413,7 @@ export function AdminBookingsManagement() {
   // Reset page when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [eventFilter, channelFilter, statusFilter, searchQuery]);
+  }, [eventFilter, channelFilter, statusFilter, searchQuery, dateRange]);
 
   const paginatedBookings = React.useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
@@ -412,13 +424,15 @@ export function AdminBookingsManagement() {
     searchQuery !== "" ||
     statusFilter !== "all" ||
     eventFilter !== "all" ||
-    channelFilter !== "all";
+    channelFilter !== "all" ||
+    Boolean(dateRange.from || dateRange.to);
 
   const clearFilters = () => {
     setSearchQuery("");
     setStatusFilter("all");
     setEventFilter("all");
     setChannelFilter("all");
+    setDateRange({});
   };
 
   const selectedEventName =
@@ -542,6 +556,7 @@ export function AdminBookingsManagement() {
       header: "Booking & Customer",
       priority: 1,
       hideable: false,
+      className: "min-w-[210px]",
       cell: (b) => (
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -570,6 +585,8 @@ export function AdminBookingsManagement() {
       id: "event",
       header: "Event",
       priority: 1,
+      sortable: true,
+      className: "min-w-[170px]",
       cell: (b) => (
         <div className="min-w-0 max-w-[200px]">
           <div className="font-medium text-sm truncate">
@@ -591,6 +608,7 @@ export function AdminBookingsManagement() {
     {
       id: "channel",
       header: "Channel",
+      className: "min-w-[120px]",
       cell: (b) =>
         b.is_parchi ? (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#0069DB]/15 text-[#0069DB]">
@@ -607,6 +625,8 @@ export function AdminBookingsManagement() {
       id: "tickets",
       header: "Tickets",
       align: "end",
+      sortable: true,
+      className: "min-w-[90px]",
       cell: (b) => (
         <div className="tabular-nums text-right">
           <span className="font-semibold text-sm">{b.total_tickets || 0}</span>
@@ -620,6 +640,8 @@ export function AdminBookingsManagement() {
       id: "amount",
       header: "Amount",
       align: "end",
+      sortable: true,
+      className: "min-w-[120px]",
       cell: (b) => (
         <div className="tabular-nums text-right">
           <div className="font-semibold text-emerald-600 dark:text-emerald-400 text-sm">
@@ -636,6 +658,7 @@ export function AdminBookingsManagement() {
     {
       id: "status",
       header: "Status",
+      className: "min-w-[120px]",
       cell: (b) => (
         <StatusBadge status={b.payment_status || b.status || "unknown"} />
       ),
@@ -644,6 +667,8 @@ export function AdminBookingsManagement() {
       id: "date",
       header: "Date",
       align: "end",
+      sortable: true,
+      className: "min-w-[130px]",
       cell: (b) => (
         <div className="whitespace-nowrap tabular-nums text-right">
           <div className="text-sm font-medium">
@@ -724,7 +749,12 @@ export function AdminBookingsManagement() {
           ],
         },
       ]}
-      onClearAll={clearFilters}
+      dateRange={{
+        from: dateRange.from,
+        to: dateRange.to,
+        onChange: setDateRange,
+      }}
+      onClearAll={hasFilters ? clearFilters : undefined}
       trailing={
         <SegmentedControl
           label="View"
