@@ -81,18 +81,27 @@ export async function uploadPdfToInventory(opts: {
   }
 
   const override = opts.externalId?.trim() || null;
-  const externalId =
-    override && /^\d{6,}$/.test(override)
-      ? override
-      : extractExternalId(filename);
+  let externalId: string | null = null;
 
+  if (override) {
+    externalId = override;
+  } else {
+    externalId = extractExternalId(filename);
+  }
+
+  // If no external ID extracted from filename or provided as override,
+  // auto-generate a unique ID so singular/custom uploads (e.g. ticket.pdf, pass.pdf)
+  // succeed rather than failing with invalid_filename.
   if (!externalId) {
-    return {
-      filename,
-      status: "invalid_filename",
-      message:
-        "Filename must end with the Ticketwala ticket number (6+ digits), e.g. 002_Prism_Fam_2586389.pdf",
-    };
+    const base = path.basename(filename, path.extname(filename));
+    const anyDigitsMatch = base.match(/(\d+)$/);
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    if (anyDigitsMatch?.[1]) {
+      externalId = `${opts.ticketTypeId}${anyDigitsMatch[1]}${randomSuffix}`;
+    } else {
+      const fullRandom = Math.floor(100000 + Math.random() * 900000);
+      externalId = `${opts.ticketTypeId}${Date.now().toString().slice(-4)}${fullRandom}`;
+    }
   }
 
   try {

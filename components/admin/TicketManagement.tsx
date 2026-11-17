@@ -83,6 +83,7 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
   const [uploadingTicket, setUploadingTicket] = React.useState<TicketType | null>(null);
   const [isUploadingPdfs, setIsUploadingPdfs] = React.useState(false);
   const [selectedFiles, setSelectedFiles] = React.useState<FileList | null>(null);
+  const [uploadExternalId, setUploadExternalId] = React.useState("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Section Header Management
@@ -142,6 +143,9 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
     for (let i = 0; i < selectedFiles.length; i++) {
       formDataUpload.append("files", selectedFiles[i]);
     }
+    if (selectedFiles.length === 1 && uploadExternalId.trim()) {
+      formDataUpload.append("external_ticket_id", uploadExternalId.trim());
+    }
 
     try {
       setIsUploadingPdfs(true);
@@ -158,12 +162,26 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
         throw new Error(json.error || "Failed to upload PDFs");
       }
 
-      toast({
-        title: "Upload Successful",
-        description: `Successfully uploaded ${json.data?.inserted ?? selectedFiles.length} ticket PDFs!`,
-      });
+      const inserted = Number(json.data?.inserted ?? 0);
+      const skipped = Number(json.data?.skipped ?? 0);
+      const results = (json.data?.results ?? []) as Array<{ status: string; message?: string }>;
+
+      if (inserted > 0) {
+        toast({
+          title: "Upload Successful",
+          description: `Successfully uploaded ${inserted} ticket PDF${inserted !== 1 ? "s" : ""}!${skipped > 0 ? ` (${skipped} skipped)` : ""}`,
+        });
+      } else {
+        const firstError = results.find((r) => r.status !== "ok")?.message;
+        toast({
+          title: "Upload Failed",
+          description: firstError || "0 ticket PDFs were uploaded. Please check the files.",
+          variant: "destructive",
+        });
+      }
 
       setSelectedFiles(null);
+      setUploadExternalId("");
       if (fileInputRef.current) fileInputRef.current.value = "";
       setUploadingTicket(null);
       fetchTicketTypes();
@@ -2024,7 +2042,14 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
       </Dialog>
 
       {/* Quick PDF Upload Dialog */}
-      <Dialog open={!!uploadingTicket} onOpenChange={(open) => !open && setUploadingTicket(null)}>
+      <Dialog open={!!uploadingTicket} onOpenChange={(open) => {
+        if (!open) {
+          setUploadingTicket(null);
+          setSelectedFiles(null);
+          setUploadExternalId("");
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -2069,6 +2094,21 @@ export function TicketManagement({ eventId }: TicketManagementProps) {
                 </p>
               )}
             </div>
+
+            {selectedFiles && selectedFiles.length === 1 && (
+              <div className="space-y-1.5 pt-1">
+                <Label htmlFor="pdf-external-id" className="text-xs text-muted-foreground">
+                  Custom Ticket ID / Code (Optional)
+                </Label>
+                <Input
+                  id="pdf-external-id"
+                  placeholder="e.g. 100245 (leave blank to auto-generate)"
+                  value={uploadExternalId}
+                  onChange={(e) => setUploadExternalId(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+            )}
 
             <div className="pt-2 flex items-center justify-between">
               <Button
