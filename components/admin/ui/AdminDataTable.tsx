@@ -246,20 +246,15 @@ export function AdminDataTable<T>({
         <EmptyState icon={empty.icon} title={empty.title} description={empty.description} action={empty.action} />
       ) : (
         <>
-          {/* Desktop and tablet: a real table. Sticky header needs no scroll container, so wide tables scroll only below lg unless scrollable is true. */}
-          <div className={scrollable ? "hidden overflow-x-auto md:block" : "hidden max-lg:overflow-x-auto md:block"}>
+          {/* Desktop and tablet: a real table with full horizontal scroll support and clean sticky headers. */}
+          <div className="hidden overflow-x-auto md:block">
             <table aria-label={label} aria-busy={state !== "ready"} className="w-full min-w-full border-collapse text-data">
               <thead>
                 <tr>
                   {selection && (
                     <th
                       scope="col"
-                      className={cn(
-                        scrollable
-                          ? "sticky top-0 z-10"
-                          : "sticky top-[var(--admin-sticky-top,0px)] z-10",
-                        "w-12 border-b bg-muted px-4",
-                      )}
+                      className="sticky top-0 z-10 w-12 border-b bg-muted px-4"
                     >
                       <AdminCheckbox
                         aria-label="Select all on this page"
@@ -278,10 +273,7 @@ export function AdminDataTable<T>({
                         scope="col"
                         aria-sort={sorted ? (sorted === "asc" ? "ascending" : "descending") : undefined}
                         className={cn(
-                          scrollable
-                            ? "sticky top-0 z-10"
-                            : "sticky top-[var(--admin-sticky-top,0px)] z-10",
-                          "h-10 whitespace-nowrap border-b bg-muted px-4 text-xs font-medium text-muted-foreground",
+                          "sticky top-0 z-10 h-10 whitespace-nowrap border-b bg-muted px-4 text-xs font-medium text-muted-foreground",
                           col.align === "end" ? "text-right" : "text-left",
                           col.className,
                         )}
@@ -311,12 +303,7 @@ export function AdminDataTable<T>({
                   {rowActions && (
                     <th
                       scope="col"
-                      className={cn(
-                        scrollable
-                          ? "sticky top-0 z-10"
-                          : "sticky top-[var(--admin-sticky-top,0px)] z-10",
-                        "border-b bg-muted px-4",
-                      )}
+                      className="sticky top-0 z-10 border-b bg-muted px-4 text-right min-w-[100px]"
                     >
                       <span className="sr-only">Actions</span>
                     </th>
@@ -387,7 +374,7 @@ export function AdminDataTable<T>({
                             </td>
                           ))}
                           {rowActions && (
-                            <td className={cn(cellPad, "w-px whitespace-nowrap text-right")}>
+                            <td className={cn(cellPad, "whitespace-nowrap text-right min-w-[100px]")}>
                               <div className="inline-flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100">
                                 {rowActions(row)}
                               </div>

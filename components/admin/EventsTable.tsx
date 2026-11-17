@@ -72,6 +72,7 @@ export function EventsTable({
       header: "Event",
       priority: 1,
       hideable: false,
+      className: "min-w-[200px]",
       cell: (e) => (
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -93,6 +94,7 @@ export function EventsTable({
     {
       id: "date",
       header: "Date",
+      className: "min-w-[130px]",
       cell: (e) => (
         <div className="whitespace-nowrap tabular-nums">
           <div className="font-medium">{dayFmt.format(new Date(e.start_time))}</div>
@@ -103,7 +105,7 @@ export function EventsTable({
     {
       id: "organizer",
       header: "Organizer",
-      className: "hidden lg:table-cell",
+      className: "hidden lg:table-cell min-w-[150px]",
       cell: (e) =>
         e.organizer_name ? (
           <span className="flex items-center gap-2 whitespace-nowrap">
@@ -114,12 +116,13 @@ export function EventsTable({
           <span className="text-muted-foreground">—</span>
         ),
     },
-    { id: "status", header: "Status", cell: (e) => <StatusBadge status={e.event_status} /> },
+    { id: "status", header: "Status", className: "min-w-[100px]", cell: (e) => <StatusBadge status={e.event_status} /> },
     {
       id: "capacity",
       header: "Capacity",
       align: "end",
       priority: 3,
+      className: "min-w-[80px]",
       cell: (e) => (e.max_capacity ? numFmt.format(e.max_capacity) : <span className="text-muted-foreground">—</span>),
     },
   ];
