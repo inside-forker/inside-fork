@@ -91,6 +91,7 @@ interface Booking {
     name: string;
     slug: string;
     start_time?: string | null;
+    end_time?: string | null;
     location_name?: string | null;
   } | null;
   user: {
@@ -108,6 +109,13 @@ interface EventOption {
   name: string;
   slug?: string;
   start_time?: string | null;
+  end_time?: string | null;
+}
+
+function isEventPast(startTime?: string | null, endTime?: string | null): boolean {
+  const target = endTime || startTime;
+  if (!target) return false;
+  return new Date(target).getTime() < Date.now();
 }
 
 const dayFmt = new Intl.DateTimeFormat("en-GB", {
@@ -130,7 +138,7 @@ export function AdminBookingsManagement() {
   // Filters
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
-  const [eventFilter, setEventFilter] = React.useState<string>("all");
+  const [selectedEvents, setSelectedEvents] = React.useState<string[]>([]);
   const [channelFilter, setChannelFilter] = React.useState<string>("all");
   const [dateRange, setDateRange] = React.useState<DateRangeValue>({});
 
@@ -139,6 +147,10 @@ export function AdminBookingsManagement() {
 
   // Sorting & Pagination
   const [sort, setSort] = React.useState<SortState>({ id: "date", dir: "desc" });
+  const [breakdownSort, setBreakdownSort] = React.useState<{
+    id: "date" | "revenue" | "tickets" | "orders" | "name";
+    dir: "asc" | "desc";
+  }>({ id: "date", dir: "desc" });
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 20;
 
@@ -200,15 +212,19 @@ export function AdminBookingsManagement() {
         if (result.events && Array.isArray(result.events)) {
           setEventsList(result.events);
         } else {
-          const map = new Map<number, string>();
+          const map = new Map<number, EventOption>();
           rawBookings.forEach((b) => {
             if (b.event?.id && b.event?.name) {
-              map.set(b.event.id, b.event.name);
+              map.set(b.event.id, {
+                id: b.event.id,
+                name: b.event.name,
+                slug: b.event.slug,
+                start_time: b.event.start_time,
+                end_time: b.event.end_time,
+              });
             }
           });
-          setEventsList(
-            Array.from(map.entries()).map(([id, name]) => ({ id, name })),
-          );
+          setEventsList(Array.from(map.values()));
         }
       } else {
         throw new Error(result.error || "Failed to fetch bookings");
@@ -237,6 +253,10 @@ export function AdminBookingsManagement() {
       {
         id: number;
         name: string;
+        startTime?: string | null;
+        endTime?: string | null;
+        isPast: boolean;
+        latestBookingDate: string;
         totalBookings: number;
         paidBookings: number;
         paidTickets: number;
@@ -250,9 +270,17 @@ export function AdminBookingsManagement() {
     for (const b of bookings) {
       const eventId = b.event?.id ?? 0;
       const eventName = b.event?.name ?? "No event";
+      const eventOpt = eventsList.find((e) => e.id === eventId);
+      const startTime = b.event?.start_time || eventOpt?.start_time || null;
+      const endTime = b.event?.end_time || eventOpt?.end_time || null;
+      const isPast = isEventPast(startTime, endTime);
       const existing = map.get(eventId) || {
         id: eventId,
         name: eventName,
+        startTime,
+        endTime,
+        isPast,
+        latestBookingDate: b.created_at,
         totalBookings: 0,
         paidBookings: 0,
         paidTickets: 0,
@@ -262,6 +290,9 @@ export function AdminBookingsManagement() {
         parchiPaidRevenue: 0,
       };
 
+      if (new Date(b.created_at).getTime() > new Date(existing.latestBookingDate).getTime()) {
+        existing.latestBookingDate = b.created_at;
+      }
       existing.totalBookings += 1;
       if (b.is_parchi) existing.parchiBookings += 1;
 
@@ -279,24 +310,46 @@ export function AdminBookingsManagement() {
       map.set(eventId, existing);
     }
 
-    return Array.from(map.values()).sort(
-      (a, b) => b.paidRevenue - a.paidRevenue,
-    );
-  }, [bookings]);
+    return Array.from(map.values()).sort((a, b) => {
+      let cmp = 0;
+      if (breakdownSort.id === "date") {
+        const aTime = a.startTime ? new Date(a.startTime).getTime() : new Date(a.latestBookingDate).getTime();
+        const bTime = b.startTime ? new Date(b.startTime).getTime() : new Date(b.latestBookingDate).getTime();
+        cmp = aTime - bTime;
+      } else if (breakdownSort.id === "revenue") {
+        cmp = a.paidRevenue - b.paidRevenue;
+      } else if (breakdownSort.id === "tickets") {
+        cmp = a.paidTickets - b.paidTickets;
+      } else if (breakdownSort.id === "orders") {
+        cmp = a.totalBookings - b.totalBookings;
+      } else if (breakdownSort.id === "name") {
+        cmp = a.name.localeCompare(b.name);
+      }
+      return breakdownSort.dir === "asc" ? cmp : -cmp;
+    });
+  }, [bookings, eventsList, breakdownSort]);
 
-  // Contextual bookings for dynamic top KPI metrics (respects active event & channel filter)
+  // Contextual bookings for dynamic top KPI metrics (respects active multi-event & channel filter)
   const contextBookings = React.useMemo(() => {
     let list = bookings;
-    if (eventFilter !== "all") {
-      list = list.filter((b) => String(b.event?.id) === eventFilter);
+    if (selectedEvents.length > 0) {
+      list = list.filter((b) => selectedEvents.includes(String(b.event?.id)));
     }
     if (channelFilter === "parchi") {
       list = list.filter((b) => b.is_parchi);
     } else if (channelFilter === "inside") {
       list = list.filter((b) => !b.is_parchi);
     }
+    if (dateRange.from) {
+      const fromTime = new Date(`${dateRange.from}T00:00:00`).getTime();
+      list = list.filter((b) => new Date(b.created_at).getTime() >= fromTime);
+    }
+    if (dateRange.to) {
+      const toTime = new Date(`${dateRange.to}T23:59:59.999`).getTime();
+      list = list.filter((b) => new Date(b.created_at).getTime() <= toTime);
+    }
     return list;
-  }, [bookings, eventFilter, channelFilter]);
+  }, [bookings, selectedEvents, channelFilter, dateRange]);
 
   // Dynamic KPI Stats
   const stats = React.useMemo(() => {
@@ -349,9 +402,9 @@ export function AdminBookingsManagement() {
   const filteredBookings = React.useMemo(() => {
     let list = bookings;
 
-    // Filter by Event
-    if (eventFilter !== "all") {
-      list = list.filter((b) => String(b.event?.id) === eventFilter);
+    // Filter by Event (supports multi-selection)
+    if (selectedEvents.length > 0) {
+      list = list.filter((b) => selectedEvents.includes(String(b.event?.id)));
     }
 
     // Filter by Channel (Parchi vs Inside Direct)
@@ -408,12 +461,12 @@ export function AdminBookingsManagement() {
     });
 
     return list;
-  }, [bookings, eventFilter, channelFilter, statusFilter, searchQuery, sort]);
+  }, [bookings, selectedEvents, channelFilter, statusFilter, searchQuery, sort, dateRange]);
 
   // Reset page when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [eventFilter, channelFilter, statusFilter, searchQuery, dateRange]);
+  }, [selectedEvents, channelFilter, statusFilter, searchQuery, dateRange]);
 
   const paginatedBookings = React.useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
@@ -423,22 +476,35 @@ export function AdminBookingsManagement() {
   const hasFilters =
     searchQuery !== "" ||
     statusFilter !== "all" ||
-    eventFilter !== "all" ||
+    selectedEvents.length > 0 ||
     channelFilter !== "all" ||
     Boolean(dateRange.from || dateRange.to);
 
   const clearFilters = () => {
     setSearchQuery("");
     setStatusFilter("all");
-    setEventFilter("all");
+    setSelectedEvents([]);
     setChannelFilter("all");
     setDateRange({});
   };
 
-  const selectedEventName =
-    eventFilter !== "all"
-      ? eventsList.find((e) => String(e.id) === eventFilter)?.name || "Event"
-      : null;
+  const selectedEventNames =
+    selectedEvents.length > 0
+      ? eventsList
+          .filter((e) => selectedEvents.includes(String(e.id)))
+          .map((e) => e.name)
+      : [];
+
+  const toggleBreakdownSort = (
+    id: "date" | "revenue" | "tickets" | "orders" | "name",
+  ) => {
+    setBreakdownSort((prev) => {
+      if (prev.id === id) {
+        return { id, dir: prev.dir === "asc" ? "desc" : "asc" };
+      }
+      return { id, dir: "desc" };
+    });
+  };
 
   // Export current filtered records to CSV
   const handleExportCsv = () => {
@@ -499,8 +565,10 @@ export function AdminBookingsManagement() {
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
     const activeEventSlug =
-      eventFilter !== "all"
-        ? (selectedEventName || "event").replace(/\s+/g, "_").toLowerCase()
+      selectedEvents.length === 1
+        ? (selectedEventNames[0] || "event").replace(/\s+/g, "_").toLowerCase()
+        : selectedEvents.length > 1
+        ? `${selectedEvents.length}_events`
         : "all_events";
     link.setAttribute(
       "download",
@@ -586,24 +654,41 @@ export function AdminBookingsManagement() {
       header: "Event",
       priority: 1,
       sortable: true,
-      className: "min-w-[170px]",
-      cell: (b) => (
-        <div className="min-w-0 max-w-[200px]">
-          <div className="font-medium text-sm truncate">
-            {b.event?.name || (
-              <span className="text-muted-foreground text-xs italic">
-                No event
+      className: "min-w-[190px]",
+      cell: (b) => {
+        const isPast = isEventPast(b.event?.start_time, b.event?.end_time);
+        return (
+          <div className="min-w-0 max-w-[220px]">
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium text-sm truncate">
+                {b.event?.name || (
+                  <span className="text-muted-foreground text-xs italic">
+                    No event
+                  </span>
+                )}
               </span>
-            )}
-          </div>
-          {b.event?.location_name && (
-            <div className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
-              <MapPin className="size-3 shrink-0" />
-              <span className="truncate">{b.event.location_name}</span>
+              {isPast && (
+                <span className="inline-flex shrink-0 items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground border">
+                  Past
+                </span>
+              )}
             </div>
-          )}
-        </div>
-      ),
+            <div className="mt-0.5 flex flex-col gap-0.5 text-xs text-muted-foreground">
+              {b.event?.start_time && (
+                <div>
+                  {dayFmt.format(new Date(b.event.start_time))}
+                </div>
+              )}
+              {b.event?.location_name && (
+                <div className="flex items-center gap-1 truncate">
+                  <MapPin className="size-3 shrink-0" />
+                  <span className="truncate">{b.event.location_name}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      },
     },
     {
       id: "channel",
@@ -682,13 +767,14 @@ export function AdminBookingsManagement() {
     },
   ];
 
-  // Event facets options with ticket & order counts
+  // Event facets options with ticket & order counts and Past marker
   const eventFacetOptions = React.useMemo(() => {
     return eventsList.map((e) => {
       const bks = bookings.filter((b) => b.event?.id === e.id);
+      const isPast = isEventPast(e.start_time, e.end_time);
       return {
         value: String(e.id),
-        label: e.name,
+        label: isPast ? `${e.name} (Past)` : e.name,
         count: bks.length,
       };
     });
@@ -706,9 +792,8 @@ export function AdminBookingsManagement() {
         {
           id: "event",
           label: "Event",
-          single: true,
-          selected: eventFilter === "all" ? [] : [eventFilter],
-          onChange: (values) => setEventFilter(values[0] ?? "all"),
+          selected: selectedEvents,
+          onChange: setSelectedEvents,
           options: eventFacetOptions,
         },
         {
@@ -774,8 +859,10 @@ export function AdminBookingsManagement() {
       eyebrow="Events & ticketing"
       title="Bookings"
       description={
-        selectedEventName
-          ? `Filtered to ${selectedEventName} · ${stats.total} bookings, ${stats.paid} paid.`
+        selectedEvents.length > 0
+          ? `Filtered to ${selectedEvents.length} event${
+              selectedEvents.length > 1 ? "s" : ""
+            } (${selectedEventNames.join(", ")}) · ${stats.total} bookings, ${stats.paid} paid.`
           : `${stats.total} total bookings across all events.`
       }
       live="live"
@@ -870,17 +957,74 @@ export function AdminBookingsManagement() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30 text-xs">
-                    <TableHead className="font-semibold">Event Name</TableHead>
-                    <TableHead className="font-semibold text-center">
-                      Total Orders
+                    <TableHead
+                      className="font-semibold cursor-pointer select-none hover:text-foreground"
+                      onClick={() => toggleBreakdownSort("name")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Event Name
+                        {breakdownSort.id === "name" && (
+                          <span className="text-primary font-bold">
+                            {breakdownSort.dir === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="font-semibold cursor-pointer select-none hover:text-foreground"
+                      onClick={() => toggleBreakdownSort("date")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Event Date
+                        {breakdownSort.id === "date" && (
+                          <span className="text-primary font-bold">
+                            {breakdownSort.dir === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="font-semibold text-center cursor-pointer select-none hover:text-foreground"
+                      onClick={() => toggleBreakdownSort("orders")}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        Total Orders
+                        {breakdownSort.id === "orders" && (
+                          <span className="text-primary font-bold">
+                            {breakdownSort.dir === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </div>
                     </TableHead>
                     <TableHead className="font-semibold text-center">
                       Paid Orders
                     </TableHead>
-                    <TableHead className="font-semibold text-center text-primary">
-                      Tickets Sold
+                    <TableHead
+                      className="font-semibold text-center text-primary cursor-pointer select-none hover:text-foreground"
+                      onClick={() => toggleBreakdownSort("tickets")}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        Tickets Sold
+                        {breakdownSort.id === "tickets" && (
+                          <span className="text-primary font-bold">
+                            {breakdownSort.dir === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </div>
                     </TableHead>
-                    <TableHead className="font-semibold">Paid Revenue</TableHead>
+                    <TableHead
+                      className="font-semibold cursor-pointer select-none hover:text-foreground"
+                      onClick={() => toggleBreakdownSort("revenue")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Paid Revenue
+                        {breakdownSort.id === "revenue" && (
+                          <span className="text-primary font-bold">
+                            {breakdownSort.dir === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </div>
+                    </TableHead>
                     <TableHead className="font-semibold text-center">
                       Parchi Tickets
                     </TableHead>
@@ -896,7 +1040,7 @@ export function AdminBookingsManagement() {
                   {eventBreakdown.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={8}
+                        colSpan={9}
                         className="text-center py-12 text-muted-foreground text-sm"
                       >
                         No event sales data found.
@@ -904,7 +1048,7 @@ export function AdminBookingsManagement() {
                     </TableRow>
                   ) : (
                     eventBreakdown.map((ev) => {
-                      const isSelected = String(ev.id) === eventFilter;
+                      const isSelected = selectedEvents.includes(String(ev.id));
                       return (
                         <TableRow
                           key={ev.id}
@@ -914,8 +1058,28 @@ export function AdminBookingsManagement() {
                               : "hover:bg-muted/20"
                           }`}
                         >
-                          <TableCell className="font-medium max-w-[260px] truncate">
-                            {ev.name}
+                          <TableCell className="font-medium max-w-[260px]">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate font-semibold">
+                                {ev.name}
+                              </span>
+                              {ev.isPast && (
+                                <span className="inline-flex shrink-0 items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground border">
+                                  Past
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {ev.startTime ? (
+                              <span>
+                                {dayFmt.format(new Date(ev.startTime))}
+                              </span>
+                            ) : (
+                              <span>
+                                {dayFmt.format(new Date(ev.latestBookingDate))} (last order)
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell className="text-center font-mono">
                             {ev.totalBookings}
@@ -952,17 +1116,33 @@ export function AdminBookingsManagement() {
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant={isSelected ? "secondary" : "outline"}
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() => {
-                                setEventFilter(isSelected ? "all" : String(ev.id));
-                                setViewMode("table");
-                              }}
-                            >
-                              {isSelected ? "Clear Filter" : "Filter Bookings"}
-                            </Button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                variant={isSelected ? "default" : "outline"}
+                                size="sm"
+                                className="h-7 text-xs font-medium"
+                                onClick={() => {
+                                  setSelectedEvents((prev) =>
+                                    prev.includes(String(ev.id))
+                                      ? prev.filter((id) => id !== String(ev.id))
+                                      : [...prev, String(ev.id)],
+                                  );
+                                }}
+                              >
+                                {isSelected ? "Selected ✓" : "Select"}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                  setSelectedEvents([String(ev.id)]);
+                                  setViewMode("table");
+                                }}
+                              >
+                                View
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );

@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
                      'name', e.name,
                      'slug', e.slug,
                      'start_time', e.start_time,
+                     'end_time', e.end_time,
                      'location_name', e.location_name
                    )
               END AS events
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch all events for the filter dropdown
     const { rows: allEvents } = await query(
-      `SELECT id, name, slug, start_time FROM events ORDER BY start_time DESC NULLS LAST, name ASC`
+      `SELECT id, name, slug, start_time, end_time FROM events ORDER BY start_time DESC NULLS LAST, name ASC`
     );
 
     // Fetch user profiles
