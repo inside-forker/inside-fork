@@ -24,11 +24,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch bookings with event info and more fields
+    // Fetch bookings with event info, discount and Parchi verification
     const { rows: bookings } = await query(
       `SELECT b.id, b.booking_reference, b.payment_status, b.status, b.total_amount,
-              b.created_at, b.customer_name, b.customer_email, b.customer_phone,
+              b.discount_amount, b.created_at, b.customer_name, b.customer_email, b.customer_phone,
               b.cnic_last4, b.event_id, b.user_id,
+              pv.parchi_id, pv.status AS parchi_status,
               CASE WHEN e.id IS NULL THEN NULL
                    ELSE json_build_object(
                      'id', e.id,
@@ -40,8 +41,20 @@ export async function GET(request: NextRequest) {
               END AS events
        FROM bookings b
        LEFT JOIN events e ON e.id = b.event_id
+       LEFT JOIN LATERAL (
+         SELECT parchi_id, status
+         FROM parchi_verifications
+         WHERE booking_id = b.id
+         ORDER BY approved_at DESC NULLS LAST, created_at DESC
+         LIMIT 1
+       ) pv ON true
        ORDER BY b.created_at DESC
-       LIMIT 500`
+       LIMIT 2000`
+    );
+
+    // Fetch all events for the filter dropdown
+    const { rows: allEvents } = await query(
+      `SELECT id, name, slug, start_time FROM events ORDER BY start_time DESC NULLS LAST, name ASC`
     );
 
     // Fetch user profiles
@@ -143,6 +156,10 @@ export async function GET(request: NextRequest) {
         payment_status: normalizedPaymentStatus,
         status: booking.status,
         total_amount: Number(booking.total_amount) || 0,
+        discount_amount: Number(booking.discount_amount) || 0,
+        is_parchi: Boolean(booking.parchi_id),
+        parchi_id: (booking.parchi_id as string | null) || null,
+        parchi_status: (booking.parchi_status as string | null) || null,
         created_at: booking.created_at,
         customer_name: booking.customer_name,
         customer_email: booking.customer_email,
@@ -187,6 +204,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: transformedBookings,
+      events: allEvents,
       userRole: profile?.role,
     });
   } catch (error) {
