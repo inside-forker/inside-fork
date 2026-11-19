@@ -29,8 +29,10 @@ import {
   Sparkles,
   Link as LinkIcon,
   Check,
+  Plus,
 } from "lucide-react";
 import { BankCardImage } from "@/components/bank-cards/BankCardImage";
+import { CreateBankDialog, BankItem } from "./CreateBankDialog";
 
 export type CardVariantRow = {
   id: number;
@@ -91,6 +93,7 @@ export function AddCardDialog({
   const [selectedBankId, setSelectedBankId] = React.useState<string>(
     defaultBankId ? String(defaultBankId) : "",
   );
+  const [isCreateBankOpen, setIsCreateBankOpen] = React.useState(false);
   const [cardName, setCardName] = React.useState("");
   const [cardType, setCardType] = React.useState<string>("Debit");
   const [cardNetwork, setCardNetwork] = React.useState<string>("Visa");
@@ -275,7 +278,8 @@ export function AddCardDialog({
   const currentBankDisplayName = activeBank?.name || defaultBankName || "Bank";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-2">
@@ -324,9 +328,18 @@ export function AddCardDialog({
           <div className="grid grid-cols-2 gap-4">
             {/* Bank Select */}
             <div className="space-y-1.5 col-span-2 sm:col-span-1">
-              <Label htmlFor="card-bank" className="text-xs font-semibold">
-                Bank *
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="card-bank" className="text-xs font-semibold">
+                  Bank / Wallet *
+                </Label>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateBankOpen(true)}
+                  className="text-[11px] text-primary hover:underline font-medium inline-flex items-center gap-0.5"
+                >
+                  <Plus className="size-3" /> New Bank
+                </button>
+              </div>
               <Select value={selectedBankId} onValueChange={setSelectedBankId}>
                 <SelectTrigger id="card-bank" className="h-9">
                   <SelectValue placeholder="Select bank" />
@@ -600,5 +613,15 @@ export function AddCardDialog({
         </form>
       </DialogContent>
     </Dialog>
+
+    <CreateBankDialog
+      open={isCreateBankOpen}
+      onOpenChange={setIsCreateBankOpen}
+      onSuccess={(createdBank) => {
+        setBanks((prev) => [...prev, createdBank]);
+        setSelectedBankId(String(createdBank.id));
+      }}
+    />
+  </>
   );
 }

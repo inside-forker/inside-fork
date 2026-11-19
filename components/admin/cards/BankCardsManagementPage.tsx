@@ -39,6 +39,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { BankCardImage } from "@/components/bank-cards/BankCardImage";
 import { AddCardDialog, CardVariantRow } from "./AddCardDialog";
+import { CreateBankDialog, BankItem } from "./CreateBankDialog";
 
 interface BankOption {
   id: number;
@@ -61,6 +62,7 @@ export function BankCardsManagementPage() {
 
   // Dialogs
   const [isAddOpen, setIsAddOpen] = React.useState(false);
+  const [isCreateBankOpen, setIsCreateBankOpen] = React.useState(false);
   const [editingCard, setEditingCard] = React.useState<CardVariantRow | null>(null);
   const [isEditSubmitting, setIsEditSubmitting] = React.useState(false);
 
@@ -274,6 +276,15 @@ export function BankCardsManagementPage() {
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsCreateBankOpen(true)}
+            className="h-9 gap-1.5"
+          >
+            <Building2 className="h-4 w-4" />
+            <span>Add Bank / Wallet</span>
           </Button>
           <Button
             onClick={() => setIsAddOpen(true)}
@@ -559,6 +570,16 @@ export function BankCardsManagementPage() {
           })}
         </div>
       )}
+
+      {/* Create Bank / Wallet Dialog */}
+      <CreateBankDialog
+        open={isCreateBankOpen}
+        onOpenChange={setIsCreateBankOpen}
+        onSuccess={(createdBank) => {
+          fetchBanks();
+          setSelectedBankId(String(createdBank.id));
+        }}
+      />
 
       {/* Add Card Dialog */}
       <AddCardDialog

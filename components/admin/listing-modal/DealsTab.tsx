@@ -38,6 +38,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import { Database } from "@/types/database";
 import { BankCardImage } from "@/components/bank-cards/BankCardImage";
 import { AddCardDialog } from "@/components/admin/cards/AddCardDialog";
+import { CreateBankDialog } from "@/components/admin/cards/CreateBankDialog";
 
 type BrandGroupMember = {
   listing_id: number;
@@ -67,6 +68,7 @@ type Bank = {
   id: number;
   name: string;
   logo_url: string | null;
+  code?: string | null;
 };
 
 type CardVariant = {
@@ -121,10 +123,16 @@ export function DealsTab({
   const [editingDeal, setEditingDeal] = React.useState<Deal | null>(null);
   const [formData, setFormData] = React.useState<DealFormData>(initialFormData);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [localBanks, setLocalBanks] = React.useState<Bank[]>(banks);
+  const [isCreateBankOpen, setIsCreateBankOpen] = React.useState(false);
   const [cards, setCards] = React.useState<CardVariant[]>([]);
   const [cardsLoading, setCardsLoading] = React.useState(false);
   const [selectedBankName, setSelectedBankName] = React.useState<string>("");
   const [isAddCardOpen, setIsAddCardOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    setLocalBanks(banks);
+  }, [banks]);
 
   // Brand Group states
   const [brandGroup, setBrandGroup] = React.useState<BrandGroupSummary | null>(null);
@@ -320,7 +328,7 @@ export function DealsTab({
     fetchCardsForBank(bankId);
 
     // Set selected bank name
-    const selectedBank = banks.find((bank) => bank.id.toString() === bankId);
+    const selectedBank = localBanks.find((bank) => bank.id.toString() === bankId);
     setSelectedBankName(selectedBank?.name || "");
   };
 
@@ -794,16 +802,25 @@ export function DealsTab({
               </div>
               {formData.deal_type === "bank_discount" && (
                 <div className="space-y-2">
-                  <Label htmlFor="bank_id">Bank</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="bank_id">Bank / Wallet</Label>
+                    <button
+                      type="button"
+                      onClick={() => setIsCreateBankOpen(true)}
+                      className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1"
+                    >
+                      <Plus className="size-3" /> New Bank / Wallet
+                    </button>
+                  </div>
                   <Select
                     value={formData.bank_id}
                     onValueChange={handleBankChange}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select bank" />
+                      <SelectValue placeholder="Select bank or wallet" />
                     </SelectTrigger>
                     <SelectContent>
-                      {banks.map((bank) => (
+                      {localBanks.map((bank) => (
                         <SelectItem key={bank.id} value={bank.id.toString()}>
                           {bank.name}
                         </SelectItem>
@@ -1236,7 +1253,7 @@ export function DealsTab({
         onOpenChange={setIsAddCardOpen}
         defaultBankId={formData.bank_id}
         defaultBankName={selectedBankName}
-        banks={banks}
+        banks={localBanks}
         onSuccess={async (newCard) => {
           if (formData.bank_id) {
             await fetchCardsForBank(formData.bank_id);
@@ -1247,6 +1264,22 @@ export function DealsTab({
           if (!current.includes(newCard.id)) {
             handleInputChange("valid_card_variants", [...current, newCard.id]);
           }
+        }}
+      />
+
+      {/* Create Bank / Wallet Dialog */}
+      <CreateBankDialog
+        open={isCreateBankOpen}
+        onOpenChange={setIsCreateBankOpen}
+        onSuccess={(createdBank) => {
+          const newBankObj: Bank = {
+            id: createdBank.id,
+            name: createdBank.name,
+            code: createdBank.code || "",
+            logo_url: createdBank.logo_url || null,
+          };
+          setLocalBanks((prev) => [...prev, newBankObj]);
+          handleBankChange(String(createdBank.id));
         }}
       />
     </TabsContent>
