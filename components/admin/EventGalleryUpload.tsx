@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Upload, X, AlertCircle, Loader2, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EventImage } from "@/types/events.types";
+import { shrinkImageForUpload } from "@/lib/images/shrink-for-upload";
 
 interface UploadItem {
   file: File;
@@ -133,7 +134,16 @@ export function EventGalleryUpload({
       return;
     }
 
-    const validFiles = files.filter((file) => {
+    // Shrink big photos first: Vercel rejects bodies over 4.5 MB.
+    const prepared = await Promise.all(
+      files.map((file) =>
+        ALLOWED_TYPES.includes(file.type)
+          ? shrinkImageForUpload(file).catch(() => file)
+          : Promise.resolve(file)
+      )
+    );
+
+    const validFiles = prepared.filter((file) => {
       const error = validateFile(file);
       if (error) {
         toast({
@@ -208,7 +218,10 @@ export function EventGalleryUpload({
       );
 
       if (!response.ok) {
-        const error = await response.json();
+        if (response.status === 413) {
+          throw new Error("Image is too large to upload. Try a smaller file.");
+        }
+        const error = await response.json().catch(() => ({}));
         throw new Error(error.error || "Upload failed");
       }
 
