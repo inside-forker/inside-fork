@@ -43,6 +43,11 @@ The client set these during the November 2026 revamp rounds (homepage INSID-259,
   - The details are white text straight on the banner: the name, with the date under it, at the bottom left, and the price at the bottom right. No label box, no caption under the banner and no venue.
 - **Category icons** are the app's illustrated PNG pack (`insidekhi-reactnative/assets/icons`, copied into `public/`), never Lucide. Lucide is only for generic UI icons such as search, arrows and menu.
 - **Text over an image** is white and sits straight on the image, with a soft dark text shadow so it stays readable. No label boxes and no gradient scrims.
+- **Discounts and deals** (INSID-262):
+  - No coupon or ticket styling (tear lines, stubs, notches), and no pills, chips or badges on deal cards. Use at most three filter menus.
+  - Deal photos are partner-feed images, not designed posters. Keep them small (a thumbnail or a short strip) and never make them the hero.
+  - The % comes first on every card, at normal text size (about 14 to 20px), never as a giant display number. Make big discounts stand out through shape or colour, not type size.
+  - Lead with the discount, not the rupee saving, and don't sort by saving by default.
 
 These decisions replace several parts of the brief:
 - the one pink action per screen
