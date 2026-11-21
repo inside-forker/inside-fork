@@ -2,8 +2,8 @@ import { query } from "@/lib/db";
 import { EVENT_CARD_SQL_COLUMNS, EVENTS_FROM_SQL } from "@/lib/events/upcoming-query";
 import { fetchPriceRangeByEventId, type EventPriceRange } from "@/lib/mobile/event-pricing";
 import { getImageSize } from "@/lib/images/dimensions";
-import { EVENT_AREAS, eventAreaKey } from "@/lib/events/areas";
-import { eventDaySpan, formatEventDateLine, karachiToday, type KarachiToday } from "@/lib/events/datetime";
+import { EVENT_AREAS, eventAreaKey, eventVenueLabel } from "@/lib/events/areas";
+import { eventDaySpan, formatEventClock, formatEventDateLine, karachiToday, type KarachiToday } from "@/lib/events/datetime";
 import type { EventFilterFields, FilterOption } from "@/lib/events/list-filters";
 
 /** An event banner with its pixel size, so it can be laid out uncropped. */
@@ -19,6 +19,11 @@ export interface EventListItem extends EventFilterFields {
   name: string;
   /** "Sat 14 Nov" or "Sat 28 – Sun 29 Nov". */
   dateLabel: string;
+  /** "Sat 14 Nov · 7:00 PM". */
+  whenLabel: string;
+  /** "District19, Korangi", or null without a venue. */
+  venue: string | null;
+  organizer: string | null;
   /** "Rs 2,500", "From Rs 2,550", "Free", or null without tickets. */
   priceLabel: string | null;
   banner: EventBanner | null;
@@ -104,6 +109,9 @@ export async function loadEventsList(now = new Date()): Promise<EventsListData> 
       slug: String(r.event_slug),
       name: String(r.event_name),
       dateLabel: formatEventDateLine(start, end),
+      whenLabel: `${formatEventDateLine(start, end)} · ${formatEventClock(start)}`,
+      venue: eventVenueLabel(locationName, address),
+      organizer: typeof r.organizer_name === "string" ? r.organizer_name : null,
       priceLabel: eventPriceLabel(range),
       banner: banners[i],
       firstDay: span?.first ?? 0,

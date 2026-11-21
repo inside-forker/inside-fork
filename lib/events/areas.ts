@@ -36,3 +36,12 @@ export function eventAreaKey(...parts: (string | null | undefined)[]): string | 
 export function eventAreaLabel(key: string): string {
   return EVENT_AREAS.find((a) => a.key === key)?.label ?? key;
 }
+
+/** "District19, Korangi": the venue name with its area when the name doesn't say it. */
+export function eventVenueLabel(locationName: string | null | undefined, address: string | null | undefined): string | null {
+  const name = locationName?.trim();
+  if (!name) return address?.trim() || null;
+  const area = eventAreaKey(locationName, address);
+  const label = area ? eventAreaLabel(area) : null;
+  return label && !name.toLowerCase().includes(label.toLowerCase()) ? `${name}, ${label}` : name;
+}

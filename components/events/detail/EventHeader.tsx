@@ -7,16 +7,7 @@ import type { ImageSize } from "@/lib/images/dimensions";
 import { cn } from "@/lib/utils";
 import { formatEventClock, formatEventDateLine } from "@/lib/events/datetime";
 import { eventDirectionsUrl } from "@/lib/events/directions";
-import { eventAreaKey, eventAreaLabel } from "@/lib/events/areas";
-
-/** "District19, Korangi": the venue with its area when the name doesn't say it. */
-function venueText(event: Event): string | null {
-  const name = event.location_name?.trim();
-  if (!name) return event.address?.trim() || null;
-  const area = eventAreaKey(event.location_name, event.address);
-  const label = area ? eventAreaLabel(area) : null;
-  return label && !name.toLowerCase().includes(label.toLowerCase()) ? `${name}, ${label}` : name;
-}
+import { eventVenueLabel } from "@/lib/events/areas";
 
 function whenText(event: Event): string {
   return `${formatEventDateLine(event.start_time, event.end_time)} · ${formatEventClock(event.start_time)}`;
@@ -32,7 +23,7 @@ export function EventVenueLine({
   tone?: "light" | "ink";
   className?: string;
 }) {
-  const venue = venueText(event);
+  const venue = eventVenueLabel(event.location_name, event.address);
   if (!venue && !(event.latitude && event.longitude)) return null;
   return (
     <div className={cn("flex items-center gap-1.5", className)}>
