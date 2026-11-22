@@ -206,7 +206,7 @@ const cachedBanks = unstable_cache(
         logo: b.logoUrl,
         offers: b.dealsCount,
         places: b.places,
-        href: `/listings?deals=true&bank=${b.id}`,
+        href: `/discounts?tab=all&bank=${b.id}`,
         deals: dealsByBank.get(b.id) ?? [],
       })),
       totalOffers: Number(totalRows[0]?.n) || 0,

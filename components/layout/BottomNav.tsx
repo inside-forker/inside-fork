@@ -138,11 +138,11 @@ export function BottomNav({
           {/* Center Deals Button */}
           {(() => {
             const isDealsActive =
-              pathname === "/listings" || pathname?.startsWith("/listings");
+              pathname === "/discounts" || pathname?.startsWith("/discounts");
             return (
               <div className="relative z-10 flex items-center justify-center w-16">
                 <Link
-                  href="/listings?deals=true"
+                  href="/discounts"
                   className="flex flex-col items-center justify-center gap-1 text-xs group"
                 >
                   <motion.div

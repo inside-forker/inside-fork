@@ -62,7 +62,7 @@ export function FilterMenu({
           align={align}
           sideOffset={6}
           collisionPadding={16}
-          className="z-50 w-56 rounded-media border border-border bg-background p-1.5 text-foreground shadow-overlay"
+          className="z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] w-56 overflow-y-auto rounded-media border border-border bg-background p-1.5 text-foreground shadow-overlay"
         >
           <DropdownMenu.RadioGroup value={value ?? ANY} onValueChange={(v) => onChange(v === ANY ? null : v)}>
             <MenuItem value={ANY} label={anyLabel} count={anyCount} />

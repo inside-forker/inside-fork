@@ -109,7 +109,7 @@ export function LandingBanks({ data }: { data: LandingBanksData }) {
           </div>
           {more > 0 && (
             <Link
-              href="/listings?deals=true"
+              href="/discounts"
               className="mt-1.5 inline-flex min-h-11 items-center gap-1.5 text-small font-semibold transition-colors duration-fast hover:text-primary lg:mt-3 lg:gap-2 lg:text-[15px]"
             >
               {more} more banks
