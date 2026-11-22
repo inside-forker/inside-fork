@@ -3,17 +3,19 @@
 import { useEffect, useRef, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Calendar, MapPin, Search } from "lucide-react";
+import { ArrowRight, Calendar, MapPin, Search, TrendingUp } from "lucide-react";
 import { Container } from "@/components/ds";
 import { useSearch } from "@/hooks/useSearch";
 import { cn } from "@/lib/utils";
 
-/** The app's popular searches (RN `POPULAR_SEARCH_TERMS`); phones show the first four. */
+/** The app's popular searches (RN `POPULAR_SEARCH_TERMS`); phones show the first three as chips. */
 const TRENDING = ["Kolachi", "Café Flo", "Xander's", "Concerts", "Gyms"];
 
 /**
  * Landing hero: the headline, the line under it, one search box with live
  * suggestions, and a Trending line. Left-aligned on phones, centred from lg.
+ * Phones drop the eyebrow and show Trending as chips, so the category icons
+ * below come into the first screen.
  */
 export function LandingHero() {
   const router = useRouter();
@@ -38,12 +40,12 @@ export function LandingHero() {
   };
 
   return (
-    <section className="pb-7 pt-7 lg:pb-14 lg:pt-[88px]">
+    <section className="pb-6 pt-6 lg:pb-14 lg:pt-[88px]">
       <Container className="flex flex-col items-start lg:items-center lg:text-center">
-        <p className="text-label font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+        <p className="hidden text-label font-semibold uppercase tracking-[0.06em] text-muted-foreground lg:block">
           Karachi&rsquo;s city guide
         </p>
-        <h1 className="mt-3.5 text-[46px] font-bold leading-none tracking-[-0.05em] lg:mt-5 lg:max-w-[1000px] lg:text-8xl lg:leading-[0.98]">
+        <h1 className="text-[46px] font-bold leading-none tracking-[-0.05em] lg:mt-5 lg:max-w-[1000px] lg:text-8xl lg:leading-[0.98]">
           Find your kind of Karachi.
         </h1>
         <p className="mt-3 text-body text-muted-foreground lg:mt-5 lg:text-body-lg">
@@ -119,15 +121,17 @@ export function LandingHero() {
           )}
         </form>
 
-        <p className="mt-3.5 flex flex-wrap gap-x-3 gap-y-1 text-small lg:mt-[18px] lg:justify-center lg:gap-x-3.5 lg:text-[15px]">
-          <span className="font-bold">Trending</span>
+        <p className="mt-3 flex flex-wrap items-center gap-2 text-small lg:mt-[18px] lg:justify-center lg:gap-x-3.5 lg:gap-y-1 lg:text-[15px]">
+          <TrendingUp className="h-5 w-5 shrink-0 text-muted-foreground lg:hidden" aria-hidden="true" />
+          <span className="sr-only font-bold lg:not-sr-only">Trending</span>
           {TRENDING.map((term, i) => (
             <Link
               key={term}
               href={`/search?q=${encodeURIComponent(term)}`}
               className={cn(
-                "underline decoration-border underline-offset-[3px] transition-colors duration-fast hover:decoration-foreground",
-                i >= 4 && "hidden lg:inline",
+                "inline-flex h-11 items-center rounded-full bg-muted px-4 font-medium transition-colors duration-fast hover:bg-border",
+                "lg:inline lg:h-auto lg:rounded-none lg:bg-transparent lg:px-0 lg:font-normal lg:underline lg:decoration-border lg:underline-offset-[3px] lg:hover:bg-transparent lg:hover:decoration-foreground",
+                i >= 3 && "hidden",
               )}
             >
               {term}
