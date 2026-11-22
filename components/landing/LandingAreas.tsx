@@ -4,6 +4,7 @@ import { useState, type CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Container, Section } from "@/components/ds";
+import { SectionHeader } from "@/components/landing/SectionHeader";
 import type { LandingArea } from "@/lib/homepage/landing";
 import { cn } from "@/lib/utils";
 
@@ -43,29 +44,16 @@ export function LandingAreas({ areas }: { areas: LandingArea[] }) {
   const area = areas.find((a) => a.name === selected) ?? areas[0];
 
   return (
-    <Section size="md" className="py-10" aria-labelledby="landing-areas">
+    <Section size="md" aria-labelledby="landing-areas">
       <Container>
-        <div className="flex items-center gap-3 lg:mb-8 lg:gap-4">
-          <Image
-            src="/assets/icons/saved-places.png"
-            alt=""
-            width={56}
-            height={56}
-            className="h-10 w-10 shrink-0 rotate-[7deg] lg:h-14 lg:w-14"
-          />
-          <div className="min-w-0 flex-1">
-            <h2
-              id="landing-areas"
-              className="text-[26px] font-bold leading-8 tracking-[-0.03em] lg:text-[44px] lg:leading-[48px]"
-            >
-              Pick your side of town
-            </h2>
-            <p className="mt-1.5 hidden text-[17px] leading-[26px] lg:block">Tap an area on the map to see what&rsquo;s good there.</p>
-          </div>
-        </div>
-        <p className="mt-1.5 text-small lg:hidden">Tap an area to see what&rsquo;s good there.</p>
+        <SectionHeader
+          id="landing-areas"
+          eyebrow="Around town"
+          title="Pick your side of town"
+          subline="Tap an area on the map to see what’s good there."
+        />
 
-        <div className="mt-3.5 flex flex-col gap-3 lg:mt-0 lg:flex-row lg:flex-wrap lg:gap-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:gap-6">
           <div className="relative h-[360px] min-w-0 overflow-hidden rounded-container bg-cream lg:h-[560px] lg:flex-[7_1_560px]">
             {/* Sea and Shahrah-e-Faisal, drawn in the page colour. */}
             <svg

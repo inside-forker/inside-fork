@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { Bell, Star, Tag, Ticket, ChevronLeft, Search } from "lucide-react";
 import { Container, Section } from "@/components/ds";
+import { SectionHeader } from "@/components/landing/SectionHeader";
 import type { EventListItem } from "@/lib/events/list";
 import type { LandingCategory } from "@/lib/homepage/landing";
 import { cn } from "@/lib/utils";
@@ -142,21 +143,18 @@ function TicketPhone({ event }: { event: EventListItem | null }) {
 
 /** "Karachi, in your pocket", on ink: what the app adds, the store links, and two phones. */
 export function LandingApp({ events, categories }: { events: EventListItem[]; categories: LandingCategory[] }) {
+  // The hairline at the bottom keeps the phones from running into the ink footer.
   return (
-    <Section tone="ink" size="md" className="overflow-hidden pb-0 pt-10 md:pb-0" aria-labelledby="landing-app">
+    <Section tone="ink" size="md" className="overflow-hidden border-b border-border pb-0 md:pb-0" aria-labelledby="landing-app">
       <Container className="flex flex-col lg:flex-row lg:flex-wrap lg:gap-12">
         <div className="min-w-0 lg:flex-[5_1_420px] lg:pb-24">
-          <p className="text-label font-semibold uppercase tracking-[0.06em] text-muted-foreground">The Inside app</p>
-          <h2
+          <SectionHeader
             id="landing-app"
-            className="mt-2.5 text-[32px] font-bold leading-9 tracking-[-0.035em] lg:mt-4 lg:text-[52px] lg:leading-[56px]"
-          >
-            Karachi, in your pocket
-          </h2>
-          <p className="mt-2.5 text-[15px] leading-[22px] text-muted-foreground lg:mt-5 lg:max-w-[460px] lg:text-body-lg">
-            Everything on the site, plus a few things that work better on your phone.
-          </p>
-          <ul className="mt-5 grid gap-3 lg:mt-7 lg:gap-4">
+            eyebrow="The Inside app"
+            title="Karachi, in your pocket"
+            subline="Everything on the site, plus a few things that work better on your phone."
+          />
+          <ul className="grid gap-3 lg:gap-4">
             {FEATURES.map(({ icon: Icon, text }) => (
               <li key={text} className="flex items-center gap-3 text-[15px] leading-5 lg:gap-3.5 lg:text-[17px] lg:leading-6">
                 <span className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-border lg:h-10 lg:w-10">

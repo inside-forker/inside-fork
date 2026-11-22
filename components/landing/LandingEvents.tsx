@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { Container, Section } from "@/components/ds";
 import { EventBannerCard } from "@/components/events/EventBannerCard";
+import { SectionHeader } from "@/components/landing/SectionHeader";
 import { DEFAULT_BANNER_SIZE, type EventListItem } from "@/lib/events/list";
 import { formatKarachiDay, type KarachiToday } from "@/lib/events/datetime";
 import { cn } from "@/lib/utils";
@@ -53,29 +53,16 @@ export function LandingEvents({ events, today }: { events: EventListItem[]; toda
   const price = feature.priceLabel ? splitPrice(feature.priceLabel) : null;
 
   return (
-    <Section tone="ink" size="md" className="py-9" aria-labelledby="landing-events">
+    <Section tone="ink" size="md" aria-labelledby="landing-events">
       <Container>
-        <div className="flex items-end gap-3 lg:gap-4">
-          <div className="min-w-0 flex-1">
-            <p className="text-label font-semibold uppercase tracking-[0.06em] text-muted-foreground">What&rsquo;s on</p>
-            <h2
-              id="landing-events"
-              className="mt-1.5 text-[30px] font-bold leading-[34px] tracking-[-0.03em] lg:mt-2 lg:text-5xl lg:leading-[52px]"
-            >
-              {heading}
-            </h2>
-          </div>
-          <Link
-            href="/events"
-            className="inline-flex min-h-11 items-center gap-2 text-small font-semibold transition-opacity duration-fast hover:opacity-80 lg:text-body"
-          >
-            <span className="lg:hidden">All</span>
-            <span className="hidden lg:inline">All events</span>
-            <ArrowRight className="hidden h-[18px] w-[18px] lg:block" aria-hidden="true" />
-          </Link>
-        </div>
+        <SectionHeader
+          id="landing-events"
+          eyebrow="What’s on"
+          title={heading}
+          action={{ href: "/events", label: "All events" }}
+        />
 
-        <div className="mt-[18px] flex flex-col gap-[22px] lg:mt-9 lg:flex-row lg:flex-wrap lg:gap-8">
+        <div className="flex flex-col gap-[22px] lg:flex-row lg:flex-wrap lg:gap-8">
           <article className="min-w-0 lg:flex-[7_1_520px]">
             <Link href={`/events/${feature.slug}`} className="block overflow-hidden rounded-media bg-muted lg:rounded-container">
               <Image

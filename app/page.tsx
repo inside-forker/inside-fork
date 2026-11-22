@@ -20,7 +20,8 @@ export const revalidate = 300;
 
 /**
  * The landing page: hero and search, categories, what's on (ink), the bank
- * picker (cream), the area map, the app (ink) and a strip for businesses.
+ * picker (cream), the area map, a strip for businesses, then the app (ink),
+ * which runs into the ink footer.
  */
 export default async function Home() {
   const [categories, events, banks, areas] = await Promise.all([
@@ -41,8 +42,8 @@ export default async function Home() {
       {events && <LandingEvents events={upcoming} today={events.today} />}
       <LandingBanks data={banks} />
       <LandingAreas areas={areas} />
-      <LandingApp events={upcoming} categories={categories} />
       <LandingGetListed />
+      <LandingApp events={upcoming} categories={categories} />
     </div>
   );
 }

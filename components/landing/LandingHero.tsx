@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, type FormEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Calendar, MapPin, Search, TrendingUp } from "lucide-react";
@@ -11,11 +12,66 @@ import { cn } from "@/lib/utils";
 /** The app's popular searches (RN `POPULAR_SEARCH_TERMS`); phones show the first three as chips. */
 const TRENDING = ["Kolachi", "Café Flo", "Xander's", "Concerts", "Gyms"];
 
+/** The phone headline's last word: a few kinds of place, settling on Karachi. */
+const WORDS = [
+  { icon: "food-and-drink", word: "food" },
+  { icon: "shopping", word: "shopping" },
+  { icon: "fitness", word: "fitness" },
+  { icon: "salons", word: "salon" },
+  { icon: "things-to-do", word: "night out" },
+  { icon: "saved-places", word: "Karachi." },
+];
+const STEP_MS = 1400;
+
+/**
+ * The cycling word, in pink on a cream sticker with its app icon. It runs
+ * through WORDS once and stops on Karachi; with reduced motion (or on desktop,
+ * where it is hidden) it shows Karachi straight away.
+ */
+function RotatingWord() {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const last = WORDS.length - 1;
+    if (window.matchMedia("(prefers-reduced-motion: reduce), (min-width: 1024px)").matches) {
+      setIndex(last);
+      return;
+    }
+    let i = 0;
+    const id = window.setInterval(() => {
+      i += 1;
+      setIndex(i);
+      if (i >= last) window.clearInterval(id);
+    }, STEP_MS);
+    return () => window.clearInterval(id);
+  }, []);
+
+  return (
+    <span className="mt-2 inline-flex h-14 overflow-hidden align-top">
+      {/* Reduced motion sits on the last word from the first paint, before hydration. */}
+      <span
+        className="flex flex-col items-start transition-transform duration-slow ease-standard [transform:translateY(calc(var(--i)*-3.5rem))] motion-reduce:transition-none motion-reduce:[transform:translateY(calc(var(--last)*-3.5rem))]"
+        style={{ "--i": index, "--last": WORDS.length - 1 } as CSSProperties}
+      >
+        {WORDS.map(({ icon, word }) => (
+          <span
+            key={word}
+            className="inline-flex h-14 shrink-0 items-center gap-2 whitespace-nowrap rounded-media bg-cream pl-2 pr-3.5 text-primary"
+          >
+            <Image src={`/assets/icons/${icon}.png`} alt="" width={40} height={40} loading="eager" className="h-10 w-10" />
+            {word}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
 /**
  * Landing hero: the headline, the line under it, one search box with live
  * suggestions, and a Trending line. Left-aligned on phones, centred from lg.
- * Phones drop the eyebrow and show Trending as chips, so the category icons
- * below come into the first screen.
+ * Phones drop the eyebrow, cycle the headline's last word and show Trending
+ * as chips, so the category icons below come into the first screen.
  */
 export function LandingHero() {
   const router = useRouter();
@@ -45,8 +101,16 @@ export function LandingHero() {
         <p className="hidden text-label font-semibold uppercase tracking-[0.06em] text-muted-foreground lg:block">
           Karachi&rsquo;s city guide
         </p>
-        <h1 className="text-[46px] font-bold leading-none tracking-[-0.05em] lg:mt-5 lg:max-w-[1000px] lg:text-8xl lg:leading-[0.98]">
-          Find your kind of Karachi.
+        <h1 className="text-[40px] font-bold leading-[1.05] tracking-[-0.05em] lg:mt-5 lg:max-w-[1000px] lg:text-8xl lg:leading-[0.98]">
+          <span className="sr-only">Find your kind of Karachi.</span>
+          <span aria-hidden="true" className="lg:hidden">
+            Find your kind of
+            <br />
+            <RotatingWord />
+          </span>
+          <span aria-hidden="true" className="hidden lg:inline">
+            Find your kind of Karachi.
+          </span>
         </h1>
         <p className="mt-3 text-body text-muted-foreground lg:mt-5 lg:text-body-lg">
           Discover places, discounts, and events across Karachi.

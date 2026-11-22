@@ -28,6 +28,7 @@ The client set these during the November 2026 revamp rounds (homepage INSID-259,
   - Body content (titles, lead text, numerals) stays black, never pink.
   - Inside a dense component such as a ticket card, keep one pink (its action) and use ink for picked items.
   - No large pink slabs.
+  - Exception (INSID-273): on phones the homepage headline's cycling last word is pink, on a cream sticker with its app icon. It runs once and stops on "Karachi.".
 - **Visual, not texty.** Lead with real photos, banners, colour and shape. Keep details to one or two lines, and keep descriptions short and clamped. Stacked text blocks, grey label/value boxes and a heading over every block read as "dumped".
 - **Compact.** People should see many items and their prices without much scrolling. Nothing oversized, no long descriptions. On phones, the page title and search share one row.
 - **Hairlines, not outlines.** Borders are 1px `border-border` (#E5E7EB) or none. Never 2px ink outlines.
