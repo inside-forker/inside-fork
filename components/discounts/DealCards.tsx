@@ -156,13 +156,13 @@ export function InkDealCard({
     >
       <DealPhoto
         item={item}
-        sizes="(min-width: 1024px) 290px, 300px"
+        sizes="(min-width: 1024px) 290px, 240px"
         placeholder="bg-cream/10"
-        className="h-[140px] lg:h-40"
+        className="h-[108px] lg:h-40"
       />
-      <span className="block px-3.5 pb-3.5 pt-3 lg:px-4 lg:pb-4 lg:pt-3.5">
-        <DealPercent item={item} className="text-lg leading-[22px] lg:text-xl lg:leading-[26px]" />
-        <span className="mt-[3px] block truncate text-[17px] font-bold leading-[22px] lg:text-lg lg:leading-6">
+      <span className="block px-3 pb-3 pt-2.5 lg:px-4 lg:pb-4 lg:pt-3.5">
+        <DealPercent item={item} className="text-[17px] leading-[22px] lg:text-xl lg:leading-[26px]" />
+        <span className="mt-0.5 block truncate text-base font-bold leading-[21px] lg:mt-[3px] lg:text-lg lg:leading-6">
           {item.brand}
         </span>
         <DealMeta item={item} banks={banks} className="mt-1 text-data lg:text-small" />
@@ -193,9 +193,9 @@ export function CreamDealCard({
         className,
       )}
     >
-      <DealPhoto item={item} sizes="(min-width: 1024px) 190px, 50vw" className="h-[100px] lg:h-[104px]" />
-      <span className="block px-3 pb-3 pt-2.5 lg:px-3.5 lg:pb-3.5 lg:pt-3">
-        <DealPercent item={item} className="text-[17px] leading-[22px] lg:text-lg lg:leading-6" />
+      <DealPhoto item={item} sizes="(min-width: 1024px) 190px, 50vw" className="h-[92px] lg:h-[104px]" />
+      <span className="block px-3 pb-2.5 pt-2 lg:px-3.5 lg:pb-3.5 lg:pt-3">
+        <DealPercent item={item} className="text-base leading-[21px] lg:text-lg lg:leading-6" />
         <span className="mt-0.5 block truncate text-[15px] font-bold leading-5 lg:text-base lg:leading-[22px]">
           {item.brand}
         </span>

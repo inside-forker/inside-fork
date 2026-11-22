@@ -95,7 +95,7 @@ function SectionHead({
   children?: ReactNode;
 }) {
   return (
-    <div className="mb-3 flex min-h-9 items-center justify-between gap-3 lg:mb-3.5">
+    <div className="mb-3 flex min-h-8 items-center justify-between gap-3 lg:mb-3.5">
       <h2 id={id} className="text-[15px] font-bold leading-5 tracking-[-0.01em] lg:text-[17px] lg:leading-6">
         {title}
         <span className="ml-1.5 text-data font-semibold tracking-normal text-muted-foreground lg:text-small">
@@ -112,7 +112,7 @@ function SeeAll({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="h-11 text-data font-semibold underline underline-offset-[3px] outline-none focus-visible:ring-2 focus-visible:ring-primary lg:mr-2 lg:text-small"
+      className="relative h-8 text-data font-semibold underline underline-offset-[3px] outline-none before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] focus-visible:ring-2 focus-visible:ring-primary lg:mr-2 lg:text-small"
     >
       See all
     </button>
@@ -438,7 +438,7 @@ export function DiscountsBrowser({
               <SectionHead id="discounts-tier" title={TIER_TITLES[view.tier]} count={data[view.tier].count} />
               <ul
                 className={cn(
-                  view.tier === "half" && "grid gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4",
+                  view.tier === "half" && "grid grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4",
                   view.tier === "forty" && "grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-4 xl:grid-cols-6",
                   view.tier === "rest" && "lg:grid lg:grid-cols-2 lg:gap-x-8 xl:grid-cols-3",
                 )}
@@ -477,7 +477,7 @@ export function DiscountsBrowser({
                         item={item}
                         banks={bankLookup}
                         onOpen={setOpenItem}
-                        className="w-[300px] shrink-0 snap-start lg:w-[calc((100%-32px)/3)] xl:w-[calc((100%-48px)/4)]"
+                        className="w-[240px] shrink-0 snap-start lg:w-[calc((100%-32px)/3)] xl:w-[calc((100%-48px)/4)]"
                       />
                     ))}
                   </div>

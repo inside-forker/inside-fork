@@ -203,10 +203,10 @@ function AddCardPrompt({
   const addClass =
     "inline-flex h-10 items-center justify-center rounded-full bg-primary px-5 text-small font-semibold text-primary-foreground outline-none transition-opacity duration-fast hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:h-11 lg:px-[22px] lg:text-[15px]";
   const slotClass =
-    "flex h-[76px] w-[120px] shrink-0 flex-col items-center justify-center gap-2.5 rounded-control border border-dashed border-cream/25 text-small font-semibold text-foreground outline-none transition-colors duration-fast hover:border-cream/50 focus-visible:ring-2 focus-visible:ring-primary lg:h-[132px] lg:w-[210px] lg:rounded-media";
+    "flex h-[60px] w-24 shrink-0 flex-col items-center justify-center gap-2.5 rounded-control border border-dashed border-cream/25 text-small font-semibold text-foreground outline-none transition-colors duration-fast hover:border-cream/50 focus-visible:ring-2 focus-visible:ring-primary lg:h-[132px] lg:w-[210px] lg:rounded-media";
   const slotInner = (
     <>
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-cream/10 lg:h-11 lg:w-11">
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-cream/10 lg:h-11 lg:w-11">
         <Plus className="h-[18px] w-[18px] lg:h-5 lg:w-5" aria-hidden="true" />
       </span>
       <span className="hidden lg:block">Your card goes here</span>
