@@ -1,43 +1,35 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { LayoutGrid } from "lucide-react";
+import { transition } from "@/lib/motion";
 
 interface FloatingActionButtonProps {
   onClick: () => void;
 }
 
+/**
+ * Stands in for the bottom bar while the footer is on screen; tapping it
+ * brings the bar back. A plain white button with a hairline, like the bar.
+ */
 export function FloatingActionButton({ onClick }: FloatingActionButtonProps) {
+  const reduceMotion = useReducedMotion();
   return (
     <motion.div
-      initial={{ scale: 0, y: 50, opacity: 0 }}
-      animate={{ scale: 1, y: 0, opacity: 1 }}
-      exit={{ scale: 0, y: 50, opacity: 0 }}
-      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={transition.base}
       data-mobile-fab=""
-      className="md:hidden fixed bottom-4 right-4 z-50"
+      className="fixed bottom-4 right-4 z-50 mb-[env(safe-area-inset-bottom)] md:hidden"
     >
-      <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
+      <button
+        type="button"
         onClick={onClick}
-        className="group relative w-14 h-14 rounded-2xl bg-background/95 backdrop-blur-xl border border-border/50 shadow-2xl shadow-black/10 dark:shadow-black/30 transition-all duration-300 hover:shadow-xl hover:shadow-primary/20"
+        aria-label="Show menu"
+        className="grid h-14 w-14 place-items-center rounded-full border border-border bg-background shadow-overlay transition-opacity duration-fast ease-standard active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl opacity-100 group-hover:opacity-80 transition-opacity duration-200" />
-
-        {/* Icon container */}
-        <div className="relative z-10 flex items-center justify-center w-full h-full">
-          <LayoutGrid className="h-6 w-6 text-primary group-hover:text-primary/90 transition-colors duration-200" />
-        </div>
-
-        {/* Subtle pulse effect */}
-        <motion.div
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute inset-0 rounded-2xl border-2 border-primary/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-        />
-      </motion.button>
+        <LayoutGrid className="h-6 w-6 text-primary" aria-hidden="true" />
+      </button>
     </motion.div>
   );
 }
