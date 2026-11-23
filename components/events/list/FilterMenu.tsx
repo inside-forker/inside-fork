@@ -27,6 +27,7 @@ export function FilterMenu({
   options,
   onChange,
   align = "start",
+  tone = "light",
 }: {
   title: string;
   anyLabel: string;
@@ -35,6 +36,8 @@ export function FilterMenu({
   options: FilterMenuOption[];
   onChange: (value: string | null) => void;
   align?: "start" | "end";
+  /** "dark" for a pill on an ink band. */
+  tone?: "light" | "dark";
 }) {
   const selected = options.find((o) => o.value === value) ?? null;
 
@@ -46,7 +49,10 @@ export function FilterMenu({
           "group inline-flex h-9 items-center gap-1 whitespace-nowrap rounded-full pl-[13px] pr-2.5 text-data font-semibold outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 lg:h-10 lg:text-small",
           selected
             ? "bg-primary text-primary-foreground hover:opacity-90"
-            : "bg-muted text-foreground hover:bg-border data-[state=open]:bg-border",
+            : tone === "dark"
+              ? "bg-cream/10 text-foreground hover:bg-cream/20 data-[state=open]:bg-cream/20"
+              : "bg-muted text-foreground hover:bg-border data-[state=open]:bg-border",
+          tone === "dark" && "focus-visible:ring-offset-ink",
         )}
       >
         <span>{selected ? selected.label : title}</span>

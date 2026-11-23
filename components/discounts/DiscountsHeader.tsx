@@ -265,7 +265,8 @@ function AddCardPrompt({
 
 /**
  * The black band at the top of /discounts: title, search, For you / All and
- * the reader's cards (or an Add a card prompt).
+ * the reader's cards (or an Add a card prompt). `children` continue the band
+ * (the filters and the half-off row), so the page reads black, cream, white.
  */
 export function DiscountsHeader({
   tab,
@@ -284,6 +285,7 @@ export function DiscountsHeader({
   bankList,
   loginHref,
   addCardHref,
+  children,
 }: {
   tab: DiscountTab;
   card: number | null;
@@ -301,6 +303,7 @@ export function DiscountsHeader({
   bankList: DiscountBank[];
   loginHref: string;
   addCardHref: string;
+  children?: ReactNode;
 }) {
   const hasCards = cards.length > 0;
   const editCards = (className: string) => (
@@ -317,7 +320,7 @@ export function DiscountsHeader({
   );
 
   return (
-    <Section tone="ink" size="sm" aria-label="Your cards" className="py-5 md:py-5 lg:py-10">
+    <Section as="div" tone="ink" size="sm" className="pb-7 pt-5 md:pb-7 md:pt-5 lg:pb-12 lg:pt-10">
       <Container className="max-w-[1200px] px-5 sm:px-5 lg:px-8 xl:grid xl:grid-cols-[minmax(0,1fr)_560px] xl:items-center xl:gap-14">
         <div className="min-w-0">
           <div className="flex items-center gap-3">
@@ -384,6 +387,7 @@ export function DiscountsHeader({
           )}
         </div>
       </Container>
+      {children}
     </Section>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Container } from "@/components/ds";
+import { Container, Section } from "@/components/ds";
 import { FilterMenu, type FilterMenuOption } from "@/components/events/list/FilterMenu";
 import { useAuthLinks } from "@/lib/auth/return-to";
 import { AUTH_CHANGED_EVENT } from "@/lib/auth/client-events";
@@ -67,10 +67,22 @@ function useScrollRow(itemsKey: string) {
   return { ref: setEl, edges, go };
 }
 
-function RowArrows({ row, label }: { row: ReturnType<typeof useScrollRow>; label: string }) {
+function RowArrows({
+  row,
+  label,
+  tone,
+}: {
+  row: ReturnType<typeof useScrollRow>;
+  label: string;
+  tone: "ink" | "cream";
+}) {
   if (!row.edges.prev && !row.edges.next) return null;
-  const btn =
-    "flex h-9 w-9 items-center justify-center rounded-full bg-muted text-foreground outline-none transition-colors duration-fast hover:bg-border focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40 disabled:hover:bg-muted";
+  const btn = cn(
+    "flex h-9 w-9 items-center justify-center rounded-full text-foreground outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40",
+    tone === "ink"
+      ? "bg-cream/10 hover:bg-cream/20 disabled:hover:bg-cream/10"
+      : "bg-white hover:bg-white/70 disabled:hover:bg-white",
+  );
   return (
     <div className="hidden items-center gap-2 lg:flex">
       <button type="button" aria-label={`Previous ${label}`} disabled={!row.edges.prev} onClick={() => row.go(-1)} className={btn}>
@@ -129,9 +141,10 @@ function menuOptions(menu: DiscountMenu, value: string | null, label: (v: string
 }
 
 /**
- * /discounts: the black card-wallet header, three filter menus, then the
- * three sections (W1): half off or more on black cards, 40% off on cream
- * cards, everything else as rows. "See all" opens one section as a grid.
+ * /discounts in three colour bands (W1): one black band holds the card-wallet
+ * header, the filter menus and the half-off row; 40% off sits on a cream
+ * band; everything else is white rows. "See all" opens one section as a grid
+ * of black or cream cards on white.
  */
 export function DiscountsBrowser({
   initialData,
@@ -319,6 +332,10 @@ export function DiscountsBrowser({
     },
   ];
 
+  // The three-section view (vs one section's grid or an empty state).
+  const sectioned = total > 0 && !view.tier;
+  const busy = cn("transition-opacity duration-fast", loading && "opacity-60");
+
   const showMore = hasMore && (
     <button type="button" onClick={loadMore} disabled={moreLoading} className={cn(PILL_BUTTON, "mt-4 lg:mx-auto lg:mt-7 lg:w-[280px]")}>
       {moreLoading ? "Loading…" : "Show more"}
@@ -344,60 +361,129 @@ export function DiscountsBrowser({
         bankList={banks}
         loginHref={loginHref}
         addCardHref={addCardHref}
-      />
+      >
+        <Container className="max-w-[1200px] px-5 sm:px-5 lg:px-8">
+          <div ref={listTop} className="mt-5 scroll-mt-24 border-t border-border pt-4 lg:mt-8 lg:pt-6">
+            <div role="group" aria-label="Filter discounts" className="flex flex-wrap items-center gap-2">
+              {menus.map((m) => (
+                <FilterMenu
+                  key={m.key}
+                  title={m.title}
+                  anyLabel={m.anyLabel}
+                  anyCount={m.menu.anyCount}
+                  value={view.filters[m.key]}
+                  options={menuOptions(m.menu, view.filters[m.key], m.label)}
+                  onChange={(value) => setFilters({ [m.key]: value } as Partial<DiscountFilters>)}
+                  align={m.align}
+                  tone="dark"
+                />
+              ))}
+            </div>
 
-      <Container className="max-w-[1200px] px-5 pb-9 pt-3.5 sm:px-5 lg:px-8 lg:pb-16 lg:pt-6">
-        <div role="group" aria-label="Filter discounts" className="flex flex-wrap items-center gap-2">
-          {menus.map((m) => (
-            <FilterMenu
-              key={m.key}
-              title={m.title}
-              anyLabel={m.anyLabel}
-              anyCount={m.menu.anyCount}
-              value={view.filters[m.key]}
-              options={menuOptions(m.menu, view.filters[m.key], m.label)}
-              onChange={(value) => setFilters({ [m.key]: value } as Partial<DiscountFilters>)}
-              align={m.align}
-            />
-          ))}
-        </div>
+            {filtersActive && (
+              <div className="mt-2.5 flex items-center gap-3 text-data lg:mt-3.5 lg:text-small" aria-live="polite">
+                <span className="font-semibold">
+                  {fmt(total)} {total === 1 ? "discount" : "discounts"}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="h-8 font-semibold text-muted-foreground underline underline-offset-[3px] transition-colors duration-fast hover:text-foreground"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
 
-        {filtersActive && (
-          <div className="mt-2.5 flex items-center gap-3 text-data lg:mt-3.5 lg:text-small" aria-live="polite">
-            <span className="font-semibold">
-              {fmt(total)} {total === 1 ? "discount" : "discounts"}
-            </span>
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="h-8 font-semibold text-muted-foreground underline underline-offset-[3px] transition-colors duration-fast hover:text-foreground"
-            >
-              Clear filters
-            </button>
+            {error && (
+              <p className="mt-3 text-data font-semibold" role="alert">
+                {error}{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setReload((r) => r + 1);
+                  }}
+                  className="underline underline-offset-[3px]"
+                >
+                  Try again
+                </button>
+              </p>
+            )}
           </div>
-        )}
 
-        {error && (
-          <p className="mt-3 text-data text-destructive" role="alert">
-            {error}{" "}
-            <button
-              type="button"
-              onClick={() => {
-                setError(null);
-                setReload((r) => r + 1);
-              }}
-              className="font-semibold underline underline-offset-[3px]"
-            >
-              Try again
-            </button>
-          </p>
-        )}
+          {sectioned && data.half.count > 0 && (
+            <section aria-labelledby="discounts-half" aria-busy={loading} className={cn("mt-6 lg:mt-10", busy)}>
+              <SectionHead id="discounts-half" title="Half off or more" count={data.half.count}>
+                <div className="flex items-center gap-2">
+                  {data.half.count > data.half.items.length && <SeeAll onClick={() => openTier("half")} />}
+                  <RowArrows row={halfRow} label="half-off discounts" tone="ink" />
+                </div>
+              </SectionHead>
+              <div
+                ref={halfRow.ref}
+                className="scrollbar-hide -mx-5 -my-1 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-5 px-5 py-1 lg:mx-0 lg:gap-5 lg:scroll-px-0 lg:px-0"
+              >
+                {data.half.items.map((item) => (
+                  <InkDealCard
+                    key={item.key}
+                    item={item}
+                    banks={bankLookup}
+                    onOpen={setOpenItem}
+                    flat
+                    className="w-[240px] shrink-0 snap-start lg:w-[calc((100%-40px)/3)] xl:w-[calc((100%-60px)/4)]"
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </Container>
+      </DiscountsHeader>
 
-        <div
-          ref={listTop}
-          aria-busy={loading}
-          className={cn("scroll-mt-24 transition-opacity duration-fast", loading && "opacity-60")}
-        >
+      {sectioned && data.forty.count > 0 && (
+        <Section as="div" tone="cream" size="sm" className="py-6 md:py-6 lg:py-10">
+          <Container className="max-w-[1200px] px-5 sm:px-5 lg:px-8">
+            <section aria-labelledby="discounts-forty" aria-busy={loading} className={busy}>
+              <SectionHead id="discounts-forty" title="40% off" count={data.forty.count}>
+                <div className="hidden items-center gap-2 lg:flex">
+                  {data.forty.count > data.forty.items.length && <SeeAll onClick={() => openTier("forty")} />}
+                  <RowArrows row={fortyRow} label="40% off discounts" tone="cream" />
+                </div>
+              </SectionHead>
+              <div
+                ref={fortyRow.ref}
+                className="scrollbar-hide grid grid-cols-2 gap-x-3 gap-y-4 lg:-my-1 lg:flex lg:snap-x lg:snap-mandatory lg:gap-5 lg:overflow-x-auto lg:py-1"
+              >
+                {data.forty.items.map((item, i) => (
+                  <CreamDealCard
+                    key={item.key}
+                    item={item}
+                    banks={bankLookup}
+                    onOpen={setOpenItem}
+                    flat
+                    className={cn(
+                      "lg:w-[calc((100%-60px)/4)] lg:shrink-0 lg:snap-start xl:w-[calc((100%-100px)/6)]",
+                      i >= 4 && "max-lg:hidden",
+                    )}
+                  />
+                ))}
+              </div>
+              {data.forty.count > 4 && (
+                <button
+                  type="button"
+                  onClick={() => openTier("forty")}
+                  className={cn(PILL_BUTTON, "mt-5 bg-white hover:bg-white/70 lg:hidden")}
+                >
+                  See all {fmt(data.forty.count)}
+                </button>
+              )}
+            </section>
+          </Container>
+        </Section>
+      )}
+
+      <Container className="max-w-[1200px] px-5 pb-9 pt-6 sm:px-5 lg:px-8 lg:pb-16 lg:pt-10">
+        <div aria-busy={loading} className={busy}>
           {total === 0 ? (
             <div className="py-16 text-center lg:py-24">
               <p className="text-body font-bold">
@@ -426,7 +512,7 @@ export function DiscountsBrowser({
               ) : null}
             </div>
           ) : view.tier ? (
-            <section aria-labelledby="discounts-tier" className="mt-2 lg:mt-4">
+            <section aria-labelledby="discounts-tier" className="-mt-2">
               <button
                 type="button"
                 onClick={() => openTier(null)}
@@ -457,85 +543,23 @@ export function DiscountsBrowser({
               </ul>
               {showMore}
             </section>
-          ) : (
-            <div className="mt-5 space-y-7 lg:mt-7 lg:space-y-9">
-              {data.half.count > 0 && (
-                <section aria-labelledby="discounts-half">
-                  <SectionHead id="discounts-half" title="Half off or more" count={data.half.count}>
-                    <div className="flex items-center gap-2">
-                      {data.half.count > data.half.items.length && <SeeAll onClick={() => openTier("half")} />}
-                      <RowArrows row={halfRow} label="half-off discounts" />
-                    </div>
-                  </SectionHead>
-                  <div
-                    ref={halfRow.ref}
-                    className="scrollbar-hide -mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-5 px-5 lg:mx-0 lg:gap-4 lg:scroll-px-0 lg:px-0"
-                  >
-                    {data.half.items.map((item) => (
-                      <InkDealCard
-                        key={item.key}
-                        item={item}
-                        banks={bankLookup}
-                        onOpen={setOpenItem}
-                        className="w-[240px] shrink-0 snap-start lg:w-[calc((100%-32px)/3)] xl:w-[calc((100%-48px)/4)]"
-                      />
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {data.forty.count > 0 && (
-                <section aria-labelledby="discounts-forty">
-                  <SectionHead id="discounts-forty" title="40% off" count={data.forty.count}>
-                    <div className="hidden items-center gap-2 lg:flex">
-                      {data.forty.count > data.forty.items.length && <SeeAll onClick={() => openTier("forty")} />}
-                      <RowArrows row={fortyRow} label="40% off discounts" />
-                    </div>
-                  </SectionHead>
-                  <div
-                    ref={fortyRow.ref}
-                    className="scrollbar-hide grid grid-cols-2 gap-2.5 lg:flex lg:snap-x lg:snap-mandatory lg:gap-4 lg:overflow-x-auto"
-                  >
-                    {data.forty.items.map((item, i) => (
-                      <CreamDealCard
-                        key={item.key}
-                        item={item}
-                        banks={bankLookup}
-                        onOpen={setOpenItem}
-                        className={cn(
-                          "lg:w-[calc((100%-48px)/4)] lg:shrink-0 lg:snap-start xl:w-[calc((100%-80px)/6)]",
-                          i >= 4 && "max-lg:hidden",
-                        )}
-                      />
-                    ))}
-                  </div>
-                  {data.forty.count > 4 && (
-                    <button type="button" onClick={() => openTier("forty")} className={cn(PILL_BUTTON, "mt-3 lg:hidden")}>
-                      See all {fmt(data.forty.count)}
-                    </button>
-                  )}
-                </section>
-              )}
-
-              {data.rest.count > 0 && (
-                <section aria-labelledby="discounts-rest">
-                  <SectionHead
-                    id="discounts-rest"
-                    title={data.tab === "for-you" ? "More for your cards" : "More discounts"}
-                    count={data.rest.count}
-                  />
-                  <ul className="lg:grid lg:grid-cols-2 lg:gap-x-8 xl:grid-cols-3">
-                    {pagedItems.map((item) => (
-                      <li key={item.key} className="min-w-0">
-                        <DealRow item={item} banks={bankLookup} onOpen={setOpenItem} />
-                      </li>
-                    ))}
-                  </ul>
-                  {showMore}
-                </section>
-              )}
-            </div>
-          )}
+          ) : data.rest.count > 0 ? (
+            <section aria-labelledby="discounts-rest">
+              <SectionHead
+                id="discounts-rest"
+                title={data.tab === "for-you" ? "More for your cards" : "More discounts"}
+                count={data.rest.count}
+              />
+              <ul className="lg:grid lg:grid-cols-2 lg:gap-x-8 xl:grid-cols-3">
+                {pagedItems.map((item) => (
+                  <li key={item.key} className="min-w-0">
+                    <DealRow item={item} banks={bankLookup} onOpen={setOpenItem} />
+                  </li>
+                ))}
+              </ul>
+              {showMore}
+            </section>
+          ) : null}
         </div>
       </Container>
 

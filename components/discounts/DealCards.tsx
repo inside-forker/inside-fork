@@ -132,16 +132,21 @@ function DealPhoto({
 const CARD_FOCUS =
   "outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
 
-/** Half off or more: a black card with the photo across the top. */
+/**
+ * Half off or more: a black card with the photo across the top. `flat` drops
+ * the card's own fill for use on the black band, where the band is the card.
+ */
 export function InkDealCard({
   item,
   banks,
   onOpen,
+  flat = false,
   className,
 }: {
   item: DiscountItem;
   banks: BankLookup;
   onOpen: (item: DiscountItem) => void;
+  flat?: boolean;
   className?: string;
 }) {
   return (
@@ -149,7 +154,8 @@ export function InkDealCard({
       type="button"
       onClick={() => onOpen(item)}
       className={cn(
-        "ds-tone-ink group block min-w-0 overflow-hidden rounded-media bg-background text-left text-foreground",
+        "group block min-w-0 rounded-media text-left text-foreground",
+        flat ? "focus-visible:ring-offset-background" : "ds-tone-ink overflow-hidden bg-background",
         CARD_FOCUS,
         className,
       )}
@@ -158,9 +164,9 @@ export function InkDealCard({
         item={item}
         sizes="(min-width: 1024px) 290px, 240px"
         placeholder="bg-cream/10"
-        className="h-[108px] lg:h-40"
+        className={cn("h-[108px] lg:h-40", flat && "rounded-media")}
       />
-      <span className="block px-3 pb-3 pt-2.5 lg:px-4 lg:pb-4 lg:pt-3.5">
+      <span className={cn("block", flat ? "pt-2.5 lg:pt-3" : "px-3 pb-3 pt-2.5 lg:px-4 lg:pb-4 lg:pt-3.5")}>
         <DealPercent item={item} className="text-[17px] leading-[22px] lg:text-xl lg:leading-[26px]" />
         <span className="mt-0.5 block truncate text-base font-bold leading-[21px] lg:mt-[3px] lg:text-lg lg:leading-6">
           {item.brand}
@@ -171,16 +177,18 @@ export function InkDealCard({
   );
 }
 
-/** 40% off: a cream card with a shorter photo on top. */
+/** 40% off: a cream card with a shorter photo on top. `flat` is for the cream band. */
 export function CreamDealCard({
   item,
   banks,
   onOpen,
+  flat = false,
   className,
 }: {
   item: DiscountItem;
   banks: BankLookup;
   onOpen: (item: DiscountItem) => void;
+  flat?: boolean;
   className?: string;
 }) {
   return (
@@ -188,13 +196,19 @@ export function CreamDealCard({
       type="button"
       onClick={() => onOpen(item)}
       className={cn(
-        "ds-tone-cream group block min-w-0 overflow-hidden rounded-media bg-background text-left text-foreground",
+        "group block min-w-0 rounded-media text-left text-foreground",
+        flat ? "focus-visible:ring-offset-background" : "ds-tone-cream overflow-hidden bg-background",
         CARD_FOCUS,
         className,
       )}
     >
-      <DealPhoto item={item} sizes="(min-width: 1024px) 190px, 50vw" className="h-[92px] lg:h-[104px]" />
-      <span className="block px-3 pb-2.5 pt-2 lg:px-3.5 lg:pb-3.5 lg:pt-3">
+      <DealPhoto
+        item={item}
+        sizes="(min-width: 1024px) 190px, 50vw"
+        placeholder={flat ? "bg-white" : "bg-muted"}
+        className={cn("h-[92px] lg:h-[104px]", flat && "rounded-media")}
+      />
+      <span className={cn("block", flat ? "pt-2 lg:pt-2.5" : "px-3 pb-2.5 pt-2 lg:px-3.5 lg:pb-3.5 lg:pt-3")}>
         <DealPercent item={item} className="text-base leading-[21px] lg:text-lg lg:leading-6" />
         <span className="mt-0.5 block truncate text-[15px] font-bold leading-5 lg:text-base lg:leading-[22px]">
           {item.brand}
