@@ -42,6 +42,10 @@ The client set these during the November 2026 revamp rounds (homepage INSID-259,
   - Never use calendars, date rails or date blocks.
   - On desktop, place banners in justified rows: each item's flex-grow is its aspect ratio, so a row shares one height and nothing is cropped.
   - The details are white text straight on the banner: the name, with the date under it, at the bottom left, and the price at the bottom right. No label box, no caption under the banner and no venue.
+  - **/events has one compact spotlight** (INSID-278, 23 Nov 2026), on a short black band between the filters and the wall, matching the /discounts band.
+    - Phones show the event's banner card (as in the wall), about 270px in all. Desktop shows a smaller whole banner (416px wide) beside the date, name, venue, price and a pink Get tickets.
+    - It's the soonest event with tickets, shown only on the unfiltered list and only when there are 2 or more events. It never repeats in the wall.
+    - Keep it compact: the larger round 11 version was rejected for taking too much space.
 - **Category icons** are the app's illustrated PNG pack (`insidekhi-reactnative/assets/icons`, copied into `public/`), never Lucide. Lucide is only for generic UI icons such as search, arrows and menu.
 - **Text over an image** is white and sits straight on the image, with a soft dark text shadow so it stays readable. No label boxes and no gradient scrims.
 - **Discounts and deals** (INSID-262):
