@@ -148,7 +148,7 @@ export function DealCard({
   onOpen,
   sizes,
   photoClassName = "aspect-video",
-  nameClassName = "text-body leading-[22px] lg:text-[17px] lg:leading-6",
+  nameClassName = "text-body leading-[22px]",
   placeholder,
   className,
 }: {
@@ -168,8 +168,8 @@ export function DealCard({
       className={cn("group block min-w-0 text-left text-foreground", CARD_FOCUS, className)}
     >
       <DealPhoto item={item} sizes={sizes} placeholder={placeholder} className={cn("w-full rounded-media", photoClassName)} />
-      <span className="mt-2.5 block text-small font-semibold leading-5 lg:text-[15px]">{offerLabel(item)}</span>
-      <span className={cn("block truncate font-bold", nameClassName)}>{item.brand}</span>
+      <span className="mt-2.5 block text-[15px] font-bold leading-5">{offerLabel(item)}</span>
+      <span className={cn("block truncate font-semibold", nameClassName)}>{item.brand}</span>
       <DealMeta item={item} banks={banks} className="mt-0.5 text-data" />
     </button>
   );
@@ -193,8 +193,8 @@ export function DealRow({
     >
       <DealPhoto item={item} sizes="88px" className="h-[66px] w-[88px] shrink-0 rounded-media" />
       <span className="min-w-0 flex-1">
-        <span className="block text-small font-semibold leading-5">{offerLabel(item)}</span>
-        <span className="block truncate text-[15px] font-bold leading-5">{item.brand}</span>
+        <span className="block text-small font-bold leading-5">{offerLabel(item)}</span>
+        <span className="block truncate text-[15px] font-semibold leading-5">{item.brand}</span>
         <DealMeta item={item} banks={banks} className="mt-0.5 text-label lg:text-data" />
       </span>
     </button>

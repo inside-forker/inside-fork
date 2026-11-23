@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft } from "lucide-react";
+import { ArrowRight, ChevronLeft } from "lucide-react";
 import { Container, Section } from "@/components/ds";
 import { FilterMenu, type FilterMenuOption } from "@/components/events/list/FilterMenu";
-import { SectionHeader } from "@/components/landing/SectionHeader";
 import { useAuthLinks } from "@/lib/auth/return-to";
 import { AUTH_CHANGED_EVENT } from "@/lib/auth/client-events";
 import { cn } from "@/lib/utils";
@@ -26,7 +25,6 @@ import { CardsDialog, type CardsDialogMode } from "@/components/discounts/CardsD
 import { DISCOUNTS_WRAP, DiscountsHeader } from "@/components/discounts/DiscountsHeader";
 
 const fmt = (n: number) => n.toLocaleString("en-US");
-const places = (n: number) => `${fmt(n)} ${n === 1 ? "place" : "places"}`;
 
 const TIER_TITLES: Record<DiscountTier, string> = {
   half: "Half off or more",
@@ -37,8 +35,38 @@ const TIER_TITLES: Record<DiscountTier, string> = {
 const PILL_BUTTON =
   "flex h-11 w-full items-center justify-center rounded-full bg-muted text-small font-semibold outline-none transition-colors duration-fast hover:bg-border focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60";
 
-const PINK_BUTTON =
-  "flex h-12 w-full items-center justify-center rounded-full bg-primary px-4 text-[15px] font-semibold text-primary-foreground outline-none transition-opacity duration-fast hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 lg:h-[52px] lg:text-body";
+/** "Half off or more  137        See all →": the small header every section uses. */
+function SectionHead({
+  id,
+  title,
+  count,
+  onSeeAll,
+}: {
+  id: string;
+  title: string;
+  count: number;
+  onSeeAll?: () => void;
+}) {
+  return (
+    <div className="mb-3.5 flex items-baseline gap-2 lg:mb-4">
+      <h2 id={id} className="text-[17px] font-bold leading-[22px] tracking-[-0.01em] lg:text-xl lg:leading-[26px]">
+        {title}
+      </h2>
+      <span className="text-small font-semibold text-muted-foreground lg:text-[15px]">{fmt(count)}</span>
+      {onSeeAll && (
+        <button
+          type="button"
+          onClick={onSeeAll}
+          aria-label={`See all: ${title}`}
+          className="relative ml-auto inline-flex items-center gap-1 rounded-control text-small font-semibold outline-none before:absolute before:-inset-x-2 before:-inset-y-3 before:content-[''] focus-visible:ring-2 focus-visible:ring-primary lg:text-[15px]"
+        >
+          See all
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </button>
+      )}
+    </div>
+  );
+}
 
 /** Menu options, keeping a picked value visible even when nothing matches it any more. */
 function menuOptions(menu: DiscountMenu, value: string | null, label: (v: string) => string): FilterMenuOption[] {
@@ -47,10 +75,10 @@ function menuOptions(menu: DiscountMenu, value: string | null, label: (v: string
 }
 
 /**
- * /discounts (round 9 Y): the /events top on white with the reader's cards as
- * homepage bank-picker tiles, then homepage-style sections: half off on a
- * black band, 40% off and everything else on white. Each section opens with
- * the homepage's SectionHeader. "All N" opens one section as a grid.
+ * /discounts (round 12 "C"): the /events top on white with the reader's card
+ * strip, then a short black band holding only the half-off deals, then 40%
+ * off cards and every other deal as rows, on white. "See all" opens one
+ * section as a grid.
  */
 export function DiscountsBrowser({
   initialData,
@@ -228,8 +256,6 @@ export function DiscountsBrowser({
 
   const forYou = data.tab === "for-you";
   const busy = cn("transition-opacity duration-fast", loading && "opacity-60");
-  const [halfLead, ...halfMore] = data.half.items;
-  const [fortyLead, ...fortyMore] = data.forty.items;
 
   const showMore = hasMore && (
     <button type="button" onClick={loadMore} disabled={moreLoading} className={cn(PILL_BUTTON, "mt-6 lg:mx-auto lg:mt-9 lg:w-[280px]")}>
@@ -253,6 +279,7 @@ export function DiscountsBrowser({
         onAddCard={() => setCardsMode("add")}
         onEditCards={() => setCardsMode("manage")}
         banks={bankLookup}
+        bankList={banks}
         loginHref={loginHref}
         addCardHref={addCardHref}
         filters={menus.map((m) => (
@@ -321,7 +348,7 @@ export function DiscountsBrowser({
           )}
         </Container>
       ) : view.tier ? (
-        <Container className={cn(DISCOUNTS_WRAP, busy, "pb-16 pt-4 lg:pb-24 lg:pt-6")}>
+        <Container className={cn(DISCOUNTS_WRAP, busy, "pb-12 pt-4 lg:pb-16 lg:pt-6")}>
           <section aria-labelledby="discounts-tier" aria-busy={loading}>
             <button
               type="button"
@@ -331,12 +358,7 @@ export function DiscountsBrowser({
               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
               Back
             </button>
-            <SectionHeader
-              id="discounts-tier"
-              eyebrow={forYou ? "Your cards" : "All discounts"}
-              title={TIER_TITLES[view.tier]}
-              subline={places(data[view.tier].count)}
-            />
+            <SectionHead id="discounts-tier" title={TIER_TITLES[view.tier]} count={data[view.tier].count} />
             {view.tier === "rest" ? (
               <ul className="grid gap-3 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-4 xl:grid-cols-3">
                 {pagedItems.map((item) => (
@@ -353,8 +375,9 @@ export function DiscountsBrowser({
                       item={item}
                       banks={bankLookup}
                       onOpen={setOpenItem}
-                      sizes="(min-width: 1280px) 280px, (min-width: 1024px) 30vw, 50vw"
-                      nameClassName="text-[15px] leading-5 lg:text-[17px] lg:leading-6"
+                      sizes="(min-width: 1280px) 270px, (min-width: 1024px) 30vw, 50vw"
+                      photoClassName="h-[110px] lg:h-[168px]"
+                      nameClassName="text-[15px] leading-5 lg:text-body lg:leading-[22px]"
                       className="w-full"
                     />
                   </li>
@@ -366,114 +389,89 @@ export function DiscountsBrowser({
         </Container>
       ) : (
         <>
-          {halfLead && (
-            <Section tone="ink" size="md" aria-labelledby="discounts-half" aria-busy={loading} className={busy}>
+          {data.half.items.length > 0 && (
+            <Section
+              tone="ink"
+              size="sm"
+              aria-labelledby="discounts-half"
+              aria-busy={loading}
+              className={cn(busy, "mt-6 pb-7 pt-6 md:pb-7 md:pt-6 lg:mt-8 lg:pb-10 lg:pt-8")}
+            >
               <Container className={DISCOUNTS_WRAP}>
-                <SectionHeader
+                <SectionHead
                   id="discounts-half"
-                  eyebrow="Half off or more"
-                  title={forYou ? "Your biggest discounts" : "The biggest discounts"}
-                  action={data.half.count > 3 ? { label: `All ${fmt(data.half.count)}`, onClick: () => openTier("half") } : undefined}
+                  title="Half off or more"
+                  count={data.half.count}
+                  onSeeAll={data.half.count > 4 ? () => openTier("half") : undefined}
                 />
-                <div className="flex flex-col gap-7 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8">
-                  <DealCard
-                    item={halfLead}
-                    banks={bankLookup}
-                    onOpen={setOpenItem}
-                    sizes="(min-width: 1024px) 568px, 100vw"
-                    placeholder="bg-cream/10"
-                    nameClassName="mt-0.5 text-[22px] leading-7 tracking-[-0.025em] lg:text-[32px] lg:leading-10"
-                  />
-                  {halfMore.length > 0 && (
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-6 lg:gap-x-5">
-                      {halfMore.slice(0, 4).map((item, i) => (
-                        <DealCard
-                          key={item.key}
-                          item={item}
-                          banks={bankLookup}
-                          onOpen={setOpenItem}
-                          sizes="(min-width: 1024px) 274px, 50vw"
-                          placeholder="bg-cream/10"
-                          nameClassName="text-[15px] leading-5 lg:text-[17px] lg:leading-6"
-                          className={cn(i >= 2 && "max-lg:hidden")}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </Container>
-            </Section>
-          )}
-
-          {fortyLead && (
-            <Section size="md" aria-labelledby="discounts-forty" aria-busy={loading} className={busy}>
-              <Container className={DISCOUNTS_WRAP}>
-                <SectionHeader
-                  id="discounts-forty"
-                  eyebrow="40% off"
-                  title={forYou ? "40% off with your cards" : "40% off, all over town"}
-                  subline={`${places(data.forty.count)}. Each bank sets its own terms.`}
-                  action={data.forty.count > 4 ? { label: `All ${fmt(data.forty.count)}`, onClick: () => openTier("forty") } : undefined}
-                />
-                {/* Phones: one big card, then rows. Desktop: two rows of three. */}
-                <div className="lg:hidden">
-                  <DealCard item={fortyLead} banks={bankLookup} onOpen={setOpenItem} sizes="100vw" className="w-full" />
-                  {fortyMore.length > 0 && (
-                    <ul className="mt-5 grid gap-3">
-                      {fortyMore.slice(0, 3).map((item) => (
-                        <li key={item.key} className="min-w-0">
-                          <DealRow item={item} banks={bankLookup} onOpen={setOpenItem} />
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <ul className="hidden grid-cols-3 gap-x-5 gap-y-8 lg:grid">
-                  {data.forty.items.slice(0, 6).map((item) => (
-                    <li key={item.key} className="min-w-0">
-                      <DealCard item={item} banks={bankLookup} onOpen={setOpenItem} sizes="380px" className="w-full" />
+                {/* Phones swipe the row; desktop shows the first three or four. */}
+                <ul className="scrollbar-hide -mx-5 -my-1 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-5 px-5 py-1 lg:mx-0 lg:my-0 lg:grid lg:grid-cols-3 lg:gap-x-5 lg:gap-y-7 lg:overflow-visible lg:px-0 lg:py-0 xl:grid-cols-4">
+                  {data.half.items.map((item, i) => (
+                    <li
+                      key={item.key}
+                      className={cn("w-[240px] shrink-0 snap-start lg:w-auto", i >= 3 && "lg:max-xl:hidden", i >= 4 && "lg:hidden")}
+                    >
+                      <DealCard
+                        item={item}
+                        banks={bankLookup}
+                        onOpen={setOpenItem}
+                        sizes="(min-width: 1280px) 270px, (min-width: 1024px) 30vw, 240px"
+                        placeholder="bg-cream/10"
+                        photoClassName="h-[132px] lg:h-[168px]"
+                        className="w-full"
+                      />
                     </li>
                   ))}
                 </ul>
-                {data.forty.count > 4 && (
-                  <button
-                    type="button"
-                    onClick={() => openTier("forty")}
-                    className={cn(PINK_BUTTON, "mt-6 lg:mx-auto lg:mt-9 lg:w-[320px]", data.forty.count <= 6 && "lg:hidden")}
-                  >
-                    See all {fmt(data.forty.count)} at 40% off
-                  </button>
-                )}
               </Container>
             </Section>
           )}
 
-          {data.rest.count > 0 && (
-            <Section
-              size="md"
-              aria-labelledby="discounts-rest"
-              aria-busy={loading}
-              className={cn(busy, fortyLead && "pt-0 md:pt-0")}
-            >
-              <Container className={DISCOUNTS_WRAP}>
-                <div className={cn(fortyLead && "border-t border-border pt-16 md:pt-24")}>
-                  <SectionHeader
-                    id="discounts-rest"
-                    eyebrow={forYou ? "More for your cards" : "More discounts"}
-                    title={halfLead || fortyLead ? `${fmt(data.rest.count)} more ${data.rest.count === 1 ? "place" : "places"}` : places(data.rest.count)}
-                  />
-                  <ul className="grid gap-3 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-4 xl:grid-cols-3">
-                    {pagedItems.map((item) => (
-                      <li key={item.key} className="min-w-0">
-                        <DealRow item={item} banks={bankLookup} onOpen={setOpenItem} />
-                      </li>
-                    ))}
-                  </ul>
-                  {showMore}
-                </div>
-              </Container>
-            </Section>
-          )}
+          <Container className={cn(DISCOUNTS_WRAP, "pb-12 lg:pb-16")}>
+            {data.forty.items.length > 0 && (
+              <section aria-labelledby="discounts-forty" aria-busy={loading} className={cn(busy, "pt-7 lg:pt-10")}>
+                <SectionHead
+                  id="discounts-forty"
+                  title="40% off"
+                  count={data.forty.count}
+                  onSeeAll={data.forty.count > 4 ? () => openTier("forty") : undefined}
+                />
+                <ul className="grid grid-cols-2 gap-x-3 gap-y-5 lg:grid-cols-4 lg:gap-x-4 lg:gap-y-6 xl:grid-cols-6">
+                  {data.forty.items.slice(0, 6).map((item, i) => (
+                    <li key={item.key} className={cn("min-w-0", i >= 4 && "max-xl:hidden")}>
+                      <DealCard
+                        item={item}
+                        banks={bankLookup}
+                        onOpen={setOpenItem}
+                        sizes="(min-width: 1280px) 180px, (min-width: 1024px) 25vw, 50vw"
+                        photoClassName="h-[100px] lg:h-[112px]"
+                        nameClassName="text-[15px] leading-5 lg:text-body lg:leading-[22px]"
+                        className="w-full"
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {data.rest.count > 0 && (
+              <section aria-labelledby="discounts-rest" aria-busy={loading} className={cn(busy, "pt-8 lg:pt-11")}>
+                <SectionHead
+                  id="discounts-rest"
+                  title={forYou ? "More for your cards" : "More discounts"}
+                  count={data.rest.count}
+                />
+                <ul className="grid gap-3 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-4 xl:grid-cols-3">
+                  {pagedItems.map((item) => (
+                    <li key={item.key} className="min-w-0">
+                      <DealRow item={item} banks={bankLookup} onOpen={setOpenItem} />
+                    </li>
+                  ))}
+                </ul>
+                {showMore}
+              </section>
+            )}
+          </Container>
         </>
       )}
 

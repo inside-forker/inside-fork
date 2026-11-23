@@ -3,13 +3,14 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { BadgePercent, Plus, Search } from "lucide-react";
+import { Percent, Plus, Search } from "lucide-react";
 import { Container } from "@/components/ds";
 import { cn } from "@/lib/utils";
 import type { DiscountBank, DiscountTab, SavedCardSummary } from "@/lib/discounts/types";
 import { BankLogo, type BankLookup } from "@/components/discounts/DealCards";
 
 const fmt = (n: number) => n.toLocaleString("en-US");
+const offers = (n: number) => `${fmt(n)} ${n === 1 ? "offer" : "offers"}`;
 
 /** The page column, the same as /events. */
 export const DISCOUNTS_WRAP = "max-w-[1200px] px-5 sm:px-5 lg:px-8";
@@ -35,9 +36,9 @@ function SearchField({ value, onChange, className }: { value: string; onChange: 
 
 function CardArt({ card, bank, className }: { card: SavedCardSummary; bank: DiscountBank | undefined; className?: string }) {
   return (
-    <span className={cn("relative flex shrink-0 items-center justify-center overflow-hidden rounded bg-ink", className)}>
+    <span className={cn("relative flex shrink-0 items-center justify-center overflow-hidden rounded-control bg-ink", className)}>
       {card.image ? (
-        <Image src={card.image} alt="" fill sizes="48px" className="object-cover" />
+        <Image src={card.image} alt="" fill sizes="72px" className="object-cover" />
       ) : (
         <BankLogo bank={bank} className="h-4 w-4" />
       )}
@@ -45,43 +46,42 @@ function CardArt({ card, bank, className }: { card: SavedCardSummary; bank: Disc
   );
 }
 
-const TILE =
-  "flex h-14 w-full min-w-0 items-center gap-2.5 rounded-media px-3 text-left outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 lg:h-16 lg:w-auto lg:max-w-[280px] lg:gap-3 lg:pl-3 lg:pr-5";
+const STRIP_ITEM =
+  "relative flex h-[38px] w-[60px] shrink-0 items-center justify-center rounded-control outline-none transition-shadow duration-fast focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 lg:h-[46px] lg:w-[72px]";
 
-/** A homepage bank-picker tile: art, a name and its offer count. Pink when picked. */
-function Tile({
+function StripButton({
   on,
+  label,
   onClick,
-  art,
-  title,
-  count,
+  className,
+  children,
 }: {
   on: boolean;
+  label: string;
   onClick: () => void;
-  art: ReactNode;
-  title: string;
-  count: number;
+  className?: string;
+  children: ReactNode;
 }) {
   return (
     <button
       type="button"
       aria-pressed={on}
+      aria-label={label}
+      title={label}
       onClick={onClick}
-      className={cn(TILE, on ? "bg-primary text-primary-foreground" : "bg-muted text-foreground hover:bg-border")}
+      className={cn(STRIP_ITEM, on && "ring-2 ring-primary ring-offset-2", className)}
     >
-      {art}
-      <span className="min-w-0">
-        <span className="block truncate text-[13.5px] font-bold leading-[18px] lg:text-[15px] lg:leading-5">{title}</span>
-        <span className={cn("block text-label lg:text-data", on ? "text-primary-foreground" : "text-muted-foreground")}>
-          {fmt(count)} {count === 1 ? "offer" : "offers"}
-        </span>
-      </span>
+      {children}
     </button>
   );
 }
 
-/** All discounts, both (or all) cards, each card, then Add a card. */
-function Wallet({
+/**
+ * The reader's cards as small card art on white: All discounts, both (or all)
+ * cards, each card, then Add. The picked one gets a pink ring, and one line
+ * under it names it.
+ */
+function CardStrip({
   cards,
   allCardsCount,
   totalOffers,
@@ -91,7 +91,7 @@ function Wallet({
   onShowAll,
   onPickCard,
   onAddCard,
-  editCards,
+  onEditCards,
 }: {
   cards: SavedCardSummary[];
   allCardsCount: number;
@@ -102,102 +102,128 @@ function Wallet({
   onShowAll: () => void;
   onPickCard: (cardVariantId: number | null) => void;
   onAddCard: () => void;
-  editCards: ReactNode;
+  onEditCards: () => void;
 }) {
   const [a, b] = cards;
-  const artSize = "h-[26px] w-10 lg:h-[31px] lg:w-12";
+  const single = cards.length === 1;
+  const forYou = tab === "for-you";
+  const allName = cards.length === 2 ? "Both cards" : "All your cards";
+  const pickedCard = card == null ? null : cards.find((c) => c.cardVariantId === card);
+  const picked = !forYou
+    ? { name: "All discounts", count: totalOffers }
+    : pickedCard
+      ? { name: pickedCard.name, count: pickedCard.count }
+      : single
+        ? { name: a.name, count: a.count }
+        : { name: allName, count: allCardsCount };
+  const art = "absolute h-[22px] w-[34px] lg:h-[27px] lg:w-[42px]";
+
   return (
-    <div role="group" aria-label="Your cards" className="grid grid-cols-2 gap-2 lg:flex lg:flex-wrap lg:items-center lg:gap-2.5">
-      <Tile
-        on={tab === "all"}
-        onClick={onShowAll}
-        title="All discounts"
-        count={totalOffers}
-        art={
-          <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-control bg-white text-ink lg:h-9 lg:w-9">
-            <BadgePercent className="h-[18px] w-[18px] lg:h-5 lg:w-5" aria-hidden="true" />
-          </span>
-        }
-      />
-      {cards.length > 1 && (
-        <Tile
-          on={tab === "for-you" && card === null}
-          onClick={() => onPickCard(null)}
-          title={cards.length === 2 ? "Both cards" : "All your cards"}
-          count={allCardsCount}
-          art={
-            <span className="relative h-[30px] w-10 shrink-0 lg:h-9 lg:w-12">
-              <CardArt card={b} bank={banks.get(b.bankId)} className="absolute left-0 top-0 h-[21px] w-8 lg:h-6 lg:w-[38px]" />
-              <CardArt
-                card={a}
-                bank={banks.get(a.bankId)}
-                className="absolute bottom-0 right-0 h-[21px] w-8 ring-2 ring-white lg:h-6 lg:w-[38px]"
-              />
-            </span>
-          }
-        />
-      )}
-      {cards.map((c) => (
-        <Tile
-          key={c.id}
-          on={tab === "for-you" && (card === c.cardVariantId || (cards.length === 1 && card === null))}
-          onClick={() => onPickCard(cards.length === 1 ? null : c.cardVariantId)}
-          title={c.name}
-          count={c.count}
-          art={<CardArt card={c} bank={banks.get(c.bankId)} className={artSize} />}
-        />
-      ))}
-      <button
-        type="button"
-        onClick={onAddCard}
-        className={cn(
-          TILE,
-          "justify-center gap-2 border border-dashed border-ink/25 text-[13.5px] font-bold hover:border-ink/50 lg:px-5 lg:text-[15px]",
+    <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-5">
+      <div role="group" aria-label="Your cards" className="scrollbar-hide -m-1 flex gap-2.5 overflow-x-auto p-1 lg:gap-3">
+        <StripButton
+          on={!forYou}
+          label={`All discounts, ${offers(totalOffers)}`}
+          onClick={onShowAll}
+          className="bg-muted text-foreground"
+        >
+          <Percent className="h-[18px] w-[18px] lg:h-5 lg:w-5" aria-hidden="true" />
+        </StripButton>
+        {cards.length > 1 && (
+          <StripButton
+            on={forYou && card === null}
+            label={`${allName}, ${offers(allCardsCount)}`}
+            onClick={() => onPickCard(null)}
+            className="bg-muted"
+          >
+            <CardArt card={b} bank={banks.get(b.bankId)} className={cn(art, "left-1.5 top-1")} />
+            <CardArt card={a} bank={banks.get(a.bankId)} className={cn(art, "bottom-1 right-1.5 ring-2 ring-white")} />
+          </StripButton>
         )}
-      >
-        <Plus className="h-[18px] w-[18px]" aria-hidden="true" />
-        Add a card
-      </button>
-      {editCards}
+        {cards.map((c) => (
+          <StripButton
+            key={c.id}
+            on={forYou && (card === c.cardVariantId || (single && card === null))}
+            label={`${c.name}, ${offers(c.count)}`}
+            onClick={() => onPickCard(single ? null : c.cardVariantId)}
+            className="overflow-hidden"
+          >
+            <CardArt card={c} bank={banks.get(c.bankId)} className="h-full w-full rounded-none" />
+          </StripButton>
+        ))}
+        <button
+          type="button"
+          onClick={onAddCard}
+          aria-label="Add a card"
+          title="Add a card"
+          className={cn(
+            STRIP_ITEM,
+            "border border-dashed border-ink/30 text-muted-foreground hover:border-ink/50 hover:text-foreground",
+          )}
+        >
+          <Plus className="h-[18px] w-[18px]" aria-hidden="true" />
+        </button>
+      </div>
+      <p className="text-data text-muted-foreground lg:text-small" aria-live="polite">
+        <span className="font-semibold text-foreground">{picked.name}</span> · {offers(picked.count)}
+        <button
+          type="button"
+          onClick={onEditCards}
+          className="relative ml-2.5 font-semibold text-foreground underline underline-offset-[3px] outline-none before:absolute before:-inset-x-1 before:-inset-y-3 before:content-[''] focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          Edit cards
+        </button>
+      </p>
     </div>
   );
 }
 
-/** No saved cards (or signed out): one line and the pink Add a card. */
+/** No saved cards (or signed out): bank logos, the offer count and the pink Add your card. */
 function AddCardLine({
   signedIn,
+  banks,
+  stats,
   loginHref,
   addCardHref,
   onAddCard,
 }: {
   signedIn: boolean;
+  banks: DiscountBank[];
+  stats: { offers: number; banks: number };
   loginHref: string;
   addCardHref: string;
   onAddCard: () => void;
 }) {
+  const logos = banks.filter((b) => b.logo).slice(0, 5);
   const addClass =
-    "inline-flex h-10 items-center rounded-full bg-primary px-5 text-small font-semibold text-primary-foreground outline-none transition-opacity duration-fast hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
+    "inline-flex h-10 items-center gap-1.5 rounded-full bg-primary px-4 text-small font-semibold text-primary-foreground outline-none transition-opacity duration-fast hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 lg:h-9";
+  const add = (
+    <>
+      <Plus className="h-4 w-4" aria-hidden="true" />
+      Add your card
+    </>
+  );
   return (
-    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-3">
-      <span
-        aria-hidden="true"
-        className="flex h-7 w-11 shrink-0 items-center justify-center rounded border border-dashed border-ink/30 text-muted-foreground"
-      >
-        <Plus className="h-3.5 w-3.5" />
-      </span>
-      <p className="min-w-0 flex-1 text-small leading-5 lg:flex-none lg:text-body">
-        <span className="font-semibold">Your cards, your offers.</span>{" "}
-        <span className="text-muted-foreground">Add a card and we show only what it unlocks.</span>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
+      {logos.length > 0 && (
+        <span className="flex shrink-0" aria-hidden="true">
+          {logos.map((b, i) => (
+            <BankLogo key={b.id} bank={b} className={cn("h-7 w-7 border-2 border-white", i > 0 && "-ml-2")} />
+          ))}
+        </span>
+      )}
+      <p className="min-w-0 flex-1 text-data text-muted-foreground lg:flex-none lg:text-[15px]">
+        {fmt(stats.offers)} offers from {stats.banks} banks and wallets
       </p>
-      <div className="flex w-full items-center gap-4 lg:ml-1.5 lg:w-auto">
+      <div className="flex w-full items-center gap-4 lg:ml-1 lg:w-auto">
         {signedIn ? (
           <button type="button" onClick={onAddCard} className={addClass}>
-            Add a card
+            {add}
           </button>
         ) : (
           <>
             <Link href={addCardHref} className={addClass}>
-              Add a card
+              {add}
             </Link>
             <Link href={loginHref} className="text-small font-semibold underline underline-offset-[3px]">
               Sign in
@@ -210,9 +236,9 @@ function AddCardLine({
 }
 
 /**
- * The top of /discounts, built like /events: the title and search on one row,
- * the filter menus, and the reader's cards as homepage bank-picker tiles (or
- * one Add a card line). `children` holds the filter status and errors.
+ * The top of /discounts on white, built like /events: the title, search and
+ * filter menus, then the reader's cards as a small strip of card art (or one
+ * Add your card line). `children` holds the filter status and errors.
  */
 export function DiscountsHeader({
   tab,
@@ -228,6 +254,7 @@ export function DiscountsHeader({
   onAddCard,
   onEditCards,
   banks,
+  bankList,
   loginHref,
   addCardHref,
   filters,
@@ -246,28 +273,15 @@ export function DiscountsHeader({
   onAddCard: () => void;
   onEditCards: () => void;
   banks: BankLookup;
+  bankList: DiscountBank[];
   loginHref: string;
   addCardHref: string;
   /** The filter menus. */
   filters: ReactNode;
   children?: ReactNode;
 }) {
-  const hasCards = cards.length > 0;
-  const editCards = (className: string) => (
-    <button
-      type="button"
-      onClick={onEditCards}
-      className={cn(
-        "h-11 items-center px-1 text-data font-semibold underline underline-offset-[3px] outline-none focus-visible:ring-2 focus-visible:ring-primary lg:text-small",
-        className,
-      )}
-    >
-      Edit cards
-    </button>
-  );
-
   return (
-    <Container className={cn(DISCOUNTS_WRAP, "pb-2 pt-4 lg:pb-4 lg:pt-8")}>
+    <Container className={cn(DISCOUNTS_WRAP, "pt-4 lg:pt-8")}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-3 lg:gap-x-4">
         <h1 className="order-1 text-[22px] font-bold leading-7 tracking-[-0.02em] lg:text-3xl lg:leading-9">
           <span className="lg:hidden">Discounts</span>
@@ -278,32 +292,38 @@ export function DiscountsHeader({
           onChange={onSearch}
           className="order-2 flex-1 lg:order-3 lg:ml-auto lg:w-[300px] lg:flex-none"
         />
-        <div className="order-3 w-full lg:order-4 lg:mt-2">
-          {hasCards ? (
-            <Wallet
-              cards={cards}
-              allCardsCount={allCardsCount}
-              totalOffers={stats.offers}
-              tab={tab}
-              card={card}
-              banks={banks}
-              onShowAll={onShowAll}
-              onPickCard={onPickCard}
-              onAddCard={onAddCard}
-              editCards={editCards("hidden lg:ml-1 lg:inline-flex")}
-            />
-          ) : (
-            <AddCardLine signedIn={signedIn} loginHref={loginHref} addCardHref={addCardHref} onAddCard={onAddCard} />
-          )}
-        </div>
         <div
           role="group"
           aria-label="Filter discounts"
-          className="order-4 flex w-full flex-wrap items-center gap-2 lg:order-2 lg:ml-4 lg:w-auto"
+          className="order-3 flex w-full flex-wrap gap-2 lg:order-2 lg:ml-4 lg:w-auto"
         >
           {filters}
-          {hasCards && editCards("ml-auto inline-flex lg:hidden")}
         </div>
+      </div>
+      <div className="mt-4 lg:mt-5">
+        {cards.length > 0 ? (
+          <CardStrip
+            cards={cards}
+            allCardsCount={allCardsCount}
+            totalOffers={stats.offers}
+            tab={tab}
+            card={card}
+            banks={banks}
+            onShowAll={onShowAll}
+            onPickCard={onPickCard}
+            onAddCard={onAddCard}
+            onEditCards={onEditCards}
+          />
+        ) : (
+          <AddCardLine
+            signedIn={signedIn}
+            banks={bankList}
+            stats={stats}
+            loginHref={loginHref}
+            addCardHref={addCardHref}
+            onAddCard={onAddCard}
+          />
+        )}
       </div>
       {children}
     </Container>

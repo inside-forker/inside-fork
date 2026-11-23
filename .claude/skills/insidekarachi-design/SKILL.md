@@ -49,10 +49,12 @@ The client set these during the November 2026 revamp rounds (homepage INSID-259,
   - Deal photos are partner-feed images, not designed posters. Run them across the top of a card or as a row thumbnail, never as a full-bleed hero or a banner wall, and never put text on them. Photos and place names must be big enough to read.
   - The % comes first on every card, at normal text size (about 14 to 20px), never as a giant display number. Make big discounts stand out through shape or colour, not type size.
   - Lead with the discount, not the rupee saving, and don't sort by saving by default.
-  - **/discounts must look like the rest of the site** (round 9, direction Y without cream, 23 Nov 2026). It's built only from existing parts:
-    - The top is the /events top on white: the title and search on one row, then the grey filter pills. Saved cards are homepage bank-picker tiles (grey, pink when picked). Guests see one "Add a card" line.
-    - Sections use the homepage `SectionHeader`. Half off or more sits on a black band, with one lead deal and smaller ones beside it. 40% off sits on white, with a pink "See all". The rest are homepage-style rows (photo on the left).
-    - Deal cards are the homepage deal card: the photo, then "50% off", the name in bold, and grey banks and branches.
+  - **/discounts is a browse page at /events scale** (round 12, direction C, 23 Nov 2026). Round 9's Y used the homepage's marketing scale (48px headings, a hero deal photo, deep padding) and looked awful built.
+    - The top is the /events top on white: the title and search, then the grey filter pills.
+    - Saved cards are a small strip of card art on white (All discounts, Both cards, each card, then Add), with a pink ring on the picked one and one line under it ("Both cards · 525 offers · Edit cards"). Guests see bank logos, the offer count and a pink "Add your card".
+    - Half off or more sits on a short black band that holds only those deals: a swipe row on phones, 3 to 4 across on desktop.
+    - 40% off is a grid of smaller cards on white, and the rest are rows with the photo on the left.
+    - Sections open with a small header (17–20px title, count, "See all →"), never the homepage `SectionHeader`. Cards in a section are all the same size: no lead or hero deal.
     - No cream band, no black header, and no black or cream cards on white.
   - Big deals get their own sections, and each section looks different.
   - Show each place once, led by its best offer. A chain's branches and other banks' offers go in the deal sheet.
