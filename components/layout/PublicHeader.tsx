@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -57,6 +57,37 @@ const primaryAction = cn(
   "inline-flex min-h-11 items-center rounded-control bg-primary px-4 font-ui text-small font-medium text-primary-foreground transition-colors duration-fast ease-standard hover:bg-primary/90",
   focusRing,
 );
+
+// The desktop menu. Phones reach these pages from the bottom bar, which hides from md.
+const NAV_LINKS = [
+  { href: "/events", label: "Events" },
+  { href: "/discounts", label: "Discounts" },
+];
+
+function HeaderNav() {
+  const pathname = usePathname() ?? "";
+  return (
+    <nav aria-label="Main" className="flex items-center gap-1">
+      {NAV_LINKS.map(({ href, label }) => {
+        const active = pathname === href || pathname.startsWith(`${href}/`);
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "inline-flex min-h-11 items-center rounded-control px-3 font-ui text-small transition-colors duration-fast ease-standard hover:bg-muted",
+              active ? "font-semibold text-primary" : "font-medium text-foreground",
+              focusRing,
+            )}
+          >
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
 
 // Logo link with a 44px hit area (the shared ThemeAwareLogo link is 35px)
 function HeaderLogo() {
@@ -198,10 +229,13 @@ export function PublicHeader({
           </div>
         </div>
 
-        {/* Desktop: logo, search, actions */}
-        <div className="hidden h-full grid-cols-3 items-center md:grid">
-          <div className="flex items-center">
+        {/* Desktop: logo and menu, search, actions. From lg the outer columns
+            share the leftover width so the search stays centred; on tablets
+            the search takes whatever the two sides leave. */}
+        <div className="hidden h-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 md:grid lg:grid-cols-[1fr_minmax(0,32rem)_1fr]">
+          <div className="flex items-center gap-2 lg:gap-4">
             <HeaderLogo />
+            <HeaderNav />
           </div>
 
           <div className="flex justify-center">
