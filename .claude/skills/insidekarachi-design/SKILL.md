@@ -46,10 +46,15 @@ The client set these during the November 2026 revamp rounds (homepage INSID-259,
 - **Text over an image** is white and sits straight on the image, with a soft dark text shadow so it stays readable. No label boxes and no gradient scrims.
 - **Discounts and deals** (INSID-262):
   - No coupon or ticket styling (tear lines, stubs, notches), and no pills, chips or badges on deal cards. Use at most three filter menus.
-  - Deal photos are partner-feed images, not designed posters. Run them across the top of a card or as a row thumbnail, never as a full-bleed hero or a banner wall. Photos and place names must be big enough to read (in W1: 140–160px photos and 17–18px names on the black cards).
+  - Deal photos are partner-feed images, not designed posters. Run them across the top of a card or as a row thumbnail, never as a full-bleed hero or a banner wall, and never put text on them. Photos and place names must be big enough to read.
   - The % comes first on every card, at normal text size (about 14 to 20px), never as a giant display number. Make big discounts stand out through shape or colour, not type size.
   - Lead with the discount, not the rupee saving, and don't sort by saving by default.
-  - Big deals get their own sections, and each section looks different. On /discounts (INSID-263, direction W1): half off or more on black cards with the photo on top (they swipe on phones), 40% off on cream cards, and everything else as white rows with the photo on the right.
+  - **/discounts must look like the rest of the site** (round 9, direction Y without cream, 23 Nov 2026). It's built only from existing parts:
+    - The top is the /events top on white: the title and search on one row, then the grey filter pills. Saved cards are homepage bank-picker tiles (grey, pink when picked). Guests see one "Add a card" line.
+    - Sections use the homepage `SectionHeader`. Half off or more sits on a black band, with one lead deal and smaller ones beside it. 40% off sits on white, with a pink "See all". The rest are homepage-style rows (photo on the left).
+    - Deal cards are the homepage deal card: the photo, then "50% off", the name in bold, and grey banks and branches.
+    - No cream band, no black header, and no black or cream cards on white.
+  - Big deals get their own sections, and each section looks different.
   - Show each place once, led by its best offer. A chain's branches and other banks' offers go in the deal sheet.
 
 These decisions replace several parts of the brief:

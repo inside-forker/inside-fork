@@ -9,9 +9,13 @@ type SectionHeaderProps = {
   eyebrow: string;
   title: string;
   subline?: string;
-  action?: { href: string; label: string };
+  /** A link, or a button when the action stays on the page. */
+  action?: { href: string; label: string } | { onClick: () => void; label: string };
   className?: string;
 };
+
+const ACTION_CLASS =
+  "-my-3 inline-flex items-center gap-1.5 py-3 text-small font-semibold transition-opacity duration-fast hover:opacity-80 lg:text-body";
 
 /**
  * The one header every landing section uses: the section's name with an
@@ -23,15 +27,25 @@ export function SectionHeader({ id, eyebrow, title, subline, action, className }
     <div className={cn("mb-5 lg:mb-9", className)}>
       <div className="flex items-center gap-3">
         <p className="flex-1 text-label font-semibold uppercase tracking-[0.06em] text-muted-foreground">{eyebrow}</p>
-        {action && (
-          <Link
-            href={action.href}
-            className="-my-3 inline-flex items-center gap-1.5 py-3 text-small font-semibold transition-opacity duration-fast hover:opacity-80 lg:text-body"
-          >
-            {action.label}
-            <ArrowRight className="h-4 w-4 lg:h-[18px] lg:w-[18px]" aria-hidden="true" />
-          </Link>
-        )}
+        {action &&
+          ("href" in action ? (
+            <Link href={action.href} className={ACTION_CLASS}>
+              {action.label}
+              <ArrowRight className="h-4 w-4 lg:h-[18px] lg:w-[18px]" aria-hidden="true" />
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={action.onClick}
+              className={cn(
+                ACTION_CLASS,
+                "rounded-control outline-none focus-visible:ring-2 focus-visible:ring-primary",
+              )}
+            >
+              {action.label}
+              <ArrowRight className="h-4 w-4 lg:h-[18px] lg:w-[18px]" aria-hidden="true" />
+            </button>
+          ))}
       </div>
       <h2
         id={id}
