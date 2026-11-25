@@ -10,6 +10,8 @@ export interface CheckoutEventInfo {
   /** Parchi student discount toggle (per-tier parchi_price). */
   parchi_enabled?: boolean;
   parchi_discount_percent?: number | null;
+  /** Parchi-members-only event: booking needs an approved Parchi verification. */
+  parchi_only?: boolean;
   start_time: string | null;
   location_name: string | null;
   image_url: string | null;

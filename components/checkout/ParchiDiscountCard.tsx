@@ -21,7 +21,10 @@ interface Verification {
 
 interface ParchiDiscountCardProps {
   eventId: number;
-  offer: ParchiOffer;
+  /** Null on a Parchi-members-only event without a discount. */
+  offer: ParchiOffer | null;
+  /** Parchi-members-only event: verifying is how the buyer gets in. */
+  required?: boolean;
   /** Verifying needs an account; logged out, the card offers a login. */
   isLoggedIn: boolean;
   onLogin: () => void;
@@ -38,6 +41,7 @@ interface ParchiDiscountCardProps {
 export function ParchiDiscountCard({
   eventId,
   offer,
+  required = false,
   isLoggedIn,
   onLogin,
   onApprovedChange,
@@ -133,22 +137,28 @@ export function ParchiDiscountCard({
         <div className="flex items-center gap-3">
           <GraduationCap className="h-[22px] w-[22px] shrink-0 text-foreground" />
           <div>
-            <h3 className="text-sm font-semibold">Student? Verify with Parchi</h3>
+            <h3 className="text-sm font-semibold">
+              {required ? "Parchi members only" : "Student? Verify with Parchi"}
+            </h3>
             <p className="text-xs text-muted-foreground">
-              {describeParchiOffer(offer)} for verified Parchi students.
+              {required
+                ? `Verify your Parchi ID to book this event.${offer ? ` ${describeParchiOffer(offer)} once verified.` : ""}`
+                : offer
+                  ? `${describeParchiOffer(offer)} for verified Parchi students.`
+                  : null}
             </p>
           </div>
         </div>
 
         {!isLoggedIn ? (
           <Button variant="outline" className="w-full" onClick={onLogin}>
-            Log in to use your student discount
+            {required ? "Log in to verify with Parchi" : "Log in to use your student discount"}
           </Button>
         ) : status === "approved" ? (
           <div className="flex items-center justify-between gap-3 rounded-xl bg-primary/5 p-4">
             <div className="flex items-center gap-2 font-medium">
               <CheckCircle2 className="h-5 w-5 text-primary" />
-              Student discount applied
+              {required && !offer ? "Parchi membership verified" : "Student discount applied"}
             </div>
             <Button variant="ghost" size="sm" onClick={reset}>
               Remove

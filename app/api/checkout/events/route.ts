@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { rows } = await query(
-      `SELECT e.id, e.require_guest_details, e.parchi_enabled, e.parchi_discount_percent, e.name, e.slug, e.start_time, e.location_name,
+      `SELECT e.id, e.require_guest_details, e.parchi_enabled, e.parchi_discount_percent, e.status::text AS status, e.name, e.slug, e.start_time, e.location_name,
               e.payment_processing_fee_percentage, e.payment_processing_fee_fixed,
               e.platform_fee_percentage, e.platform_fee_fixed,
               (SELECT i.url FROM event_images i
@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
       id: Number(row.id),
       require_guest_details: row.require_guest_details,
       parchi_enabled: row.parchi_enabled === true,
+      parchi_only: row.status === "parchi_only",
       parchi_discount_percent:
         row.parchi_discount_percent != null
           ? Number(row.parchi_discount_percent)

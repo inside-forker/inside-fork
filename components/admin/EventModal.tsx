@@ -1283,6 +1283,12 @@ export function EventModal({
                                 Invite only (hidden)
                               </div>
                             </SelectItem>
+                            <SelectItem value="parchi_only">
+                              <div className="flex items-center gap-2">
+                                <div className="size-2 rounded-full bg-warning"></div>
+                                Parchi members only (hidden)
+                              </div>
+                            </SelectItem>
                             <SelectItem value="archived">
                               <div className="flex items-center gap-2">
                                 <div className="size-2 rounded-full bg-muted-foreground"></div>

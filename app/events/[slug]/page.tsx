@@ -1,6 +1,10 @@
 import { query } from "@/lib/db";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { EventDetailView } from "@/components/events/detail/EventDetailView";
+import { ParchiOnlyGate } from "@/components/events/detail/ParchiOnlyGate";
+import { InviteNotice } from "@/components/events/invite/InviteNotice";
+import { Button } from "@/components/ui/button";
 import { loadEventDetail } from "@/lib/events/event-detail";
 
 // Enable ISR with 60 second revalidation for event pages
@@ -16,6 +20,27 @@ export default async function EventPage({
   const data = await loadEventDetail(slug);
   // Invite-only events open only through an invite link (/i/[code]).
   if (!data || data.event.status === "invite_only") notFound();
+
+  // Parchi-members-only events open only from the Parchi app's link.
+  if (data.event.status === "parchi_only") {
+    return (
+      <ParchiOnlyGate
+        locked={
+          <InviteNotice
+            title="Only for Parchi members"
+            body="Tickets for this event are only sold through the Parchi app. Open the event in Parchi to get yours."
+            action={
+              <Button asChild size="lg" className="h-12 w-full rounded-control text-body">
+                <Link href="https://parchi.io">Get the Parchi app</Link>
+              </Button>
+            }
+          />
+        }
+      >
+        <EventDetailView data={data} />
+      </ParchiOnlyGate>
+    );
+  }
 
   return <EventDetailView data={data} />;
 }

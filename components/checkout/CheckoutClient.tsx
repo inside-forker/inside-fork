@@ -205,6 +205,8 @@ export function CheckoutClient() {
   // Event's Parchi toggle: the per-tier Parchi price, for Parchi-app shoppers
   // only and only once verified. Inside shoppers pay list price.
   const parchiEnabled = eventInfo?.parchi_enabled === true;
+  // Parchi-members-only event: every buyer verifies with Parchi before paying.
+  const parchiOnly = eventInfo?.parchi_only === true;
   const effectiveParchiOffer = useMemo(() => {
     if (parchiOffer) return parchiOffer;
     if (
@@ -511,6 +513,15 @@ export function CheckoutClient() {
       return;
     }
 
+    if (parchiOnly && !parchiVerificationId) {
+      toast({
+        title: "Verify with Parchi first",
+        description: "This event is only for Parchi members. Enter your Parchi ID and approve it in the Parchi app.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const effectiveName = (buyer.name.trim() || user?.full_name || user?.email?.split("@")[0] || "Guest").trim();
     const effectiveEmail = (user?.email || buyer.email).trim();
     const effectivePhone = (buyer.phone.trim() || profile?.phone || "").trim();
@@ -707,10 +718,12 @@ export function CheckoutClient() {
         onChangeQuantity={updateQuantity}
       />
 
-      {parchiEventId && arrivedFromParchi && parchiEnabled && effectiveParchiOffer ? (
+      {parchiEventId &&
+      (parchiOnly || (arrivedFromParchi && parchiEnabled && effectiveParchiOffer)) ? (
         <ParchiDiscountCard
           eventId={parchiEventId}
           offer={effectiveParchiOffer}
+          required={parchiOnly}
           isLoggedIn={!!user}
           onLogin={() => setAuthOpen(true)}
           onApprovedChange={setParchiVerificationId}

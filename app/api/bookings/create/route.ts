@@ -211,11 +211,24 @@ export async function POST(request: NextRequest) {
     // Fetch event-specific fee overrides (if configured), falling back to system_config defaults
     const { rows: eventFeeRows } = await query(
       `SELECT payment_processing_fee_percentage, payment_processing_fee_fixed,
-              platform_fee_percentage, platform_fee_fixed
+              platform_fee_percentage, platform_fee_fixed, status::text AS status
        FROM events WHERE id = $1`,
       [eventId],
     );
     const eventFees = eventFeeRows[0];
+
+    // Parchi-members-only events: the DB trigger rejects the booking anyway
+    // (sql/migrations/20261125_parchi_only_events.sql); this says why sooner.
+    if (eventFees?.status === "parchi_only" && !parchiVerificationId) {
+      return NextResponse.json(
+        {
+          error:
+            "This event is only for Parchi members. Verify your Parchi ID to book.",
+          error_code: "parchi_required",
+        },
+        { status: 403 },
+      );
+    }
 
     const platformFeeFixed =
       eventFees?.platform_fee_fixed != null

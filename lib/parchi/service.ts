@@ -300,14 +300,15 @@ export async function startParchiVerification(input: {
   }
 
   const { rows: eventRows } = await query(
-    `SELECT name, start_time FROM events WHERE id = $1`,
+    `SELECT name, start_time, status::text AS status FROM events WHERE id = $1`,
     [input.eventId],
   );
   const event = eventRows[0];
   if (!event) {
     throw new ParchiServiceError("not_found", "Event not found.", 404);
   }
-  if (!(await getParchiOffer(input.eventId))) {
+  // Parchi-members-only events verify membership even without a discount.
+  if (event.status !== "parchi_only" && !(await getParchiOffer(input.eventId))) {
     throw new ParchiServiceError(
       "parchi_not_offered",
       "The Parchi student discount isn't available for this event.",
